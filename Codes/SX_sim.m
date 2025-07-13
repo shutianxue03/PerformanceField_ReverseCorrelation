@@ -37,12 +37,12 @@ addpath(genpath('Codes/SX_toolbox'))  % Path to analysis functions
 nameFolder_NOM0 = 'Data_NOM_trialWise';
 
 % The data directory in the Carrasco Lab server
-nameFolder_Data = '/Volumes/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC/Data';
+% nameFolder_Data = '/Volumes/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC/Data';
 
 %=========================
 % MUST be the same as shell_all_runSim
-nORI = 29;
-fxn_getSigma_SPdomain = @(SF) 3 * sqrt(2*log(2)) / (2 * pi * SF); 
+% nORI = 29;
+% fxn_getSigma_SPdomain = @(SF) 3 * sqrt(2*log(2)) / (2 * pi * SF); 
 
 noiseCST_allCond=.2;
 gaborCST_allCond=.2;%.2:.1:.5;

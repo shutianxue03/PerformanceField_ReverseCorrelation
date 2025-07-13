@@ -88,7 +88,7 @@ parfor iblk_rec = 1:nBlocks
     %%%%%%%%%%%%
     %   stim patch/noise   %
     %%%%%%%%%%%%
-    if flagGetPatch
+    if flag_getPatch
         for itrial = 1:nTrialsPerBlock
             % patch
             pp = run_allTrials{itrial}.stimPatch_all{iLoc_blk};
@@ -100,7 +100,7 @@ parfor iblk_rec = 1:nBlocks
             noise_perBlk{iblk_rec, itrial} = nn;
             
         end % end of itrial
-    end % if flagGetPatch
+    end % if flag_getPatch
     
     if ~mod(iblk,10), fprintf('='), end
     
@@ -141,7 +141,7 @@ dataMatrix = [fxn_reorder(itrial_allT), ...
     fxn_reorder(iPass_allT), fxn_reorder(iPair_allT), fxn_reorder(resp_allT), fxn_reorder(RT_allT), fxn_reorder(cst_allT)];
 
 %% save patches
-if flagGetPatch
+if flag_getPatch
 %     tic
 %     fprintf('  Saving noise patches...')
 %     noise_allT = fxn_reorder(noise_perBlk);
@@ -152,7 +152,7 @@ if flagGetPatch
     tic
     fprintf('  Saving target patches...')
     target_allT = fxn_reorder(target_perBlk);
-    save(nameTgtPatch, 'target_allT')
+    save(nameFile_TgtPatch, 'target_allT')
     dur = toc; fprintf('DONE (Dur %.1f min)\n', dur/60)
     clear target_allT 
 end
@@ -165,7 +165,7 @@ fprintf('DONE\n')
 
 %%
 function [iCuedLoc, thresh_exp, correctness, tgtPrs, iPair, answer, run_allTrials, RT] = extractRecord(dataFileDir_ib)
-load(dataFileDir_ib.name, 'record'); % only load the record
+load(sprintf('%s/%s', dataFileDir_ib.folder, dataFileDir_ib.name), 'record'); % only load the record
 iCuedLoc = record.iCuedLoc;
 thresh_exp = record.thresh_exp;
 correctness = record.correctness;

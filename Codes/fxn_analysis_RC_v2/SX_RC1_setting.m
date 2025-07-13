@@ -1,6 +1,16 @@
 
 % if isempty(dir('Data_OOD')), mkdir('Data_OOD'), end
 
+% Identify the server directory of the Data/ folder
+nameFolder_Data = '/Volumes/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC/Data';
+% Inside Data/ there are Data, Data_OOD, Data_MC, Data_NOM*
+
+% Define the function to normalize Gabor SD
+fxn_getSigma_SPdomain = @(SF) 3 * sqrt(2*log(2)) / (2 * pi * SF); 
+
+% Define number of ORI (and SF) channels
+% we assume nORI=nSF
+nORI = 29; 
 %%
 nBins=10;
 binStrategy_all = {'equal', 'algorithm', 'manual'};

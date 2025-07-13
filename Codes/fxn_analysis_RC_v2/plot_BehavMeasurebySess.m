@@ -9,13 +9,14 @@ for isubj = 1:nsubj
     subjName = subjList{isubj};
     nblock = nblocks_allSubj(isubj);
     
-    load(sprintf('Data_OOD/%s%d/%s_behavMeas.mat', subjName, nblock, subjName), 'cst_perSess_perLoc', 'pA3_perSess_perLoc', 'pC3_perSess_perLoc')
+    load(sprintf('%s/Data_OOD_%d%d/%s%d/%s_behavMeas.mat', nameFolder_Data, nORI, nSF, subjName, nblock, subjName), ...
+        'cst_perSess_perLoc', 'pA3_perSess_perLoc', 'pC3_perSess_perLoc')
     
     %%
     figure('Position', [0 0 1e3 1e3])
     
     for im = 1:nm
-        switch im,
+        switch im
             case 1, m= cst_perSess_perLoc*100; y_label = 'Gabor CST (%)'; y_ticks = linspace(log10(.3), log10(.8), 5); y_ticklabels = round(10.^y_ticks*100);
                 y_ticks = linspace(30,80, 5); y_ticklabels = y_ticks;
             case 2, m=squeeze(pA3_perSess_perLoc(:, :, 1))*100; y_label = 'pA (%)'; y_ticks = 40:15:100; y_ticklabels = y_ticks;
@@ -54,7 +55,6 @@ for isubj = 1:nsubj
     
     set(findall(gcf, '-property', 'LineWidth'), 'LineWidth',1.5)
     set(findall(gcf, '-property', 'fontsize'), 'fontsize',15)
-    
     
 end % isubj
 

@@ -1,6 +1,10 @@
 
 % if isempty(dir('Data_OOD')), mkdir('Data_OOD'), end
 
+% Directory of the Data folder on the server
+nameFolder_Data = '/Volumes/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC/Data';
+% Include Data, Data_OOD, Data_MC, Data_NOM*
+, 
 %%
 nORI = 29;
 nBins=10;
