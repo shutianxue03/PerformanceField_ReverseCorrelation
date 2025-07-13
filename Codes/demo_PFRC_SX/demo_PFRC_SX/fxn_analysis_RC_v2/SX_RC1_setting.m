@@ -2,6 +2,7 @@
 % if isempty(dir('Data_OOD')), mkdir('Data_OOD'), end
 
 %%
+nORI = 29;
 nBins=10;
 binStrategy_all = {'equal', 'algorithm', 'manual'};
 eyeD_all = [1,1,0,1,1,1,1,1,0,0,1,0]; % 1=right eye dominant; 0=left eye dominant

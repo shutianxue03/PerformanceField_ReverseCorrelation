@@ -18,7 +18,6 @@ nORI = 29;
 
 % Function to compute spatial-domain SD based on SF
 fxn_getSigma_SPdomain = @(SF) 3 * sqrt(2*log(2)) / (2 * pi * SF); 
-fxn_getSigma_SPdomain = @(SF) 3*sqrt(log(2))/(pi*SF);
 
 %--------------------------------------------%
 % Load experimental settings
@@ -99,7 +98,6 @@ margORI_true = mean(template_true, 2);
 margSF_true  = mean(template_true, 1);
 
 % Plot: 2D Template + ORI and SF marginals
-
 figure('Position', [0 0 2000 500])
 
 % --- 2D Template ---

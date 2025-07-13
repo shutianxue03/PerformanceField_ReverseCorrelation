@@ -66,7 +66,7 @@ if isnumeric(isubj)
     % behavioral measurement
     load(sprintf('%s/Data_OOD/%s%d/%s_behavMeas.mat', nameFolder_Data, subjName, nblocks, subjName));
     % energy
-    load(sprintf('%s/Data_OOD/%s%d/%s_energy_%s_%d_%d.mat', nameFolder_Data, subjName, nblocks, subjName, namePatchMode, nORI, nSF));
+    Oload(sprintf('%s/Data_OOD/%s%d/%s_energy_%s_%d_%d.mat', nameFolder_Data, subjName, nblocks, subjName, namePatchMode, nORI, nSF));
 else
     % behavioral measurement
     load(sprintf('%s/%s/behavMeas_c%.1f.mat', nameFolder_Data, nameFolder_OOD, criterion_true));

@@ -42,7 +42,8 @@ nameFolder_Data = '/Volumes/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_se
 %=========================
 % MUST be the same as shell_all_runSim
 nORI = 29;
-fxn_getSigma = @(SF) 3*sqrt(2*log(2))/(2*pi*SF);
+fxn_getSigma_SPdomain = @(SF) 3 * sqrt(2*log(2)) / (2 * pi * SF); 
+
 noiseCST_allCond=.2;
 gaborCST_allCond=.2;%.2:.1:.5;
 nTrials_allCond = 5e3;%[5e3, 1e4];
@@ -59,6 +60,7 @@ iModelA = 1;%[1, 5];  % 1: use the derived template, 5: use the ideal template
 iModelB_fit_all = iModelB_sim_allCond; % make them consistent for now; later try differ modelB for model recovery
 iLocComb=1;
 patchMode = 1; % 1=energy calculated from target-patches; 2=from noise patches
+new_max =.4; new_min = -.05;
 
 % Names of the performance metrics being analyzed
 namesMetrics = {'pC', 'pYES', 'pA'};
@@ -110,26 +112,78 @@ limit0to1 = @(x) min(max(x, 0), 1);
 nTrialsPerSess = 100;  % Number of trials per session
 
 % Define folder to save results
-nameFolder_Fig_NOM = sprintf('Figures/%s/ORI%dSF%d/FIGURES_IO_n%d_A%d', nameFolder_NOM0, nORI, nSF, ni, iModelA);
+nameFolder_Fig_NOM = sprintf('Figures/NOM_Trialwise/ORI%dSF%d/FIGURES_IO_n%d_A%d', nORI, nSF, ni, iModelA);
 if isempty(dir(nameFolder_Fig_NOM)), mkdir(nameFolder_Fig_NOM), end
 
 % Create a pool of Gabor filter
 %------------------------%
-[filter_sin, filter_cos] = SX_sim02_setFilters(stim, noise.filtersSF_all, filtersOri_all, fxn_getSigma, 0);
+[filter_sin, filter_cos] = SX_sim02_setFilters(stim, noise.filtersSF_all, filtersOri_all, fxn_getSigma_SPdomain, 0);
 %------------------------%
 fprintf('\nPool of filters created: nORI=%d, nSF=%d\n', length(filtersOri_all), length(noise.filtersSF_all))
 
-% Define the TRUE template (ORI x SF)
-stim.gaborSD = fxn_getSigma(stim.gaborSF);
-template_true = exp_CreateGabor(stim, cst_ln_template);
-template_true = SX_RC4_Energy_parfor(stim.mask, {template_true}, filter_sin, filter_cos);
-template_true = squeeze(template_true);  %  Remove singleton dimension
-new_max =.4; new_min = -.05;
-template_true = (template_true * (new_max - new_min)) + new_min;
+% Choose SD for the input Gabor (normalized or fixed)
+stim.gaborSD = fxn_getSigma_SPdomain(stim.gaborSF);
 
+% Create Gabor template patch
+template_true_gabor = exp_CreateGabor(stim, cst_ln_template);
+
+% Compute energy profile across filters
+template_true = SX_RC4_Energy_parfor(stim.mask, ...
+    {template_true_gabor}, filter_sin, filter_cos);
+template_true = squeeze(template_true); % Remove singleton dim
+
+% Normalize template values for visualization
+new_max = 0.4;
+new_min = -0.05;
+template_true = (template_true - min(template_true(:))) * ...
+    (new_max - new_min) / ...
+    (max(template_true(:)) - min(template_true(:))) + new_min;
+
+% Marginals
 margORI_true = mean(template_true, 2);
-margSF_true = mean(template_true, 1);
+margSF_true  = mean(template_true, 1);
 
+%% Plot: 2D Template + ORI and SF marginals
+figure('Position', [0 0 2000 500])
+
+% --- 2D Template ---
+subplot(1, 3, 1); hold on;
+imagesc(template_true);
+[max_ORI, max_SF] = find(template_true == max(template_true(:)));
+plot(max_SF, max_ORI, 'b*', 'MarkerSize', 10);
+xline(15, 'r-');
+yline(15, 'r-');
+colorbar; clim([new_min, new_max]);
+xlabel('SF channel #');
+ylabel('ORI channel #');
+
+% --- ORI Marginal ---
+subplot(1, 3, 2); hold on;
+plot(axis_tuning{1}, margORI_true, 'k-');
+xticks(axisTicks_tuning{1});
+yline(0, 'k--');
+xline(0, 'r-');
+xlabel('Orientation (º)');
+ylim([new_min, new_max]);
+
+% --- SF Marginal ---
+subplot(1, 3, 3); hold on;
+plot(axis_tuning{2}, margSF_true, 'k-');
+xticks(axisTicks_tuning{2});
+xticklabels(round(2.^axisTicks_tuning{2}, 2));
+yline(0, 'k--');
+xline(log2(2), 'r-');  % Reference line at 2 cpd
+xline(axis_tuning{2}(margSF_true == max(margSF_true)), 'b-');
+xlabel('SF (cpd)');
+ylim([new_min, new_max]);
+
+% --- Final Formatting ---
+sgtitle(sprintf('True Template: Energy Profile of 2 cpd Gabor (Gabor SD = %.2f°)', stim.gaborSD));
+set(findall(gcf, '-property', 'fontsize'), 'fontsize', 25);
+set(findall(gcf, '-property', 'linewidth'), 'linewidth', 2);
+
+% Optionally save figure
+% saveas(gcf, sprintf('Fig/Sim_NOM_TrialWise/true_template_energy_profile_GaborSD%.2f.jpg', stim.gaborSD));
 %% COMPILE
 clc
 iModelA=1; % simulating data using the legit template
@@ -166,20 +220,23 @@ for gaborCST = gaborCST_allCond
             for iModelB_sim = iModelB_sim_allCond
                 iiModelB_sim = find(iModelB_sim == iModelB_sim_allCond);
                 
+                % Define the name of the condition
                 nameCond_OOD = sprintf('%s/Data_OOD/ORI%dSF%d/IO/IO_nC%.0f_gC%.0f_nT%s_N%.3f_B%d', ...
                     nameFolder_Data, noiseCST*100, gaborCST*100, format_num2exp(nTrials), noiseP, iModelB_sim);
                 nameCond = sprintf('IO_nC%.0f_gC%.0f_nT%s_N%.3f_B%d', noiseCST*100, gaborCST*100, format_num2exp(nTrials), noiseP, iModelB_sim);
-                % LOAD KERNELS (from Data_OOD)
+                
+                % LOAD KERNELS (from Data/Data_OOD on the server)
                 nameFolder_kernel = sprintf('%s/Data_OOD/ORI%dSF%d/IO/%s/kernels*.mat', nameFolder_Data, nORI, nSF, nameCond);
                 dirFolder_kernel = dir(nameFolder_kernel);
                 load(sprintf('%s/%s', dirFolder_kernel.folder, dirFolder_kernel.name), 'kernels2D', 'criterion_true') % nTrials x 11
                 
+                % Check if the criterion is within the expected range
                 str_c = sprintf('c%.1f', criterion_true);
                 kernels_allCond(igaborCST, inTrials, inoiseP, iiModelB_sim, icriterion, :, :, :) = kernels2D;
                 clear kernels2D
                 
-                % LOAD NOM fitting (from Data_NOM_trialWise)
-                nameFileModelIDVD_trialWise = sprintf('%s/ORI%dSF%d/IO/%s_%s/n%d_A%dB%d', nameFolder_NOM0, nORI, nSF, nameCond, str_c, ni, iModelA, iModelB_sim);
+                % LOAD NOM fitting (from Data/Data_NOM_trialWise on the server)
+                nameFileModelIDVD_trialWise = sprintf('%s/%s/ORI%dSF%d/IO/%s_%s/n%d_A%dB%d', nameFolder_Data, nameFolder_NOM0, nORI, nSF, nameCond, str_c, ni, iModelA, iModelB_sim);
                 load(nameFileModelIDVD_trialWise, 'pred_metrics_allB', 'params_est_allB', 'nLL_allB')
                 
                 % Calculate ICs based on nLL
@@ -336,8 +393,9 @@ for iiModelB_sim = 1:length(iModelB_sim_allCond)
 %                     ylim(y_lim)
                     xlabel(namesFeature{iFeature})
                     xticks(axisTicks_tuning{iFeature}), xticklabels(axisTL_tuning{iFeature}), xlim([min(axis_tuning{iFeature}), max(axis_tuning{iFeature})])
-                    legend(str_title, 'Location', 'best')
-                    
+                    lgd=legend(str_title, 'Location', 'best');
+                    lgd.Title.String = 'Noise level';
+
                 end % iFeature
             end % iType
         end % igaborCST
