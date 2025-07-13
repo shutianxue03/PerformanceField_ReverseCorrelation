@@ -30,11 +30,14 @@
 
 % Setup (needs to be the same as OOD_sim)
 clear all, clc, close all
-addpath(genpath('fxn_exp'))  % Path to experimental functions
-addpath(genpath('fxn_analysis_RC_v2'))  % Path to analysis functions
-addpath(genpath('SX_toolbox'))  % Path to analysis functions
+addpath(genpath('Codes/fxn_exp'))  % Path to experimental functions
+addpath(genpath('Codes/fxn_analysis_RC_v2'))  % Path to analysis functions
+addpath(genpath('Codes/SX_toolbox'))  % Path to analysis functions
 
 nameFolder_NOM0 = 'Data_NOM_trialWise';
+
+% The data directory in the Carrasco Lab server
+nameFolder_Data = '/Volumes/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC/Data';
 
 %=========================
 % MUST be the same as shell_all_runSim
@@ -107,7 +110,7 @@ limit0to1 = @(x) min(max(x, 0), 1);
 nTrialsPerSess = 100;  % Number of trials per session
 
 % Define folder to save results
-nameFolder_Fig_NOM = sprintf('%s/ORI%dSF%d/FIGURES_IO_n%d_A%d', nameFolder_NOM0, nORI, nSF, ni, iModelA);
+nameFolder_Fig_NOM = sprintf('Figures/%s/ORI%dSF%d/FIGURES_IO_n%d_A%d', nameFolder_NOM0, nORI, nSF, ni, iModelA);
 if isempty(dir(nameFolder_Fig_NOM)), mkdir(nameFolder_Fig_NOM), end
 
 % Create a pool of Gabor filter
@@ -163,10 +166,11 @@ for gaborCST = gaborCST_allCond
             for iModelB_sim = iModelB_sim_allCond
                 iiModelB_sim = find(iModelB_sim == iModelB_sim_allCond);
                 
-                nameCond_OOD = sprintf('Data_OOD/ORI%dSF%d/IO/IO_nC%.0f_gC%.0f_nT%s_N%.3f_B%d', noiseCST*100, gaborCST*100, format_num2exp(nTrials), noiseP, iModelB_sim);
+                nameCond_OOD = sprintf('%s/Data_OOD/ORI%dSF%d/IO/IO_nC%.0f_gC%.0f_nT%s_N%.3f_B%d', ...
+                    nameFolder_Data, noiseCST*100, gaborCST*100, format_num2exp(nTrials), noiseP, iModelB_sim);
                 nameCond = sprintf('IO_nC%.0f_gC%.0f_nT%s_N%.3f_B%d', noiseCST*100, gaborCST*100, format_num2exp(nTrials), noiseP, iModelB_sim);
                 % LOAD KERNELS (from Data_OOD)
-                nameFolder_kernel = sprintf('Data_OOD/ORI%dSF%d/IO/%s/kernels*.mat', nORI, nSF, nameCond);
+                nameFolder_kernel = sprintf('%s/Data_OOD/ORI%dSF%d/IO/%s/kernels*.mat', nameFolder_Data, nORI, nSF, nameCond);
                 dirFolder_kernel = dir(nameFolder_kernel);
                 load(sprintf('%s/%s', dirFolder_kernel.folder, dirFolder_kernel.name), 'kernels2D', 'criterion_true') % nTrials x 11
                 

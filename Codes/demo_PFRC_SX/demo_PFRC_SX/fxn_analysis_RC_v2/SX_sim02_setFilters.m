@@ -31,8 +31,8 @@ for oo = oo_all
         %         stim.gaborSD = stim.gaborSF * bw_scaling;
         stim.gaborSD = fxn_getSigma_SPdomain(stim.gaborSF);
 
-        for n = 1:2 % sin and cos
-            stim.phase = pi/2 * (n-1); % sin: 0, cos: pi/2
+        for n = 1:2 % cos and sin % sin and cos
+            stim.phase = pi/2 * (n-1); % sin: pi/2 (because later I used cos() in exp_CreateGabor); cos: 0
             % use SX's code
             %------------------------------%
             patch = exp_CreateGabor(stim, cstOfFilter, 0);% .* stim.mask;

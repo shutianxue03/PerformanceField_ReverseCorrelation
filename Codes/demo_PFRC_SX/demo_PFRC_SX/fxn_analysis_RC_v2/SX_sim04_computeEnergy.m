@@ -23,8 +23,10 @@ lumiBG = patch(1,1);
 % Apply mask to filters and normalize to unit energy
 filter_sin_m = filter_sin_raw .* mask;
 filter_cos_m = filter_cos_raw .* mask;
-filter_sin = filter_sin_m / sum(filter_sin_m(:).^2);   % Normalize sin filter
-filter_cos = filter_cos_m / sum(filter_cos_m(:).^2);   % Normalize cos filter
+% filter_sin = filter_sin_m / sum(filter_sin_m(:).^2);   % Normalize sin filter
+% filter_cos = filter_cos_m / sum(filter_cos_m(:).^2);   % Normalize cos filter
+filter_sin = filter_sin_m / sqrt(sum(filter_sin_m(:).^2));   % Normalize sin filter by the length
+filter_cos = filter_cos_m / sqrt(sum(filter_cos_m(:).^2));   % Normalize cos filter
 
 % Remove background luminance from the patch
 patch = patch - lumiBG;
