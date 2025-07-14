@@ -1,4 +1,16 @@
 
+% Last updated on 07/14/2025 by Shutian Xue 
+
+% This script performs model comparison (MC) analysis for the
+% psychophysical data collected in the RC lab. It compares different
+% families of models (e.g., Gaussian, Difference of Gaussians, Log
+% Parabola, Truncated Log Parabola) based on their fit to the data
+% across different observers and conditions. The analysis includes
+% cross-validation, leave-one-out cross-validation, and information
+% criteria (AIC, AICc, BIC) to determine the best model for each
+% feature (Orientation, Spatial Frequency) and family of models.
+
+
 %%%%%%%%%
 %  Inputs
 %%%%%%%%%

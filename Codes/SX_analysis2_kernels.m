@@ -1,4 +1,6 @@
 
+% Last updated on 07/14/2025 by Shutian Xue
+
 % Step 2: [Local] run PF_RC_step2 to do RC analysis on ALL trials (no resampling)
 % code is similar to OOD_boot (noresampling)
 % use the sensitivity kernels derived from ALL trials to determine which model best captures ORI and SF
@@ -8,10 +10,9 @@ close all
 warning off
 format compact
 
-addpath(genpath('fxn_analysis_RC_v2'))
-addpath(genpath('fxn_exp'))
-addpath(genpath('fxn_MC'))
-addpath(genpath('Data_OOD'))
+addpath(genpath('Codes/fxn_analysis_RC_v2'))
+addpath(genpath('Codes/fxn_exp'))
+addpath(genpath('Codes/fxn_MC'))
 
 %%
 %---------------%
@@ -28,7 +29,7 @@ iLocComb_all = 1:8;
 fprintf('Discard data before # %d\n', iSess_start)
 
 %% create gabor filters
-[filter_sin, filter_cos] = SX_sim02_setFilters(stim, noise.filtersSF_all, filtersOri_all, 0);
+[filter_sin, filter_cos] = SX_sim02_setFilters(stim, noise.filtersSF_all, filtersOri_all, fxn_getSigma_SPdomain, 0);
 fprintf('\n\n   Pool of filters created: nORI=%d, nSF=%d\n\n\n', length(filtersOri_all), length(noise.filtersSF_all))
 
 %% MAIN LOOP
@@ -40,20 +41,20 @@ for isubj = 1:nsubj
     fprintf('%s%d (%d/%d) ...\n', subjName, nblocks, isubj, nsubj)
     
     % get dir
-    nameBehavMeas = sprintf('Data_OOD/%s%d/%s_behavMeas.mat', subjName, nblocks, subjName);
-    dirBehavMeas = dir(nameBehavMeas);
+    nameFile_BehavMeas = sprintf('%s/Data_OOD_%d%d/%s%d/%s_behavMeas.mat', nameFolder_Data, nORI, nSF, subjName, nblocks, subjName);
+    dirBehavMeas = dir(nameFile_BehavMeas);
     if flag_PatchMode == 1, namePatchMode = 'T'; else, namePatchMode = 'N'; end
-    nameSourceEnergy = sprintf('Data_OOD/%s%d/%s_energy_%s_%d_%d.mat', subjName, nblocks, subjName, namePatchMode, nORI, nSF);
-    nameKernel = sprintf('Data_OOD/%s%d/%s_kernel_%s_%d_%d.mat', subjName, nblocks, subjName, namePatchMode, nORI, nSF);
+    nameFile_SourceEnergy = sprintf('%s/Data_OOD_%d%d/%s%d/%s_energy_%s_%d_%d.mat', nameFolder_Data, nORI, nSF, subjName, nblocks, subjName, namePatchMode, nORI, nSF);
+    nameFile_Kernel = sprintf('%s/Data_OOD_%d%d/%s%d/%s_kernel_%s_%d_%d.mat', nameFolder_Data, nORI, nSF, subjName, nblocks, subjName, namePatchMode, nORI, nSF);
     
     % extract basic data matrix
     fprintf('  Loading Data matrix...'), tic
-    load(nameBehavMeas, 'dataMatrix')
+    load(nameFile_BehavMeas, 'dataMatrix')
     dur = toc; fprintf('DONE (Dur %.1f min)\n', dur/60)
     
     % load the source energy (from which energy will be sampled in each bootstrapping)
     fprintf('  Loading Source Energy...'), tic
-    load(nameSourceEnergy)
+    load(nameFile_SourceEnergy)
     if flag_PatchMode == 1, e3D_allT = e3D_target_allT; else, e3D_allT = e3D_noise_allT; end
     dur = toc; fprintf('DONE (Dur %.1f min)\n', dur/60)
     
@@ -113,7 +114,7 @@ for isubj = 1:nsubj
         
         % pYES vs. binned energy [SX_RC5_slope]
         % un-standardized energy
-        [pYES_tgt, ebin_tgt] =  SX_RC5_slope(dataMtx_resampled, e3D_resampled, nTypes, nbins_e);
+        [pYES_tgt, ebin_tgt] = SX_RC5_slope(dataMtx_resampled, e3D_resampled, nTypes, nbins_e);
         
         % standardized energy
         [pYES_tgt_norm, ebin_tgt_norm] = SX_RC5_slope(dataMtx_resampled, e3D_norm, nTypes, nbins_e);
@@ -139,7 +140,7 @@ for isubj = 1:nsubj
     
     % save kernels to OOD
     fprintf('  Saving kernels...'), tic
-    save(nameKernel, '*_perComb', 'ntrialsPerLoc_*')
+    save(nameFile_Kernel, '*_perComb', 'ntrialsPerLoc_*')
     dur = toc; fprintf('DONE (Dur %.1f min)\n', dur/60)
     
 end % isubj
@@ -154,8 +155,8 @@ iLocPair_all = [1, 8; 6, 7; 5, 3; 2, 4]; % F vs. P; HM vs. VM; LVM vs. UVM; LHM 
 for isubj = 1:nsubj
     subjName = subjList{isubj};
     nblocks = nblocks_allSubj(isubj);
-    nameKernel = sprintf('Data_OOD/%s%d/%s_kernel_%s_%d_%d.mat', subjName, nblocks, subjName, namePatchMode, nORI, nSF);
-    load(nameKernel, 'kernels2D_perComb')
+    nameFile_Kernel = sprintf('%s/Data_OOD_%d%d/%s%d/%s_kernel_%s_%d_%d.mat', nameFolder_Data, nORI, nSF, subjName, nblocks, subjName, namePatchMode, nORI, nSF);
+    load(nameFile_Kernel, 'kernels2D_perComb')
     
     for iFeature = 1:2
         if iFeature == 1
@@ -207,9 +208,11 @@ for isubj = 1:nsubj
         end % iType
         %         sgtitle(sprintf('[%s-%s] %s - %d/%d trials', namesFeature{iFeature}, namePatchMode, subjName, ntrialsPerLoc_selected, nTrialsPerLoc_original))
         sgtitle(sprintf('[%s-%s] %s', namesFeature{iFeature}, namePatchMode, subjName))
-        nameFolder_kernel = sprintf('Fig_kernels/%s', namesFeature{iFeature});
-        if isempty(dir(nameFolder_kernel)), mkdir(nameFolder_kernel), end
-        saveas(gcf, sprintf('%s/kernels_%s_%s.jpg', nameFolder_kernel,  subjName, namePatchMode))
+
+        % Save the figure
+        nameFolder_Fig_kernel = sprintf('Figures/Kernels_%d%d/%s', nORI, nSF, namesFeature{iFeature});
+        if isempty(dir(nameFolder_Fig_kernel)), mkdir(nameFolder_Fig_kernel), end
+        saveas(gcf, sprintf('%s/kernels_%s_%s.jpg', nameFolder_Fig_kernel,  subjName, namePatchMode))
     end % iFeature
 end % isubj
 

@@ -1,6 +1,4 @@
 % SX_analysis1_extractData.m
-% Last updated on 07/14/2025 by Shutian Xue
-
 % This script extracts basic data from observers' data files and computes
 % behavioral measurements and energy profile for each observer.
 % It also sets up the necessary directories and parameters for further analysis.
@@ -68,7 +66,7 @@ for isubj = 1:nsubj
     dirPatch_target = dir(nameFile_TgtPatch);
 
     % Looping through files takes ~10 min
-    % Saving the patches takes ~1min
+    % Saving the patches takes ~10min
     if isempty(dirBehavMeas)
         % flag_getPatch = 1;
         if isempty(dirPatch_target), flag_getPatch = 1; else, flag_getPatch = 0;end
@@ -127,6 +125,6 @@ for isubj = 1:nsubj
     
 end % end of isubj
 
-%% plot contrast threshold, pA and accuracy as a function of session for each observer
+% plot contrast threshold, pA and accuracy as a function of session for each observer
 plot_BehavMeasurebySess
 
