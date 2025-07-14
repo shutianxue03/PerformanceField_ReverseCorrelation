@@ -22,9 +22,10 @@ clear all, clc, close all, warning off, format compact
 
 % addpath(genpath('Data'))
 % addpath(genpath('Data_OOD'))
-addpath(genpath('Codes/fxn_exp'))
-addpath(genpath('Codes/fxn_analysis_RC_v2'))
-addpath(genpath('Codes/fxn_simulation'))
+addpath(genpath('fxn_exp'))
+addpath(genpath('fxn_analysis_RC_v2'))
+addpath(genpath('fxn_simulation'))
+addpath(genpath('SX_toolbox'))
 
 %-------------%
 SX_RC1_setting
@@ -47,18 +48,18 @@ for isubj = 1:nsubj
     nameFile_Data = sprintf('%s/%s_exp*', nameFolder_DataData, subjName);
     dirFile_Data = dir(nameFile_Data); % find out all possible files
     nBlocks = length(dirFile_Data); % number of blocks finished
-    
+
     %% if not consider all blocks
     ib_start = 1;
     if strcmp(subjName, 'SP'), ib_start = 81; end
     ib_end = nBlocks;
     nBlocks = ib_end - ib_start+1;
     fprintf('\n%s%d (S%d/%d) ...\n', subjName, nBlocks, isubj, nsubj)
-    
+
     %% Define names of folders and files
     nameFolder_OOD =  sprintf('%s/Data_OOD_%d%d/%s%d/', nameFolder_Data, nORI, nSF, subjName, nBlocks);
     if isempty(dir(nameFolder_OOD)), mkdir(nameFolder_OOD), end
-    
+
     %% 1. Extract raw data (behavioral measurements and patches)
     nameFile_BehavMeas = sprintf('%s/Data_OOD_%d%d/%s%d/%s_behavMeas.mat', ...
         nameFolder_Data, nORI, nSF, subjName, nBlocks, subjName);
@@ -70,64 +71,64 @@ for isubj = 1:nsubj
 
     % Looping through files takes ~4 min
     % Saving the patches takes ~0.5min
-    % if isempty(nameDir_BehavMeas)
+    if isempty(nameDir_BehavMeas)
         % flag_getPatch = 1;
         if isempty(nameDir_PatchTarget), flag_getPatchTarget = 1; else, flag_getPatchTarget = 0;end
         if isempty(nameDir_PatchNoise), flag_getPatchNoise = 1; else, flag_getPatchNoise = 0;end
-            % flag_getPatchTarget = 0; flag_getPatchNoise = 0; % for debugging
+        % flag_getPatchTarget = 0; flag_getPatchNoise = 0; % for debugging
         % ======================
-        SX_RC3a_extractSubjData 
+        SX_RC3a_extractSubjData
         SX_RC3b_organizeData_v2
         % ======================
-    % end
-    
+    end
+
     % Since name* is deleted in SX_RC3b, define names below
-    
+
     %% 2. Compute source energy (from Noise & target patch)
-    % % Note: the energy profile derived from noise patch, transformed or not, are NOT different
-    % name1 = {'N', 'T'};
-    % name2 = {'noise', 'target'};
-    % name3 = {'noise_allT', 'target_allT'};
-    
-    % for iPatchMode = 1 %1=noise patch; 2=target patch
-    %     nameFile_Patch = sprintf('%s/Data/%s/%s_%s.mat', nameFolder_Data, subjName, subjName, name2{iPatchMode});
-    %     nameFile_EnergySource = sprintf('%s/Data_OOD_%d%d/%s%d/%s_energy_%s_%d_%d.mat', ...
-    %         nameFolder_Data, nORI, nSF, subjName, nBlocks, subjName, name1{iPatchMode}, nORI, nSF);
-        
-    %     % Load patches if not already loaded (takes <0.5 min)
-    %     if ~exist(name3{iPatchMode}, 'var')
-    %         tic
-    %         fprintf('\n  Loading %s patches...', name2{iPatchMode})
-    %         load(nameFile_Patch)
-    %         dur = toc; fprintf('DONE (Dur: %.1f min)\n', dur/60)
-    %     end
-    %     switch iPatchMode, case 1, patch_allT = noise_allT; case 2, patch_allT = target_allT; end
-    %     assert(size(patch_allT, 1) == nBlocks*100)
-        
-    %     % Derive energy profiles (usually takes <14 min)
-    %     fprintf('  Generating source energy (from %s) ... ', name2{iPatchMode}), tic
-    %     %---------------------------------%
-    %     [e3D_allT, phase3D_allT] = SX_RC4_Energy_parfor(stim.mask, patch_allT, filter_sin, filter_cos);
-    %     %---------------------------------%
-    %     dur = toc; fprintf(' (Dur: %.1f min)\n', dur/60)
-    %     assert(size(e3D_allT, 1) == nBlocks*100)
-        
-    %     % Save energy profiles (takes <0.2 min)
-    %     fprintf('  Saving source energy (%s patch) ...', name2{iPatchMode}), tic
-    %     switch iPatchMode
-    %         case 1, e3D_noise_allT = e3D_allT; phase3D_noise_allT = phase3D_allT;
-    %         case 2, e3D_target_allT = e3D_allT; phase3D_target_allT = phase3D_allT;
-    %     end
-    %     save(nameFile_EnergySource, sprintf('e3D_%s', name3{iPatchMode}), sprintf('phase3D_%s', name3{iPatchMode}))
-    %     dur = toc; fprintf('DONE (Dur: %.1f min)\n', dur/60)
-    %     clear *allT
-    % end % for iPatchMode
-    
+    % Note: the energy profile derived from noise patch, transformed or not, are NOT different
+    name1 = {'N', 'T'};
+    name2 = {'noise', 'target'};
+    name3 = {'noise_allT', 'target_allT'};
+
+    for iPatchMode = 1:2 %1=noise patch; 2=target patch
+        nameFile_Patch = sprintf('%s/Data/%s/%s_%s.mat', nameFolder_Data, subjName, subjName, name2{iPatchMode});
+        nameFile_EnergySource = sprintf('%s/Data_OOD_%d%d/%s%d/%s_energy_%s_%d_%d.mat', ...
+            nameFolder_Data, nORI, nSF, subjName, nBlocks, subjName, name1{iPatchMode}, nORI, nSF);
+
+        % Load patches if not already loaded (takes <0.5 min)
+        if ~exist(name3{iPatchMode}, 'var')
+            tic
+            fprintf('\n  Loading %s patches...', name2{iPatchMode})
+            load(nameFile_Patch)
+            dur = toc; fprintf('DONE (Dur: %.1f min)\n', dur/60)
+        end
+        switch iPatchMode, case 1, patch_allT = noise_allT; case 2, patch_allT = target_allT; end
+        assert(size(patch_allT, 1) == nBlocks*100)
+
+        % Derive energy profiles (usually takes <14 min)
+        fprintf('  Generating source energy (from %s) ... ', name2{iPatchMode}), tic
+        %---------------------------------%
+        [e3D_allT, phase3D_allT] = SX_RC4_Energy_parfor(stim.mask, patch_allT, filter_sin, filter_cos);
+        %---------------------------------%
+        dur = toc; fprintf(' (Dur: %.1f min)\n', dur/60)
+        assert(size(e3D_allT, 1) == nBlocks*100)
+
+        % Save energy profiles (takes <0.2 min)
+        fprintf('  Saving source energy (%s patch) ...', name2{iPatchMode}), tic
+        switch iPatchMode
+            case 1, e3D_noise_allT = e3D_allT; phase3D_noise_allT = phase3D_allT;
+            case 2, e3D_target_allT = e3D_allT; phase3D_target_allT = phase3D_allT;
+        end
+        save(nameFile_EnergySource, sprintf('e3D_%s', name3{iPatchMode}), sprintf('phase3D_%s', name3{iPatchMode}))
+        dur = toc; fprintf('DONE (Dur: %.1f min)\n', dur/60)
+        clear *allT
+    end % for iPatchMode
+
     %%
     clear patch* noise* % so that these two files won't be saved in the file of the next observer
     %     e3D = e3D_noise_allT; for iLoc = 1:5, quickPlot_energy, end
     %     e3D = e3D_target_allT; for iLoc = 1:5, quickPlot_energy, end
-    
+
 end % end of isubj
 
 %% Plot contrast threshold, pA and accuracy as a function of session for each observer

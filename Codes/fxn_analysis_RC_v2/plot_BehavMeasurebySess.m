@@ -25,6 +25,8 @@ for isubj = 1:nsubj
     load(sprintf('%s/Data_OOD_%d%d/%s%d/%s_behavMeas.mat', nameFolder_Data, nORI, nSF, subjName, nblock, subjName), ...
         'cst_perSess_perLoc', 'pA3_perSess_perLoc', 'pC3_perSess_perLoc')
     
+    nSess = size(cst_perSess_perLoc,1);
+
     figure('Position', [0 0 1e3 1e3])
     
     % Loop through each metric (CST, pA, pC)
@@ -84,8 +86,7 @@ end % isubj
 %% Conduct ANOVA for each metric across subjects
 clc
 
-for iMetric = 3%:nm
-    %     for iiLoc = 1:nLoc
+for iMetric = 3
     for iStat = 1:4
         switch iStat
             case 1, m = meas_sd; n='SD';
@@ -94,11 +95,11 @@ for iMetric = 3%:nm
             case 4, m = meas_ave; n='AVE';
         end
         
-        a=squeeze(m(:, iMetric, :));
+        metric = squeeze(m(:, iMetric, :));
         indLoc = repmat(iLoc_all, nsubj, 1);
-        text_ANOVA = print_nANOVA({'Loc'}, a(:), {indLoc(:)}, nsubj);
+        text_ANOVA = print_nANOVA({'Loc'}, metric(:), {indLoc(:)}, nsubj);
         
-        [ave, ~, ~, SEM] = getCI(a(:), 2, 1);
+        [ave, ~, ~, SEM] = getCI(metric(:), 2, 1);
         fprintf('%s: %.1f +- %.1f\n%s\n', n, ave, SEM, text_ANOVA)
     end
 end
