@@ -18,7 +18,7 @@ limit0to1 = @(x) min(max(x,0),1);
 iPair_all = 1:nTrialsPerBlock/2; % need to fix if not DOUBLE-pass!!
 nPairs = length(iPair_all);
 
-%% empty containers
+%% Preallocate containers
 target_perBlk = cell(nBlocks, nTrialsPerBlock); % presented patches
 patchSD_perBlk = nan(nBlocks, nTrialsPerBlock);
 noise_perBlk = target_perBlk; % unmodified noise patches
@@ -88,7 +88,7 @@ parfor iblk_rec = 1:nBlocks
     %%%%%%%%%%%%
     %   stim patch/noise   %
     %%%%%%%%%%%%
-    if flag_getPatch
+    if flag_getPatchTarget || flag_getPatchNoise
         for itrial = 1:nTrialsPerBlock
             % patch
             pp = run_allTrials{itrial}.stimPatch_all{iLoc_blk};
@@ -141,26 +141,29 @@ dataMatrix = [fxn_reorder(itrial_allT), ...
     fxn_reorder(iPass_allT), fxn_reorder(iPair_allT), fxn_reorder(resp_allT), fxn_reorder(RT_allT), fxn_reorder(cst_allT)];
 
 %% save patches
-if flag_getPatch
-%     tic
-%     fprintf('  Saving noise patches...')
-%     noise_allT = fxn_reorder(noise_perBlk);
-%     save(nameNoisePatch, 'noise_allT')
-%     dur = toc; fprintf('DONE (Dur %.1f min)\n', dur/60)
-%     clear noise_allT
-    
+if flag_getPatchTarget
+    tic
+    fprintf('  Saving noise patches...')
+    noise_allT = fxn_reorder(noise_perBlk);
+    save(nameFile_NoisePatch, 'noise_allT')
+    dur = toc; fprintf('DONE (Dur %.1f min)\n', dur/60)
+end
+
+if flag_getPatchNoise
     tic
     fprintf('  Saving target patches...')
     target_allT = fxn_reorder(target_perBlk);
     save(nameFile_TgtPatch, 'target_allT')
     dur = toc; fprintf('DONE (Dur %.1f min)\n', dur/60)
-    clear target_allT 
 end
 
-%% save behav data
+clear noise_allT
+clear target_allT 
+
+%% Save behav data
 clear repInd_allT answer_allT correctness_allT tgtPrs_allT target_perBlk
 fprintf('  Saving behav data...')
-save(nameBehavMeas, 'dataMatrix', '*_allT') % patch/noise_all T are cleared
+save(nameFile_BehavMeas, 'dataMatrix', '*_allT') 
 fprintf('DONE\n')
 
 %%

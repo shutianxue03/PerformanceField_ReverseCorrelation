@@ -15,6 +15,7 @@ meas_min = nan(nsubj, nMetrics, nLoc);
 meas_max = nan(nsubj, nMetrics, nLoc);
 meas_ave = nan(nsubj, nMetrics, nLoc);
 
+% Loop through each subject
 for isubj = 1:nsubj
     
     subjName = subjList{isubj};

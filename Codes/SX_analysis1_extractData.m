@@ -60,65 +60,68 @@ for isubj = 1:nsubj
     if isempty(dir(nameFolder_OOD)), mkdir(nameFolder_OOD), end
     
     %% 1. Extract raw data (behavioral measurements and patches)
-    nameBehavMeas = sprintf('%s/Data_OOD_%d%d/%s%d/%s_behavMeas.mat', ...
+    nameFile_BehavMeas = sprintf('%s/Data_OOD_%d%d/%s%d/%s_behavMeas.mat', ...
         nameFolder_Data, nORI, nSF, subjName, nBlocks, subjName);
-    dirBehavMeas = dir(nameBehavMeas);
+    nameDir_BehavMeas = dir(nameFile_BehavMeas);
     nameFile_TgtPatch = sprintf('%s/Data/%s/%s_target.mat', nameFolder_Data, subjName, subjName);
     nameFile_NoisePatch = sprintf('%s/Data/%s/%s_noise.mat', nameFolder_Data, subjName, subjName);
-    dirPatch_target = dir(nameFile_TgtPatch);
+    nameDir_PatchTarget = dir(nameFile_TgtPatch);
+    nameDir_PatchNoise = dir(nameFile_NoisePatch);
 
-    % Looping through files takes ~10 min
-    % Saving the patches takes ~1min
-    if isempty(dirBehavMeas)
+    % Looping through files takes ~4 min
+    % Saving the patches takes ~0.5min
+    % if isempty(nameDir_BehavMeas)
         % flag_getPatch = 1;
-        if isempty(dirPatch_target), flag_getPatch = 1; else, flag_getPatch = 0;end
+        if isempty(nameDir_PatchTarget), flag_getPatchTarget = 1; else, flag_getPatchTarget = 0;end
+        if isempty(nameDir_PatchNoise), flag_getPatchNoise = 1; else, flag_getPatchNoise = 0;end
+            % flag_getPatchTarget = 0; flag_getPatchNoise = 0; % for debugging
         % ======================
         SX_RC3a_extractSubjData 
         SX_RC3b_organizeData_v2
         % ======================
-    end
+    % end
     
     % Since name* is deleted in SX_RC3b, define names below
     
     %% 2. Compute source energy (from Noise & target patch)
-    % Note: the energy profile derived from noise patch, transformed or not, are NOT different
-    name1 = {'N', 'T'};
-    name2 = {'noise', 'target'};
-    name3 = {'noise_allT', 'target_allT'};
+    % % Note: the energy profile derived from noise patch, transformed or not, are NOT different
+    % name1 = {'N', 'T'};
+    % name2 = {'noise', 'target'};
+    % name3 = {'noise_allT', 'target_allT'};
     
-    for iPatchMode = 1:2 % just choose one; 1=noise patch; 2=target patch
-        nameFile_Patch = sprintf('%s/Data/%s/%s_%s.mat', nameFolder_Data, subjName, subjName, name2{iPatchMode});
-        nameFile_EnergySource = sprintf('%s/Data_OOD_%d%d/%s%d/%s_energy_%s_%d_%d.mat', ...
-            nameFolder_Data, nORI, nSF, subjName, nBlocks, subjName, name1{iPatchMode}, nORI, nSF);
+    % for iPatchMode = 1 %1=noise patch; 2=target patch
+    %     nameFile_Patch = sprintf('%s/Data/%s/%s_%s.mat', nameFolder_Data, subjName, subjName, name2{iPatchMode});
+    %     nameFile_EnergySource = sprintf('%s/Data_OOD_%d%d/%s%d/%s_energy_%s_%d_%d.mat', ...
+    %         nameFolder_Data, nORI, nSF, subjName, nBlocks, subjName, name1{iPatchMode}, nORI, nSF);
         
-        % Load patches if not already loaded (takes <0.5 min)
-        if ~exist(name3{iPatchMode}, 'var')
-            tic
-            fprintf('\n  Loading %s patches...', name2{iPatchMode})
-            load(nameFile_Patch)
-            dur = toc; fprintf('DONE (Dur %.1f min)\n', dur/60)
-        end
-        switch iPatchMode, case 1, patch_allT = noise_allT; case 2, patch_allT = target_allT; end
-        assert(size(patch_allT, 1) == nBlocks*100)
+    %     % Load patches if not already loaded (takes <0.5 min)
+    %     if ~exist(name3{iPatchMode}, 'var')
+    %         tic
+    %         fprintf('\n  Loading %s patches...', name2{iPatchMode})
+    %         load(nameFile_Patch)
+    %         dur = toc; fprintf('DONE (Dur: %.1f min)\n', dur/60)
+    %     end
+    %     switch iPatchMode, case 1, patch_allT = noise_allT; case 2, patch_allT = target_allT; end
+    %     assert(size(patch_allT, 1) == nBlocks*100)
         
-        % Derive energy profiles (usually takes <14 min)
-        fprintf('  Generating source energy (from %s) ...\n', name2{iPatchMode}), tic
-        %---------------------------------%
-        [e3D_allT, phase3D_allT] = SX_RC4_Energy_parfor(stim.mask, patch_allT, filter_sin, filter_cos);
-        %---------------------------------%
-        dur = toc; fprintf(' (Dur %.1f min)\n', dur/60)
-        assert(size(e3D_allT, 1) == nBlocks*100)
+    %     % Derive energy profiles (usually takes <14 min)
+    %     fprintf('  Generating source energy (from %s) ... ', name2{iPatchMode}), tic
+    %     %---------------------------------%
+    %     [e3D_allT, phase3D_allT] = SX_RC4_Energy_parfor(stim.mask, patch_allT, filter_sin, filter_cos);
+    %     %---------------------------------%
+    %     dur = toc; fprintf(' (Dur: %.1f min)\n', dur/60)
+    %     assert(size(e3D_allT, 1) == nBlocks*100)
         
-        % Save energy profiles (takes <0.2 min)
-        fprintf('  Saving source energy (%s patch) ...', name2{iPatchMode}), tic
-        switch iPatchMode
-            case 1, e3D_noise_allT = e3D_allT; phase3D_noise_allT = phase3D_allT;
-            case 2, e3D_target_allT = e3D_allT; phase3D_target_allT = phase3D_allT;
-        end
-        save(nameFile_EnergySource, sprintf('e3D_%s', name3{iPatchMode}), sprintf('phase3D_%s', name3{iPatchMode}))
-        dur = toc; fprintf('DONE (Dur %.1f min)\n', dur/60)
-        clear *allT
-    end % for iPatchMode
+    %     % Save energy profiles (takes <0.2 min)
+    %     fprintf('  Saving source energy (%s patch) ...', name2{iPatchMode}), tic
+    %     switch iPatchMode
+    %         case 1, e3D_noise_allT = e3D_allT; phase3D_noise_allT = phase3D_allT;
+    %         case 2, e3D_target_allT = e3D_allT; phase3D_target_allT = phase3D_allT;
+    %     end
+    %     save(nameFile_EnergySource, sprintf('e3D_%s', name3{iPatchMode}), sprintf('phase3D_%s', name3{iPatchMode}))
+    %     dur = toc; fprintf('DONE (Dur: %.1f min)\n', dur/60)
+    %     clear *allT
+    % end % for iPatchMode
     
     %%
     clear patch* noise* % so that these two files won't be saved in the file of the next observer
@@ -127,6 +130,6 @@ for isubj = 1:nsubj
     
 end % end of isubj
 
-%% plot contrast threshold, pA and accuracy as a function of session for each observer
+%% Plot contrast threshold, pA and accuracy as a function of session for each observer
 plot_BehavMeasurebySess
 

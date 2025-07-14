@@ -5,6 +5,7 @@
 nameFolder_Data = '/Volumes/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC/Data';
 % Include Data, Data_OOD, Data_MC, Data_NOM*
 
+% Directory for saving figures
 nameFolder_Figures = '/Volumes/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC/Figures';
 
 %%
@@ -53,7 +54,7 @@ params.stim=stim;
 params.noise=noise;
 % save('Data_OOD/params', 'params')
 
-%%
+%% 
 nbins_e = 5; % number of energy bins
 nitp = 2;% number of multiples of interpolated pints
 nLoc8 = 8;
@@ -65,7 +66,7 @@ CI_ratio = .68;
 threshPerf = .7;
 dprime_theo = norminv(threshPerf)-norminv(1-threshPerf); % corresponding to 75% accuracy
 
-%% get ORI/SF filters
+%% Define properties of ORI/SF filters
 % ORI filter
 switch nORI
     case 29, fOri = [5:5:50, 60:10:90]; % nORI=29
@@ -92,7 +93,7 @@ filtersSF_all = noise.filtersSF_all(cut_SF);
 noise.SF_low_sampling = noise.SF_low;
 noise.SF_high_sampling = noise.SF_high;
 
-%% ticks and labels
+%% Ticks and labels
 axis_tuning{1} = filtersOri_all - 90;
 axis_tuning{2} = filtersSF_all_log;
 axisTicks_tuning = {-90:45:90, linspace(log2(noise.SF_low), log2(noise.SF_high), 5)}; % ticks (SF is on log scale)
@@ -102,7 +103,7 @@ axisLim = {[-99, 99], [-.1, 2.1]};
 limit0to1 = @(x) min(max(x, 0), 1);
 nTrialsPerSess = 100;  % Number of trials per session
 
-%% index
+%% Index
 combInd = [1,8; 6,7; 5,3; 2,4; 1,6;1,7];
 ncomb = size(combInd, 1);
 plotInd = [1:ncomb; ncomb+1:2*ncomb];
@@ -251,7 +252,7 @@ namesTunC_unit_perF{8,2} = {'Pref ORI (deg)', 'peak amp. (a.u.)', 'trough ori (d
 namesTunC_unit_perF{12,2} = {'peak SF1 (cpd)', 'peak amp. 1 (a.u.)', 'bandwidth 1 (octave)', 'peak SF2 (cpd)', 'peak amp. 2 (a.u.)', 'bandwidth 2 (octave)'};
 namesTunC_unit_perF{13,2} = {'peak amp. (a.u.)', 'trough ori (deg)', 'trough mag, (a.u.)', 'bandwidth (deg)', 'baseline (a.u.)'};
 
-%%
+%% Colors
 colors_comb = [
     0,0,0; ...,     % center; black
     0, .75, 0; ..., % Left: light green

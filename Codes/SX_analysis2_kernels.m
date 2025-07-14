@@ -1,4 +1,3 @@
-
 % Last updated on 07/14/2025 by Shutian Xue
 
 % Step 2: [Local] run PF_RC_step2 to do RC analysis on ALL trials (no resampling)
@@ -210,7 +209,7 @@ for isubj = 1:nsubj
         sgtitle(sprintf('[%s-%s] %s', namesFeature{iFeature}, namePatchMode, subjName))
 
         % Save the figure
-        nameFolder_Fig_kernel = sprintf('Figures/Kernels_%d%d/%s', nORI, nSF, namesFeature{iFeature});
+        nameFolder_Fig_kernel = sprintf('%s/Kernels_%d%d/%s', nameFolder_Figures, nORI, nSF, namesFeature{iFeature});
         if isempty(dir(nameFolder_Fig_kernel)), mkdir(nameFolder_Fig_kernel), end
         saveas(gcf, sprintf('%s/kernels_%s_%s.jpg', nameFolder_Fig_kernel,  subjName, namePatchMode))
     end % iFeature
