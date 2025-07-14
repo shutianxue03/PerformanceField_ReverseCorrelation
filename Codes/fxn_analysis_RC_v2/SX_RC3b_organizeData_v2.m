@@ -135,12 +135,12 @@ end
 % end
 
 %%
-clear noise* patch* pp* nn* name* nfilters*
+clear noise* patch* pp* nn* nfilters*
 clear filters* kernels* nparams*  pV* R2* % do NOT delete isubj, subjList, nBlocks (thou unwanted)
 clear repInd_allT answer_allT correctness_allT tgtPrs_allT 
 
 %% save data
-nameBehavMeas = sprintf('%s/Data_OOD/%s%d/%s_behavMeas.mat', nameFolder_Data, subjName, nBlocks, subjName);
+nameBehavMeas = sprintf('%s/Data_OOD_%d%d/%s%d/%s_behavMeas.mat', nameFolder_Data, nORI, nSF, subjName, nBlocks, subjName);
 fprintf('  Updating behav data...')
 tic
 save(nameBehavMeas, '*_perLoc', '*_perBlk', '*_perComb', '-append')

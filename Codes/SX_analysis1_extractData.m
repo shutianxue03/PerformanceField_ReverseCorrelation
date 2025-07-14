@@ -39,7 +39,7 @@ fprintf('\nPool of filters created: nORI=%d, nSF=%d [%.2f, %.2f]\n', ...
     length(filtersOri_all), length(noise.filtersSF_all), noise.SF_low, noise.SF_high)
 
 %% Loop through each subject
-for isubj = 1:nsubj
+for isubj = 13:nsubj
     subjName = subjList{isubj};
     nameFolder_DataData = sprintf('%s/Data/%s', nameFolder_Data, subjName);
     nameFile_Data = sprintf('%s/%s_exp*', nameFolder_DataData, subjName);
@@ -64,12 +64,14 @@ for isubj = 1:nsubj
     nameFile_TgtPatch = sprintf('%s/Data/%s/%s_target.mat', nameFolder_Data, subjName, subjName);
     nameFile_NoisePatch = sprintf('%s/Data/%s/%s_noise.mat', nameFolder_Data, subjName, subjName);
     dirPatch_target = dir(nameFile_TgtPatch);
-    
+
+    % Looping through files takes ~10 min
+    % Saving the patches takes ~10min
     if isempty(dirBehavMeas)
         % flag_getPatch = 1;
-                if isempty(dirPatch_target), flag_getPatch = 1; else, flag_getPatch = 0;end
+        if isempty(dirPatch_target), flag_getPatch = 1; else, flag_getPatch = 0;end
         % ======================
-        SX_RC3a_extractSubjData
+        SX_RC3a_extractSubjData 
         SX_RC3b_organizeData_v2
         % ======================
     end
@@ -82,12 +84,12 @@ for isubj = 1:nsubj
     name2 = {'noise', 'target'};
     name3 = {'noise_allT', 'target_allT'};
     
-    for iPatchMode = 2 % 1=noise patch; 2=target patch
+    for iPatchMode = 2 % just choose one; 1=noise patch; 2=target patch
         nameFile_Patch = sprintf('%s/Data/%s/%s_%s.mat', nameFolder_Data, subjName, subjName, name2{iPatchMode});
         nameFile_EnergySource = sprintf('%s/Data_OOD_%d%d/%s%d/%s_energy_%s_%d_%d.mat', ...
             nameFolder_Data, nORI, nSF, subjName, nBlocks, subjName, name1{iPatchMode}, nORI, nSF);
         
-        % Load patches if not already loaded
+        % Load patches if not already loaded (usually takes 5 min)
         if ~exist(name3{iPatchMode}, 'var')
             tic
             fprintf('\n  Loading %s patches...', name2{iPatchMode})
@@ -97,13 +99,15 @@ for isubj = 1:nsubj
         switch iPatchMode, case 1, patch_allT = noise_allT; case 2, patch_allT = target_allT; end
         assert(size(patch_allT, 1) == nBlocks*100)
         
-        % Derive energy profiles
+        % Derive energy profiles (usually takes ~20 min)
         fprintf('  Generating source energy (from %s) ...\n', name2{iPatchMode}), tic
+        %---------------------------------%
         [e3D_allT, phase3D_allT] = SX_RC4_Energy_parfor(stim.mask, patch_allT, filter_sin, filter_cos);
+        %---------------------------------%
         dur = toc; fprintf('  * Dur %.1f min *\n', dur/60)
         assert(size(e3D_allT, 1) == nBlocks*100)
         
-        % Save energy profiles
+        % Save energy profiles (takes ~2 min)
         fprintf('  Saving source energy (%s patch) ...', name2{iPatchMode}), tic
         switch iPatchMode
             case 1, e3D_noise_allT = e3D_allT; phase3D_noise_allT = phase3D_allT;
