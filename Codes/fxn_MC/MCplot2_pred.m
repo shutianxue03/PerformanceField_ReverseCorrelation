@@ -4,6 +4,9 @@ ylimits = {[-.05, .16], [-.03, .1]};
 % text1_y = [.08, .08];
 % text2_y = [-.07, 0];
 
+nameFolder_Fig_MCpred = sprintf('%s/Pred/', nameFolder_Fig_MC);
+if isempty(dir(nameFolder_Fig_MCpred)), mkdir(nameFolder_Fig_MCpred), end
+
 for iIC = 1:nIC_
     iBest_unik = unique(iBest_allSubj(:, iIC));
     [freq, iBest_best] = groupcounts(iBest_allSubj(:, iIC));
@@ -15,24 +18,25 @@ for iIC = 1:nIC_
     iBest_group = irank_groupAVE(1);
     dd_ = dev_groupAVE-min(dev_groupAVE);
     
-    if flag_plot
+    if flag_plotMC
         figure('Position', [0, 0, 2e3, 2e3]), hold on
         for isubj = 1:nsubj
             subjName = subjList{isubj};
             nblocks = nblocks_allSubj(isubj);
             
-            nameKernel = sprintf('Data_OOD/%s%d/%s_kernel_%s_%d_%d.mat', subjName, nblocks, subjName, namePatchMode, nORI, nSF);
+            nameFile_Kernel = sprintf('%s/Data_OOD_%d%d/%s%d/%s_kernel_%s_%d_%d.mat', ...
+                nameFolder_Data, nORI, nSF, subjName, nblocks, subjName, namePatchMode, nORI, nSF);
             
             %         load(nameKernel, 'margORI_perComb', 'margSF_perComb')
-            load(nameKernel, 'kernels2D_perComb')
+            load(nameFile_Kernel, 'kernels2D_perComb')
             
             %%  extract y (i.e., kernels)
             [~, nORI, nSF] = size(kernels2D_perComb{1});
             %     kk = nan(nLoc2, nORI, nSF);
             if ifeature==1, marg = nan(nLoc2, nORI); else, marg = nan(nLoc2, nSF); end
             for iiLoc = 1:nLoc2
-                %         yData(iiLoc, :) = marg{iLoc_all(iiLoc)}(itype, :);
-                kk = squeeze(kernels2D_perComb{iLocComb_all(iiLoc)}(itype, :, :));
+                %         yData(iiLoc, :) = marg{iLoc_all(iiLoc)}(iType, :);
+                kk = squeeze(kernels2D_perComb{iLocComb_all(iiLoc)}(iType, :, :));
                 % cut
                 if flag_cutMapping
                     kk = kk(cut_ORI, cut_SF);
@@ -128,11 +132,11 @@ for iIC = 1:nIC_
                 iBest_group, num2str(paramInd_all(iBest_group, :)), mean(Rsquared_groupBest_allSubj)*100))
         end
         
-        if isempty(dir(sprintf('%spred/', nameFolder_fig))), mkdir(sprintf('%spred/', nameFolder_fig)), end
+        
         if MCmode==3
-            saveas(gcf, sprintf('%spred/n%d_M%d_%s.jpg', nameFolder_fig, nsubj, ifamily, namesIC{iIC}))
+            saveas(gcf, sprintf('%s/n%d_M%d_%s.jpg', nameFolder_Fig_MCpred, nsubj, ifamily, namesIC{iIC}))
         else
-            saveas(gcf, sprintf('%spred/n%d_M%d_%s.jpg', nameFolder_fig, nsubj, ifamily, namesMCmode{MCmode}))
+            saveas(gcf, sprintf('%s/n%d_M%d_%s.jpg', nameFolder_Fig_MCpred, nsubj, ifamily, namesMCmode{MCmode}))
         end
     end % if flag_plot
 end % iIC

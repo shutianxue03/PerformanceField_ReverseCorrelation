@@ -31,12 +31,11 @@
 % Fig 3: bar plots of dev of each ifamily for each MCmode
 
 clear all, close all, clc
-addpath(genpath('Data_MC'))
 addpath(genpath('staircasecode_MJ'))
 addpath(genpath('fxn_analysis_RC_v2'))
 addpath(genpath('fxn_MC'))
 addpath(genpath('fxn_exp'))
-addpath(genpath('XueCarrasco_JN/code'))
+% addpath(genpath('XueCarrasco_JN/code'))
 
 datetime('now')
 
@@ -45,14 +44,16 @@ clc
 ifamily_all_perF = {[1,8], [2, 3]}; % models to compare
 iLocPairs_all = [1,8; 6,7; 5,3]; %location pairs
 nLocPairs = size(iLocPairs_all, 1);
+
+% Define flags
 flag_cutMapping = 0; %input('       >>> Whether cut the edges (1=CUT, 0=NO): ');
 flag_mirrorMapping=1; %input('       >>> Whether mirror the kernel mapping (1=mirror, 0=NO): ');
 MCmode = 1; %input('       >>> What model comparison mode (1=CV, 2=LOOCV, 3=iC): ');
-flag_plot = 1; %input('       >>> Make plots? (1=YES, 0=NO): ');
-flag_devErrorbar = input('       >>> Plot errorbars in dev plots? (1=YES, 0=NO): ');
-flag_plotIDVD  = input('       >>> Plot idvd data in family comparison plots? (1=YES, 0=NO): ');
+flag_plotMC = 1; %input('       >>> Make plots? (1=YES, 0=NO): ');
+flag_devErrorbar = 0;%input('       >>> Plot errorbars in dev plots? (1=YES, 0=NO): ');
+flag_plotMC_IDVD  = 0;%input('       >>> Plot idvd data in family comparison plots? (1=YES, 0=NO): ');
 
-nORI = 29; nSF = 29;
+% nORI = 29; nSF = 29;
 %-------------%
 SX_RC1_setting
 %-------------%
@@ -63,14 +64,13 @@ nblocks_allSubj = [200, 240, 210, 240, 220, 220, 215, 220, 205, 210, 205, 205, 2
 % nblocks_allSubj = [200, 240, 210, 240, 220, 220,        220, 205, 210, 205, 205, 205,      195];
 nsubj = length(subjList);
 
-
 flag_PatchMode = 2; % energy derives from target; 2=noise patch
 if flag_PatchMode == 1, namePatchMode = 'T'; else, namePatchMode = 'N'; end
-itype = 2;
+iType = 2;
 close all
 
 flag_plotIDVDdev = 0; % 1=plot idvd dev as grey line in Fig 1 (MCplot1)
-flagPlotComp = 1; % 1=plot comparison of dev/IC
+flag_plotComp = 1; % 1=plot comparison of dev/IC
 flagPlotPred = 1; % 1=plot idvd prediction, 0=do NOT plot
 flag_fancyXticks = 0; %1=plot candidate index (1=free to vary; 0= shared)
 
@@ -85,17 +85,17 @@ for iiLocPair = 1:nLocPairs
     for iFeature = 1:2
         ifamily_all = ifamily_all_perF{iFeature};
         
-        % Fig folder
-        nameFolder_fig = sprintf('Fig/MC/%d%d%s/L%d%d/%s/', ...
-            nORI, nSF, nameM, iLocComb_all, namesFeature{iFeature});
-        dirFolder_fig = dir(nameFolder_fig);
-        if isempty(dirFolder_fig), mkdir(nameFolder_fig), end
+        % Define Figure folder
+        nameFolder_Fig_MC = sprintf('%s/MC/%d%d%s/L%d%d/%s/', nameFolder_Figures, nORI, nSF, nameM, iLocComb_all, namesFeature{iFeature});
+        nameDir_Fig_MC = dir(nameFolder_Fig_MC);
+        if isempty(nameDir_Fig_MC), mkdir(nameFolder_Fig_MC), end
         
         ibestGroup_perModePerFamily = cell(1,length(ifamily_all));
         
+        % Loop through model families
         for ifamily = ifamily_all
             %% compile idvd file
-            nameFileMC_allSubj = sprintf('Data_MC/%d%d%s/n%d_L%d%d_Family%d_mode%d.mat', nORI, nSF, nameM, nsubj, iLocComb_all, ifamily, MCmode);
+            nameFile_MCallSubj = sprintf('%s/Data_MC/%d%d%s/n%d_L%d%d_Family%d_mode%d.mat', nameFolder_Data, nORI, nSF, nameM, nsubj, iLocComb_all, ifamily, MCmode);
             
             %% model setting
             namesParams = namesParams_all{ifamily};
@@ -105,8 +105,8 @@ for iiLocPair = 1:nLocPairs
             
             if MCmode == 3, nIC_ = nIC; else, nIC_ = 1; end
             
-            if isempty(dir(nameFileMC_allSubj))
-                %% empty folders
+            if isempty(dir(nameFile_MCallSubj))
+                %% Preallocate variables
                 irank_allSubj = nan(nsubj, nIC_, nCands); % the sorted model index (best to worst model);
                 iBest_allSubj = nan(nsubj, nIC_);
                 dev_allSubj = nan(nsubj, nCands, 3);
@@ -116,7 +116,7 @@ for iiLocPair = 1:nLocPairs
                     fprintf('%s (%d/%d)', subjList{isubj}, isubj, nsubj)
                     
                     % Data folder
-                    nameFolder_MC = sprintf('Data_MC/%d%d%s%s/%s/L%d%d/', nORI, nSF, nameM, nameC, subjList{isubj}, iLocComb_all);
+                    nameFolder_MC = sprintf('%s/Data_MC/%d%d%s%s/%s/L%d%d/', nameFolder_Data, nORI, nSF, nameM, nameC, subjList{isubj}, iLocComb_all);
                     nameFile_MC = sprintf('%sFamily%d_mode%d.mat', nameFolder_MC, ifamily, MCmode);
                     if isempty(dir(nameFile_MC)), fprintf('\n********************\n NOT EXIST: %s\n********************\n', nameFile_MC)
                     else, load(nameFile_MC), fprintf('... Loaded\n')
@@ -131,8 +131,8 @@ for iiLocPair = 1:nLocPairs
                     
                 end % isubj
                 
-                save(nameFileMC_allSubj, 'ifeature', 'ifamily',  'MCmode', 'paramInd_all', '*_allSubj')
-            else, load(nameFileMC_allSubj), fprintf('Loaded\n')
+                save(nameFile_MCallSubj, 'ifeature', 'ifamily',  'MCmode', 'paramInd_all', '*_allSubj')
+            else, load(nameFile_MCallSubj), fprintf('Loaded\n')
             end
             
             %% Fig 1-2

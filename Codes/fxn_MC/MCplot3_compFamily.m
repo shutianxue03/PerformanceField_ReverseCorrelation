@@ -30,7 +30,7 @@ for iIC = 1:nIC_ % if using CV, nIC_=1
     dev_allF = dev_allF - min(dev_allF(:));
  
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    basicFxn_drawBars(dev_allF', [], [0 0 0;0,0,0], namesFamily_all(ifamily_all), y_ticks, [], flag_plotIDVD, flag_plotDiff, ...
+    basicFxn_drawBars(dev_allF', [], [0 0 0;0,0,0], namesFamily_all(ifamily_all), y_ticks, [], flag_plotMC_IDVD, flag_plotMC_IDVD, ...
         sprintf('[%s] %s L%d%d [ORI%d SF%d]', namesMCmode{MCmode}, namesFeature{ifeature}, iLocComb_all, nORI, nSF), 0, sz_fig);
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

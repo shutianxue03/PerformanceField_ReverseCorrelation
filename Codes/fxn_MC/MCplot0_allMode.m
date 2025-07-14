@@ -11,7 +11,7 @@ end
 nfilters = length(axis_tuning_ln);
 
 %% Fig 1. plot the dev/IC & freq averaged across subj
-if flagPlotComp
+if flag_plotComp
     %-------------------%
     MCplot1_perMCmode
     %-------------------%

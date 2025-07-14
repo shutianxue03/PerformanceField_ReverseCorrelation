@@ -15,5 +15,5 @@ for iParam = 1:nParams_full
 end
 
 assert(sum(nmodels_all) == nCand-1)
-indParamIncl = boolean(indParamIncl);
+indParamIncl = (indParamIncl==1);
 end
