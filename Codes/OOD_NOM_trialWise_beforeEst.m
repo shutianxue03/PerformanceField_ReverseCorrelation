@@ -43,18 +43,18 @@ if isnumeric(isubj)
     nblocks_allSubj = [200, 240, 210, 240, 220, 220, 215, 220, 205, 210, 205, 205, 205, 205, 195, 0];
     subjName = subjList{isubj};
     nblocks = nblocks_allSubj(isubj);
-    nameFolder_OOD = sprintf('%s/Data_OOD/ORI%dSF%d/%s', nameFolder_Data, nORI, nSF, subjName); % To Load behav & energy
+    nameFolder_OOD = sprintf('%s/Data_OOD_%d%d/%s', nameFolder_Data, nORI, nSF, subjName); % To Load behav & energy
     nameFolder_NOM = sprintf('%s/%s/ORI%dSF%d/%s/L%d', nameFolder_Data, nameFolder_NOM0, nORI, nSF, subjName, iLocComb); % To Save results
 else
     subjName = isubj{1};
     criterion_true = isubj{2};
     nblocks=0;
-    nameFolder_OOD = sprintf('%s/Data_OOD/ORI%dSF%d/IO/%s', nameFolder_Data, nORI, nSF, subjName);% To Load behav & energy
+    nameFolder_OOD = sprintf('%s/Data_OOD_%d%d/IO/%s', nameFolder_Data, nORI, nSF, subjName);% To Load behav & energy
     nameFolder_NOM = sprintf('%s/%s/ORI%dSF%d/IO/%s_c%.1f', nameFolder_Data, nameFolder_NOM0, nORI, nSF, subjName, criterion_true);% To Save results
 end
 if isempty(dir(nameFolder_NOM)), mkdir(nameFolder_NOM), end
 
-nameFileModelIDVD_beforeEst = sprintf('%s/n%d_A%d_beforeEst', nameFolder_NOM, ni, iModelA); 
+nameFile_ModelIDVD_beforeEst = sprintf('%s/n%d_A%d_beforeEst', nameFolder_NOM, ni, iModelA); 
 
 % PRINT
 fprintf('\n%s [nblocks = %d] [ORI%d SF%d]\n - ni = %d\n - Loc: %s\n - A%d %s\n - Template (1=PRS, 2=ABS, 3=BOTH): %d\n - Energy source: %d (1=TARGET, 2=NOISE)\n - Convolve type: %d\n - IV type: %d\n', ...
@@ -64,9 +64,9 @@ fprintf('\n%s [nblocks = %d] [ORI%d SF%d]\n - ni = %d\n - Loc: %s\n - A%d %s\n -
 if flag_PatchMode == 1, namePatchMode = 'T'; else, namePatchMode = 'N'; end
 if isnumeric(isubj)
     % behavioral measurement
-    load(sprintf('%s/Data_OOD/%s%d/%s_behavMeas.mat', nameFolder_Data, subjName, nblocks, subjName));
+    load(sprintf('%s/Data_OOD_%d%d/%s%d/%s_behavMeas.mat', nameFolder_Data, nORI, nSF, subjName, nblocks, subjName));
     % energy
-    load(sprintf('%s/Data_OOD/%s%d/%s_energy_%s_%d_%d.mat', nameFolder_Data, subjName, nblocks, subjName, namePatchMode, nORI, nSF));
+    load(sprintf('%s/Data_OOD_%d%d/%s%d/%s_energy_%s_%d_%d.mat', nameFolder_Data, nORI, nSF, subjName, nblocks, subjName, namePatchMode, nORI, nSF));
 else
     % behavioral measurement
     load(sprintf('%s/%s/behavMeas_c%.1f.mat', nameFolder_Data, nameFolder_OOD, criterion_true));
@@ -158,7 +158,7 @@ for ii = 1:ni
     %%%%%%%%%%%%%%%%%%%%%%%%
     % 1. Derive the Template from the TRAINING set
     if iModelA== 3 % use IO template (the energy profile of the signal)
-        load(sprintf('%s/Data_OOD/signalEnergy_%d_%d.mat', nameFolder_Data, nORI, nSF), 'template_true');
+        load(sprintf('%s/Data_OOD_%d%d/signalEnergy.mat', nameFolder_Data, nORI, nSF), 'template_true');
         template = template_true;
     else
         flag_plot = 0;
@@ -192,7 +192,7 @@ end % end of ii
 fprintf('\n\nALL iterations DONE\n')
 
 % SAVE
-save(nameFileModelIDVD_beforeEst, '*_allB', 'names*', 'flag*', 'ratio_train', 'ORI_bound', '*Type')
+save(nameFile_ModelIDVD_beforeEst, '*_allB', 'names*', 'flag*', 'ratio_train', 'ORI_bound', '*Type')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if flag_plotIVsDist, ModelPlot_local_perSubj, end

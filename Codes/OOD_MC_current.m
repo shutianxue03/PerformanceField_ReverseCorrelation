@@ -15,10 +15,10 @@ function OOD_MC_current(isubj, iiLoc_all_all, flag_PatchMode, flag_cutMapping, f
 close all
 clc
 
-addpath(genpath('Data_MC'))
-addpath(genpath('Data_OOD'))
-addpath(genpath('fxn_MC'))
-addpath(genpath('fxn_analysis_RC_v2'))
+addpath(genpath('Data/Data_MC'))
+addpath(genpath('Data/Data_OOD'))
+addpath(genpath('Codes/fxn_MC'))
+addpath(genpath('Codes/fxn_analysis_RC_v2'))
 
 time_start = datetime('now')
 
@@ -26,7 +26,7 @@ time_start = datetime('now')
 % LOOCV: ~20 mins
 % IC: ~1 min
 
-%% general params
+%% Define params
 %--------------%
 SX_RC1_setting
 %--------------%
@@ -97,7 +97,7 @@ nfilters = length(axis_tuning_ln);
 if flag_mirrorMapping, nameM = '_m'; else, nameM = ''; end
 if flag_cutMapping, nameC = 'c'; else, nameC = ''; end
 
-nameFolder_MC = sprintf('Data_MC/%d%d%s%s/%s/L%d%d', nORI, nSF, nameM, nameC, subjList{isubj}, iLoc_all);
+nameFolder_MC = sprintf('%s/Data_MC/%d%d%s%s/%s/L%d%d', nameFolder_Data, nORI, nSF, nameM, nameC, subjList{isubj}, iLoc_all);
 dirFolder_MC = dir(nameFolder_MC); if isempty(dirFolder_MC), mkdir(nameFolder_MC), end
 nameFile_MC = sprintf('%s/Family%d_mode%d.mat', nameFolder_MC, ifamily, MCmode);
 

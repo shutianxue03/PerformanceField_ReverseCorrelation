@@ -1,4 +1,4 @@
-% function OOD_sim(noiseCST, gaborCST, nTrials, noiseP, iModelB_sim, nORI)
+% function OOD_sim(noiseCST, gaborCST, nTrials, noiseP, iModelB_sim)
 clc, close all
 time_start = datetime('now')
 
@@ -8,19 +8,22 @@ addpath(genpath('fxn_analysis_RC_v2'))  % Path to analysis functions
 addpath(genpath('SX_toolbox'))  % Path to analysis functions
 
 %%
-fprintf('\nnoiseCST=%.1f, gaborCST=%.1f, nTrials=%d, noiseP=%.3f, iModelB_sim=%d, nORI=%d\n', noiseCST, gaborCST, nTrials, noiseP, iModelB_sim, nORI)
 %--------------%
 SX_RC1_setting
 %--------------%
 
-nameFolder_NOM0 = 'Data_NOM_trialWise';
-% [UPDATED] Normalize SF bandwidth using Mike’s method (sigma ∝ 1/SF), see Mike's Math in google drive
-fxn_getSigma = @(SF) 3*sqrt(2*log(2))/(2*pi*SF); 
+fprintf('\nnoiseCST=%.1f, gaborCST=%.1f, nTrials=%d, noiseP=%.3f, iModelB_sim=%d, nORI=%d\n', ...
+    noiseCST, gaborCST, nTrials, noiseP, iModelB_sim, nORI)
 
-% fxn_getSigma = @(SF) 0.8;
+
+% Unmute the line below on HPC
+% nameFolder_Data = 'Data/'; 
+
+nameFolder_NOM0 = 'Data_NOM_trialWise';
+
 lapseRate=0;
 pC_titrate = .7; % the accuracy at which threshold is measured
-ni = 100;
+ni = 100; % 
 iModelA_fit_all = 1;%[1, 5];  % 1: use the derived template, 5: use the ideal template
 iModelB_fit_all = iModelB_sim; % make them consistent for now; later try differ modelB for model recovery
 iLocComb = 1;
@@ -68,51 +71,51 @@ nameCond_OOD = sprintf('IO_nC%.0f_gC%.0f_nT%s_N%.3f_B%d', ...
     noiseCST*100, gaborCST*100, format_num2exp(nTrials), noiseP, iModelB_sim);
 
 % Define folder name to save results in Data_OOD
-nameFolder_OOD_IO = sprintf('Data_OOD/ORI%dSF%d/IO/%s', nORI, nSF, nameCond_OOD);
+nameFolder_OOD_IO = sprintf('%s/Data_OOD_%d%d/IO/%s', nameFolder_Data, nORI, nSF, nameCond_OOD);
 if isempty(dir(nameFolder_OOD_IO)), mkdir(nameFolder_OOD_IO), end
 
 %% Create a pool of Gabor filters
 %------------------------%
-[filter_sin, filter_cos] = SX_sim02_setFilters(stim, noise.filtersSF_all, filtersOri_all, fxn_getSigma, 0);
+[filter_sin, filter_cos] = SX_sim02_setFilters(stim, noise.filtersSF_all, filtersOri_all, fxn_getSigma_SPdomain, 0);
 %------------------------%
 fprintf('\nPool of filters created: nORI=%d, nSF=%d\n', length(filtersOri_all), length(noise.filtersSF_all))
 
 % ==== Mute below when running on HPC ====
-% Plot the energy profile of these Gabor filters
-ind_plot = 1:nSF;
-for iORI=15 % Just select one orientation, as change in ori is relfected as vertical shift in energy profiles
-    % for iORI=1:nORI
-    figure('Position', [0 0 2e3 2e3])
-    isubplot = 1;
-    for iSF=ind_plot
-        subplot(5,6, isubplot)
-        
-        imagesc(filter_sin{iORI, iSF})
-
-        template_true = SX_RC4_Energy_parfor(stim.mask, filter_sin(iORI, iSF), filter_sin, filter_cos);
-        template_true = squeeze(template_true);
-
-        imagesc(axis_tuning{2}, axis_tuning{1}, template_true)
-        xline(axis_tuning{2}(iSF), 'r-', 'linewidth', 2);
-        yline(axis_tuning{1}(iORI), 'r-', 'linewidth', 2);
-        axis square
-        xticks([]), yticks([])
-        title(sprintf('ORI=%d SF=%.2f [x%.1f]', axis_tuning{1}(iORI), 2.^axis_tuning{2}(iSF), fxn_getSigma(axis_tuning{2}(iSF))))
-        isubplot=isubplot+1;
-    end % iSF
-    sgtitle(sprintf('Energy profile of filters at ORI=%dº\n Value in [] = Filter bandwidth, normalized by SF', axis_tuning{1}(iORI)))
-end % iORI
+% % Plot the energy profile of these Gabor filters
+% ind_plot = 1:nSF;
+% for iORI=15 % Just select one orientation, as change in ori is relfected as vertical shift in energy profiles
+%     % for iORI=1:nORI
+%     figure('Position', [0 0 2e3 2e3])
+%     isubplot = 1;
+%     for iSF=ind_plot
+%         subplot(5,6, isubplot)
+% 
+%         imagesc(filter_sin{iORI, iSF})
+% 
+%         template_true = SX_RC4_Energy_parfor(stim.mask, filter_sin(iORI, iSF), filter_sin, filter_cos);
+%         template_true = squeeze(template_true);
+% 
+%         imagesc(axis_tuning{2}, axis_tuning{1}, template_true)
+%         xline(axis_tuning{2}(iSF), 'r-', 'linewidth', 2);
+%         yline(axis_tuning{1}(iORI), 'r-', 'linewidth', 2);
+%         axis square
+%         xticks([]), yticks([])
+%         title(sprintf('ORI=%d SF=%.2f [x%.1f]', axis_tuning{1}(iORI), 2.^axis_tuning{2}(iSF), fxn_getSigma_SPdomain(axis_tuning{2}(iSF))))
+%         isubplot=isubplot+1;
+%     end % iSF
+%     sgtitle(sprintf('Energy profile of filters at ORI=%dº\n Value in [] = Filter bandwidth, normalized by SF', axis_tuning{1}(iORI)))
+% end % iORI
 % ====================================
 
 %% Define the TRUE template (ORI x SF)
-stim.gaborSD = fxn_getSigma(stim.gaborSF);
+stim.gaborSD = fxn_getSigma_SPdomain(stim.gaborSF);
 template_true = exp_CreateGabor(stim, cst_ln_template);
 template_true = SX_RC4_Energy_parfor(stim.mask, {template_true}, filter_sin, filter_cos);
 template_true = squeeze(template_true);  %  Remove singleton dimension
 % new_max =.15; new_min = -.05; % given these params, the peak of SF tuning is negative
 new_max =.4; new_min = -.05;
 template_true = (template_true * (new_max - new_min)) + new_min; % scale the signal energy to roughly match the range of templates derived from subbj data
-save(sprintf('Data_OOD/signalEnergy_%d_%d', nORI, nSF), 'template_true')
+save(sprintf('%s/Data_OOD_%d%d/signalEnergy', nameFolder_Data, nORI, nSF), 'template_true')
 
 %% Simulate stimuli and responses
 nPairs = nTrials / 2;  % Half the trials are pairs
@@ -136,7 +139,7 @@ mask = stim.mask;
 ratio_base = noise.ratio_base;
 ratio_gaborInTgt = noise.ratio_gaborInTgt;
 
-%%
+
 fprintf('\nRunning simulation (%d pairs): \n', nPairs)
 parfor iPair = 1:nPairs
     % Create the signal Gabor patch
@@ -171,7 +174,9 @@ parfor iPair = 1:nPairs
     e3D_target_allT(iPair, :, :) = e3D_target;
     
     % Display progress
-    fprintf('=')
+    if mod(iPair, nPairs/20) == 0
+    fprintf('%d/%d = ', iPair, nPairs)
+    end
     
 end % iPair
 fprintf('\nDONE\n')
@@ -241,6 +246,10 @@ metrics_sim = [dprime, c, pC, pHit, pFA, pA];  % Collect all behavioral metrics
 save(sprintf('%s/behavMeas_c%.1f.mat', nameFolder_OOD_IO, criterion_true), 'dataMatrix', 'metrics_sim')
 
 %% Plot performance (optional)
+% Define figure folder for histogram
+nameFolder_Fig_hist = sprintf('%s/Data_OOD_%d%d/IO/Fig', nameFolder_Data,  nORI, nSF);
+if isempty(dir(nameFolder_Fig_hist)), mkdir(nameFolder_Fig_hist), end
+
 figure('Position', [0 200 600 1e3])
 subplot(2,1,1), hold on
 histogram(IV_noisy_sim_allT(iPRS_allT == 1), 'FaceColor', 'r')
@@ -259,10 +268,8 @@ sgtitle(sprintf('IV 95%% CI [%.1f, %.1f] Median = %.1f\n[TRUE] GaborCST=%.0f%%, 
     gaborCST*100, criterion_true, namesParamsModel_all{iModelB_sim}{1}, noiseP, ...
     metrics_sim_(2:end)))
 
-nameFolder_fig_hist=sprintf('Data_OOD/ORI%dSF%d/IO/Fig', nORI, nSF);
-if isempty(dir(nameFolder_fig_hist)), mkdir(nameFolder_fig_hist), end
 nameCond_NOM = sprintf('IO_nC%.0f_gC%.0f_nT%s_N%.3f_B%d_c%.1f', noiseCST*100, gaborCST*100, format_num2exp(nTrials), noiseP, iModelB_sim, criterion_true);
-saveas(gcf, sprintf('%s/%s.jpg', nameFolder_fig_hist, nameCond_NOM))
+saveas(gcf, sprintf('%s/%s.jpg', nameFolder_Fig_hist, nameCond_NOM))
 
 % Standardize the energy to normalize across trials
 switch patchMode
