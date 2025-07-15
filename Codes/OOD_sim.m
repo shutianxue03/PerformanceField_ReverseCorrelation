@@ -19,9 +19,13 @@ fprintf('\nnoiseCST=%.1f, gaborCST=%.1f, nTrials=%d, noiseP=%.3f, iModelB_sim=%d
 % Define the IO's name based on stim and condition parameters
 nameIO = sprintf('IO_nC%.0f_gC%.0f_nT%s_N%.3f_B%d', noiseCST*100, gaborCST*100, format_num2exp(nTrials), noiseP, iModelB_sim);
 
-% Define folder name to save results in Data_OOD
+% Define folder to save results in Data_OOD
 nameFolder_Data_OOD_IO = sprintf('%s/%s', nameFolder_Data_OOD, nameIO);
 if isempty(dir(nameFolder_Data_OOD_IO)), mkdir(nameFolder_Data_OOD_IO), end
+
+% Define folder to save results in Data_NOM
+nameFolder_Data_NOM_IO = sprintf('%s/%s', nameFolder_Data_NOM_Trialwise, nameIO);
+if isempty(dir(nameFolder_Data_NOM_IO)), mkdir(nameFolder_Data_NOM_IO), end
 
 %% Parameters for the simulation
 lapseRate=0;
@@ -30,8 +34,7 @@ ni = 100; %
 iModelA_fit_all = 1;%[1, 5];  % 1: use the derived template, 5: use the ideal template
 iModelB_fit_all = iModelB_sim; % make them consistent for now; later try differ modelB for model recovery
 iLocComb = 1;
-patchMode = 1; % 1=energy calculated from target-patches; 2=from noise patches
-mode_stim = 2; % 1=use target patches, 2=use noise patches
+patchMode = 'N'; % 'T'=energy calculated from target-patches; 'N'=from noise patches
 
 % Define the noise sampling range based on pre-set values
 noise.SF_low_sampling = noise.SF_low;
@@ -194,17 +197,16 @@ e3D_target_allT(nPairs+1:end, :, :) = e3D_target_allT(1:nPairs, :, :);  % Copy t
 assert(sum(e3D_target_allT(nPairs+1:end, :, :) - e3D_target_allT(1:nPairs, :, :), 'all') == 0)
 assert(sum(e3D_noise_allT(nPairs+1:end, :, :) - e3D_noise_allT(1:nPairs, :, :), 'all') == 0)
 
-%% Save behavioral and energy data for this IO
-save(sprintf('%s/behavMeas.mat', nameFolder_Data_OOD_IO), 'dataMatrix')
+%% Save the energy profile for this IO (behav data saved later)
 save(sprintf('%s/energy_T_%d_%d.mat', nameFolder_Data_OOD_IO, nORI, nSF), 'e3D_target_allT')
 save(sprintf('%s/energy_N_%d_%d.mat', nameFolder_Data_OOD_IO, nORI, nSF), 'e3D_noise_allT')
 
-fprintf('\n========== Saved simulated behav data and energy ========== \n')
+fprintf('\n========== Saved simulated energy  (%d trials) ========== \n', nTrials)
 
 %% Sample internal noise and calculate response for each trial
-switch mode_stim
-    case 1, IV_sim_allT = IV_target_sim_allT;
-    case 2, IV_sim_allT = IV_noise_sim_allT;
+switch patchMode
+    case 'T', IV_sim_allT = IV_target_sim_allT;
+    case 'N', IV_sim_allT = IV_noise_sim_allT;
 end
 
 % Add noise to the internal variable (IV) to simulate trial-by-trial variability
@@ -219,7 +221,7 @@ end
 % Sample and add internal noise to IV
 IV_noisy_sim_allT = IV_sim_allT + randn(size(IV_sim_allT)) * SDadd + randn(size(IV_sim_allT)).* (IV_sim_allT*Nmul);
 
-% do a simple fitting to determine the criterion_true so that accuracy matches a certain level
+% Do a simple fitting to determine the criterion_true so that accuracy matches a certain level
 fxn_loss_pC_ = @(criterion_potential) fxn_loss_pC(criterion_potential, pC_titrate, IV_noisy_sim_allT, iPRS_allT);
 criterion_true_ = fmincon(fxn_loss_pC_, median(IV_noisy_sim_allT), [],[],[],[], min(IV_noisy_sim_allT), max(IV_noisy_sim_allT)) ;
 criterion_true = round(criterion_true_, 1);
@@ -255,11 +257,16 @@ for iPairUnik = 1:nPairs
 end
 pA = mean(respC);  % Average response consistency across pairs
 metrics_sim = [dprime, c, pC, pHit, pFA, pA];  % Collect all behavioral metrics
-save(sprintf('%s/behavMeas_c%.1f.mat', nameFolder_NOM_IO, criterion_true), 'dataMatrix', 'metrics_sim')
+
+% Save the simulated data and metrics
+% save(sprintf('%s/behavMeas_c%.1f.mat', nameFolder_Data_OOD, criterion_true), 'dataMatrix', 'metrics_sim')
+save(sprintf('%s/behavMeas.mat', nameFolder_Data_OOD_IO), 'dataMatrix', 'metrics_sim')
+
+fprintf('\n========== Saved simulated behav data  (%d trials) ========== \n', nTrials)
 
 %% Plot performance (optional)
 % Define figure folder for histogram
-nameFolder_Fig_hist = sprintf('%s/Data_OOD_%d%d/IO/Fig', nameFolder_Data,  nORI, nSF);
+nameFolder_Fig_hist = sprintf('%s/IO/Fig', nameFolder_Data_OOD);
 if isempty(dir(nameFolder_Fig_hist)), mkdir(nameFolder_Fig_hist), end
 
 figure('Position', [0 200 600 1e3])
@@ -280,13 +287,13 @@ sgtitle(sprintf('IV 95%% CI [%.1f, %.1f] Median = %.1f\n[TRUE] GaborCST=%.0f%%, 
     gaborCST*100, criterion_true, namesParamsModel_all{iModelB_sim}{1}, noiseP, ...
     metrics_sim_(2:end)))
 
-nameCond_NOM = sprintf('IO_nC%.0f_gC%.0f_nT%s_N%.3f_B%d_c%.1f', noiseCST*100, gaborCST*100, format_num2exp(nTrials), noiseP, iModelB_sim, criterion_true);
-saveas(gcf, sprintf('%s/%s.jpg', nameFolder_Fig_hist, nameCond_NOM))
+% Save the figure
+% saveas(gcf, sprintf('%s/%s.jpg', nameFolder_Fig_hist, nameCond_NOM))
 
 % Standardize the energy to normalize across trials
 switch patchMode
-    case 1, e3D_allT = e3D_target_allT;
-    case 2, e3D_allT = e3D_noise_allT;
+    case 'T', e3D_allT = e3D_target_allT;
+    case 'N', e3D_allT = e3D_noise_allT;
 end
 e3D_norm = normEnergy(e3D_allT, dataMatrix(:, 11), iPRS_allT);
 
@@ -294,28 +301,27 @@ e3D_norm = normEnergy(e3D_allT, dataMatrix(:, 11), iPRS_allT);
 kernels2D = SX_RC6_kernel_parfor(e3D_norm, dataMatrix, filtersSF_all, filtersOri_all);
 
 % Save the derived kernels for future use
-save(sprintf('%s/kernels_c%.1f.mat', nameFolder_NOM_IO, criterion_true), 'kernels2D', 'criterion_true')
+% save(sprintf('%s/kernels_c%.1f.mat', nameFolder_NOM_IO, criterion_true), 'kernels2D', 'criterion_true')
+save(sprintf('%s/kernel_%s.mat', nameFolder_Data_OOD_IO, patchMode), 'kernels2D', 'criterion_true')
 fprintf('\n========== Kernels saved ========== \n\n\n')
 
 %% Fit trial-wise model to simulated data
 for iModelA_fit = iModelA_fit_all
-    OOD_NOM_trialWise_beforeEst({nameFile_IO, criterion_true}, iLocComb, iModelA_fit, ni, nameFolder_Data, nameFolder_NOM);
+    OOD_NOM_trialWise_beforeEst({nameIO, criterion_true}, iLocComb, iModelA_fit, ni, nameFolder_Data_OOD, nameFolder_NOM_IO);
     for iModelB_fit = iModelB_fit_all
-        OOD_NOM_trialWise_Est({nameFile_IO, criterion_true}, iLocComb, iModelA_fit, iModelB_fit, ni, nameFolder_Data, nameFolder_NOM)
+        OOD_NOM_trialWise_Est({nameIO, criterion_true}, iLocComb, iModelA_fit, iModelB_fit, ni, nameFolder_Data_OOD, nameFolder_NOM_IO)
     end
 end
 fprintf('\n\n============= CRITERION=%.1f DONE =============\n\n', criterion_true)
 % end % criterion
 
-%% Clean up variables for next iteration
+%% Clean up variables for the next iteration
 clear *allT e2D* e3D* kernels2D* dataMatrix
-delete(sprintf('%s/energy_T_%d_%d.mat', nameFolder_NOM_IO, nORI, nSF))
+% delete(sprintf('%s/energy_T_%d_%d.mat', nameFolder_NOM_IO, nORI, nSF)) % I don't know why this is needed
 
 time_end = datetime('now')
 
 time_end - time_start
-
-% end
 
 function loss = fxn_loss_pC(criterion_potential, pC_titrate, IV_noisy_sim_allT, iPRS_allT)
 resp_allT = IV_noisy_sim_allT > criterion_potential;
