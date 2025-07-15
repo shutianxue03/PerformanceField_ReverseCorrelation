@@ -57,12 +57,12 @@ for isubj = 1:nsubj
     fprintf('\n%s%d (S%d/%d) ...\n', subjName, nBlocks, isubj, nsubj)
 
     %% Define names of folders and files
-    nameFolder_OOD =  sprintf('%s/Data_OOD_%d%d/%s%d/', nameFolder_Data, nORI, nSF, subjName, nBlocks);
+    nameFolder_OOD =  sprintf('%s/%s%d/', nameFolder_Data_OOD, subjName, nBlocks);
     if isempty(dir(nameFolder_OOD)), mkdir(nameFolder_OOD), end
 
     %% 1. Extract raw data (behavioral measurements and patches)
-    nameFile_BehavMeas = sprintf('%s/Data_OOD_%d%d/%s%d/%s_behavMeas.mat', ...
-        nameFolder_Data, nORI, nSF, subjName, nBlocks, subjName);
+    nameFile_BehavMeas = sprintf('%s/%s%d/%s_behavMeas.mat', ...
+        nameFolder_Data_OOD, subjName, nBlocks, subjName);
     nameDir_BehavMeas = dir(nameFile_BehavMeas);
     nameFile_TgtPatch = sprintf('%s/Data/%s/%s_target.mat', nameFolder_Data, subjName, subjName);
     nameFile_NoisePatch = sprintf('%s/Data/%s/%s_noise.mat', nameFolder_Data, subjName, subjName);
@@ -92,8 +92,8 @@ for isubj = 1:nsubj
 
     for iPatchMode = 1:2 %1=noise patch; 2=target patch
         nameFile_Patch = sprintf('%s/Data/%s/%s_%s.mat', nameFolder_Data, subjName, subjName, name2{iPatchMode});
-        nameFile_EnergySource = sprintf('%s/Data_OOD_%d%d/%s%d/%s_energy_%s_%d_%d.mat', ...
-            nameFolder_Data, nORI, nSF, subjName, nBlocks, subjName, name1{iPatchMode}, nORI, nSF);
+        nameFile_EnergySource = sprintf('%s/%s%d/%s_energy_%s_%d_%d.mat', ...
+            nameFolder_Data_OOD, subjName, nBlocks, subjName, name1{iPatchMode}, nORI, nSF);
 
         % Load patches if not already loaded (takes <0.5 min)
         if ~exist(name3{iPatchMode}, 'var')

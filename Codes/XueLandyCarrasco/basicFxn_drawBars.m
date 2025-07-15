@@ -111,7 +111,6 @@ end
 
 %% conduct ANOVA (regardless of nBars)
 indBar = repmat(1:nBars, nsubj, 1);
-keyboard
 text_ANOVA = print_nANOVA({'Loc'}, med_allSubj(:), {indBar(:)}, nsubj, 1);
 
 %% if nBars>2, compare every pair

@@ -1,25 +1,31 @@
 
-% if isempty(dir('Data_OOD')), mkdir('Data_OOD'), end
-
-% Define the server directory of the Data/ folder
-nameFolder_Data = '/Volumes/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC/Data';
-% Inside Data/ there are Data, Data_OOD, Data_MC, Data_NOM*
-
-% Define the server directory of the Figrues/ folder
-nameFolder_Figures = '/Volumes/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC/Figures';
-
-% Define the function to normalize Gabor SD
-fxn_getSigma_SPdomain = @(SF) 3 * sqrt(2*log(2)) / (2 * pi * SF); 
-
 % Define number of ORI (and SF) channels
 % we assume nORI=nSF
-nORI = 29; 
+nORI = 29;
+nSF = nORI;
+
+% Define names of folders to load/save data (on the server)
+% if run on HPC
+nameFolder_server = '';
+% if run on local
+nameFolder_server = '/Volumes/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC'; % the server directory of the Data and Figures folders
+
+nameFolder_Data = sprintf('%s/Data', nameFolder_server) ;
+nameFolder_Data_OOD = sprintf('%s/Data_OOD_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
+nameFolder_Data_NOM_Trialwise = sprintf('%s/Data_NOM_Trialwise_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
+
+% Define names of folders to save figures (on the server)
+nameFolder_Figures = sprintf('%s/Figures', nameFolder_server) ;
+
+% Define the function to normalize Gabor SD
+fxn_getSigma_SPdomain = @(SF) 3 * sqrt(2*log(2)) / (2 * pi * SF);
+
 %%
 nBins=10;
 binStrategy_all = {'equal', 'algorithm', 'manual'};
 eyeD_all = [1,1,0,1,1,1,1,1,0,0,1,0]; % 1=right eye dominant; 0=left eye dominant
 flag_block200 = 0; % 1; all observers are forced to have 200 blocks; 0=no
-markers_allSubj = {'o', 's', 'd', '^', 'v', '<', '>', '+', 'p', 'h', 'x', 'o', 's', 'd', '^'}; 
+markers_allSubj = {'o', 's', 'd', '^', 'v', '<', '>', '+', 'p', 'h', 'x', 'o', 's', 'd', '^'};
 nMarkersMax = 11;  % Maximum number of different markers to use in plotting
 
 %% Exp params
@@ -83,8 +89,8 @@ nORI = length(filtersOri_all);
 
 % SF filter
 nSF = nORI; % could generate 0.5: 17, 29, 37
-noise.SF_low = 1;              
-noise.SF_low = 1.1869; 
+noise.SF_low = 1;
+noise.SF_low = 1.1869;
 noise.SF_high = 2/noise.SF_low*2; noise.filtersSF_all_log = linspace(log2(noise.SF_low), log2(noise.SF_high), nSF); noise.filtersSF_all = 2.^noise.filtersSF_all_log;
 cut_ORI = 1:nORI; cut_SF = 1:nSF;
 nORI = length(cut_ORI);

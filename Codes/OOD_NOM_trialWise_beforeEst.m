@@ -1,5 +1,5 @@
 
-function OOD_NOM_trialWise_beforeEst(isubj, iLocComb, iModelA, ni, nameFolder_Data, nameFolder_NOM0)
+function OOD_NOM_trialWise_beforeEst(isubj, iLocComb, iModelA, ni)
 % The previous version is in OOD_NOM_trialWise, which makes
 % predictions for each model from different binned IVs
 % INPUT
@@ -12,14 +12,13 @@ function OOD_NOM_trialWise_beforeEst(isubj, iLocComb, iModelA, ni, nameFolder_Da
 
 close all, warning off, format compact
 time_start = datetime('now')
-% addpath(genpath('Data_OOD'))
-% addpath(genpath('Data_model'))
-% addpath(genpath('fxn_NOM'))
-% addpath(genpath('fxn_RCplot'))
-% addpath(genpath('fxn_analysis_RC_v2'))
-% addpath(genpath('SX_toolbox/bads-master'))
-addpath(genpath('Codes/'))
-% load('Data_OOD/params.mat')
+
+addpath(genpath('Data/Data_OOD'))
+% addpath(genpath('Data/Data_model')) % Data_model or Data_NOM??
+addpath(genpath('Codes/fxn_NOM'))
+addpath(genpath('Codes/fxn_RCplot'))
+addpath(genpath('Codes/fxn_analysis_RC_v2'))
+addpath(genpath('Codes/SX_toolbox/bads-master'))
 
 %% general params
 %--------------%
@@ -38,40 +37,40 @@ ratio_train = 3/4; % proportion of trials in the training set (to derive 2D kern
 ORI_bound = [10, 20];
 
 %% Set names of directories
-if isnumeric(isubj)
+if isnumeric(isubj) % Human subjects
     subjList =             {'YK', 'SP', 'SX', 'LS', 'RE', 'MD', 'AS', 'HL', 'FH', 'HA', 'CS', 'DT', 'DU', 'RC','SR', 'IO'};
     nblocks_allSubj = [200, 240, 210, 240, 220, 220, 215, 220, 205, 210, 205, 205, 205, 205, 195, 0];
     subjName = subjList{isubj};
     nblocks = nblocks_allSubj(isubj);
-    nameFolder_OOD = sprintf('%s/Data_OOD_%d%d/%s', nameFolder_Data, nORI, nSF, subjName); % To Load behav & energy
-    nameFolder_NOM = sprintf('%s/%s/ORI%dSF%d/%s/L%d', nameFolder_Data, nameFolder_NOM0, nORI, nSF, subjName, iLocComb); % To Save results
-else
+    nameFolder_OOD_load = sprintf('%s/%s', nameFolder_Data_OOD, subjName); % To Load behav & energy
+    nameFolder_NOM_save = sprintf('%s/%s/L%d', nameFolder_Data_NOM_Trialwise, subjName, iLocComb); % To Save results
+else % IO
     subjName = isubj{1};
     criterion_true = isubj{2};
     nblocks=0;
-    nameFolder_OOD = sprintf('%s/Data_OOD_%d%d/IO/%s', nameFolder_Data, nORI, nSF, subjName);% To Load behav & energy
-    nameFolder_NOM = sprintf('%s/%s/ORI%dSF%d/IO/%s_c%.1f', nameFolder_Data, nameFolder_NOM0, nORI, nSF, subjName, criterion_true);% To Save results
+    nameFolder_OOD_load = sprintf('%s/%s', nameFolder_Data_OOD, subjName);% To Load behav & energy
+    nameFolder_NOM_save = sprintf('%s/%s_c%.1f', nameFolder_Data_NOM_Trialwise, subjName, criterion_true);% To Save results
 end
-if isempty(dir(nameFolder_NOM)), mkdir(nameFolder_NOM), end
+if isempty(dir(nameFolder_NOM_save)), mkdir(nameFolder_NOM_save), end
 
-nameFile_ModelIDVD_beforeEst = sprintf('%s/n%d_A%d_beforeEst', nameFolder_NOM, ni, iModelA); 
+nameFile_ModelIDVD_beforeEst = sprintf('%s/n%d_A%d_beforeEst', nameFolder_NOM_save, ni, iModelA); 
 
 % PRINT
-fprintf('\n%s [nblocks = %d] [ORI%d SF%d]\n - ni = %d\n - Loc: %s\n - A%d %s\n - Template (1=PRS, 2=ABS, 3=BOTH): %d\n - Energy source: %d (1=TARGET, 2=NOISE)\n - Convolve type: %d\n - IV type: %d\n', ...
-    subjName, nblocks, nORI, nSF, ni, namesLocComb{iLocComb}, iModelA, namesModelA{iModelA}, itype_template, flag_PatchMode, convolveType, IVType)
+fprintf('\nSubject/IO name: %s [nblocks = %d] [nORI=%d | nSF=%d]\n - Number of iterations (ni) = %d\n - Location: %s\n - A%d [%s]\n - Template derived from %s trials\n - Energy source: %d (1=TARGET, 2=NOISE)\n - Convolve type: %s\n - IV type: %s\n', ...
+    subjName, nblocks, nORI, nSF, ni, namesLocComb{iLocComb}, iModelA, namesModelA{iModelA}, namesType{itype_template}, flag_PatchMode, namesConvolveType{convolveType}, namesIVType{IVType})
 
 %% Load
 if flag_PatchMode == 1, namePatchMode = 'T'; else, namePatchMode = 'N'; end
 if isnumeric(isubj)
     % behavioral measurement
-    load(sprintf('%s/Data_OOD_%d%d/%s%d/%s_behavMeas.mat', nameFolder_Data, nORI, nSF, subjName, nblocks, subjName));
+    load(sprintf('%s/%s%d/%s_behavMeas.mat', nameFolder_Data_OOD, subjName, nblocks, subjName));
     % energy
-    load(sprintf('%s/Data_OOD_%d%d/%s%d/%s_energy_%s_%d_%d.mat', nameFolder_Data, nORI, nSF, subjName, nblocks, subjName, namePatchMode, nORI, nSF));
+    load(sprintf('%s/%s%d/%s_energy_%s_%d_%d.mat', nameFolder_Data_OOD, subjName, nblocks, subjName, namePatchMode, nORI, nSF));
 else
     % behavioral measurement
-    load(sprintf('%s/%s/behavMeas_c%.1f.mat', nameFolder_Data, nameFolder_OOD, criterion_true));
+    load(sprintf('%s/behavMeas_c%.1f.mat', nameFolder_OOD_load, criterion_true));
     % energy
-    load(sprintf('%s/%s/energy_%s_%d_%d.mat', nameFolder_Data, nameFolder_OOD, namePatchMode, nORI, nSF));
+    load(sprintf('%s/energy_%s_%d_%d.mat', nameFolder_OOD_load, namePatchMode, nORI, nSF));
 end
 
 e3D_allT_train = e3D_target_allT; % e3D_allT_train is used in fxn_resampleTrials

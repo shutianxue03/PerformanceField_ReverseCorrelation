@@ -22,7 +22,7 @@ for isubj = 1:nsubj
     nblock = nblocks_allSubj(isubj);
     
     % Load behavioral measurements for each subject
-    load(sprintf('%s/Data_OOD_%d%d/%s%d/%s_behavMeas.mat', nameFolder_Data, nORI, nSF, subjName, nblock, subjName), ...
+    load(sprintf('%s/%s%d/%s_behavMeas.mat', nameFolder_Data_OOD, subjName, nblock, subjName), ...
         'cst_perSess_perLoc', 'pA3_perSess_perLoc', 'pC3_perSess_perLoc')
     
     nSess = size(cst_perSess_perLoc,1);

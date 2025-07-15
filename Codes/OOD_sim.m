@@ -1,4 +1,5 @@
 % function OOD_sim(noiseCST, gaborCST, nTrials, noiseP, iModelB_sim)
+% noiseCST=.2, gaborCST=.5, nTrials=5e3, noiseP=0, iModelB_sim=1
 clc, close all
 time_start = datetime('now')
 
@@ -15,19 +16,22 @@ SX_RC1_setting
 fprintf('\nnoiseCST=%.1f, gaborCST=%.1f, nTrials=%d, noiseP=%.3f, iModelB_sim=%d, nORI=%d\n', ...
     noiseCST, gaborCST, nTrials, noiseP, iModelB_sim, nORI)
 
+% Define the IO's name based on stim and condition parameters
+nameIO = sprintf('IO_nC%.0f_gC%.0f_nT%s_N%.3f_B%d', noiseCST*100, gaborCST*100, format_num2exp(nTrials), noiseP, iModelB_sim);
 
-% Unmute the line below on HPC
-% nameFolder_Data = 'Data/'; 
+% Define folder name to save results in Data_OOD
+nameFolder_Data_OOD_IO = sprintf('%s/%s', nameFolder_Data_OOD, nameIO);
+if isempty(dir(nameFolder_Data_OOD_IO)), mkdir(nameFolder_Data_OOD_IO), end
 
-nameFolder_NOM0 = 'Data_NOM_trialWise';
-
+%% Parameters for the simulation
 lapseRate=0;
 pC_titrate = .7; % the accuracy at which threshold is measured
-ni = 100; % 
+ni = 100; %
 iModelA_fit_all = 1;%[1, 5];  % 1: use the derived template, 5: use the ideal template
 iModelB_fit_all = iModelB_sim; % make them consistent for now; later try differ modelB for model recovery
 iLocComb = 1;
 patchMode = 1; % 1=energy calculated from target-patches; 2=from noise patches
+mode_stim = 2; % 1=use target patches, 2=use noise patches
 
 % Define the noise sampling range based on pre-set values
 noise.SF_low_sampling = noise.SF_low;
@@ -66,14 +70,6 @@ noise.ratio_base = 0.5;  % Base ratio for noise
 limit0to1 = @(x) min(max(x, 0), 1);
 nTrialsPerSess = 100;  % Number of trials per session
 
-% Define subj/condition name
-nameCond_OOD = sprintf('IO_nC%.0f_gC%.0f_nT%s_N%.3f_B%d', ...
-    noiseCST*100, gaborCST*100, format_num2exp(nTrials), noiseP, iModelB_sim);
-
-% Define folder name to save results in Data_OOD
-nameFolder_OOD_IO = sprintf('%s/Data_OOD_%d%d/IO/%s', nameFolder_Data, nORI, nSF, nameCond_OOD);
-if isempty(dir(nameFolder_OOD_IO)), mkdir(nameFolder_OOD_IO), end
-
 %% Create a pool of Gabor filters
 %------------------------%
 [filter_sin, filter_cos] = SX_sim02_setFilters(stim, noise.filtersSF_all, filtersOri_all, fxn_getSigma_SPdomain, 0);
@@ -89,12 +85,12 @@ fprintf('\nPool of filters created: nORI=%d, nSF=%d\n', length(filtersOri_all), 
 %     isubplot = 1;
 %     for iSF=ind_plot
 %         subplot(5,6, isubplot)
-% 
+%
 %         imagesc(filter_sin{iORI, iSF})
-% 
+%
 %         template_true = SX_RC4_Energy_parfor(stim.mask, filter_sin(iORI, iSF), filter_sin, filter_cos);
 %         template_true = squeeze(template_true);
-% 
+%
 %         imagesc(axis_tuning{2}, axis_tuning{1}, template_true)
 %         xline(axis_tuning{2}(iSF), 'r-', 'linewidth', 2);
 %         yline(axis_tuning{1}(iORI), 'r-', 'linewidth', 2);
@@ -112,16 +108,15 @@ stim.gaborSD = fxn_getSigma_SPdomain(stim.gaborSF);
 template_true = exp_CreateGabor(stim, cst_ln_template);
 template_true = SX_RC4_Energy_parfor(stim.mask, {template_true}, filter_sin, filter_cos);
 template_true = squeeze(template_true);  %  Remove singleton dimension
-% new_max =.15; new_min = -.05; % given these params, the peak of SF tuning is negative
 new_max =.4; new_min = -.05;
 template_true = (template_true * (new_max - new_min)) + new_min; % scale the signal energy to roughly match the range of templates derived from subbj data
-save(sprintf('%s/Data_OOD_%d%d/signalEnergy', nameFolder_Data, nORI, nSF), 'template_true')
+save(sprintf('%s/signalEnergy', nameFolder_Data_OOD), 'template_true')
 
 %% Simulate stimuli and responses
 nPairs = nTrials / 2;  % Half the trials are pairs
 nSess = nTrials / nTrialsPerSess;  % Number of sessions
 
-% define iPRS, iPass and iPair of each pair in two passess
+% Define iPRS, iPass and iPair of each pair in two passess
 iPRS_allT_OnePass = [ones(nPairs/2, 1); zeros(nPairs/2, 1)];
 iPRS_allT = [iPRS_allT_OnePass; iPRS_allT_OnePass]; %1=PRS, 0=ABS
 iPair_allT = [1:nPairs,1:nPairs]';
@@ -130,71 +125,88 @@ iSess_allT = repmat(1:nSess, 1, nTrialsPerSess)';
 
 % Preallocate data structures for performance and energy
 dataMatrix = nan(nTrials, 11);  % Stores trial data
-e3D_target_allT = nan(nTrials, nORI, nSF);  % Noise energy for each trial
-% e3D_noise_allT = e3D_target_allT;  % Target energy for each trial
-IV_sim_allT = nan(nTrials, 1);  % Internal variable for each trial
+e3D_target_allT = nan(nTrials, nORI, nSF);  % Nnergy for each trial
+e3D_noise_allT = e3D_target_allT;
+IV_target_sim_allT = nan(nTrials, 1);  % Internal variable for each trial
+IV_noise_sim_allT = IV_target_sim_allT;
 
 % Parallel loop to simulate responses for each pair of trials
 mask = stim.mask;
 ratio_base = noise.ratio_base;
 ratio_gaborInTgt = noise.ratio_gaborInTgt;
 
-
+% Loop through each pair of trials
 fprintf('\nRunning simulation (%d pairs): \n', nPairs)
 parfor iPair = 1:nPairs
+
     % Create the signal Gabor patch
     gabor = exp_CreateGabor(stim, stim.gaborCST, 0);
-    
+
     % Generate filtered noise
     filtered_noise = exp_CreateFilteredNoise(noise);
-    
+
     % Create stimulus patches (signal-present and absent)
     stim_PRS = limit0to1(ratio_base + gabor * ratio_gaborInTgt + filtered_noise) .* mask + ratio_base * (1 - mask);
     stim_ABS = limit0to1(ratio_base + filtered_noise) .* mask + ratio_base * (1 - mask);
-    
-    % Select the correct stimulus for the current trial
-    % Target Patch - what was presented on the screen
+
+    % Select the target patch based on the PRS/ABS condition
     if iPRS_allT(iPair)==1, patch_target = stim_PRS;
     else, patch_target = stim_ABS;
     end
-    
-    % Calculate energy of the noise and target
+    patch_noise = stim_ABS;  % Noise patch is always the same for both conditions
+
+    % Calculate energy profile of the stimulus
     e3D_target = SX_RC4_Energy_parfor(mask, {patch_target}, filter_sin, filter_cos);
     e3D_target = squeeze(e3D_target);  % Remove singleton dimensions
-    
+    e3D_noise = SX_RC4_Energy_parfor(mask, {patch_noise}, filter_sin, filter_cos);
+    e3D_noise = squeeze(e3D_noise);  % Remove singleton dimensions
+
     % Compute internal variable (cross-correlation with template)
-    IV = sum(e3D_target .* template_true, 'all');
-    IV_sim_allT(iPair) = IV;
-    
-    % Store results
+    IV_target = sum(e3D_target .* template_true, 'all');
+    IV_target_sim_allT(iPair) = IV_target;
+    IV_noise = sum(e3D_noise .* template_true, 'all');
+    IV_noise_sim_allT(iPair) = IV_noise;
+
+    % Store data in the matrix
     if iPRS_allT(iPair)==1, dataMatrix(iPair, :) = [nan, nan, nan, nan, iLocComb, nan, nan, nan, nan, nan, stim.gaborCST];
     else, dataMatrix(iPair, :) = [nan, nan, nan, nan, iLocComb, nan, nan, nan, nan, nan, 0];
     end
-    
+
+    % Store energy profile
     e3D_target_allT(iPair, :, :) = e3D_target;
-    
+    e3D_noise_allT(iPair, :, :) = e3D_noise;
+
     % Display progress
-    if mod(iPair, nPairs/20) == 0
-    fprintf('%d/%d = ', iPair, nPairs)
-    end
-    
-end % iPair
+    if mod(iPair, nPairs/20) == 0, fprintf('%d/%d \n', iPair, nPairs), end
+
+end % end of iPair
 fprintf('\nDONE\n')
 
 %% Copy information from pass A to pass B
 % Since each pair of trials is simulated twice (once in each pass), copy results from pass A to pass B
 dataMatrix(nPairs+1:end, :, :) = dataMatrix(1:nPairs, :, :);
-IV_sim_allT(nPairs+1:end, :) = IV_sim_allT(1:nPairs, :);
-% e3D_noise_allT(nPairs+1:end, :, :) = e3D_noise_allT(1:nPairs, :, :);  % Copy noise energy
+IV_target_sim_allT(nPairs+1:end, :) = IV_target_sim_allT(1:nPairs, :);
+IV_noise_sim_allT(nPairs+1:end, :) = IV_noise_sim_allT(1:nPairs, :);
+e3D_noise_allT(nPairs+1:end, :, :) = e3D_noise_allT(1:nPairs, :, :);  % Copy noise energy
 e3D_target_allT(nPairs+1:end, :, :) = e3D_target_allT(1:nPairs, :, :);  % Copy target energy
 
 % Assert that pass A and pass B results are identical (for validation)
-% assert(sum(e3D_noise_allT(nPairs+1:end, :, :) - e3D_noise_allT(1:nPairs, :, :), 'all') == 0)
 assert(sum(e3D_target_allT(nPairs+1:end, :, :) - e3D_target_allT(1:nPairs, :, :), 'all') == 0)
-save(sprintf('%s/energy_T_%d_%d.mat', nameFolder_OOD_IO, nORI, nSF), 'e3D_target_allT')
-fprintf('\n========== Simulated data saved ========== \n')
+assert(sum(e3D_noise_allT(nPairs+1:end, :, :) - e3D_noise_allT(1:nPairs, :, :), 'all') == 0)
+
+%% Save behavioral and energy data for this IO
+save(sprintf('%s/behavMeas.mat', nameFolder_Data_OOD_IO), 'dataMatrix')
+save(sprintf('%s/energy_T_%d_%d.mat', nameFolder_Data_OOD_IO, nORI, nSF), 'e3D_target_allT')
+save(sprintf('%s/energy_N_%d_%d.mat', nameFolder_Data_OOD_IO, nORI, nSF), 'e3D_noise_allT')
+
+fprintf('\n========== Saved simulated behav data and energy ========== \n')
 
 %% Sample internal noise and calculate response for each trial
+switch mode_stim
+    case 1, IV_sim_allT = IV_target_sim_allT;
+    case 2, IV_sim_allT = IV_noise_sim_allT;
+end
+
 % Add noise to the internal variable (IV) to simulate trial-by-trial variability
 switch iModelB_sim
     case 1, Nmul=0; SDadd=noiseP;
@@ -243,7 +255,7 @@ for iPairUnik = 1:nPairs
 end
 pA = mean(respC);  % Average response consistency across pairs
 metrics_sim = [dprime, c, pC, pHit, pFA, pA];  % Collect all behavioral metrics
-save(sprintf('%s/behavMeas_c%.1f.mat', nameFolder_OOD_IO, criterion_true), 'dataMatrix', 'metrics_sim')
+save(sprintf('%s/behavMeas_c%.1f.mat', nameFolder_NOM_IO, criterion_true), 'dataMatrix', 'metrics_sim')
 
 %% Plot performance (optional)
 % Define figure folder for histogram
@@ -282,14 +294,14 @@ e3D_norm = normEnergy(e3D_allT, dataMatrix(:, 11), iPRS_allT);
 kernels2D = SX_RC6_kernel_parfor(e3D_norm, dataMatrix, filtersSF_all, filtersOri_all);
 
 % Save the derived kernels for future use
-save(sprintf('%s/kernels_c%.1f.mat', nameFolder_OOD_IO, criterion_true), 'kernels2D', 'criterion_true')
+save(sprintf('%s/kernels_c%.1f.mat', nameFolder_NOM_IO, criterion_true), 'kernels2D', 'criterion_true')
 fprintf('\n========== Kernels saved ========== \n\n\n')
 
 %% Fit trial-wise model to simulated data
 for iModelA_fit = iModelA_fit_all
-    OOD_NOM_trialWise_beforeEst({nameCond_OOD, criterion_true}, iLocComb, iModelA_fit, ni, nameFolder_NOM0, nORI);
+    OOD_NOM_trialWise_beforeEst({nameFile_IO, criterion_true}, iLocComb, iModelA_fit, ni, nameFolder_Data, nameFolder_NOM);
     for iModelB_fit = iModelB_fit_all
-        OOD_NOM_trialWise_Est({nameCond_OOD, criterion_true}, iLocComb, iModelA_fit, iModelB_fit, ni, nameFolder_NOM0, nORI)
+        OOD_NOM_trialWise_Est({nameFile_IO, criterion_true}, iLocComb, iModelA_fit, iModelB_fit, ni, nameFolder_Data, nameFolder_NOM)
     end
 end
 fprintf('\n\n============= CRITERION=%.1f DONE =============\n\n', criterion_true)
@@ -297,7 +309,7 @@ fprintf('\n\n============= CRITERION=%.1f DONE =============\n\n', criterion_tru
 
 %% Clean up variables for next iteration
 clear *allT e2D* e3D* kernels2D* dataMatrix
-delete(sprintf('%s/energy_T_%d_%d.mat', nameFolder_OOD_IO, nORI, nSF))
+delete(sprintf('%s/energy_T_%d_%d.mat', nameFolder_NOM_IO, nORI, nSF))
 
 time_end = datetime('now')
 

@@ -140,7 +140,7 @@ clear filters* kernels* nparams*  pV* R2* % do NOT delete isubj, subjList, nBloc
 clear repInd_allT answer_allT correctness_allT tgtPrs_allT 
 
 %% save data
-nameFile_BehavMeas = sprintf('%s/Data_OOD_%d%d/%s%d/%s_behavMeas.mat', nameFolder_Data, nORI, nSF, subjName, nBlocks, subjName);
+nameFile_BehavMeas = sprintf('%s/%s%d/%s_behavMeas.mat', nameFolder_Data_OOD, subjName, nBlocks, subjName);
 fprintf('  Updating behav data...')
 tic
 save(nameFile_BehavMeas, '*_perLoc', '*_perBlk', '*_perComb', '-append')
