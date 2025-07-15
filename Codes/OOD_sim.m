@@ -307,9 +307,9 @@ fprintf('\n========== Kernels saved ========== \n\n\n')
 
 %% Fit trial-wise model to simulated data
 for iModelA_fit = iModelA_fit_all
-    OOD_NOM_trialWise_beforeEst({nameIO, criterion_true}, iLocComb, iModelA_fit, ni, nameFolder_Data_OOD, nameFolder_NOM_IO);
+    OOD_NOM_Trialwise_beforeEst({nameIO, criterion_true}, iLocComb, iModelA_fit, ni);
     for iModelB_fit = iModelB_fit_all
-        OOD_NOM_trialWise_Est({nameIO, criterion_true}, iLocComb, iModelA_fit, iModelB_fit, ni, nameFolder_Data_OOD, nameFolder_NOM_IO)
+        OOD_NOM_Trialwise_Est({nameIO, criterion_true}, iLocComb, iModelA_fit, iModelB_fit, ni)
     end
 end
 fprintf('\n\n============= CRITERION=%.1f DONE =============\n\n', criterion_true)

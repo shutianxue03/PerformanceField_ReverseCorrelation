@@ -1,5 +1,5 @@
 
-function OOD_NOM_trialWise_beforeEst(isubj, iLocComb, iModelA, ni)
+function OOD_NOM_Trialwise_beforeEst(isubj, iLocComb, iModelA, ni)
 % The previous version is in OOD_NOM_trialWise, which makes
 % predictions for each model from different binned IVs
 % INPUT
@@ -13,7 +13,7 @@ function OOD_NOM_trialWise_beforeEst(isubj, iLocComb, iModelA, ni)
 close all, warning off, format compact
 time_start = datetime('now')
 
-addpath(genpath('Data/Data_OOD'))
+% addpath(genpath('Data/Data_OOD'))
 % addpath(genpath('Data/Data_model')) % Data_model or Data_NOM??
 addpath(genpath('Codes/fxn_NOM'))
 addpath(genpath('Codes/fxn_RCplot'))
@@ -28,10 +28,10 @@ SX_RC1_setting
 iSess_start = 1; % from which session data is taken into account
 templateType = 1; % (1) mirrored kernel (2) positive kernel (3) reconstructed kernel
 itype_template = 2; % 1=estimate template from PRS trials, ABS trials, or BOTH trials
-convolveType=1; % IV is calcluated by 1=cross correlation of template and stim energy; 2=convolution [fxn_getIV_v3]
-IVType=1; % 1=sum, 2=the max [fxn_getIV_v3]
-flag_PatchMode=1; %1=use target patches; 2=use noise patches
-flag_standEnergy=1; % 1=standardize (z-score) energy
+convolveType = 1; % IV is calcluated by 1=cross correlation of template and stim energy; 2=convolution [fxn_getIV_v3]
+IVType = 1; % 1=sum, 2=the max [fxn_getIV_v3]
+flag_PatchMode = 2; %1=use target patches; 2=use noise patches
+flag_standEnergy = 1; % 1=standardize (z-score) energy
 flag_plotIVsDist = 0;
 ratio_train = 3/4; % proportion of trials in the training set (to derive 2D kernels); others are in the test set (to estimate params)
 ORI_bound = [10, 20];
@@ -49,11 +49,12 @@ else % IO
     criterion_true = isubj{2};
     nblocks=0;
     nameFolder_OOD_load = sprintf('%s/%s', nameFolder_Data_OOD, subjName);% To Load behav & energy
-    nameFolder_NOM_save = sprintf('%s/%s_c%.1f', nameFolder_Data_NOM_Trialwise, subjName, criterion_true);% To Save results
+    nameFolder_NOM_save = sprintf('%s/%s', nameFolder_Data_NOM_Trialwise, subjName);% To Save results
 end
 if isempty(dir(nameFolder_NOM_save)), mkdir(nameFolder_NOM_save), end
 
-nameFile_ModelIDVD_beforeEst = sprintf('%s/n%d_A%d_beforeEst', nameFolder_NOM_save, ni, iModelA); 
+% Set names of directories for saving data
+nameFile_beforeEst = sprintf('%s/n%d_A%d_beforeEst', nameFolder_NOM_save, ni, iModelA);
 
 % PRINT
 fprintf('\nSubject/IO name: %s [nblocks = %d] [nORI=%d | nSF=%d]\n - Number of iterations (ni) = %d\n - Location: %s\n - A%d [%s]\n - Template derived from %s trials\n - Energy source: %d (1=TARGET, 2=NOISE)\n - Convolve type: %s\n - IV type: %s\n', ...
@@ -65,18 +66,25 @@ if isnumeric(isubj)
     % behavioral measurement
     load(sprintf('%s/%s%d/%s_behavMeas.mat', nameFolder_Data_OOD, subjName, nblocks, subjName));
     % energy
-    load(sprintf('%s/%s%d/%s_energy_%s_%d_%d.mat', nameFolder_Data_OOD, subjName, nblocks, subjName, namePatchMode, nORI, nSF));
+    load(sprintf('%s/%s%d/%s_energy_%s_%d_%d.mat', nameFolder_OOD_load, subjName, nblocks, subjName, namePatchMode, nORI, nSF));
 else
     % behavioral measurement
-    load(sprintf('%s/behavMeas_c%.1f.mat', nameFolder_OOD_load, criterion_true));
+    load(sprintf('%s/behavMeas.mat', nameFolder_OOD_load));
     % energy
     load(sprintf('%s/energy_%s_%d_%d.mat', nameFolder_OOD_load, namePatchMode, nORI, nSF));
 end
 
-e3D_allT_train = e3D_target_allT; % e3D_allT_train is used in fxn_resampleTrials
-e3D_allT_test = e3D_target_allT; % e3D_allT_test is used in fxn_resampleTrials
-
 fprintf('Behav and energy LOADED\n\n')
+
+% Determine the type of energy to use based on flag_PatchMode
+switch flag_PatchMode
+    case 1
+        e3D_allT_train = e3D_target_allT; % e3D_allT_train is used in fxn_resampleTrials
+        e3D_allT_test = e3D_target_allT; % e3D_allT_test is used in fxn_resampleTrials
+    case 2
+        e3D_allT_train = e3D_noise_allT; % e3D_allT_train is used in fxn_resampleTrials
+        e3D_allT_test = e3D_noise_allT; % e3D_all
+end
 
 % Check if the iPRS of each pair are the same
 for ipair = 1:max(dataMatrix(:, 8))
@@ -92,7 +100,7 @@ nSess = length(unique(dataMatrix(:, 2)));
 ntrials_perSingleLoc = sum(dataMatrix(:, 5)==1);
 iSess_select = iSess_start:nSess; % the index of selected sessions, used in fxn_resampleTrials
 
-% Handle special cases for subject 'RE'
+% Handle special cases for subject 'RE' due to missing sessions
 if strcmp(subjName, 'RE'), iSess_select = [1:15, 17:23, 25:nSess]; ntrials_perSingleLoc = length(iSess_select)*100; end
 
 % Assign location combination based on iLocComb input
@@ -118,59 +126,59 @@ for ii = 1:ni
     %----------------%
     fxn_resampleTrials
     %----------------%
-    
+
     % standardize the energy for the training set
     switch itype_template
         case 1
             e3D_train = e3D_train(iPRS_train, :, :);
             cst_train = cst_train(iPRS_train);
-            resp_train = resp_train(boolean(iPRS_train));
+            resp_train = resp_train(iPRS_train);
             iPRS_train = iPRS_train(iPRS_train);
         case 2
-            e3D_train = e3D_train(boolean(1-iPRS_train), :, :); % only use signal-ABS trials to derive the template
-            cst_train = cst_train(boolean(1-iPRS_train));
-            resp_train = resp_train(boolean(1-iPRS_train));
-            iPRS_train = iPRS_train(boolean(1-iPRS_train));
+            e3D_train = e3D_train(iPRS_train==0, :, :); % only use signal-ABS trials to derive the template
+            cst_train = cst_train(iPRS_train==0);
+            resp_train = resp_train(iPRS_train==0);
+            iPRS_train = iPRS_train(iPRS_train==0);
     end
-    
+
     if flag_standEnergy
         e3D_train_norm = normEnergy(e3D_train, cst_train, iPRS_train);
     else
         e3D_train_norm = e3D_train;
     end
-    
+
     % Calculate 2D kernel from the TRAINING set
     kernel2D = SX_sim07_RC(filtersSF_all, filtersOri_all, e3D_train_norm, resp_train); % 5 seconds
     %         figure, imagesc(kernel2D), axis square
-    
+
     % Calculate performance metrics for the TEST set
     pHit = mean(iPRS_test==1 & resp_test==1)*2;
     pFA = mean(iPRS_test==0 & resp_test==1)*2;
     pC = (pHit+1-pFA)/2;
     [d,c] = SX_sim06_SDT(pHit, pFA);
     metrics_test = [d,c, [pC, pHit, pFA], nanmean(respC_test)]; % dprime, criterion, pC, pHit, pFA, pA, pA_PRS, pA_ABS
-    
+
     clear data % as the size of IV differs across subjects
-    
+
     %%%%%%%%%%%%%%%%%%%%%%%%
     %  calculate internal variable
     %%%%%%%%%%%%%%%%%%%%%%%%
     % 1. Derive the Template from the TRAINING set
     if iModelA== 3 % use IO template (the energy profile of the signal)
-        load(sprintf('%s/Data_OOD_%d%d/signalEnergy.mat', nameFolder_Data, nORI, nSF), 'template_true');
+        load(sprintf('%s/signalEnergy.mat', nameFolder_Data, nORI, nSF), 'template_true'); % nameFolder_Data is created in SX_RC1_setting
         template = template_true;
     else
         flag_plot = 0;
         template = fxn_getTemplate(kernel2D, templateType, flag_plot);
     end
-    
+
     % 2. Calculate the Internal variable (IV)
     IV = fxn_getIV_v3(iModelA, e3D_test, convolveType, IVType, template, ORI_bound);
     ndata = length(IV);
-    
+
     % bin IV values
     [nTrials_allBins, ~, iTrial4Bin] = histcounts(IV, nBins);
-    
+
     % Compile data for the current iteration
     data.ndata = ndata;
     data.IV=IV;
@@ -184,14 +192,14 @@ for ii = 1:ni
     data.metrics_sim = metrics_test; % keep the field name 'metrics_sim'!!
     data_allB{ii} = data;
     data_metrics_allB(ii, :) = metrics_test;
-    
+
     %     fprintf('%d ', ii)
 end % end of ii
 
 fprintf('\n\nALL iterations DONE\n')
 
 % SAVE
-save(nameFile_ModelIDVD_beforeEst, '*_allB', 'names*', 'flag*', 'ratio_train', 'ORI_bound', '*Type')
+save(nameFile_beforeEst, '*_allB', 'names*', 'flag*', 'ratio_train', 'ORI_bound', '*Type')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if flag_plotIVsDist, ModelPlot_local_perSubj, end

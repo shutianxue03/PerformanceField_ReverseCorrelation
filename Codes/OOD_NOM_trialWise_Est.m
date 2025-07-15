@@ -1,4 +1,4 @@
-function OOD_NOM_trialWise_Est(isubj, iLocComb, iModelA, iModelB, ni, nameFolder_NOM0, nORI)
+function OOD_NOM_Trialwise_Est(isubj, iLocComb, iModelA, iModelB, ni, nameFolder_NOM0, nORI)
 
 % To estimate parameters for trial-wise NOM 
 
