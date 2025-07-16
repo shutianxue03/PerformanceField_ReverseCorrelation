@@ -1,7 +1,45 @@
-% function OOD_sim(noiseCST, gaborCST, nTrials, noiseP, iModelB_sim)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% % Script name: OOD_sim.m
+% Script type: function
+% Author: Shutian Xue
+% Date created: 
+% Last updated: 07/15/2025
+
+% Description: 
+%       This script simulates observer responses based on a trialwise noisy observer model (NOM), and fits the model to the simulated data.
+
+% Example:
+%       noiseCST=.2, gaborCST=.5, nTrials=5e3, noiseP=0, iModelB_sim=5
+%       OOD_sim(noiseCST, gaborCST, nTrials, noiseP, iModelB_sim)
+
+% Inputs:
+%       noiseCST: contrast of noise patches (0-1)
+%       gaborCST: contrast of Gabor patches (0-1)
+%       nTrials: Total number of trials (>1000)
+%       noiseP: Noise parameter (can be both SDadd and Nmul)
+%       iModelB_sim: Model index for simulation 
+%               1 = estimate lapse rate, additive noise (SDadd) and criterion;
+%               2 = estimate lapse rate, multiplicative noise (Nmul) and criterion;
+%               3 = estimate lapse rate and criterion;
+%               4 = estimate  additive noise (SDadd) and criterion;
+%               5 = estimate multiplicative noise (Nmul) and criterion;
+
+% Outputs:
+%       Simulated data and energy profiles saved in the specified directories.
+
+% Dependencies: none
+% Notes: none
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+function OOD_sim(noiseCST, gaborCST, nTrials, noiseP, iModelB_sim)
 % noiseCST=.2, gaborCST=.5, nTrials=5e3, noiseP=0, iModelB_sim=1
+
 clc, close all
 time_start = datetime('now')
+
+% Go to the directory
+cd Codes/
 
 % Add paths for custom functions
 addpath(genpath('fxn_exp'))  % Path to experimental functions
@@ -322,6 +360,7 @@ clear *allT e2D* e3D* kernels2D* dataMatrix
 time_end = datetime('now')
 
 time_end - time_start
+end 
 
 function loss = fxn_loss_pC(criterion_potential, pC_titrate, IV_noisy_sim_allT, iPRS_allT)
 resp_allT = IV_noisy_sim_allT > criterion_potential;

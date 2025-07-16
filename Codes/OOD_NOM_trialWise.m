@@ -10,7 +10,7 @@ function OOD_NOM_Trialwise(isubj, iLocComb, iModelA, ni)
 % generate IVs
 fprintf('\n\n=====================\nGenerating IVs\n=====================\n\n')
 nameFolder_Data = '/Volumes/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC/Data';
-nameFolder_NOM0 = 'Data_NOM_trialWise';
+% nameFolder_NOM0 = 'Data_NOM_trialWise';
 OOD_NOM_Trialwise_beforeEst(isubj, iLocComb, iModelA, ni, nameFolder_Data, nameFolder_NOM0);
 
 % fit different models to IVs and make predictions

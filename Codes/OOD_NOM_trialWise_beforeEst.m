@@ -13,12 +13,10 @@ function OOD_NOM_Trialwise_beforeEst(isubj, iLocComb, iModelA, ni)
 close all, warning off, format compact
 time_start = datetime('now')
 
-% addpath(genpath('Data/Data_OOD'))
-% addpath(genpath('Data/Data_model')) % Data_model or Data_NOM??
-addpath(genpath('Codes/fxn_NOM'))
-addpath(genpath('Codes/fxn_RCplot'))
-addpath(genpath('Codes/fxn_analysis_RC_v2'))
-addpath(genpath('Codes/SX_toolbox/bads-master'))
+addpath(genpath('fxn_NOM'))
+addpath(genpath('fxn_RCplot'))
+addpath(genpath('fxn_analysis_RC_v2'))
+addpath(genpath('SX_toolbox/bads-master'))
 
 %% general params
 %--------------%

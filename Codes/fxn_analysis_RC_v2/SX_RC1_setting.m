@@ -1,6 +1,18 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% % Script name: SX_RC1_setting.m
+% Script type: script
+% Author: Shutian Xue
+% Date created: 
+% Last updated: 07/16/2025
+
+% Description:
+%   This script creates the settings for the PF-RC ANALYSIS pipeline.
+%   It defines experimental settings (folder paths), global parameters (stimulus and noise properties), model fitting settings, names (in strings), and plotting styles.
+%   The script is intended to be run at the start of most analysis scripts to ensure consistency and reproducibility across all modeling
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Define number of ORI (and SF) channels
-% we assume nORI=nSF
 nORI = 29;
 nSF = nORI;
 
@@ -20,15 +32,25 @@ nameFolder_Figures = sprintf('%s/Figures', nameFolder_server) ;
 % Define the function to normalize Gabor SD
 fxn_getSigma_SPdomain = @(SF) 3 * sqrt(2*log(2)) / (2 * pi * SF);
 
-%%
+%%  Global parameters
 nBins=10;
 binStrategy_all = {'equal', 'algorithm', 'manual'};
 eyeD_all = [1,1,0,1,1,1,1,1,0,0,1,0]; % 1=right eye dominant; 0=left eye dominant
 flag_block200 = 0; % 1; all observers are forced to have 200 blocks; 0=no
 markers_allSubj = {'o', 's', 'd', '^', 'v', '<', '>', '+', 'p', 'h', 'x', 'o', 's', 'd', '^'};
 nMarkersMax = 11;  % Maximum number of different markers to use in plotting
+nbins_e = 5; % number of energy bins
+nitp = 2;% number of multiples of interpolated pints
+nLoc8 = 8;
+nLoc5 = 5;
+nLoc2 = 2;
+nlines = 2;
+CI_ratio = .68;
 
-%% Exp params
+threshPerf = .7;
+dprime_theo = norminv(threshPerf)-norminv(1-threshPerf); % corresponding to 75% accuracy
+
+%% Stimulus and noise parameters
 ppd = 32;  % Pixels per degree
 sz_dva = 3;  % Size of stimulus in degrees of visual angle
 sz_pix = sz_dva * ppd;  % Convert size to pixels
@@ -65,19 +87,7 @@ params.stim=stim;
 params.noise=noise;
 % save('Data_OOD/params', 'params')
 
-%%
-nbins_e = 5; % number of energy bins
-nitp = 2;% number of multiples of interpolated pints
-nLoc8 = 8;
-nLoc5 = 5;
-nLoc2 = 2;
-nlines = 2;
-CI_ratio = .68;
-
-threshPerf = .7;
-dprime_theo = norminv(threshPerf)-norminv(1-threshPerf); % corresponding to 75% accuracy
-
-%% get ORI/SF filters
+%% Settings for ORI/SF filter
 % ORI filter
 switch nORI
     case 29, fOri = [5:5:50, 60:10:90]; % nORI=29
@@ -104,7 +114,7 @@ filtersSF_all = noise.filtersSF_all(cut_SF);
 noise.SF_low_sampling = noise.SF_low;
 noise.SF_high_sampling = noise.SF_high;
 
-%% ticks and labels
+%% Ticks and labels
 axis_tuning{1} = filtersOri_all - 90;
 axis_tuning{2} = filtersSF_all_log;
 axisTicks_tuning = {-90:45:90, linspace(log2(noise.SF_low), log2(noise.SF_high), 5)}; % ticks (SF is on log scale)
@@ -114,7 +124,7 @@ axisLim = {[-99, 99], [-.1, 2.1]};
 limit0to1 = @(x) min(max(x, 0), 1);
 nTrialsPerSess = 100;  % Number of trials per session
 
-%% index
+%% Index
 combInd = [1,8; 6,7; 5,3; 2,4; 1,6;1,7];
 ncomb = size(combInd, 1);
 plotInd = [1:ncomb; ncomb+1:2*ncomb];
@@ -124,7 +134,7 @@ ncomb2 = 2;
 ncomb6 = 6;
 ncomb8 = 8;
 
-%% Model params (for fitting tunig curves)
+%% Tuning function params
 % names of the MODEL
 namesFamily_all = {
     'Gaussian', ... % M1
@@ -201,8 +211,8 @@ lb_full_all = {
 % ============================================
 fitMode = 2; % 1 = SSE, 2 = MLE;
 
-
 %% Names
+% General names
 namesMetrics = {'dprime', 'criterion', 'pC', 'pHit', 'pFA', 'pA', 'pA1', 'pA0', 'CS'}; nmetrics = length(namesMetrics);
 namesFeature = {'ORI', 'SF'}; nFeatures = length(namesFeature);
 namesType = {'PRS', 'ABS', 'BOTH'}; nTypes = length(namesType);
@@ -219,7 +229,7 @@ namesTitles3 = {'', 'Meridian', 'Vertical Meridian', 'HM'}; % in black
 namesIC = {'AIC', 'AICc', 'BIC'}; nICs = length(namesIC);
 publishOptions = struct('format','pdf','outputDir','publishedPDFs/', 'showCode', 0);
 
-% MC
+% Model comparison names
 namesMCmode = {'10-CV', 'LOOCV',   'InfoCriterion'}; nMCmode = length(namesMCmode);
 namesMCmode_long = {'10-fold cross validation (deviance is nLL)', ...
     'Leave-One-Out CV (deviance is nLL)', ...
@@ -228,7 +238,7 @@ namesYLabel = {'Deviance', 'Deviance', 'IC'};
 
 namesParamsMode = {'estP', 'tunC'};
 
-% model
+% Noisy observer model names
 namesModelA = {'Core', 'RandTemp', 'IO-Core'};
 % nModelsA = length(namesModelA);
 
@@ -248,7 +258,7 @@ nNormTests = length(namesNormalityTest);
 namesConvolveType = {'dot product', 'convolution'}; nConvolveType = length(namesConvolveType);
 namesIVType = {'sum all channels', 'channel with max IV'}; nIVType = length(namesIVType);
 
-% plot
+% For plotting
 namesFeature_axis = {'Orientation (deg)', 'Spatial frequency (cpd)'};
 % names of the estParams/tuningC
 clear namesTunC_unit_perF
@@ -263,7 +273,7 @@ namesTunC_unit_perF{8,2} = {'Pref ORI (deg)', 'peak amp. (a.u.)', 'trough ori (d
 namesTunC_unit_perF{12,2} = {'peak SF1 (cpd)', 'peak amp. 1 (a.u.)', 'bandwidth 1 (octave)', 'peak SF2 (cpd)', 'peak amp. 2 (a.u.)', 'bandwidth 2 (octave)'};
 namesTunC_unit_perF{13,2} = {'peak amp. (a.u.)', 'trough ori (deg)', 'trough mag, (a.u.)', 'bandwidth (deg)', 'baseline (a.u.)'};
 
-%%
+%% Colors
 colors_comb = [
     0,0,0; ...,     % center; black
     0, .75, 0; ..., % Left: light green
