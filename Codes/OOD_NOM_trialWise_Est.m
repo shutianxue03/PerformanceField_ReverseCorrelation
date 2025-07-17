@@ -64,8 +64,8 @@ else % IO
     criterion_true = isubj{2};
     nblocks=0;
     % nameFolder_NOM = sprintf('%s/ORI%dSF%d/IO/%s_c%.1f', nameFolder_NOM0, nORI, nSF, subjName, criterion_true);% To Save results
-    nameFolder_OOD_load = sprintf('%s/%s', nameFolder_Data_OOD, subjName); % To Load behav & energy
-    nameFolder_NOM_save = sprintf('%s/%s', nameFolder_Data_NOM_Trialwise, subjName); % To Save results
+    nameFolder_OOD_load = sprintf('%s/%s', nameFolder_Data_OOD, subjName); % To load behav & energy
+    nameFolder_NOM_save = sprintf('%s/%s', nameFolder_Data_NOM_Trialwise, subjName); % To save results for IO
 end
 
 if isempty(dir(nameFolder_NOM_save)), mkdir(nameFolder_NOM_save), end

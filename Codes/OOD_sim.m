@@ -33,13 +33,10 @@
 
 
 function OOD_sim(noiseCST, gaborCST, nTrials, noiseP, iModelB_sim)
-% noiseCST=.2, gaborCST=.5, nTrials=5e3, noiseP=0, iModelB_sim=1
+% noiseCST=.2, gaborCST=.5, nTrials=5e3, noiseP=0, iModelB_sim=4
 
 clc, close all
 time_start = datetime('now')
-
-% Go to the directory
-cd Codes/
 
 % Add paths for custom functions
 addpath(genpath('fxn_exp'))  % Path to experimental functions
@@ -69,7 +66,7 @@ if isempty(dir(nameFolder_Data_NOM_IO)), mkdir(nameFolder_Data_NOM_IO), end
 lapseRate=0;
 pC_titrate = .7; % the accuracy at which threshold is measured
 ni = 100; %
-iModelA_fit_all = 1;%[1, 5];  % 1: use the derived template, 5: use the ideal template
+iModelA_fit_all = [1,3];% 1=core model, 2=randomize template, 3=use IO template
 iModelB_fit_all = iModelB_sim; % make them consistent for now; later try differ modelB for model recovery
 iLocComb = 1;
 patchMode = 'N'; % 'T'=energy calculated from target-patches; 'N'=from noise patches
