@@ -21,7 +21,7 @@
 %               1 = estimate lapse rate, additive noise (SDadd) and criterion;
 %               2 = estimate lapse rate, multiplicative noise (Nmul) and criterion;
 %               3 = estimate lapse rate and criterion;
-%               4 = estimate  additive noise (SDadd) and criterion;
+%               4 = estimate additive noise (SDadd) and criterion;
 %               5 = estimate multiplicative noise (Nmul) and criterion;
 
 % Outputs:
