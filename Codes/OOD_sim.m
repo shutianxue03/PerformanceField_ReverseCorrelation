@@ -215,7 +215,7 @@ parfor iPair = 1:nPairs
     e3D_noise_allT(iPair, :, :) = e3D_noise;
 
     % Display progress
-    if mod(iPair, nPairs/20) == 0, fprintf('%d/%d \n', iPair, nPairs), end
+    if mod(iPair, nPairs/10) == 0, fprintf('%d/%d \n', iPair, nPairs), end
 
 end % end of iPair
 fprintf('\nDONE\n')

@@ -120,6 +120,7 @@ data_metrics_allB = nan(ni, nmetrics);
 fprintf('Running ni = %d: ', ni)
 
 for ii = 1:ni
+    fprintf('%d ', ii)
     % Resample trials for current iteration
     %----------------%
     fxn_resampleTrials
@@ -163,7 +164,7 @@ for ii = 1:ni
     %%%%%%%%%%%%%%%%%%%%%%%%
     % 1. Derive the Template from the TRAINING set
     if iModelA== 3 % use IO template (the energy profile of the signal)
-        load(sprintf('%s/signalEnergy.mat', nameFolder_Data, nORI, nSF), 'template_true'); % nameFolder_Data is created in SX_RC1_setting
+        load(sprintf('%s/signalEnergy.mat', nameFolder_Data_OOD), 'template_true'); % nameFolder_Data is created in SX_RC1_setting
         template = template_true;
     else
         flag_plot = 0;
@@ -191,7 +192,6 @@ for ii = 1:ni
     data_allB{ii} = data;
     data_metrics_allB(ii, :) = metrics_test;
 
-    %     fprintf('%d ', ii)
 end % end of ii
 
 fprintf('\n\nALL iterations DONE\n')
