@@ -12,7 +12,7 @@ SX_RC1_setting
 %----------------
 
 nIterations = 100; % Number of iterations (100 for raw IVs, 99 for transformed IVs)
-iModelA_all = [1]; % 1=core model, 2=randomize template, 3=use IO template
+iModelA_all = [1,3],; % 1=core model, 2=randomize template, 3=use IO template
 iModelB_all = 4;
 %               1 = estimate lapse rate, additive noise (SDadd) and criterion;
 %               2 = estimate lapse rate, multiplicative noise (Nmul) and criterion;

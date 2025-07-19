@@ -35,6 +35,20 @@
 function OOD_sim(noiseCST, gaborCST, nTrials, noiseP, iModelB_sim)
 % noiseCST=.2, gaborCST=.5, nTrials=5e3, noiseP=0, iModelB_sim=4
 
+% for noiseCST = [0, .1, .5]
+%     for gaborCST = [.1, .2, .5]
+%         for nTrials = 5000
+%             for noiseP = [0, .1, .2]
+%                 for iModelB_sim = [4,5]
+%                     OOD_sim(noiseCST, gaborCST, nTrials, noiseP, iModelB_sim)
+%                 end
+%             end
+%         end
+%     end
+% end
+
+end % OOD_sim
+
 clc, close all
 time_start = datetime('now')
 
