@@ -1,4 +1,5 @@
-% Created by Shutian Xue on October 22, 2024
+% Created by Shutian Xue on 10/22/2024
+% Last edited on 07/20/2024
 
 % This simulation aims to explain the underestimation of response consistency
 % in the trial-wise noisy observer model.
