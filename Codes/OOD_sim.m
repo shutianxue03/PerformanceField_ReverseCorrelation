@@ -1,6 +1,6 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % % Script name: OOD_sim.m
-% Script type: function
+% Script type: script
 % Author: Shutian Xue
 % Date created: 
 % Last updated: 07/15/2025
@@ -32,23 +32,25 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-function OOD_sim(noiseCST, gaborCST, nTrials, noiseP, iModelB_sim)
+% function OOD_sim(noiseCST, gaborCST, nTrials, noiseP, iModelB_sim)
+noiseCST_all = [0, .1, .2, .5]; % Noise contrast sensitivity thresholds
+gaborCST_all = [.1, .5]; % Gabor contrast sensitivity thresholds
+nTrials_all = [5000]; % Number of trials per condition
+noiseP_all = [0, 0.1, 0.2]; % Proportion of noise trials
+iModelA_sim_all = [1,3]; % 1=core model, 2=randomize template, 3=use IO template
+iModelB_sim_all = [4];
 % noiseCST=.2, gaborCST=.5, nTrials=5e3, noiseP=0, iModelB_sim=4
-
-% for noiseCST = [0, .1, .5]
-%     for gaborCST = [.1, .2, .5]
-%         for nTrials = 5000
-%             for noiseP = [0, .1, .2]
-%                 for iModelB_sim = [4,5]
-%                     OOD_sim(noiseCST, gaborCST, nTrials, noiseP, iModelB_sim)
+% for noiseCST = noiseCST_all
+%     for gaborCST = gaborCST_all
+%         for nTrials = nTrials_all
+%             for noiseP = noiseP_all
+%                 for iModelB_sim = iModelB_sim_all
+%                     OOD_sim
 %                 end
 %             end
 %         end
 %     end
 % end
-
-end % OOD_sim
-
 clc, close all
 time_start = datetime('now')
 
@@ -80,8 +82,8 @@ if isempty(dir(nameFolder_Data_NOM_IO)), mkdir(nameFolder_Data_NOM_IO), end
 lapseRate=0;
 pC_titrate = .7; % the accuracy at which threshold is measured
 ni = 100; %
-iModelA_fit_all = [1,3];% 1=core model, 2=randomize template, 3=use IO template
-iModelB_fit_all = iModelB_sim; % make them consistent for now; later try differ modelB for model recovery
+iModelA_fit_all = iModelA_sim_all;% 1=core model, 2=randomize template, 3=use IO template
+iModelB_fit_all = iModelB_sim_all; % make them consistent for now; later try differ modelB for model recovery
 iLocComb = 1;
 patchMode = 'N'; % 'T'=energy calculated from target-patches; 'N'=from noise patches
 
@@ -315,26 +317,26 @@ fprintf('\n========== Saved simulated behav data  (%d trials) ========== \n', nT
 
 %% Plot performance (optional)
 % Define figure folder for histogram
-nameFolder_Fig_hist = sprintf('%s/IO/Fig', nameFolder_Data_OOD);
-if isempty(dir(nameFolder_Fig_hist)), mkdir(nameFolder_Fig_hist), end
+% nameFolder_Fig_hist = sprintf('%s/IO/Fig', nameFolder_Data_OOD);
+% if isempty(dir(nameFolder_Fig_hist)), mkdir(nameFolder_Fig_hist), end
 
-figure('Position', [0 200 600 1e3])
-subplot(2,1,1), hold on
-histogram(IV_noisy_sim_allT(iPRS_allT == 1), 'FaceColor', 'r')
-histogram(IV_noisy_sim_allT(iPRS_allT == 0), 'FaceColor', 'b')
-xline(criterion_true, 'linewidth', 2);
-xlim([min(IV_noisy_sim_allT), max(IV_noisy_sim_allT)])
+% figure('Position', [0 200 600 1e3])
+% subplot(2,1,1), hold on
+% histogram(IV_noisy_sim_allT(iPRS_allT == 1), 'FaceColor', 'r')
+% histogram(IV_noisy_sim_allT(iPRS_allT == 0), 'FaceColor', 'b')
+% xline(criterion_true, 'linewidth', 2);
+% xlim([min(IV_noisy_sim_allT), max(IV_noisy_sim_allT)])
 
-subplot(2,1,2), hold on
-plot(IV_sim_allT, resp_allT, 'ro')
-plot(IV_sim_allT, pYES_pred_allT, 'k+')
-xline(criterion_true, 'linewidth', 2); xlabel('IV space'), ylabel('Binary Resp')
-xlim([min(IV_noisy_sim_allT), max(IV_noisy_sim_allT)])
-metrics_sim_ = metrics_sim; metrics_sim_(3:6) = metrics_sim_(3:6)*100;
-sgtitle(sprintf('IV 95%% CI [%.1f, %.1f] Median = %.1f\n[TRUE] GaborCST=%.0f%%, criterion=%.1f, %s=%.2f\n[MEASURED] criterion=%.1f, pC=%.0f%%, pHit=%.0f%%, pFA=%.0f%%, pA=%.0f%%', ...
-    round(quantile(IV_noisy_sim_allT, [.05, .95, .5]), 1), ...
-    gaborCST*100, criterion_true, namesParamsModel_all{iModelB_sim}{1}, noiseP, ...
-    metrics_sim_(2:end)))
+% subplot(2,1,2), hold on
+% plot(IV_sim_allT, resp_allT, 'ro')
+% plot(IV_sim_allT, pYES_pred_allT, 'k+')
+% xline(criterion_true, 'linewidth', 2); xlabel('IV space'), ylabel('Binary Resp')
+% xlim([min(IV_noisy_sim_allT), max(IV_noisy_sim_allT)])
+% metrics_sim_ = metrics_sim; metrics_sim_(3:6) = metrics_sim_(3:6)*100;
+% sgtitle(sprintf('IV 95%% CI [%.1f, %.1f] Median = %.1f\n[TRUE] GaborCST=%.0f%%, criterion=%.1f, %s=%.2f\n[MEASURED] criterion=%.1f, pC=%.0f%%, pHit=%.0f%%, pFA=%.0f%%, pA=%.0f%%', ...
+%     round(quantile(IV_noisy_sim_allT, [.05, .95, .5]), 1), ...
+%     gaborCST*100, criterion_true, namesParamsModel_all{iModelB_sim}{1}, noiseP, ...
+%     metrics_sim_(2:end)))
 
 % Save the figure
 % saveas(gcf, sprintf('%s/%s.jpg', nameFolder_Fig_hist, nameCond_NOM))
@@ -355,6 +357,8 @@ save(sprintf('%s/kernel_%s.mat', nameFolder_Data_OOD_IO, patchMode), 'kernels2D'
 fprintf('\n========== Kernels saved ========== \n\n\n')
 
 %% Fit trial-wise model to simulated data
+
+fprintf('\n\n============= Fit Fit trial-wise model to simulated data =============\n')
 for iModelA_fit = iModelA_fit_all
     OOD_NOM_Trialwise_beforeEst({nameIO, criterion_true}, iLocComb, iModelA_fit, ni);
     for iModelB_fit = iModelB_fit_all
@@ -371,7 +375,7 @@ clear *allT e2D* e3D* kernels2D* dataMatrix
 time_end = datetime('now')
 
 time_end - time_start
-end 
+
 
 function loss = fxn_loss_pC(criterion_potential, pC_titrate, IV_noisy_sim_allT, iPRS_allT)
 resp_allT = IV_noisy_sim_allT > criterion_potential;

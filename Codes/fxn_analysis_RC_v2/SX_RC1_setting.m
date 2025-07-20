@@ -37,7 +37,7 @@ nBins=10;
 binStrategy_all = {'equal', 'algorithm', 'manual'};
 eyeD_all = [1,1,0,1,1,1,1,1,0,0,1,0]; % 1=right eye dominant; 0=left eye dominant
 flag_block200 = 0; % 1; all observers are forced to have 200 blocks; 0=no
-markers_allSubj = {'o', 's', 'd', '^', 'v', '<', '>', '+', 'p', 'h', 'x', 'o', 's', 'd', '^'};
+markers_allSubj = {'o', 's', 'd', '^', 'v', '<', '>', '+', 'p', 'h', 'x', 'o', 's', 'd', '^',     'o', 's', 'd', '^', 'v', '<', '>', '+', 'p', 'h', 'x', 'o', 's', 'd', '^',   'o', 's', 'd', '^', 'v', '<', '>', '+', 'p', 'h', 'x', 'o', 's', 'd', '^'};
 nMarkersMax = 11;  % Maximum number of different markers to use in plotting
 nbins_e = 5; % number of energy bins
 nitp = 2;% number of multiples of interpolated pints

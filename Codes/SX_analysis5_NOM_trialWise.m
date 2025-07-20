@@ -11,17 +11,27 @@ clc, clear all, close all
 SX_RC1_setting
 %----------------
 
-nIterations = 100; % Number of iterations (100 for raw IVs, 99 for transformed IVs)
-iModelA_all = [1,3],; % 1=core model, 2=randomize template, 3=use IO template
-iModelB_all = 4;
+%%%%%% Should copy from OOD_sim %%%%%%%%%%
+noiseCST_all = [0, .1, .2, .5]; % Noise contrast sensitivity thresholds
+gaborCST_all = [.1, .5]; % Gabor contrast sensitivity thresholds
+nTrials_all = [5000]; % Number of trials per condition
+noiseP_all = [0, 0.1, 0.2]; % Proportion of noise trials
+iModelA_sim_all = [1,3]; % 1=core model, 2=randomize template, 3=use IO template
+iModelB_sim_all = [4];
 %               1 = estimate lapse rate, additive noise (SDadd) and criterion;
 %               2 = estimate lapse rate, multiplicative noise (Nmul) and criterion;
 %               3 = estimate lapse rate and criterion;
 %               4 = estimate additive noise (SDadd) and criterion;
 %               5 = estimate multiplicative noise (Nmul) and criterion;
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+nIterations = 100; % Number of iterations (100 for raw IVs, 99 for transformed IVs)
 NOM_mode = 2; % 1= aggregate model, 2 = trial-wise model
 flag_subjIsHuman = 0;
 
+nRows=4; nCols=6;
+
+iModelA_all = iModelA_sim_all;
+iModelB_all = iModelB_sim_all;
 % Define subject list
 if flag_subjIsHuman
     subjList = {'YK', 'SP', 'SX', 'LS', 'RE', 'MD', 'AS', 'HL', 'FH', 'HA', 'CS', 'DT', 'DU', 'RC', 'SR'};
@@ -32,12 +42,12 @@ else
     % Filter for directories whose names start with 'IO'
     nameDir_IO_all = dir(sprintf('%s/IO*', nameFolder_Data_NOM_Trialwise));
     nIOs = length(nameDir_IO_all);
-    subjList = cell(1, nIOs)
+    subjList = cell(1, nIOs);
 
     for iIO = 1:nIOs
         subjList{iIO} = nameDir_IO_all(iIO).name; % Store the names of IO folders
     end
-
+    assert(nRows * nCols >= nIOs, 'Not enough subplots for the number of subjects!');
     iLocComb_all = 1;, % For testing with IO data only
 end
 
@@ -210,7 +220,7 @@ for iModelA = iModelA_all
             figure('Position', [0 0 2e3 2e3])
 
             for isubj = 1:nsubj
-                subplot(3, 5, isubj), hold on
+                subplot(nRows, nCols, isubj), hold on
 
                 subjName = subjList{isubj};
 
