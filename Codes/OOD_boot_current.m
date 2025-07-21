@@ -132,7 +132,6 @@ for iB = 1:nB_perBatch
         nLoc_comb = length(iLoc_all);
         nChosen = ntrialsAll_s;
         
-        
         for iiLoc = 1:nLoc_comb
             dataMtx_nonrand = [];
             e3D_nonrand = [];
@@ -211,25 +210,25 @@ for iB = 1:nB_perBatch
             kernels2D_mir = cat(2, kk_ave, kk_mid, flip(kk_ave, 2));
             
             % get similarity after mirroring
-            for itype = 1:ntypes
-                similarityAfterMirroring_allB(iB, itype, iiLocComb) = corr2(squeeze(kernels2D(itype, :, :)), squeeze(kernels2D_mir(itype, :, :)));
+            for iType = 1:ntypes
+                similarityAfterMirroring_allB(iB, iType, iiLocComb) = corr2(squeeze(kernels2D(iType, :, :)), squeeze(kernels2D_mir(iType, :, :)));
             end
             kernels2D = kernels2D_mir;
         end
         
         %% get margORI/SF_perComb  and calculate separability
         % NO need to save, as the reorganized version will be saved)
-        for itype = 1:ntypes
-            e2D_cut_ = squeeze(kernels2D(itype, :, : ));
+        for iType = 1:ntypes
+            e2D_cut_ = squeeze(kernels2D(iType, :, : ));
             e_min = min(e2D_cut_(:));
             e2D_cut = e2D_cut_ - e_min + eps; % make all energy values positive
             margORI = mean(e2D_cut, 2);
             margSF = mean(e2D_cut, 1);
             e2D_recon = mtimes(margORI, margSF);
-            sep(itype) = corr2(e2D_cut, e2D_recon);
+            sep(iType) = corr2(e2D_cut, e2D_recon);
             % marg
-            margORI_perComb(iiLocComb, itype, :) = margORI + e_min; % stupid code, need to feed three types into SX_RC7_fitting
-            margSF_perComb(iiLocComb, itype, :) = margSF + e_min;
+            margORI_perComb(iiLocComb, iType, :) = margORI + e_min; % stupid code, need to feed three types into SX_RC7_fitting
+            margSF_perComb(iiLocComb, iType, :) = margSF + e_min;
         end % itype
         
         %% compile
@@ -277,18 +276,18 @@ for iB = 1:nB_perBatch
     
     %% extract tuning characteristics
     for iiLoc = 1:nLoc2
-        for itype = 2%1:ntypes
+        for iType = 2%1:ntypes
             % ORI
             ifeature= 1;
             tuningC_ORI = fxn_getTuningC(axis_tuning{ifeature}, ifeature, ifamily_perF(ifeature), ...
-                squeeze(margPred_ORI(iiLoc, itype,:)), squeeze(margParams_ORI(iiLoc, itype,:)));
+                squeeze(margPred_ORI(iiLoc, iType,:)), squeeze(margParams_ORI(iiLoc, iType,:)));
             % SF
             ifeature=2;
             tuningC_SF = fxn_getTuningC(axis_tuning{ifeature}, ifeature, ifamily_perF(ifeature), ...
-                squeeze(margPred_SF(iiLoc, itype,:)), squeeze(margParams_SF(iiLoc, itype,:)));
+                squeeze(margPred_SF(iiLoc, iType,:)), squeeze(margParams_SF(iiLoc, iType,:)));
             % compile
-            margTuningC_ORI_allB(iB, iiLoc, itype, :) = [pref_ORI_perComb(iiLoc), tuningC_ORI];
-            margTuningC_SF_allB(iB, iiLoc, itype, :) = tuningC_SF;
+            margTuningC_ORI_allB(iB, iiLoc, iType, :) = [pref_ORI_perComb(iiLoc), tuningC_ORI];
+            margTuningC_SF_allB(iB, iiLoc, iType, :) = tuningC_SF;
             
         end % itype
     end % ii

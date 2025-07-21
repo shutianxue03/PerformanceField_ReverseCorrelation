@@ -15,7 +15,7 @@ if ~isfield(stim, 'phase'), phase =  rand * 2 *pi; else, phase = stim.phase; end
 sigma = stim.gaborSD;
 carrier = cos(x_rotate * stim.gaborSF * 2 * pi + phase); % gaborSF_ppd is 0.0625
 % modulator = exp(-((X / sigma).^2+(Y / sigma).^2)); % arch
-modulator = exp(-(X.^2+Y.^2) / sigma^2); % new and correct
+% modulator = exp(-(X.^2+Y.^2) / sigma^2); % new and correct
 modulator = exp(-(X.^2+Y.^2) / (2*sigma^2)); % I missed a 2* in the deominator!!
 gabor = carrier .* modulator * cst;
 

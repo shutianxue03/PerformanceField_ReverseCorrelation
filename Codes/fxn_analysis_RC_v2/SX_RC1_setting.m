@@ -27,7 +27,9 @@ nameFolder_Data_OOD = sprintf('%s/Data_OOD_%d%d', nameFolder_Data, nORI, nSF);  
 nameFolder_Data_NOM_Trialwise = sprintf('%s/Data_NOM_Trialwise_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
 
 % Define names of folders to save figures (on the server)
-nameFolder_Figures = sprintf('%s/Figures', nameFolder_server) ;
+nameFolder_Figures = sprintf('%s/Figures', nameFolder_server);
+nameFolder_Figures_NOM = sprintf('%s/NOM_Trialwise_%d%d', nameFolder_Figures, nORI, nSF);
+if ~exist(nameFolder_Figures_NOM, 'dir'), mkdir(nameFolder_Figures_NOM); end
 
 % Define the function to normalize Gabor SD
 fxn_getSigma_SPdomain = @(SF) 3 * sqrt(2*log(2)) / (2 * pi * SF);

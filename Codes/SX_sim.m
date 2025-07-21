@@ -30,37 +30,33 @@
 %    perform relative to these predictions.
 
 % Setup (needs to be the same as OOD_sim)
-clear all, clc, close all
-addpath(genpath('Codes/fxn_exp'))  % Path to experimental functions
-addpath(genpath('Codes/fxn_analysis_RC_v2'))  % Path to analysis functions
-addpath(genpath('Codes/SX_toolbox'))  % Path to analysis functions
+clc, close all
+time_start = datetime('now')
 
-nameFolder_NOM0 = 'Data_NOM_trialWise';
+% Add paths for custom functions
+addpath(genpath('fxn_exp'))  % Path to experimental functions
+addpath(genpath('fxn_analysis_RC_v2'))  % Path to analysis functions
+addpath(genpath('SX_toolbox'))  % Path to analysis functions
 
-% The data directory in the Carrasco Lab server
-% nameFolder_Data = '/Volumes/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC/Data';
+% Define parameters for the simulation
+% MUST be the same as OOD_sim!!
+noiseCST_allCond = [0, .1, .2, .5]; % Noise contrast sensitivity thresholds
+gaborCST_allCond = [.1, .5]; % Gabor contrast sensitivity thresholds
+nTrials_allCond = [5000]; % Number of trials per condition
+noiseP_allCond = [0, 0.1, 0.2]; % Proportion of noise trials
+iModelA_sim_allCond = [1,3]; % 1=core model, 2=randomize template, 3=use IO template
+iModelB_sim_allCond = [4];
 
-%=========================
-% MUST be the same as shell_all_runSim
-% nORI = 29;
-% fxn_getSigma_SPdomain = @(SF) 3 * sqrt(2*log(2)) / (2 * pi * SF); 
-
-noiseCST_allCond=.2;
-gaborCST_allCond=.2;%.2:.1:.5;
-nTrials_allCond = 5e3;%[5e3, 1e4];
-iModelB_sim_allCond=[4,5];
-noiseP_allCond = [0, .5];%[0, .1, .5, 1];
 %--------------%
 SX_RC1_setting
 %--------------%
-%=========================
-
-ni = 100; % MUST be the same as OOD_sim!!
+nParams=2; % for iModelB=4 and 5
+nIterations = 100; % MUST be the same as OOD_sim!!
 lapseRate=0;
-iModelA = 1;%[1, 5];  % 1: use the derived template, 5: use the ideal template
+iModelA = iModelA_sim_allCond(2);%[1, 5];  % 1: use the derived template, 3: use the ideal template
 iModelB_fit_all = iModelB_sim_allCond; % make them consistent for now; later try differ modelB for model recovery
 iLocComb=1;
-patchMode = 1; % 1=energy calculated from target-patches; 2=from noise patches
+patchMode = 2; % 1=energy calculated from target-patches; 2=from noise patches
 new_max =.4; new_min = -.05;
 
 % Names of the performance metrics being analyzed
@@ -113,7 +109,7 @@ limit0to1 = @(x) min(max(x, 0), 1);
 nTrialsPerSess = 100;  % Number of trials per session
 
 % Define folder to save results
-nameFolder_Fig_NOM = sprintf('Figures/NOM_Trialwise/ORI%dSF%d/FIGURES_IO_n%d_A%d', nORI, nSF, ni, iModelA);
+nameFolder_Fig_NOM = sprintf('Figures/NOM_Trialwise/ORI%dSF%d/FIGURES_IO_n%d_A%d', nORI, nSF, nIterations, iModelA);
 if isempty(dir(nameFolder_Fig_NOM)), mkdir(nameFolder_Fig_NOM), end
 
 % Create a pool of Gabor filter
@@ -129,16 +125,11 @@ stim.gaborSD = fxn_getSigma_SPdomain(stim.gaborSF);
 template_true_gabor = exp_CreateGabor(stim, cst_ln_template);
 
 % Compute energy profile across filters
-template_true = SX_RC4_Energy_parfor(stim.mask, ...
-    {template_true_gabor}, filter_sin, filter_cos);
+template_true = SX_RC4_Energy_parfor(stim.mask, {template_true_gabor}, filter_sin, filter_cos);
 template_true = squeeze(template_true); % Remove singleton dim
 
 % Normalize template values for visualization
-new_max = 0.4;
-new_min = -0.05;
-template_true = (template_true - min(template_true(:))) * ...
-    (new_max - new_min) / ...
-    (max(template_true(:)) - min(template_true(:))) + new_min;
+template_true = (template_true - min(template_true(:))) * (new_max - new_min) / (max(template_true(:)) - min(template_true(:))) + new_min;
 
 % Marginals
 margORI_true = mean(template_true, 2);
@@ -185,79 +176,87 @@ set(findall(gcf, '-property', 'linewidth'), 'linewidth', 2);
 
 % Optionally save figure
 % saveas(gcf, sprintf('Fig/Sim_NOM_TrialWise/true_template_energy_profile_GaborSD%.2f.jpg', stim.gaborSD));
-%% COMPILE
-clc
-iModelA=1; % simulating data using the legit template
-nParams=2; % for iModelB=4 and 5
 
-% Preallocate
+%% Compile IO data saved in Data/Data_OOD_2929
+clc
+
+% Preallocate variables
 ncriterion_allCond = 1; icriterion=1;
-noiseCST = noiseCST_allCond;
+noiseCST = noiseCST_allCond(1); % why didn't I loop noiseCST??
 kernels_allCond = nan(length(gaborCST_allCond), length(nTrials_allCond), length(noiseP_allCond), length(iModelB_sim_allCond), ncriterion_allCond, nTypes, nORI, nSF);
-IV_allCond = nan(length(gaborCST_allCond), length(nTrials_allCond), length(noiseP_allCond), length(iModelB_sim_allCond), ncriterion_allCond, ni, nBins);
+IV_allCond = nan(length(gaborCST_allCond), length(nTrials_allCond), length(noiseP_allCond), length(iModelB_sim_allCond), ncriterion_allCond, nIterations, nBins);
 nTrials_perBin_allCond = IV_allCond;
-data_allCond = nan(length(gaborCST_allCond), length(nTrials_allCond), length(noiseP_allCond), length(iModelB_sim_allCond), ncriterion_allCond, nMetrics, ni, nBins);
+data_allCond = nan(length(gaborCST_allCond), length(nTrials_allCond), length(noiseP_allCond), length(iModelB_sim_allCond), ncriterion_allCond, nMetrics, nIterations, nBins);
 pred_allCond = data_allCond;
-nLL_allCond = nan(length(gaborCST_allCond), length(nTrials_allCond), length(noiseP_allCond), length(iModelB_sim_allCond), ncriterion_allCond, ni);
-params_allCond = nan(length(gaborCST_allCond), length(nTrials_allCond), length(noiseP_allCond), length(iModelB_sim_allCond), ncriterion_allCond, ni, 3); % Pre-allocate for max params
+nLL_allCond = nan(length(gaborCST_allCond), length(nTrials_allCond), length(noiseP_allCond), length(iModelB_sim_allCond), ncriterion_allCond, nIterations);
+params_allCond = nan(length(gaborCST_allCond), length(nTrials_allCond), length(noiseP_allCond), length(iModelB_sim_allCond), ncriterion_allCond, nIterations, 3); % Pre-allocate for max params
 criterion_allCond = nan(length(gaborCST_allCond), length(nTrials_allCond), length(noiseP_allCond), length(iModelB_sim_allCond)); % Pre-allocate for max params
-IC_nLL_allCond = nan(length(gaborCST_allCond), length(nTrials_allCond), length(noiseP_allCond), length(iModelB_sim_allCond), ncriterion_allCond, ni, 3); % AIC, AICc, BIC (3)
-R2_allCond = nan(length(gaborCST_allCond), length(nTrials_allCond), length(noiseP_allCond), length(iModelB_sim_allCond), ncriterion_allCond, nMetrics, ni);
+IC_nLL_allCond = nan(length(gaborCST_allCond), length(nTrials_allCond), length(noiseP_allCond), length(iModelB_sim_allCond), ncriterion_allCond, nIterations, 3); % AIC, AICc, BIC (3)
+R2_allCond = nan(length(gaborCST_allCond), length(nTrials_allCond), length(noiseP_allCond), length(iModelB_sim_allCond), ncriterion_allCond, nMetrics, nIterations);
 R2_w_allCond = R2_allCond;
 SSE_allCond = R2_allCond;
 SSE_w_allCond = SSE_allCond;
-IC_SSE_allCond = nan(length(gaborCST_allCond), length(nTrials_allCond), length(noiseP_allCond), length(iModelB_sim_allCond), ncriterion_allCond, nMetrics, ni, 3); % AIC, AICc, BIC (3)
+IC_SSE_allCond = nan(length(gaborCST_allCond), length(nTrials_allCond), length(noiseP_allCond), length(iModelB_sim_allCond), ncriterion_allCond, nMetrics, nIterations, 3); % AIC, AICc, BIC (3)
 IC_SSE_w_allCond = IC_SSE_allCond;
 
 for gaborCST = gaborCST_allCond
     igaborCST = find(gaborCST == gaborCST_allCond);
-    
+
     for nTrials = nTrials_allCond
         inTrials = find(nTrials == nTrials_allCond);
-        
+
         for noiseP = noiseP_allCond
-            inoiseP = find(noiseP == noiseP_allCond);
-            
+            iNoiseP = find(noiseP == noiseP_allCond);
+
             for iModelB_sim = iModelB_sim_allCond
                 iiModelB_sim = find(iModelB_sim == iModelB_sim_allCond);
-                
+
                 % Define the name of the condition
-                nameCond_OOD = sprintf('%s/Data_OOD/ORI%dSF%d/IO/IO_nC%.0f_gC%.0f_nT%s_N%.3f_B%d', ...
-                    nameFolder_Data, noiseCST*100, gaborCST*100, format_num2exp(nTrials), noiseP, iModelB_sim);
-                nameCond = sprintf('IO_nC%.0f_gC%.0f_nT%s_N%.3f_B%d', noiseCST*100, gaborCST*100, format_num2exp(nTrials), noiseP, iModelB_sim);
-                
+                % nameCond_OOD = sprintf('%s/Data_OOD/ORI%dSF%d/IO/IO_nC%.0f_gC%.0f_nT%s_N%.3f_B%d', ...
+                %     nameFolder_Data, noiseCST*100, gaborCST*100, format_num2exp(nTrials), noiseP, iModelB_sim);
+
+                nameIO = sprintf('IO_nC%.0f_gC%.0f_nT%s_N%.3f_B%d', noiseCST*100, gaborCST*100, format_num2exp(nTrials), noiseP, iModelB_sim);
+
+                % Define folder to load results from Data_OOD
+                nameFolder_Data_OOD_IO = sprintf('%s/%s', nameFolder_Data_OOD, nameIO);
+                assert(~isempty(dir(nameFolder_Data_OOD_IO)), 'ERROR: This IO does not exits in Data_OOD/')
+
+                % % Define folder to load results from Data_NOM
+                nameFolder_Data_NOM_IO = sprintf('%s/%s', nameFolder_Data_NOM_Trialwise, nameIO);
+                % if isempty(dir(nameFolder_Data_NOM_IO)), mkdir(nameFolder_Data_NOM_IO), end
+
                 % LOAD KERNELS (from Data/Data_OOD on the server)
-                nameFolder_kernel = sprintf('%s/Data_OOD/ORI%dSF%d/IO/%s/kernels*.mat', nameFolder_Data, nORI, nSF, nameCond);
-                dirFolder_kernel = dir(nameFolder_kernel);
-                load(sprintf('%s/%s', dirFolder_kernel.folder, dirFolder_kernel.name), 'kernels2D', 'criterion_true') % nTrials x 11
-                
+                nameFolder_kernel = sprintf('%s/kernel*.mat', nameFolder_Data_OOD_IO);
+                nameDir_kernel = dir(nameFolder_kernel);
+                load(sprintf('%s/%s', nameDir_kernel.folder, nameDir_kernel.name), 'kernels2D', 'criterion_true') % nTrials x 11
+
                 % Check if the criterion is within the expected range
                 str_c = sprintf('c%.1f', criterion_true);
-                kernels_allCond(igaborCST, inTrials, inoiseP, iiModelB_sim, icriterion, :, :, :) = kernels2D;
+                kernels_allCond(igaborCST, inTrials, iNoiseP, iiModelB_sim, icriterion, :, :, :) = kernels2D;
                 clear kernels2D
-                
+
                 % LOAD NOM fitting (from Data/Data_NOM_trialWise on the server)
-                nameFileModelIDVD_trialWise = sprintf('%s/%s/ORI%dSF%d/IO/%s_%s/n%d_A%dB%d', nameFolder_Data, nameFolder_NOM0, nORI, nSF, nameCond, str_c, ni, iModelA, iModelB_sim);
-                load(nameFileModelIDVD_trialWise, 'pred_metrics_allB', 'params_est_allB', 'nLL_allB')
-                
+                nameFile_Est = sprintf('%s/n%d_A%dB%d', nameFolder_Data_NOM_IO, nIterations, iModelA, iModelB_sim);
+                load(nameFile_Est, 'pred_metrics_allB', 'params_est_allB', 'nLL_allB')
+
                 % Calculate ICs based on nLL
                 IC_nLL = [getAIC_SSE(nLL_allB, nParams, nTrials), getAICc_SSE(nLL_allB, nParams, nTrials), getBIC_SSE(nLL_allB, nParams, nTrials)];
-                IC_nLL_allCond(igaborCST, inTrials, inoiseP, iiModelB_sim, icriterion, :, :) = IC_nLL;
-                
+                IC_nLL_allCond(igaborCST, inTrials, iNoiseP, iiModelB_sim, icriterion, :, :) = IC_nLL;
+
                 for iMetric = 1:nMetrics
                     % Pre-allocate temporary arrays for this subject and model
-                    IV_allB = nan(ni, nBins);  % IV for each bin
+                    IV_allB = nan(nIterations, nBins);  % IV for each bin
                     nTrials_allB = IV_allB;    % Trial count for each bin
                     data_allB = IV_allB;       % Observed data for each bin
                     pred_allB = IV_allB;       % Predicted data for each bin
-                    
-                    for ii=1:ni
+
+                    for ii=1:nIterations
                         % Extract IV per bin
                         IV_allB(ii, :) = pred_metrics_allB{ii}.metrics.IV_allBins;
-                        
+
                         % Extract the number of trials per bin
                         nTrials_allB(ii, :) = pred_metrics_allB{ii}.metrics.nTrials_allBins;
-                        
+
                         % Extract metrics (data and predictions) per bin
                         pred_metrics = pred_metrics_allB{ii}.metrics; % Extract once for faster access
                         switch namesMetrics{iMetric}
@@ -271,7 +270,7 @@ for gaborCST = gaborCST_allCond
                                 data_allB(ii, :) = pred_metrics.pYES_data_allBins;
                                 pred_allB(ii, :) = pred_metrics.pYES_pred_allBins;
                         end
-                        
+
                         % Calculate goodness-of-fit and information criteria for both weighted and unweighted cases
                         for flag_weighted=[0,1]
                             if flag_weighted, weights = nTrials_allB(ii, :);
@@ -279,33 +278,33 @@ for gaborCST = gaborCST_allCond
                             end
                             % calculate SSE and R2
                             [R2, SSE] = getR2(data_allB(ii, :), pred_allB(ii, :), weights);
-                            
+
                             % calculate information critertion based on SSE
                             nData = sum(nTrials_allB(ii, :));
                             IC_SSE = [getAIC_SSE(SSE, nParams, nData), getAICc_SSE(SSE, nParams, nData), getBIC_SSE(SSE, nParams, nData)];
-                            
+
                             % organize
                             if flag_weighted
-                                R2_w_allCond(igaborCST, inTrials, inoiseP, iiModelB_sim, icriterion, iMetric, ii) = R2;
-                                SSE_w_allCond(igaborCST, inTrials, inoiseP, iiModelB_sim, icriterion, iMetric, ii) = SSE;
-                                IC_SSE_w_allCond(igaborCST, inTrials, inoiseP, iiModelB_sim, icriterion, iMetric, ii, :) = IC_SSE;
+                                R2_w_allCond(igaborCST, inTrials, iNoiseP, iiModelB_sim, icriterion, iMetric, ii) = R2;
+                                SSE_w_allCond(igaborCST, inTrials, iNoiseP, iiModelB_sim, icriterion, iMetric, ii) = SSE;
+                                IC_SSE_w_allCond(igaborCST, inTrials, iNoiseP, iiModelB_sim, icriterion, iMetric, ii, :) = IC_SSE;
                             else
-                                R2_allCond(igaborCST, inTrials, inoiseP, iiModelB_sim, icriterion, iMetric, ii) = R2;
-                                SSE_allCond(igaborCST, inTrials, inoiseP, iiModelB_sim, icriterion, iMetric, ii) = SSE;
-                                IC_SSE_allCond(igaborCST, inTrials, inoiseP, iiModelB_sim, icriterion, iMetric, ii, :) = IC_SSE;
+                                R2_allCond(igaborCST, inTrials, iNoiseP, iiModelB_sim, icriterion, iMetric, ii) = R2;
+                                SSE_allCond(igaborCST, inTrials, iNoiseP, iiModelB_sim, icriterion, iMetric, ii) = SSE;
+                                IC_SSE_allCond(igaborCST, inTrials, iNoiseP, iiModelB_sim, icriterion, iMetric, ii, :) = IC_SSE;
                             end % if flag_weighted
                         end % for flag_weighted=[0,1]
-                        
+
                     end % ii
-                    data_allCond(igaborCST, inTrials, inoiseP, iiModelB_sim, icriterion, iMetric, :, :) = data_allB;
-                    pred_allCond(igaborCST, inTrials, inoiseP, iiModelB_sim, icriterion, iMetric, :, :) = pred_allB;
+                    data_allCond(igaborCST, inTrials, iNoiseP, iiModelB_sim, icriterion, iMetric, :, :) = data_allB;
+                    pred_allCond(igaborCST, inTrials, iNoiseP, iiModelB_sim, icriterion, iMetric, :, :) = pred_allB;
                 end % iMetric
-                
-                IV_allCond(igaborCST, inTrials, inoiseP, iiModelB_sim, icriterion, :, :) = IV_allB;
-                nTrials_perBin_allCond(igaborCST, inTrials, inoiseP, iiModelB_sim, icriterion, :, :) = nTrials_allB;
-                nLL_allCond(igaborCST, inTrials, inoiseP, iiModelB_sim, icriterion, :) = nLL_allB;
-                params_allCond(igaborCST, inTrials, inoiseP, iiModelB_sim, icriterion, :, 1:nParams) = params_est_allB;
-                criterion_allCond(igaborCST, inTrials, inoiseP, iiModelB_sim) = criterion_true;
+
+                IV_allCond(igaborCST, inTrials, iNoiseP, iiModelB_sim, icriterion, :, :) = IV_allB;
+                nTrials_perBin_allCond(igaborCST, inTrials, iNoiseP, iiModelB_sim, icriterion, :, :) = nTrials_allB;
+                nLL_allCond(igaborCST, inTrials, iNoiseP, iiModelB_sim, icriterion, :) = nLL_allB;
+                params_allCond(igaborCST, inTrials, iNoiseP, iiModelB_sim, icriterion, :, 1:nParams) = params_est_allB;
+                criterion_allCond(igaborCST, inTrials, iNoiseP, iiModelB_sim) = criterion_true;
                 %                 end % criterion
             end % iModelB_sim
         end % noiseP
@@ -316,7 +315,7 @@ fprintf('\n=========== Compile finished ===========\n')
 
 %% Template Recovery
 % Compare RC-derived template to the true template
-nameFolder_Fig_tempRecov = sprintf('%s/TemplateRecovery', nameFolder_Fig_NOM);
+nameFolder_Fig_tempRecov = sprintf('%s/TemplateRecovery', nameFolder_Figures_NOM);
 if isempty(dir(nameFolder_Fig_tempRecov)), mkdir(nameFolder_Fig_tempRecov), end
 
 iPass = 1; %1=all trials, 2=PassA, 3=passB
@@ -341,13 +340,14 @@ saveas(gcf, sprintf('%s/true_template_%d_%d.jpg', nameFolder_Fig_tempRecov, nORI
 for iiModelB_sim = 1:length(iModelB_sim_allCond)
     for inTrials = 1:length(nTrials_allCond)
         figure('Position', [0 200 length(gaborCST_allCond)*400 1e3]) % if plot all three types
-        
+
         isubplots = reshape(1:length(gaborCST_allCond)*nRows, length(gaborCST_allCond), nRows)';
+        
         for igaborCST = 1:length(gaborCST_allCond)
-            
+
             for iType = iType_all
                 kernels2D = squeeze(kernels_allCond(igaborCST, inTrials, :, iiModelB_sim, icriterion, iType, :, :));
-                
+
                 % mirror the template
                 kernels2D_mir = nan(size(kernels2D));
                 indMir = (nORI-1)/2;
@@ -356,7 +356,7 @@ for iiModelB_sim = 1:length(iModelB_sim_allCond)
                 kk_mid = kernels2D(:, indMir+1,:);
                 kk_ave = (kk_left + flip(kk_right, 2))/2;
                 kernels2D_plot = cat(2, kk_ave, kk_mid, flip(kk_ave,2));
-                
+
                 % [1] plot the derived 2D kernels (averaged across noise levels)
                 kernels2D_ave = getCI(kernels2D_plot, 2, 1);
                 subplot(nRows, length(gaborCST_allCond), isubplots(1, igaborCST)), hold on
@@ -369,7 +369,7 @@ for iiModelB_sim = 1:length(iModelB_sim_allCond)
                 yticks(axisTicks_tuning{2}), yticklabels(axisTL_tuning{2}), ylim([min(axis_tuning{2}), max(axis_tuning{2})])
                 [r, p] = corr(kernels2D_ave(:), template_true(:));
                 title(sprintf('Gabor CST=%.0f%%\ncorr with the true temp: r=%.2f, p=%.3f', gaborCST_allCond(igaborCST)*100, r, p))
-                
+
                 % [2-3] plot marginalized kernels
                 margORI = mean(kernels2D_plot, 3);
                 margSF = mean(kernels2D_plot, 2);
@@ -379,19 +379,19 @@ for iiModelB_sim = 1:length(iModelB_sim_allCond)
                         case 1, marg = margORI; marg_true = margORI_true; ref=0;y_lim = [-.15, .5];
                         case 2, marg = margSF; marg_true = margSF_true; ref=log2(stim.gaborSF); y_lim = [-.05, .2];
                     end
-                    
+
                     str_title = cell(length(noiseP_allCond),1);
                     % plot estimated template
-                    for inoiseP = 1:length(noiseP_allCond)
-                        pC = getCI(getCI(data_allCond(igaborCST, inTrials, inoiseP, iiModelB_sim, icriterion, :, :), 1, 6), 2,1);
-                        plot(axis_tuning{iFeature}, marg(inoiseP, :), '-', 'color', ones(1,3)*(inoiseP-1)/length(noiseP_allCond), 'LineWidth', 1.5)
-                        str_title{inoiseP} = sprintf('%.3f (%.0f%%)', noiseP_allCond(inoiseP), pC*100);
+                    for iNoiseP = 1:length(noiseP_allCond)
+                        pC = getCI(getCI(data_allCond(igaborCST, inTrials, iNoiseP, iiModelB_sim, icriterion, :, :), 1, 6), 2,1);
+                        plot(axis_tuning{iFeature}, marg(iNoiseP, :), '-', 'color', ones(1,3)*(iNoiseP-1)/length(noiseP_allCond), 'LineWidth', 1.5)
+                        str_title{iNoiseP} = sprintf('%.3f (%.0f%%)', noiseP_allCond(iNoiseP), pC*100);
                     end
                     % plot the true margs
                     plot(axis_tuning{iFeature}, marg_true, 'r--', 'LineWidth', 2)
-                    
-                    xline(ref, 'k--'); yline(0, 'k--'); 
-%                     ylim(y_lim)
+
+                    xline(ref, 'k--'); yline(0, 'k--');
+                    %                     ylim(y_lim)
                     xlabel(namesFeature{iFeature})
                     xticks(axisTicks_tuning{iFeature}), xticklabels(axisTL_tuning{iFeature}), xlim([min(axis_tuning{iFeature}), max(axis_tuning{iFeature})])
                     lgd=legend(str_title, 'Location', 'best');
@@ -403,7 +403,7 @@ for iiModelB_sim = 1:length(iModelB_sim_allCond)
         set(findall(gcf, '-property', 'fontsize'), 'fontsize',12)
         sgtitle(sprintf('ORI%dSF%d Signal SF=%d [%.2f, %.2f] ModelB%d, nTrials=%d', ...
             nORI, nSF, stim.gaborSF, noise.SF_low_sampling, noise.SF_high_sampling, iModelB_sim_allCond(iiModelB_sim), nTrials_allCond(inTrials)))
-        
+
         saveas(gcf, sprintf('%s/B%d_nT%s.jpg', nameFolder_Fig_tempRecov, iModelB_sim_allCond(iiModelB_sim), format_num2exp(nTrials_allCond(inTrials))))
     end % inTrials
 end % iiModelB_sim
@@ -413,7 +413,7 @@ end % iiModelB_sim
 
 %% Metric Recovery
 % Compare measured vs. predicted metrics (as a fxn of binned IV)
-nameFolder_Fig_MetricsRecov = sprintf('%s/MetricsRecovery', nameFolder_Fig_NOM);
+nameFolder_Fig_MetricsRecov = sprintf('%s/MetricsRecovery', nameFolder_Figures_NOM);
 if isempty(dir(nameFolder_Fig_MetricsRecov)), mkdir(nameFolder_Fig_MetricsRecov), end
 
 scalingF=80; %if any(iLocComb==[6,7]), scalingF=100; elseif iLocComb==8, scalingF=200; else, scalingF=50; end
@@ -421,7 +421,7 @@ scalingF=80; %if any(iLocComb==[6,7]), scalingF=100; elseif iLocComb==8, scaling
 for iiModelB_sim = 1:length(iModelB_sim_allCond)
     for inTrials = 1:length(nTrials_allCond)
         figure('Position', [0 200 1.5e3 1e3]) % if plot all three types
-        
+
         isubplots = reshape(1:length(gaborCST_allCond)*nMetrics, length(gaborCST_allCond), nMetrics)';
         for igaborCST = 1:length(gaborCST_allCond)
             % extract
@@ -429,12 +429,12 @@ for iiModelB_sim = 1:length(iModelB_sim_allCond)
             [nTrials_perBin_allBins, nTrials_perBin_allBins_lb, nTrials_perBin_allBins_ub] = getCI(nTrials_perBin_allCond(igaborCST, inTrials, :, iiModelB_sim, icriterion, :, :), 1, 6);
             [nLL_allBins, nLL_allBins_lb, nLL_allBins_ub] =           getCI(nLL_allCond(igaborCST, inTrials, :, iiModelB_sim, icriterion, :), 1, 6);
             [param_allBins, param_allBins_lb, param_allBins_ub] = getCI(params_allCond(igaborCST, inTrials, :, iiModelB_sim, icriterion, :, 1:nParams), 1, 6);
-            
+
             for iMetric = 1:nMetrics
                 % extract
                 [data_allBins, ~, ~, data_allBins_neg, data_allBins_pos] = getCI(data_allCond(igaborCST, inTrials, :, iiModelB_sim, icriterion, iMetric, :, :), 1, 7);
                 [pred_allBins, pred_allBins_lb, pred_allBins_ub] =            getCI(pred_allCond(igaborCST, inTrials, :, iiModelB_sim, icriterion, iMetric, :, :), 1, 7);
-                
+
                 subplot(nMetrics, length(gaborCST_allCond), isubplots(iMetric, igaborCST)), hold on
                 yline(.5, 'k--', 'handlevisibility', 'off');
                 ylim([0,1])
@@ -443,11 +443,11 @@ for iiModelB_sim = 1:length(iModelB_sim_allCond)
                 xlabel('Internal variable')
                 if isubplots(iMetric, igaborCST)<=length(gaborCST_allCond), title(sprintf('Gabor CST=%.0f%%', gaborCST_allCond(igaborCST)*100)), end
                 str_title = cell(length(noiseP_allCond), 1);
-                for inoiseP = 1:length(noiseP_allCond)
-                    str_title{inoiseP} = sprintf('%.3f', noiseP_allCond(inoiseP));
-                    color = ones(1,3)*(inoiseP-1)/length(noiseP_allCond);
+                for iNoiseP = 1:length(noiseP_allCond)
+                    str_title{iNoiseP} = sprintf('%.3f', noiseP_allCond(iNoiseP));
+                    color = ones(1,3)*(iNoiseP-1)/length(noiseP_allCond);
                     % Prediction
-                    plot(IV_allBins(inoiseP, :), pred_allBins(inoiseP, :), '-', 'color', color)
+                    plot(IV_allBins(iNoiseP, :), pred_allBins(iNoiseP, :), '-', 'color', color)
                     %                         patch([IV_allBins(inoiseP, :)'; flip(IV_allBins(inoiseP, :)')], [pred_allBins_lb(inoiseP, :)'; flip(pred_allBins_ub(inoiseP, :)')], color, 'FaceAlpha', 0.3, 'LineStyle', 'none', 'HandleVisibility', 'off');
                     % Errobars of the measurement
                     %                         errorbar(IV_allBins(inoiseP, :), data_allBins(inoiseP, :), IV_allBins_neg(inoiseP, :), IV_allBins_pos(inoiseP, :), '.','horizontal', 'CapSize', 0, 'color', color, 'handlevisibility', 'off')
@@ -455,9 +455,9 @@ for iiModelB_sim = 1:length(iModelB_sim_allCond)
                     % Ave of the measurment
                     for iBin=1:nBins
                         facecolor='w';
-                        plot(IV_allBins(inoiseP, iBin), data_allBins(inoiseP, iBin), '-o', 'markeredgecolor', color, 'markerfacecolor', facecolor, 'MarkerSize', nTrials_perBin_allBins(inoiseP, iBin)/scalingF+5, 'LineWidth', 1,  'handlevisibility', 'off')
+                        plot(IV_allBins(iNoiseP, iBin), data_allBins(iNoiseP, iBin), '-o', 'markeredgecolor', color, 'markerfacecolor', facecolor, 'MarkerSize', nTrials_perBin_allBins(iNoiseP, iBin)/scalingF+5, 'LineWidth', 1,  'handlevisibility', 'off')
                     end % iBin
-%                     pause
+                    %                     pause
                 end % inoiseP
                 %                     if iCond==1, legend({'Predicted metric', 'Measured metric'}, 'Location', 'best'), end
                 %                     str_est = [str_est, sprintf('B%d: %s\n', iModelB_fit, num2str(round(param_allBins', 4)))];
@@ -473,53 +473,53 @@ close all
 
 %% Parameter Recovery
 % Compare true vs. estimated parameters
-nameFolder_Fig_ParamRecov = sprintf('%s/ParamsRecovery', nameFolder_Fig_NOM);
+nameFolder_Fig_ParamRecov = sprintf('%s/ParamsRecovery', nameFolder_Figures_NOM);
 if isempty(dir(nameFolder_Fig_ParamRecov)), mkdir(nameFolder_Fig_ParamRecov), end
 
 for iiModelB_sim = 1:length(iModelB_sim_allCond)
     for inTrials = 1:length(nTrials_allCond)
         figure('Position', [0 0 1.5e3 400])
         nRows=2; %1=noise, 2=criterion
-        
+
         isubplots = reshape(1:length(gaborCST_allCond)*nRows, length(gaborCST_allCond), nRows)';
         for igaborCST = 1:length(gaborCST_allCond)
-            
+
             % 1. NOISE parameter
             iparam=1;
             subplot(nRows, length(gaborCST_allCond),isubplots(iparam, igaborCST)), hold on % noiseP
             str_legend = {};
-           
+
             [param_med, ~, ~, p_sem] =getCI(params_allCond(igaborCST, inTrials, :, iiModelB_sim, :, :, iparam), 1, 6);
-%             plot(noiseP_allCond, param_med, 'ko-')
-%           
-            for inoiseP=1:length(noiseP_allCond)
-                plot(noiseP_allCond(inoiseP), param_med(inoiseP), ...
-                    'o-','MarkerFaceColor', ones(1,3)*(inoiseP-1)/length(noiseP_allCond), 'MarkerEdgeColor', 'k', 'MarkerSize', 10);
+            %             plot(noiseP_allCond, param_med, 'ko-')
+            %
+            for iNoiseP=1:length(noiseP_allCond)
+                plot(noiseP_allCond(iNoiseP), param_med(iNoiseP), ...
+                    'o-','MarkerFaceColor', ones(1,3)*(iNoiseP-1)/length(noiseP_allCond), 'MarkerEdgeColor', 'k', 'MarkerSize', 10);
             end
-            
+
             noiseP_min = min(noiseP_allCond);
             noiseP_max = max(noiseP_allCond);
             plot([noiseP_min, noiseP_max], [noiseP_min, noiseP_max], '--r'), %xlim([0,1]), ylim([0,1])
             xlabel('True param'), ylabel('Est. param')
             title(sprintf('Gabor CST=%.0f%%\n%s', gaborCST_allCond(igaborCST)*100, namesParamsModel_all{iModelB_sim_allCond(iiModelB_sim)}{iparam}))
             axis square
-            
+
             % 2. CRITERION
             iparam=2;
             subplot(nRows, length(gaborCST_allCond), isubplots(iparam, igaborCST)), hold on % criterion
-            for inoiseP=1:length(noiseP_allCond)
-                [param_med, ~, ~, p_sem] =getCI(params_allCond(igaborCST, inTrials, inoiseP, iiModelB_sim, :, :, iparam), 1, 6);
-                plot(criterion_allCond(igaborCST, inTrials, inoiseP, iiModelB_sim), param_med, ...
-                    'o-','MarkerFaceColor', ones(1,3)*(inoiseP-1)/length(noiseP_allCond), 'MarkerEdgeColor', 'k', 'MarkerSize', 10);
+            for iNoiseP=1:length(noiseP_allCond)
+                [param_med, ~, ~, p_sem] =getCI(params_allCond(igaborCST, inTrials, iNoiseP, iiModelB_sim, :, :, iparam), 1, 6);
+                plot(criterion_allCond(igaborCST, inTrials, iNoiseP, iiModelB_sim), param_med, ...
+                    'o-','MarkerFaceColor', ones(1,3)*(iNoiseP-1)/length(noiseP_allCond), 'MarkerEdgeColor', 'k', 'MarkerSize', 10);
             end
             c_min = min(criterion_allCond(:));
             c_max = max(criterion_allCond(:));
             plot([c_min, c_max], [c_min, c_max], '--r'),%xlim([4,6]), ylim([4,6])
-%             legend(str_legend, 'Location', 'bestoutside')
+            %             legend(str_legend, 'Location', 'bestoutside')
             xlabel('True param'), ylabel('Est. param')
             title(namesParamsModel_all{iModelB_sim_allCond(iiModelB_sim)}(iparam))
             axis square
-            
+
         end % igaborCST
         sgtitle(sprintf('ModelB%d nTrials=%d', iModelB_sim_allCond(iiModelB_sim), nTrials_allCond(inTrials)))
         saveas(gcf, sprintf('%s/B%d_nT%s.jpg', nameFolder_Fig_ParamRecov, iModelB_sim_allCond(iiModelB_sim), format_num2exp(nTrials_allCond(inTrials))))
@@ -528,7 +528,7 @@ end % iiModelB_sim
 close all
 
 %% Correlation between estimated IN and measured pA
-nameFolder_Fig_corrPA = sprintf('%s/Corr_pA', nameFolder_Fig_NOM);
+nameFolder_Fig_corrPA = sprintf('%s/Corr_pA', nameFolder_Figures_NOM);
 if isempty(dir(nameFolder_Fig_corrPA)), mkdir(nameFolder_Fig_corrPA), end
 
 iMetric_pA = 3;
@@ -538,30 +538,30 @@ nParams=1; %1=noise, 2=criterion
 for iiModelB_sim = 1:length(iModelB_sim_allCond)
     for inTrials = 1:length(nTrials_allCond)
         figure('Position', [0 0 1.5e3 400])
-        
+
         isubplots = reshape(1:length(gaborCST_allCond)*nParams, length(gaborCST_allCond), nParams)';
         for igaborCST = 1:length(gaborCST_allCond)
-            
+
             % NOISE
             iparam=1;
             subplot(nParams, length(gaborCST_allCond),isubplots(iparam, igaborCST)), hold on % noiseP
             str_legend = {};
-            for inoiseP=1:length(noiseP_allCond)
-                [param_med, ~, ~, p_sem] =getCI(params_allCond(igaborCST, inTrials, inoiseP, iiModelB_sim, icriterion, :, iparam), 1, 6);
-%                 [pA_med, ~, ~, pA_sem] =getCI(getCI(data_allCond(igaborCST, inTrials, inoiseP, iiModelB_sim, icriterion, iMetric_pA, :, :), 1, 7), 1, 2);
-                [pA_med, ~, ~, pA_sem] =getCI(getCI(data_allCond(igaborCST, inTrials, inoiseP, iiModelB_sim, icriterion, iMetric_pA, :, :), 1, 7), 2, 1);
-%                 plot(pA_med, param_med, 'o-','color', ones(1,3)*(icriterion-1)/ncriterion_allCond);
+            for iNoiseP=1:length(noiseP_allCond)
+                [param_med, ~, ~, p_sem] =getCI(params_allCond(igaborCST, inTrials, iNoiseP, iiModelB_sim, icriterion, :, iparam), 1, 6);
+                %                 [pA_med, ~, ~, pA_sem] =getCI(getCI(data_allCond(igaborCST, inTrials, inoiseP, iiModelB_sim, icriterion, iMetric_pA, :, :), 1, 7), 1, 2);
+                [pA_med, ~, ~, pA_sem] =getCI(getCI(data_allCond(igaborCST, inTrials, iNoiseP, iiModelB_sim, icriterion, iMetric_pA, :, :), 1, 7), 2, 1);
+                %                 plot(pA_med, param_med, 'o-','color', ones(1,3)*(icriterion-1)/ncriterion_allCond);
                 plot(pA_med, param_med, ...
-                    'o-','MarkerFaceColor', ones(1,3)*(inoiseP-1)/length(noiseP_allCond), 'MarkerEdgeColor', 'k', 'MarkerSize', 10);
-                
-%                 str_legend{icriterion}=sprintf('%.1f', criterion_allCond(icriterion));
+                    'o-','MarkerFaceColor', ones(1,3)*(iNoiseP-1)/length(noiseP_allCond), 'MarkerEdgeColor', 'k', 'MarkerSize', 10);
+
+                %                 str_legend{icriterion}=sprintf('%.1f', criterion_allCond(icriterion));
             end
             %             plot([0, 1], [0, 1], '--k'), %xlim([0,1]), ylim([0,1])
-%             legend(str_legend, 'Location', 'bestoutside')
+            %             legend(str_legend, 'Location', 'bestoutside')
             xlabel('Sim. pA'), ylabel('Est. param')
             title(sprintf('Gabor CST=%.0f%%\n%s', gaborCST_allCond(igaborCST)*100, namesParamsModel_all{iModelB_sim_allCond(iiModelB_sim)}{iparam}))
             axis square
-            
+
             % CRITERION
             %             iparam=2;
             %             subplot(nParams, length(gaborCST_allCond), isubplots(iparam, igaborCST)), hold on % criterion
@@ -577,7 +577,7 @@ for iiModelB_sim = 1:length(iModelB_sim_allCond)
             %             xlabel('Sim. pA'), ylabel('Est. param')
             %             title(namesParamsModel_all{iModelB_sim}(iparam))
             %             axis square
-            
+
         end % igaborCST
         sgtitle(sprintf('ModelB%d nTrials=%d', iModelB_sim_allCond(iiModelB_sim), nTrials_allCond(inTrials)))
         saveas(gcf, sprintf('%s/B%d_nT%s.jpg', nameFolder_Fig_corrPA, iModelB_sim_allCond(iiModelB_sim), format_num2exp(nTrials_allCond(inTrials))))
@@ -586,7 +586,7 @@ end % iiModelB_sim
 close all
 
 %% BIC
-nameFolder_Fig_BIC = sprintf('%s/BIC', nameFolder_Fig_NOM);
+nameFolder_Fig_BIC = sprintf('%s/BIC', nameFolder_Figures_NOM);
 if isempty(dir(nameFolder_Fig_BIC)), mkdir(nameFolder_Fig_BIC), end
 iBIC=3;
 linestyle_allB = {'-', '--'};
@@ -607,14 +607,14 @@ for igaborCST = 1:length(gaborCST_allCond)
             ii=ii+1;
         end % inTrials
     end % iiModelB_sim
-    
+
     if igaborCST+icriterion==2, legend(str_legend, 'Location', 'best'), end
     %         ylim([-5e3, 2e3])
     xlabel('True noise'), ylabel('BIC')
     title(sprintf('Gabor CST=%.0f%% Criterion=%.1f', gaborCST_allCond(igaborCST)*100, criterion_allCond(icriterion)))
-    
+
     %     end % iiModelB_sim
-    
+
 end % igaborCST
 sgtitle('BIC (nLL)')
 saveas(gcf, sprintf('%s/BIC.jpg', nameFolder_Fig_BIC))

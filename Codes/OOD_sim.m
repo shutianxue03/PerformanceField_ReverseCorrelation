@@ -28,29 +28,32 @@
 %       Simulated data and energy profiles saved in the specified directories.
 
 % Dependencies: none
-% Notes: none
+% Notes:
+%       The Gabor SD was normalized by SF only when creating the filters, not when creating the Gabor patches.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 % function OOD_sim(noiseCST, gaborCST, nTrials, noiseP, iModelB_sim)
-noiseCST_all = [0, .1, .2, .5]; % Noise contrast sensitivity thresholds
-gaborCST_all = [.1, .5]; % Gabor contrast sensitivity thresholds
-nTrials_all = [5000]; % Number of trials per condition
-noiseP_all = [0, 0.1, 0.2]; % Proportion of noise trials
-iModelA_sim_all = [1,3]; % 1=core model, 2=randomize template, 3=use IO template
-iModelB_sim_all = [4];
+% noiseCST=.2, gaborCST=.5, nTrials=5000, noiseP=0, iModelB_sim=4
+noiseCST_allCond = [0, .1, .2, .5]; % Noise contrast sensitivity thresholds
+gaborCST_allCond = [.1, .5]; % Gabor contrast sensitivity thresholds
+nTrials_allCond = [5000]; % Number of trials per condition
+noiseP_allCond = [0, 0.1, 0.2]; % Proportion of noise trials
+iModelA_sim_allCond = [1,3]; % 1=core model, 2=randomize template, 3=use IO template
+iModelB_sim_allCond = [4];
 % noiseCST=.2, gaborCST=.5, nTrials=5e3, noiseP=0, iModelB_sim=4
-% for noiseCST = noiseCST_all
-%     for gaborCST = gaborCST_all
-%         for nTrials = nTrials_all
-%             for noiseP = noiseP_all
-%                 for iModelB_sim = iModelB_sim_all
+% for noiseCST = noiseCST_allCond
+%     for gaborCST = gaborCST_allCond
+%         for nTrials = nTrials_allCond
+%             for noiseP = noiseP_allCond
+%                 for iModelB_sim = iModelB_sim_allCond
 %                     OOD_sim
 %                 end
 %             end
 %         end
 %     end
 % end
+
 clc, close all
 time_start = datetime('now')
 
@@ -81,9 +84,9 @@ if isempty(dir(nameFolder_Data_NOM_IO)), mkdir(nameFolder_Data_NOM_IO), end
 %% Parameters for the simulation
 lapseRate=0;
 pC_titrate = .7; % the accuracy at which threshold is measured
-ni = 100; %
-iModelA_fit_all = iModelA_sim_all;% 1=core model, 2=randomize template, 3=use IO template
-iModelB_fit_all = iModelB_sim_all; % make them consistent for now; later try differ modelB for model recovery
+nIterations = 100; % Number of iterations for simulating the data & fitting the model
+iModelA_fit_all = iModelA_sim_allCond;% 1=core model, 2=randomize template, 3=use IO template
+iModelB_fit_all = iModelB_sim_allCond; % make them consistent for now; later try differ modelB for model recovery
 iLocComb = 1;
 patchMode = 'N'; % 'T'=energy calculated from target-patches; 'N'=from noise patches
 
@@ -158,13 +161,14 @@ fprintf('\nPool of filters created: nORI=%d, nSF=%d\n', length(filtersOri_all), 
 % ====================================
 
 %% Define the TRUE template (ORI x SF)
-stim.gaborSD = fxn_getSigma_SPdomain(stim.gaborSF);
+% stim.gaborSD = fxn_getSigma_SPdomain(stim.gaborSF); % do NOT normalize by SF here
 template_true = exp_CreateGabor(stim, cst_ln_template);
 template_true = SX_RC4_Energy_parfor(stim.mask, {template_true}, filter_sin, filter_cos);
 template_true = squeeze(template_true);  %  Remove singleton dimension
-new_max =.4; new_min = -.05;
-template_true = (template_true * (new_max - new_min)) + new_min; % scale the signal energy to roughly match the range of templates derived from subbj data
+% % new_max =.4; new_min = -.05;
+% template_true = (template_true * (new_max - new_min)) + new_min; % scale the signal energy to roughly match the range of templates derived from subbj data
 save(sprintf('%s/signalEnergy', nameFolder_Data_OOD), 'template_true')
+fprintf('Defined true template\n\n')
 
 %% Simulate stimuli and responses
 nPairs = nTrials / 2;  % Half the trials are pairs
@@ -215,18 +219,28 @@ parfor iPair = 1:nPairs
     e3D_noise = SX_RC4_Energy_parfor(mask, {patch_noise}, filter_sin, filter_cos);
     e3D_noise = squeeze(e3D_noise);  % Remove singleton dimensions
 
-    % Compute internal variable (cross-correlation with template)
+    % Compute internal variable (cross-correlation with the true template)
     IV_target = sum(e3D_target .* template_true, 'all');
     IV_target_sim_allT(iPair) = IV_target;
     IV_noise = sum(e3D_noise .* template_true, 'all');
     IV_noise_sim_allT(iPair) = IV_noise;
+
+    % Visualize patches and energy profiles (optional)
+    % figure('Position', [0 0 2e3 1e3])
+    % subplot(2, 2, 1), imagesc(patch_target), axis square, title('Target Patch'), colormap gray
+    % subplot(2, 2, 2), imagesc(patch_noise), axis square, title('Noise Patch'), colormap gray
+    % subplot(2, 2, 3), imagesc(e3D_target), axis square, title('Energy Profile - Target'), colorbar, caxis([0, 6]), xline(15, 'r-'); yline(15, 'r-');
+    % subplot(2, 2, 4), imagesc(e3D_noise), axis square, title('Energy Profile - Noise'), colorbar, caxis([0, 6]),xline(15, 'r-'); yline(15, 'r-');
+    % sgtitle(sprintf('noise cst = %.2f, gabor cst = %.2f\nPair %d/%d: PRS=%d, Pass=%d', noiseCST, gaborCST, iPair, nPairs, iPRS_allT(iPair), iPass_allT(iPair)))
+    % pause
+    % close all
 
     % Store data in the matrix
     if iPRS_allT(iPair)==1, dataMatrix(iPair, :) = [nan, nan, nan, nan, iLocComb, nan, nan, nan, nan, nan, stim.gaborCST];
     else, dataMatrix(iPair, :) = [nan, nan, nan, nan, iLocComb, nan, nan, nan, nan, nan, 0];
     end
 
-    % Store energy profile
+    % Store energy profiles
     e3D_target_allT(iPair, :, :) = e3D_target;
     e3D_noise_allT(iPair, :, :) = e3D_noise;
 
@@ -360,9 +374,9 @@ fprintf('\n========== Kernels saved ========== \n\n\n')
 
 fprintf('\n\n============= Fit Fit trial-wise model to simulated data =============\n')
 for iModelA_fit = iModelA_fit_all
-    OOD_NOM_Trialwise_beforeEst({nameIO, criterion_true}, iLocComb, iModelA_fit, ni);
+    OOD_NOM_Trialwise_beforeEst({nameIO, criterion_true}, iLocComb, iModelA_fit, nIterations);
     for iModelB_fit = iModelB_fit_all
-        OOD_NOM_Trialwise_Est({nameIO, criterion_true}, iLocComb, iModelA_fit, iModelB_fit, ni)
+        OOD_NOM_Trialwise_Est({nameIO, criterion_true}, iLocComb, iModelA_fit, iModelB_fit, nIterations)
     end
 end
 fprintf('\n\n============= CRITERION=%.1f DONE =============\n\n', criterion_true)
