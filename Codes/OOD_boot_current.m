@@ -9,8 +9,8 @@
 %   The script supports options for mapping cuts and mirroring, and saves all results for downstream analysis.
 %
 % Inputs:
-%   ibatch           - Bootstrap batch index
-%   isubj            - Subject index
+%   iBatch           - Bootstrap batch index
+%   iSubj            - Subject index
 %   iiLoc_all_all    - Indices for location combinations
 %   nB_perBatch      - Number of bootstrap samples per batch
 %   ifamilyORI       - Model family index for orientation
@@ -21,7 +21,7 @@
 % Outputs:
 %   Saves bootstrapped metrics, kernels, and fitted parameters to disk for further
 
-function OOD_boot_current(ibatch, isubj, iiLoc_all_all, nB_perBatch, ifamilyORI, ifamilySF, flag_cutMapping, flag_mirrorMapping)
+function OOD_boot_current(iBatch, iSubj, iiLoc_all_all, nB_perBatch, ifamilyORI, ifamilySF, flag_cutMapping, flag_mirrorMapping)
 clc
 close all
 warning off
@@ -48,8 +48,8 @@ SX_RC1_setting
 
 subjList =             {'YK', 'SP', 'SX', 'LS', 'RE', 'MD', 'AS', 'HL', 'FH', 'HA', 'CS', 'DT', 'DU', 'RC','SR'};
 nblocks_allSubj = [200, 240, 210, 240, 220, 220, 215, 220, 205, 210, 205, 205, 205, 205, 195];
-subjName = subjList{isubj};
-nblocks = nblocks_allSubj(isubj);
+subjName = subjList{iSubj};
+nblocks = nblocks_allSubj(iSubj);
 
 iSess_start = 1; % sessions before this number are discarded to obtain a high and stable quality of data
 %                    % JNeuro: iSess_start=6;
@@ -85,7 +85,7 @@ nameFile_energy = sprintf('%s/%s%d/%s_energy_N_%d_%d.mat', nameFolder_Data_OOD, 
 
 if flag_mirrorMapping, text_cut = '_m'; else, text_cut = ''; end
 nameFile_Boot = sprintf('%s/%s%d/%s_batch%d_B%d_L%d%d_N%d_%d_%d%s_ORI%d_SF%d.mat', ...
-    nameFolder_Data_OOD, subjName, nblocks, subjName, ibatch, nB_perBatch, iLocComb_all, flag_standEnergy, nORI, nSF, text_cut, ifamily_perF);
+    nameFolder_Data_OOD, subjName, nblocks, subjName, iBatch, nB_perBatch, iLocComb_all, flag_standEnergy, nORI, nSF, text_cut, ifamily_perF);
 
 %% Load behavior data from server
 fprintf('Loading behav data...'),tic

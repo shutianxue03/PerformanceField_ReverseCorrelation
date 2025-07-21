@@ -26,16 +26,8 @@ cat<<EOF | srun matlab -nodisplay
 
 %===============
 # Parse input arguments from shell_all_boot.sh
-ibatch=$1
-isubj=$2
-iiLoc_all_all=$3
-nB_perBatch=$4
-ifamilyORI=$5
-ifamilySF=$6
-flag_cutMapping=$7
-flag_mirrorMapping=$8
 
-OOD_boot_current($ibatch, $isubj, $iiLoc_all_all, $nB_perBatch, $ifamilyORI, $ifamilySF, $flag_cutMapping, $flag_mirrorMapping);
+OOD_boot_current($1, $2, $3, $4, $5, $6, $7, $8);
 
 %===============
 exit

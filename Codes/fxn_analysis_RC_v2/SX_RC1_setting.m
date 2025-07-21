@@ -18,7 +18,7 @@ nSF = nORI;
 
 % Define names of folders to load/save data (on the server)
 % if run on HPC
-nameFolder_server = '';
+nameFolder_server = '..';
 % if run on local
 nameFolder_server = '/Volumes/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC'; % the server directory of the Data and Figures folders
 
