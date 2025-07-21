@@ -1,3 +1,31 @@
+% fxn_runCV.m
+%
+% Last updated by Shutian Xue on 07/21/2025
+%
+% Description:
+%   This function performs cross-validation (CV) for tuning function fitting to conduct model comparison (MC) analysis.
+%   It supports both k-fold and leave-one-out cross-validation (LOOCV) modes, partitions the data, 
+%   fits model parameters using constrained optimization (MultiStart with fmincon), and evaluates model performance on test sets.
+%   The function returns estimated parameters, test set deviance, and predicted values for each CV fold.
+%
+% Inputs:
+%   CVmode         - Cross-validation mode (1 = k-fold, 2 = LOOCV)
+%   k              - Number of folds (for k-fold CV) or number of data points (for LOOCV)
+%   ncv            - Number of cross-validation repetitions
+%   nfilters       - Number of data points (filters)
+%   yData          - Observed data (2 x nfilters)
+%   paramInd       - Indices of parameters to fit
+%   ifamily        - Model family index
+%   options        - Optimization options for fmincon
+%   params0        - Initial parameter values
+%   lb, ub         - Lower and upper bounds for parameters
+%   nrep           - Number of MultiStart runs
+%   axis_tuning_ln - Tuning axis for model prediction
+%
+% Outputs:
+%   param_est_allK - Estimated parameters for each fold/repetition
+%   dev_test_allK  - Deviance on test set for each fold/repetition
+%   y_pred_allK    - Predicted values for each
 
 
 function [param_est_allK, dev_test_allK, y_pred_allK] = fxn_runCV(CVmode, k, ncv, nfilters, yData, paramInd, ifamily, options, params0, lb, ub, nrep, axis_tuning_ln)

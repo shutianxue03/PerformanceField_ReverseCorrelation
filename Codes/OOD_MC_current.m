@@ -10,20 +10,18 @@ function OOD_MC_current(isubj, iiLoc_all_all, flag_PatchMode, flag_cutMapping, f
 % flag_mirrorMapping: 1=mirror 2D kernel matrix over ORI=0
 % ifeature: 1=ORI, 2=SF
 % ifamily: 1=Gaussian, 8=DoG // 2=log parabola, 3=truncated log parabola
-% MCmodel: see var 'titlesMCmode' defined below
+% MCmodel: 1=10-fold CV, 2=LOOCV, 3=IC (AIC, AICc, BIC)
 
 close all
 clc
 
-addpath(genpath('Data/Data_MC'))
-addpath(genpath('Data/Data_OOD'))
-addpath(genpath('Codes/fxn_MC'))
-addpath(genpath('Codes/fxn_analysis_RC_v2'))
+addpath(genpath('fxn_MC'))
+addpath(genpath('fxn_analysis_RC_v2'))
 
 time_start = datetime('now')
 
-% 10-fold CV: ~30 mins
-% LOOCV: ~20 mins
+% 10-fold CV:<30 mins (from SP, who has the most data)
+% LOOCV: <20 mins
 % IC: ~1 min
 
 %% Define params
@@ -31,7 +29,6 @@ time_start = datetime('now')
 SX_RC1_setting
 %--------------%
 
-nORI = 29; nSF = 29;
 iType = 2;% extract kernels derived from target-abs trials
 flagPlot = 0;
 flag_block200 = 0; % 1; all observers are forced to have 200 blocks; 0=no
@@ -73,7 +70,7 @@ fprintf('%s\n    >> %s vs. %s (%s)\n    >> cut = %d (1=cut the edge)\n    >> mir
     titlesMCmode{MCmode})
 fprintf('============================\n')
 
-%% model setting
+%% Define model comparison  setting
 % names of params
 namesParams = namesParams_all{ifamily};
 nparams_full = length(namesParams);
@@ -86,30 +83,31 @@ paramInd_all = fxn_getParamInd(nparams_full);
 ub_full = ub_full_all{ifamily};
 lb_full = lb_full_all{ifamily};
 
-%% extract x (y is extracted for each subj)
+%% Obtain x-axis
 if (ifeature == 2) && (~sum(ifamily == [4, 5, 9])) % fitting SF except (4) raised gaussian (5) double exponential (9) gaussian to SF
     axis_tuning_ln = 2.^axis_tuning{ifeature};
-else, axis_tuning_ln = axis_tuning{ifeature};
+else
+    axis_tuning_ln = axis_tuning{ifeature};
 end
 nfilters = length(axis_tuning_ln);
 
-%% name of the folder and files
+%% Define directories
 if flag_mirrorMapping, nameM = '_m'; else, nameM = ''; end
 if flag_cutMapping, nameC = 'c'; else, nameC = ''; end
 
-nameFolder_MC = sprintf('%s/Data_MC/%d%d%s%s/%s/L%d%d', nameFolder_Data, nORI, nSF, nameM, nameC, subjList{isubj}, iLoc_all);
-dirFolder_MC = dir(nameFolder_MC); if isempty(dirFolder_MC), mkdir(nameFolder_MC), end
+nameFolder_MC = sprintf('%s/Data_MC_%d%d%s%s/%s/L%d%d', nameFolder_Data, nORI, nSF, nameM, nameC, subjList{isubj}, iLoc_all);
+nameDir_MC = dir(nameFolder_MC); if isempty(nameDir_MC), mkdir(nameFolder_MC), end
 nameFile_MC = sprintf('%s/Family%d_mode%d.mat', nameFolder_MC, ifamily, MCmode);
 
 if MCmode == 3, nIC_ = nIC; else, nIC_ = 1; end % number of information criterion
 
-%% load kernels
-nameKernel = sprintf('Data_OOD/%s%d/%s_kernel_%s_%d_%d.mat', subjName, nblocks, subjName, namePatchMode, nORI, nSF);
+%% Load kernels from server
+nameFile_kernel = sprintf('%s/%s%d/%s_kernel_%s_%d_%d.mat', nameFolder_Data_OOD, subjName, nblocks, subjName, namePatchMode, nORI, nSF);
 fprintf('  Loading kernels...'), tic
-load(nameKernel, 'kernels2D_perComb')
+load(nameFile_kernel, 'kernels2D_perComb')
 dur = toc; fprintf('DONE (Dur %.1f min)\n', dur/60)
 
-%% extract y (i.e., kernels)
+%% Extract kernels
 if ifeature==1, yData = nan(nLoc2, nORI); else, yData = nan(nLoc2, nSF); end
 for iiLoc = 1:nLoc2
     kk = squeeze(kernels2D_perComb{iLoc_all(iiLoc)}(iType, :, :));
@@ -132,13 +130,13 @@ for iiLoc = 1:nLoc2
     end
 end
 
-%% empty folders
+%% Preallocate variables
 irank_allCand = nan(nIC_, nCands); % the sorted model index (best to worst model);
 iBest_allCand = nan(nIC_, 1);
 dev_allCand = nan(nCands, 3);
 params_est_allCand = cell(1, nCands);
 
-%% loop through each candidate model
+%% Loop through each candidate model
 for iCand = 1:nCands % loop thru model candiadates // cannot and no need to 'parfor', because fitting used parfor
     fprintf('M#%d/%d...\n', iCand, nCands)
     tic
@@ -180,7 +178,7 @@ end % end of imodel
 % mode2: 22 sec per model
 % mode 3: .5 sec
 
-%% compile outputs
+%% Compile outputs
 indCands = 1:nCands;
 if flagPlot == 1
     figure('Position', [0 0 400 * nIC_, 300]), hold on
@@ -216,4 +214,4 @@ save(nameFile_MC, 'ifeature', 'ifamily',  'MCmode', 'paramInd_all', '*_allCand')
 %%
 time_end = datetime('now')
 
-time_end - time_startw
+time_end - time_start
