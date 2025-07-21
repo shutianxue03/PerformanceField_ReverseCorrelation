@@ -1,20 +1,20 @@
 % close all
 figure('Position', [0, 0, 1800, 600])
-for itype = 1:ntypes
+for iType = 1:nTypes
     % 2D
-    subplot(3, ntypes, itype), hold on
-    kk = squeeze(kernels2D(itype, :, :));
+    subplot(3, nTypes, iType), hold on
+    kk = squeeze(kernels2D(iType, :, :));
     imagesc(kk)
     axis square, colorbar
-    title(sprintf('%s-%s\nSep = %d%%', namesType{itype},namesLocComb{iLocComb}, round(sep(itype)*100)))
+    title(sprintf('%s-%s\nSep = %d%%', namesType{iType},namesLocComb{iLocComb}, round(sep(iType)*100)))
     
     % ORI marginalized kernels
-    subplot(3, ntypes, itype+3), hold on
+    subplot(3, nTypes, iType+3), hold on
     plot(axis_tuning{1}, mean(kk, 2))
     xlabel('ORI')
     
     % SF marginalized kernels
-    subplot(3, ntypes, itype+6), hold on
+    subplot(3, nTypes, iType+6), hold on
     plot(axis_tuning{2}, mean(kk, 1))
     xlabel('SF (log)')
 end

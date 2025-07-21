@@ -4,7 +4,7 @@
 
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=12
-#SBATCH --mem=10G
+#SBATCH --mem=32G
 #SBATCH --time=1:00:00
 #SBATCH --output=zzz_Boot_%j.out
 #SBATCH --mail-user=vivanxuest@gmail.com

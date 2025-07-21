@@ -64,7 +64,7 @@ for iORI = 1:nORI
         x = e3D_allT(:, iORI, iSF);
         try
             % Fit a GLM to predict response using specified link function
-            [beta, ~, stats] = glmfit(x, resp_allT, 'binomial', 'Link', fxnLink, 'Options', opts, 'LikelihoodPenalty', 'jeffreys-prior');
+            [beta, ~, stats] = glmfit(x, resp_allT, 'binomial', 'Link', fxnLink, 'Options', opts);
             % for super easy trials, The GLM can draw a hyperplane that
             % separates all 1s and 0s perfectly. As a result, the estimated
             % slope (beta(2)) goes to ±∞ to make the predicted
