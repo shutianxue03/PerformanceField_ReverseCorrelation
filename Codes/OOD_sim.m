@@ -56,6 +56,9 @@ iModelB_sim_allCond = [4];
 
 clc, close all
 time_start = datetime('now')
+% Set rng seed for reproducibility
+rng(1) 
+
 
 % Add paths for custom functions
 addpath(genpath('fxn_exp'))  % Path to experimental functions

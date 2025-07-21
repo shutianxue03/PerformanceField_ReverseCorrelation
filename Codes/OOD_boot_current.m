@@ -1,3 +1,26 @@
+% OOD_boot_current.m
+%
+% Last updated by Shutian Xue on 07/21/2025
+%
+% Description:
+%   This function performs bootstrapping analysis on observer data to drive featural representation using reerse correlation..
+%   It resamples behavioral and energy data across location combinations and batches, computes reverse correlation kernels,
+%   fits tuning functions, and extracts behavioral and model metrics for each bootstrap iteration.
+%   The script supports options for mapping cuts and mirroring, and saves all results for downstream analysis.
+%
+% Inputs:
+%   ibatch           - Bootstrap batch index
+%   isubj            - Subject index
+%   iiLoc_all_all    - Indices for location combinations
+%   nB_perBatch      - Number of bootstrap samples per batch
+%   ifamilyORI       - Model family index for orientation
+%   ifamilySF        - Model family index for spatial frequency
+%   flag_cutMapping  - Flag to cut mapping edges (1=cut, 0=no cut)
+%   flag_mirrorMapping - Flag to mirror mapping over 0 ORI (1=mirror, 0=no mirror)
+%
+% Outputs:
+%   Saves bootstrapped metrics, kernels, and fitted parameters to disk for further
+
 function OOD_boot_current(ibatch, isubj, iiLoc_all_all, nB_perBatch, ifamilyORI, ifamilySF, flag_cutMapping, flag_mirrorMapping)
 clc
 close all
@@ -11,6 +34,9 @@ addpath(genpath('fxn_exp'))
 addpath(genpath('Data_OOD'))
 
 time_start = datetime('now')
+
+% Set rng seed for reproducibility
+rng(1)
 
 %%
 % nB=100: ~30 mins
@@ -26,11 +52,11 @@ subjName = subjList{isubj};
 nblocks = nblocks_allSubj(isubj);
 
 iSess_start = 1; % sessions before this number are discarded to obtain a high and stable quality of data
-                            % JNeuro: iSess_start=6;
+%                    % JNeuro: iSess_start=6;
 flag_PatchMode = 2; % 1=target patch; 2=noise patch
 flag_standEnergy = 1; % 1=standardize energy; 0=do NOT
 
-%% define the fitting function
+%% Define parameters for fitting tuning functions
 ifamily_perF = [ifamilyORI, ifamilySF];
 iLoc_all_all = [1,8; 6,7; 5,3];
 iLocComb_all = iLoc_all_all(iiLoc_all_all, :);
@@ -45,7 +71,7 @@ nTuningC_SF = length(namesTunC_unit_perF{ifamilySF, 2}); % peakSF, peak amp., ba
 nLoc2 = length(iLocComb_all);
 namesEnergySource = {'TARGET', 'NOISE'};
 
-%% print
+%% Print out the settings
 fprintf('\n=======================\n%s, nB=%d, nORI=%d x nSF=%d\n%s vs. %s\nEnergy derived from %s patch (standardization=%d)\nCut (1=cut edges): %d\nMirror (1-mirror mapping over 0 ORI): %d\n%s: Family#%d %s [%s]\n%s: Family#%d %s [%s]\n=======================\n\n', ...
     subjName, nB_perBatch, nORI, nSF, namesLocComb{iLocComb_all(1)}, namesLocComb{iLocComb_all(2)}, ...
     namesEnergySource{flag_PatchMode}, flag_standEnergy, ...
@@ -53,21 +79,21 @@ fprintf('\n=======================\n%s, nB=%d, nORI=%d x nSF=%d\n%s vs. %s\nEner
     namesFeature{1}, ifamily_perF(1), namesFamily_all{ifamily_perF(1)}, num2str(paramInd_perF{1} ), ...
     namesFeature{2}, ifamily_perF(2), namesFamily_all{ifamily_perF(2)}, num2str(paramInd_perF{2} ))
 
-%% get dir
-nameFile_behav = sprintf('Data_OOD/%s%d/%s_behavMeas.mat', subjName, nblocks, subjName);
-nameFile_energy = sprintf('Data_OOD/%s%d/%s_energy_N_%d_%d.mat', subjName, nblocks, subjName, nORI, nSF);
+%% Define directories
+nameFile_behav = sprintf('%s/%s%d/%s_behavMeas.mat', nameFolder_Data_OOD, subjName, nblocks, subjName);
+nameFile_energy = sprintf('%s/%s%d/%s_energy_N_%d_%d.mat', nameFolder_Data_OOD, subjName, nblocks, subjName, nORI, nSF);
 
 if flag_mirrorMapping, text_cut = '_m'; else, text_cut = ''; end
-nameFile_Boot = sprintf('Data_OOD/%s%d/%s_batch%d_B%d_L%d%d_N%d_%d_%d%s_ORI%d_SF%d.mat', ...
-    subjName, nblocks, subjName, ibatch, nB_perBatch, iLocComb_all, flag_standEnergy, nORI, nSF, text_cut, ifamily_perF);
+nameFile_Boot = sprintf('%s/%s%d/%s_batch%d_B%d_L%d%d_N%d_%d_%d%s_ORI%d_SF%d.mat', ...
+    nameFolder_Data_OOD, subjName, nblocks, subjName, ibatch, nB_perBatch, iLocComb_all, flag_standEnergy, nORI, nSF, text_cut, ifamily_perF);
 
-%% load behavior data
+%% Load behavior data from server
 fprintf('Loading behav data...'),tic
 load(nameFile_behav, 'dataMatrix')
 dur = toc; fprintf('DONE (Dur %.1f min)\n', dur/60)
 
-%% load energy profiles
-fprintf('Loading Source Energy...'), tic
+%% Load energy profiles from server
+fprintf('Loading source energy...'), tic
 load(nameFile_energy)
 dur = toc; fprintf('DONE (Dur %.1f min)\n', dur/60)
 
@@ -80,58 +106,63 @@ if strcmp(subjName, 'RE'), iSess_select = [1:15, 17:23, 25:nSess]; end
 nSess = length(iSess_select);
 ntrialsAll_s = nSess*100;
 % ntrialsAll = ntrials_allT/5; % ntrials per loc
-% ntrialsAll_s = (nSess-iSess_start+1)*100; 
+% ntrialsAll_s = (nSess-iSess_start+1)*100;
 
-%% empty holders
+%% Preallocate variables
 metrics_allB = nan(nB_perBatch, nLoc2, nmetrics); %(iB, iiLocComb, :) = [dprime, c, pC, pHit, pFA, pA3];
 dataMtx_allB = nan(nB_perBatch, nLoc2, ntrialsAll_s*4, 11); % 4 because P has 4 single loc
-pYES_tgt_allB = nan(nB_perBatch, nLoc2, ntypes, nbins_e);  %(iB, iiLocComb, :, :) = pYES_tgt;
-ebin_tgt_allB = nan(nB_perBatch, nLoc2, ntypes, nbins_e); %(iB, iiLocComb, :, :) = ebin_tgt;
-kernels2D_allB = nan(nB_perBatch, nLoc2, ntypes, nORI, nSF); %(iB, iiLocComb, :, :, :) = kernels2D;
-sep_allB = nan(nB_perBatch, nLoc2, ntypes); %(iB, iiLocComb, :) = sep;
+pYES_tgt_allB = nan(nB_perBatch, nLoc2, nTypes, nbins_e);  %(iB, iiLocComb, :, :) = pYES_tgt;
+ebin_tgt_allB = nan(nB_perBatch, nLoc2, nTypes, nbins_e); %(iB, iiLocComb, :, :) = ebin_tgt;
+kernels2D_allB = nan(nB_perBatch, nLoc2, nTypes, nORI, nSF); %(iB, iiLocComb, :, :, :) = kernels2D;
+sep_allB = nan(nB_perBatch, nLoc2, nTypes); %(iB, iiLocComb, :) = sep;
 % secondary
-pYES_tgt_norm_allB = nan(nB_perBatch, nLoc2, ntypes, nbins_e); %(iB, iiLocComb, :, :) = pYES_tgt_norm;
-ebin_tgt_norm_allB = nan(nB_perBatch, nLoc2, ntypes, nbins_e); %(iB, iiLocComb, :, :) = ebin_tgt_norm;
-intercept2D_allB = nan(nB_perBatch, nLoc2, ntypes, nORI, nSF); %(iB, iiLocComb, :, :, :) = intercept2D;
-R2_2D_allB = nan(nB_perBatch, nLoc2, ntypes, nORI, nSF); %(iB, iiLocComb, :, :, :) = R2_2D;
-R2_Tjur_allB = nan(nB_perBatch, nLoc2, ntypes, nORI, nSF); %(iB, iiLocComb, :, :, :) = R2_Tjur;
-pValues_allB = nan(nB_perBatch, nLoc2, ntypes, nORI, nSF, 2); %(iB, iiLocComb, :, :, :, :) = pValues;
-pCat_allB = nan(nB_perBatch, nLoc2, ntypes, nORI, nSF); %(iB, iiLocComb, :, :, :) = pCat;
+pYES_tgt_norm_allB = nan(nB_perBatch, nLoc2, nTypes, nbins_e); %(iB, iiLocComb, :, :) = pYES_tgt_norm;
+ebin_tgt_norm_allB = nan(nB_perBatch, nLoc2, nTypes, nbins_e); %(iB, iiLocComb, :, :) = ebin_tgt_norm;
+intercept2D_allB = nan(nB_perBatch, nLoc2, nTypes, nORI, nSF); %(iB, iiLocComb, :, :, :) = intercept2D;
+R2_2D_allB = nan(nB_perBatch, nLoc2, nTypes, nORI, nSF); %(iB, iiLocComb, :, :, :) = R2_2D;
+R2_Tjur_allB = nan(nB_perBatch, nLoc2, nTypes, nORI, nSF); %(iB, iiLocComb, :, :, :) = R2_Tjur;
+pValues_allB = nan(nB_perBatch, nLoc2, nTypes, nORI, nSF, 2); %(iB, iiLocComb, :, :, :, :) = pValues;
+pCat_allB = nan(nB_perBatch, nLoc2, nTypes, nORI, nSF); %(iB, iiLocComb, :, :, :) = pCat;
 
-similarityAfterMirroring_allB = nan(nB_perBatch, ntypes, nLoc2);
-margORI_allB = nan(nB_perBatch, nLoc2, ntypes, nORI); %(iB, :, :, :) = margORI;
-margPredORI_allB = nan(nB_perBatch, nLoc2, ntypes, nORI); %(iB, :, :, :) = margPred_ORI;
-margParamsORI_allB = nan(nB_perBatch, nLoc2, ntypes, length(paramInd_perF{1})); %(iB, :, :, :) = margParams_ORI;
-margTuningC_ORI_allB = nan(nB_perBatch,  nLoc2, ntypes, nTuningC_ORI);
-margR2ORI_allB = nan(nB_perBatch, nLoc2, ntypes); %(iB, :, :, :) = margR2_ORI;
+similarityAfterMirroring_allB = nan(nB_perBatch, nTypes, nLoc2);
+margORI_allB = nan(nB_perBatch, nLoc2, nTypes, nORI); %(iB, :, :, :) = margORI;
+margPredORI_allB = nan(nB_perBatch, nLoc2, nTypes, nORI); %(iB, :, :, :) = margPred_ORI;
+margParamsORI_allB = nan(nB_perBatch, nLoc2, nTypes, length(paramInd_perF{1})); %(iB, :, :, :) = margParams_ORI;
+margTuningC_ORI_allB = nan(nB_perBatch,  nLoc2, nTypes, nTuningC_ORI);
+margR2ORI_allB = nan(nB_perBatch, nLoc2, nTypes); %(iB, :, :, :) = margR2_ORI;
 
-margSF_allB = nan(nB_perBatch, nLoc2, ntypes, nSF); %(iB, :, :, :) = margSF;
-margPredSF_allB = nan(nB_perBatch, nLoc2, ntypes, nSF); %(iB, :, :, :) = margPred_SF;
-margParamsSF_allB = nan(nB_perBatch, nLoc2, ntypes, length(paramInd_perF{2})); %(iB, :, :, :) = margParams_SF;
-margTuningC_SF_allB = nan(nB_perBatch,  nLoc2, ntypes, nTuningC_SF);
-margR2SF_allB = nan(nB_perBatch, nLoc2, ntypes); %(iB, :, :, :) = margR2_SF;
+margSF_allB = nan(nB_perBatch, nLoc2, nTypes, nSF); %(iB, :, :, :) = margSF;
+margPredSF_allB = nan(nB_perBatch, nLoc2, nTypes, nSF); %(iB, :, :, :) = margPred_SF;
+margParamsSF_allB = nan(nB_perBatch, nLoc2, nTypes, length(paramInd_perF{2})); %(iB, :, :, :) = margParams_SF;
+margTuningC_SF_allB = nan(nB_perBatch,  nLoc2, nTypes, nTuningC_SF);
+margR2SF_allB = nan(nB_perBatch, nLoc2, nTypes); %(iB, :, :, :) = margR2_SF;
 
-%%
-for iB = 1:nB_perBatch
-    fprintf('\n%d/%d...', iB, nB_perBatch) % no need to use 'parfor', which is used in fitting
-    margORI_perComb = nan(nLoc2, ntypes, nORI);
-    margSF_perComb = nan(nLoc2, ntypes, nSF);
+%% Loop through bootstrapping batches
+for iB = 1:nB_perBatch % no need to use 'parfor', which is used in fitting
+
+    % Print out the batch number
+    fprintf('\nBootstrap %d/%d...', iB, nB_perBatch)
+
+    % Preallocate variables for this batch
+    margORI_perComb = nan(nLoc2, nTypes, nORI);
+    margSF_perComb = nan(nLoc2, nTypes, nSF);
     pref_ORI_perComb = nan(nLoc2, 1);
-    
+
+    % Loop through location combinations
     for iiLocComb = 1:nLoc2
         iLocComb = iLocComb_all(iiLocComb);
         e3D_resampled = [];
         dataMtx_resampled = [];
         respC_resampled = [];
-        
-        % to equate the number of trials per loc, single location got doubled (HM vs. VM) even quandrupled (F vs. P)
+
+        % Adjust number of trials for single locations (double for HM vs. VM and quandruple for F vs. P) to equate the number of trials per loc
         if iLocComb < 6, iLoc_all = ones(1,4)*iLocComb;
         else, switch iLocComb , case 6, iLoc_all = [2,2,4,4]; case 7, iLoc_all = [3,3,5,5]; case 8, iLoc_all = 2:5; end
         end
-        
         nLoc_comb = length(iLoc_all);
         nChosen = ntrialsAll_s;
-        
+
+        % Loop through each location within the location combination
         for iiLoc = 1:nLoc_comb
             dataMtx_nonrand = [];
             e3D_nonrand = [];
@@ -146,21 +177,22 @@ for iB = 1:nB_perBatch
                 dataMtx_nonrand = [dataMtx_nonrand; dataMatrix(indLoc, :)];
                 e3D_nonrand = cat(1, e3D_nonrand, e3D_allT(indLoc, :, :));
             end
-            
+
+            % Extract the index of pairing trials
             iPair_nonrand = dataMtx_nonrand(:, 8);
             iPair_unik_nonrand = unique(iPair_nonrand); % range: [1, ntrials_ofThisSubj/2]
-            
-            rng('shuffle')
-            % get the itrial of selected data (for each loc) according to the unik pair
+
+            % Obtain the itrial of selected data (for each loc) according to the unik pair
             indRand_unikPair = randi(ntrialsAll_s/2, [nChosen/2, 1]); % range: min>=1, max<=ntrialsAll/2
             [e3D_rand, dataMtx_rand, respC] = fxn_getRespC_simp(indRand_unikPair, iPair_unik_nonrand, e3D_nonrand, dataMtx_nonrand);
-            
+
+            % Store the resampled data
             e3D_resampled = [e3D_resampled; e3D_rand];
             dataMtx_resampled = [dataMtx_resampled; dataMtx_rand];
             respC_resampled = [respC_resampled; respC];
         end % iiLoc
-        
-        %% get behav matrix
+
+        %% Obtain behavioral metrics
         iPRS = dataMtx_resampled(:, 6);
         resp = dataMtx_resampled(:, 9);
         pHit = mean(iPRS & resp)*2;
@@ -168,38 +200,38 @@ for iB = 1:nB_perBatch
         pC = mean(iPRS == resp);
         [dprime, c] = SX_sim06_SDT(pHit, pFA);
         pA3 = nanmean(respC_resampled);
-        
-        %% standardize energy
+
+        %% Standardize energy
         %------------------------------------------------------------------------------------------------%
         e3D_norm = normEnergy(e3D_resampled, dataMtx_resampled(:, 11), dataMtx_resampled(:, 6));
         %------------------------------------------------------------------------------------------------%
         if flag_standEnergy == 1, e3D = e3D_norm;
         else, e3D = e3D_resampled;
         end
-        
-        %% pYES vs. binned energy [SX_RC5_slope]
+
+        %% Compute pYES vs. binned energy [SX_RC5_slope]
         % un-standardized energy
-        [pYES_tgt, ebin_tgt] = SX_RC5_slope(dataMtx_resampled, e3D_resampled, ntypes, nbins_e);
+        [pYES_tgt, ebin_tgt] = SX_RC5_slope(dataMtx_resampled, e3D_resampled, nTypes, nbins_e);
         %         quickPlot5_slope
-        
+
         % standardized energy
-        [pYES_tgt_norm, ebin_tgt_norm] = SX_RC5_slope(dataMtx_resampled, e3D_norm, ntypes, nbins_e);
+        [pYES_tgt_norm, ebin_tgt_norm] = SX_RC5_slope(dataMtx_resampled, e3D_norm, nTypes, nbins_e);
         %         fprintf(' Energy binned.')
-        
-        %% Probit regression to get KERNELs [SX_RC6_kernel]
+
+        %% Conduct probit regression to derive kernels for each ORIxSF channel [SX_RC6_kernel]
         filtersSF_all = 2.^linspace(log2(noise.SF_low), log2(noise.SF_high), nSF);
         [kernels2D, intercept2D, margORI_, margSF_, R2_2D, R2_Tjur, pValues, pCat, sep] = ...% combine trials by averaging single loc
             SX_RC6_kernel_parfor(e3D, dataMtx_resampled, filtersSF_all, filtersOri_all);
         %         quickPlot6_kernel
-        
-        %% get preferred ORI (where kernels peak before mirroring)
+
+        %% Compute the preferred ORI (where kernels peak before mirroring)
         kernelORI = mean(kernels2D(2, :, :), 3);
         x_intp = linspace(axis_tuning{1}(1), axis_tuning{1}(end), 1e3);
         kernelORI_intp = interp1(axis_tuning{1}, kernelORI, x_intp);
         [~, imax] = max(kernelORI_intp);
-        pref_ORI_perComb(iiLocComb) = x_intp(imax); 
-        
-        %% process kernels (cutting & mirroring)
+        pref_ORI_perComb(iiLocComb) = x_intp(imax);
+
+        %% Process kernels (cutting & mirroring)
         if flag_cutMapping, kernels2D = kernels2D(:, cut_ORI, cut_SF); end
         if flag_mirrorMapping
             indMir = (nORI-1)/2;
@@ -208,17 +240,17 @@ for iB = 1:nB_perBatch
             kk_mid = kernels2D(:, indMir+1,:);
             kk_ave = (kk_left + flip(kk_right,2))/2;
             kernels2D_mir = cat(2, kk_ave, kk_mid, flip(kk_ave, 2));
-            
+
             % get similarity after mirroring
-            for iType = 1:ntypes
+            for iType = 1:nTypes
                 similarityAfterMirroring_allB(iB, iType, iiLocComb) = corr2(squeeze(kernels2D(iType, :, :)), squeeze(kernels2D_mir(iType, :, :)));
             end
             kernels2D = kernels2D_mir;
         end
-        
-        %% get margORI/SF_perComb  and calculate separability
+
+        %% Deribe marginalized ORI and SF tuning curves for each location comb and calculate separability
         % NO need to save, as the reorganized version will be saved)
-        for iType = 1:ntypes
+        for iType = 1:nTypes
             e2D_cut_ = squeeze(kernels2D(iType, :, : ));
             e_min = min(e2D_cut_(:));
             e2D_cut = e2D_cut_ - e_min + eps; % make all energy values positive
@@ -229,9 +261,9 @@ for iB = 1:nB_perBatch
             % marg
             margORI_perComb(iiLocComb, iType, :) = margORI + e_min; % stupid code, need to feed three types into SX_RC7_fitting
             margSF_perComb(iiLocComb, iType, :) = margSF + e_min;
-        end % itype
-        
-        %% compile
+        end % iType
+
+        %% Store results for this location combination
         % primary
         metrics_allB(iB, iiLocComb, :) = [dprime, c, pC, pHit, pFA, pA3, nan]; % nan is for cst_ln
         dataMtx_allB(iB, iiLocComb, :, :) = dataMtx_resampled; % to extract RT and cst
@@ -247,54 +279,58 @@ for iB = 1:nB_perBatch
         R2_Tjur_allB(iB, iiLocComb, :, :, :) = R2_Tjur;
         pValues_allB(iB, iiLocComb, :, :, :, :) = pValues;
         pCat_allB(iB, iiLocComb, :, :, :) = pCat;
-        
+
     end % iiLocComb
-    
-    %% fit fxns to kernels [SX_RC7_fitting]
+
+    %% Fit tuning fxns to marginalized kernels to estimate tuning parameters [SX_RC7_fitting]
     flag_interpolate = 0;
-    
-    iF = 1; [margORI, margPred_ORI, margParams_ORI, margR2_ORI] = SX_RC7_fitting(flag_cutMapping, iF, ...
+
+    iF = 1; [margORI, margPred_ORI, margParams_ORI, margR2_ORI] = SX_RC7_fitting(iF, ...
         margORI_perComb, ub_full_all{ifamily_perF(iF)}, lb_full_all{ifamily_perF(iF)}, ...
         ifamily_perF, paramInd_perF, flag_standEnergy);
-    iF = 2; [margSF, margPred_SF, margParams_SF, margR2_SF] = SX_RC7_fitting(flag_cutMapping, iF, ...
+    iF = 2; [margSF, margPred_SF, margParams_SF, margR2_SF] = SX_RC7_fitting(iF, ...
         margSF_perComb, ub_full_all{ifamily_perF(iF)}, lb_full_all{ifamily_perF(iF)}, ...
         ifamily_perF, paramInd_perF, flag_standEnergy);
-    
-%     quickPlot7_fitting
+
+    quickPlot7_fitting
     %     fprintf(' Kernel fitted.')
-    
-    %% compile
+
+    %% Store results for this batch
     margORI_allB(iB, :, :, :) = margORI;
     margPredORI_allB(iB, :, :, :) = margPred_ORI;
     margParamsORI_allB(iB, :, :, :) = margParams_ORI;
     margR2ORI_allB(iB, :, :, :) = margR2_ORI;
-    
+
     margSF_allB(iB, :, :, :) = margSF;
     margPredSF_allB(iB, :, :, :) = margPred_SF;
     margParamsSF_allB(iB, :, :, :) = margParams_SF;
     margR2SF_allB(iB, :, :, :) = margR2_SF;
-    
-    %% extract tuning characteristics
+
+    %% Compute tuning characteristics based on the fitted parameters
+    % Loop through location combinations and types
     for iiLoc = 1:nLoc2
-        for iType = 2%1:ntypes
+        % Loop through types
+        for iType = 2%1:nTypes
             % ORI
             ifeature= 1;
             tuningC_ORI = fxn_getTuningC(axis_tuning{ifeature}, ifeature, ifamily_perF(ifeature), ...
                 squeeze(margPred_ORI(iiLoc, iType,:)), squeeze(margParams_ORI(iiLoc, iType,:)));
+            
             % SF
             ifeature=2;
             tuningC_SF = fxn_getTuningC(axis_tuning{ifeature}, ifeature, ifamily_perF(ifeature), ...
                 squeeze(margPred_SF(iiLoc, iType,:)), squeeze(margParams_SF(iiLoc, iType,:)));
-            % compile
+                
+            % Store tuning characteristics
             margTuningC_ORI_allB(iB, iiLoc, iType, :) = [pref_ORI_perComb(iiLoc), tuningC_ORI];
             margTuningC_SF_allB(iB, iiLoc, iType, :) = tuningC_SF;
-            
-        end % itype
+
+        end % iType
     end % ii
-    
+
 end % end of iB
 
-%% save
+%% Save results
 save(nameFile_Boot, '*_allB')
 
 fprintf('ALL DONE\n')

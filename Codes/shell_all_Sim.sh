@@ -12,7 +12,7 @@ do
             do  
                 for iModelB_sim in 4
                 do
-                    sbatch shell_OOD_sim.sh $noiseCST $gaborCST $nTrials $noiseP $iModelB_sim
+                    sbatch shell_Sim.sh $noiseCST $gaborCST $nTrials $noiseP $iModelB_sim
                 done
             done
         done

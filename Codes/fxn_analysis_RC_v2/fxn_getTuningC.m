@@ -1,5 +1,5 @@
 
-function tuningC = fxn_getTuningC(x, ifeature, ifamily, pred, params)
+function tuningC = fxn_getTuningC(x, iFeature, iFamily, pred, params)
 
 % function tuningC = fxn_getTuningC(x, ifeature, pred, param)
 % extract the characteristics of the tuning function
@@ -24,8 +24,8 @@ function tuningC = fxn_getTuningC(x, ifeature, ifamily, pred, params)
 
 nfilters = length(x);
 
-if ifeature==1
-    switch ifamily
+if iFeature == 1
+    switch iFamily
         case 1 % scaled Gaussian
             % ORI-peak and bottom
             peakAmp_ORI = pred(ceil(nfilters/2));
@@ -36,10 +36,10 @@ if ifeature==1
             width_ORI = sqrt(-2* params(2)^2*log((pred_half-params(3))/params(1)));
             % compile
             tuningC = [peakAmp_ORI, width_ORI, bottom_ORI];
-            
+
         case 8 % DoG
             baseline = pred(1);
-            
+
             % SX_normPDF = @(x,mu,sigma) exp(-((x-mu)/sigma).^2);
             % fxn = @(x, params) params(1)*(exp(-(x/params(3)).^2) - params(2)*exp(-(x/params(4)).^2)) + params(5);
             % peak amp
@@ -47,12 +47,12 @@ if ifeature==1
             % trough depth
             trough_depth = min(pred);
             %% trough ori
-            trough_ORI = inverseFxn(trough_depth, ifamily, params, linspace(0, 90, 1e4));
+            trough_ORI = inverseFxn(trough_depth, iFamily, params, linspace(0, 90, 1e4));
             % ORI - width
             pred_max = max(pred); pred_min = min(pred);
             pred_half_max_min = (pred_max - pred_min)/2 + pred_min; % the y coordinate of the width
             %             pred_half_max_base = (pred_max - baseline)/2 + baseline; % the y coordinate of the width
-            width_ORI_min = 2*inverseFxn(pred_half_max_min, ifamily, params, linspace(0, 90, 1e4));
+            width_ORI_min = 2*inverseFxn(pred_half_max_min, iFamily, params, linspace(0, 90, 1e4));
             %             width_ORI_base = 2*inverseFxn(pred_half_max_base, ifamily, params, linspace(0, 90, 1e4));
             % compile
             tuningC = [peakAmp_ORI, trough_ORI, trough_depth, width_ORI_min, baseline];
@@ -65,13 +65,14 @@ if ifeature==1
             % yline(pred_half_max_min);
             % yline(pred_half_max_base);
     end
-    
-    
-else % iF=2
+
+
+else % iF=2, SF
     x_ln = linspace(1,4, 1e3);
-    switch ifamily
+    
+    switch iFamily
         case 12
-            pred_itp = predSFkernel(x_ln, ifamily, params, 0);
+            pred_itp = predSFkernel(x_ln, iFamily, params, 0);
             localMax_ = islocalmax(pred_itp);
             localMax = find(localMax_==1);
             if isempty(localMax), disp('NO local max'), [~, peakSF1_ln] = max(pred_itp); peakSF1_ln = x_ln(peakSF1_ln);
@@ -92,7 +93,7 @@ else % iF=2
             end
             peakAmp1 = predSFkernel(peakSF1_ln, 12, params, 0);
             peakAmp2 = predSFkernel(peakSF2_ln, 12, params, 0);
-            
+
             if params(1) <= params(5)
                 pred1 = predSFkernel(x_ln, 2, params(1:4), 0);
                 pred2 = predSFkernel(x_ln, 2, params(5:8), 0);
@@ -105,25 +106,25 @@ else % iF=2
                 [bw_log2, bw_ln2] = getSFbandwidth(pred2, x_ln, params(1:4));
             end
             assert(peakSF1_ln <= peakSF2_ln)
-            
+
             tuningC = [peakSF1_ln, peakAmp1, bw_log1, peakSF2_ln, peakAmp2, bw_log2];
-            
+
             %% plot for F12
             figure, hold on
-            pred = predSFkernel(x_ln, ifamily, params, 0);
+            pred = predSFkernel(x_ln, iFamily, params, 0);
             plot(x_ln, pred, 'k-', 'linewidth', 4), yline(0, 'k-');
             pred1 = predSFkernel(x_ln, 2, params(1:4), 0);
             pred2 = predSFkernel(x_ln, 2, params(5:8), 0);
             plot(x_ln, pred1, 'r-', 'linewidth', 2)
             plot(x_ln, pred2, 'b-', 'linewidth', 2)
-            
+
             localMax = islocalmax(pred);
             plot(x_ln(localMax), pred(localMax), 'r*', 'MarkerSize', 30)
             plot(([peakSF1_ln, peakSF1_ln]), [0, peakAmp1], 'k-', 'linewidth', 2)
             plot(([peakSF2_ln, peakSF2_ln]), [0, peakAmp2], 'k-', 'linewidth', 2)
             errorbar(peakSF1_ln, peakAmp1, bw_ln1/2, 'r', 'horizontal')
             errorbar(peakSF2_ln, peakAmp2, bw_ln2/2, 'b', 'horizontal')
-            
+
         case 2
             peakSF = params(1);
             peakAmp = max(pred);
@@ -148,6 +149,7 @@ else % iF=2
 end % if ifeature==1
 
 end % fxn
+
 %%
 function x = inverseFxn(y, ifamily, params, x_all)
 dev = nan(length(x_all), 1);
