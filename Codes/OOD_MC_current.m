@@ -16,6 +16,7 @@ close all
 clc
 
 addpath(genpath('fxn_MC'))
+addpath(genpath('fxn_exp'))
 addpath(genpath('fxn_analysis_RC_v2'))
 
 time_start = datetime('now')

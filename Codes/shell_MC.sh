@@ -25,8 +25,6 @@ echo "job name: $SLURM_JOB_NAME"
 cat<<EOF | srun matlab -nodisplay
 
 %===============
-# Parse input arguments from shell_all_boot.sh
-
 OOD_MC_current($1, $2, $3, $4, $5, $6, $7, $8);
 
 %===============
