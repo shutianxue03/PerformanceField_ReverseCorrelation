@@ -43,17 +43,18 @@ flag_PatchMode = 2; % energy derives from target; 2=noise patch % MUST be the sa
 flag_block200 = 0; % 1; all observers are forced to have 200 blocks; 0=no
 flag_standEnergy = 1; if flag_PatchMode==1, flag_standEnergy =1; end
 
-% determine the list of subjects
+% Determine the list of subjects
 nsubj = length(subjList);
 namesEnergySource = {'TARGET', 'NOISE'};
 if flag_PatchMode == 1, namePatchMode = 'T';
 else, namePatchMode = sprintf('N%d', flag_standEnergy);
 end
 
+if flag_mirrorMapping, text_cut = '_m'; else, text_cut = ''; end
 
 %% define tuning fxn fitting params
-edit plotAll_part2.m
-edit plotAll_part1.m
+% edit plotAll_part2.m % saved in XueLandyCarrasco
+% edit plotAll_part1.m % saved in XueLandyCarrasco
 %---------------%
 SX_RC1_setting
 %---------------%
@@ -65,10 +66,10 @@ iLocComb_all_all = {[6,7], [5,3]};
 % [6,7]: HM vs. VM (also plot HM (D) vs. VM)
 % [5,3]: LVM vs. UVM
 
-ill = input('     >>> Which location to compare (1=L18, 2=L67, 3=L53, 4=L24, 5=L47): ');
+ill =2;% input('     >>> Which location to compare (1=L18, 2=L67, 3=L53, 4=L24, 5=L47): ');
 iLocComb_all = iLocComb_all_all{ill};% delete
 
-ifamily_perF = input('     >>> What is the model family for ORI and SF (e.g., [8,2]): '); % ORI: Gaussian with different mean; SF: double peak
+ifamily_perF = [1,2]; %input('     >>> What is the model family for ORI and SF (e.g., [1,2]): '); % ORI: scaled Gaussian; SF: double peak
 
 nTuningC_ORI = length(namesTunC_unit_perF{ifamily_perF(1), 2}); % preferred ori, peak amp, bandwidth, bottom, // pred_half
 nTuningC_SF = length(namesTunC_unit_perF{ifamily_perF(2), 2}); % peakSF, peak amp., bandwidth_full (octave), baseline // bandwidth_L, bandwidth_R, bottom, pred_half, full bandwidth (linear scale)
@@ -85,41 +86,42 @@ fprintf('\nnsubj = %d, nB = %d\n\n%s vs. %s\nEnergy derived from %s patch (stand
     ifamily_perF(2), namesFamily_all{ifamily_perF(2)}, num2str(paramInd_perF{2}))
 
 %% Define directories
-if flag_mirrorMapping, text_cut = '_m'; else, text_cut = ''; end
-
-nameFolder_compile = 'Data_compile/RC';
-nameFile_bootGroup = sprintf('%s/%d%d%s/n%d_B%d_L%d%d_%d_%d%s_ORI%dSF%d.mat', ...
-    nameFolder_compile, nORI, nSF, text_cut, nsubj, nB, iLocComb_all, nORI, nSF, text_cut, ifamily_perF(1), ifamily_perF(2));
+nameFolder_compile = sprintf('%s/Data_compile/RC_%d%d%s', nameFolder_Data, nORI, nSF, text_cut);
+nameFile_bootGroup = sprintf('%s/n%d_B%d_L%d%d_%d_%d%s_ORI%dSF%d.mat', ...
+    nameFolder_compile, nsubj, nB, iLocComb_all, nORI, nSF, text_cut, ifamily_perF(1), ifamily_perF(2));
 
 nameDir_bootGroup = dir(nameFile_bootGroup);
 
 if isempty(nameDir_bootGroup)
+
+    % Create directory
+    mkdir(nameFolder_compile);
 
     % Preallocate variables
     %     if nmetrics == 9, nmetrics=8; end
     %     metrics_allSubj = nan(nsubj, nB,  nLoc2, nmetrics);
     %     cst_allSubj = nan(nsubj, nB,  nLoc2);
     %     RT_allSubj = nan(nsubj, nB,  nLoc2);
-    pYES_tgt_allSubj = nan(nsubj, nB,  nLoc2, ntypes, nbins_e);
-    ebin_tgt_allSubj = nan(nsubj, nB,  nLoc2, ntypes, nbins_e);
-    similarityAfterMirroring_allSubj = nan(nsubj, nB,  ntypes, nLoc2);
-    kernels2D_allSubj = nan(nsubj, nB,  nLoc2, ntypes, nORI, nSF);
-    sep_allSubj = nan(nsubj, nB,  nLoc2, ntypes);
+    pYES_tgt_allSubj = nan(nsubj, nB,  nLoc2, nTypes, nbins_e);
+    ebin_tgt_allSubj = nan(nsubj, nB,  nLoc2, nTypes, nbins_e);
+    similarityAfterMirroring_allSubj = nan(nsubj, nB,  nTypes, nLoc2);
+    kernels2D_allSubj = nan(nsubj, nB,  nLoc2, nTypes, nORI, nSF);
+    sep_allSubj = nan(nsubj, nB,  nLoc2, nTypes);
 
-    margORI_allSubj = nan(nsubj, nB,  nLoc2, ntypes, nORI);
-    margORIraw_allSubj = nan(nsubj, nB,  nLoc2, ntypes, nORI);
-    margPredORI_allSubj = nan(nsubj, nB,  nLoc2, ntypes, nORI);
-    margParams_ORI_allSubj = nan(nsubj, nB,  nLoc2, ntypes, length(paramInd_perF{1}));
-    margTuningC_ORI_allSubj = nan(nsubj, nB,  nLoc2, ntypes, nTuningC_ORI);
-    margR2ORI_allSubj = nan(nsubj, nB,  nLoc2, ntypes);
+    margORI_allSubj = nan(nsubj, nB,  nLoc2, nTypes, nORI);
+    margORIraw_allSubj = nan(nsubj, nB,  nLoc2, nTypes, nORI);
+    margPredORI_allSubj = nan(nsubj, nB,  nLoc2, nTypes, nORI);
+    margParams_ORI_allSubj = nan(nsubj, nB,  nLoc2, nTypes, length(paramInd_perF{1}));
+    margTuningC_ORI_allSubj = nan(nsubj, nB,  nLoc2, nTypes, nTuningC_ORI);
+    margR2ORI_allSubj = nan(nsubj, nB,  nLoc2, nTypes);
 
-    margSF_allSubj = nan(nsubj, nB,  nLoc2, ntypes, nSF);
-    margPredSF_allSubj = nan(nsubj, nB,  nLoc2, ntypes, nSF);
-    margParams_SF_allSubj = nan(nsubj, nB,  nLoc2, ntypes, length(paramInd_perF{2}));
-    margTuningC_SF_allSubj = nan(nsubj, nB,  nLoc2, ntypes, nTuningC_SF);
-    margR2SF_allSubj = nan(nsubj, nB,  nLoc2, ntypes);
+    margSF_allSubj = nan(nsubj, nB,  nLoc2, nTypes, nSF);
+    margPredSF_allSubj = nan(nsubj, nB,  nLoc2, nTypes, nSF);
+    margParams_SF_allSubj = nan(nsubj, nB,  nLoc2, nTypes, length(paramInd_perF{2}));
+    margTuningC_SF_allSubj = nan(nsubj, nB,  nLoc2, nTypes, nTuningC_SF);
+    margR2SF_allSubj = nan(nsubj, nB,  nLoc2, nTypes);
 
-    %
+    % Loop through subjects
     for isubj = 1:nsubj
 
         % Extract and print subject info
@@ -138,22 +140,18 @@ if isempty(nameDir_bootGroup)
         else, nORI_load = nORI; nSF_load = nSF;
         end
 
-        nameFile_boot = sprintf('%s/%s%d/%s_B%d_L%d%d_N%d_%d_%d%s_ORI%d_SF%d.mat', ...
-            nameFolder_Data_OOD, subjName, nblocks, subjName, nB, iLocComb_all, flag_standEnergy, nORI, nSF, text_cut, ifamily_perF);
-
-        fprintf('Loading and compiling BOOTs...\n')
-        load(nameFile_boot)
-
+        fprintf('Loading and compiling bootstrapped data from BATCH')
+        % Loop through batches
         for iBatch = 1:nBatches
+
+            fprintf(' %d/%d ', iBatch, nBatches)
+
             iB_start = (iBatch-1)*nB_perBatch+1;
             iB_end = iBatch*nB_perBatch;
 
-            % Define file name for each batch
-            nameFile_boot_perBatch = sprintf('Data_OOD/%s%d/%s_batch%d_B%d_L%d%d_N%d_%d_%d%s_ORI%d_SF%d.mat', ...
-                subjName, nblocks, subjName, iBatch, nB_perBatch, iLocComb_all, flag_standEnergy, nORI, nSF, text_cut, ifamily_perF);
-
-            fprintf(' #%d ', iBatch)
-            %             if isempty(dir(nameFileBoot_perBatch)), fprintf('NOT exist\n'), continue, else, fprintf('\n'), end
+            % Define the directory to load each batch
+            nameFile_boot_perBatch = sprintf('%s/%s%d/%s_batch%d_B%d_L%d%d_N%d_%d_%d%s_ORI%d_SF%d.mat', ...
+                nameFolder_Data_OOD, subjName, nblocks, subjName, iBatch, nB_perBatch, iLocComb_all, flag_standEnergy, nORI, nSF, text_cut, ifamily_perF);
             load(nameFile_boot_perBatch)
 
             % Store data for each batch and subject
@@ -178,17 +176,17 @@ if isempty(nameDir_bootGroup)
                 margTuningC_ORI_allSubj(:, :, :, :, 1) = abs(margTuningC_ORI_allSubj(:, :, :, :, 1));
             end
 
-            fprintf('.')
         end % ibatch
+        fprintf('\n')
     end % end of isubj
 
     % save GROUP data (still needed for basic data, like RT)
-    fprintf('\n\nSaving...')
+    fprintf('\n\nSaving group data...')
     clear markers_allSubj itype
     save(nameFile_bootGroup, '*_allSubj')
     fprintf('DONE\n')
 else
-    fprintf('Loading...')
+    fprintf('\n\nLoading group data...')
     load(nameFile_bootGroup)
     fprintf('DONE\n')
 end
