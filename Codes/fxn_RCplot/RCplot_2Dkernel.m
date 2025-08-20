@@ -1,7 +1,9 @@
 function RCplot_2Dkernel(data2D, caxisLim, outline_pos, outline_neg)
 % RCplot_2Dkernel(data2D, caxisLim, outline)
 
+%----------------%
 SX_RC1_setting
+%----------------%
 
 wd_ref = 3;
 wd_contour = 4;
@@ -25,7 +27,7 @@ ylim(axisTicks_tuning{2}([1,end]))
 ch = colorbar;
 axis square
 
-% delineate the pixels for multiple comparison
+% Delineate the pixels for multiple comparison
 if nargin >= 3
     contour(axis_tuning{1}, axis_tuning{2}, outline_pos, 1, 'r', 'linewidth', wd_contour)
 end
