@@ -20,6 +20,17 @@
 
 %% Navigate the scripts
 %==================================================================
+% RUN Simulation
+%==================================================================
+% 1. Run OOD_sim.m on HPC to simulate trial-wise stimuli and data, which are saved in Data_OOD_2929 and Data_NOM_Trialwise_2929 on the server
+% If run on HPC, remeber to modify "nameFolder_server" in SX_RC1_setting.m;
+
+% 2. Download the simulated data from the server to the local machine
+% 3. Analyze simulated data "IO_xx" using SX_analysis5_NOM_trialWise.m
+
+
+
+%==================================================================
 % RUN EXP
 %==================================================================
 % PF_RC_runExp

@@ -112,16 +112,19 @@ nTrialsPerSess = 100;  % Number of trials per session
 nameFolder_Fig_NOM = sprintf('Figures/NOM_Trialwise/ORI%dSF%d/FIGURES_IO_n%d_A%d', nORI, nSF, nIterations, iModelA);
 if isempty(dir(nameFolder_Fig_NOM)), mkdir(nameFolder_Fig_NOM), end
 
-% Create a pool of Gabor filter
+fprintf('\n >>> Initated parameters for simulation\n')
+
+%% Create a pool of Gabor filter
 %------------------------%
 [filter_sin, filter_cos] = SX_sim02_setFilters(stim, noise.filtersSF_all, filtersOri_all, fxn_getSigma_SPdomain, 0);
 %------------------------%
-fprintf('\nPool of filters created: nORI=%d, nSF=%d\n', length(filtersOri_all), length(noise.filtersSF_all))
+fprintf('\n >>> Created a pool of filters: nORI=%d, nSF=%d\n', length(filtersOri_all), length(noise.filtersSF_all))
 
+%% Create Gabor of the template patch
 % Choose SD for the input Gabor (normalized or fixed)
 stim.gaborSD = fxn_getSigma_SPdomain(stim.gaborSF);
 
-% Create Gabor template patch
+% Create Gabor of the template patch
 template_true_gabor = exp_CreateGabor(stim, cst_ln_template);
 
 % Compute energy profile across filters
@@ -131,11 +134,13 @@ template_true = squeeze(template_true); % Remove singleton dim
 % Normalize template values for visualization
 template_true = (template_true - min(template_true(:))) * (new_max - new_min) / (max(template_true(:)) - min(template_true(:))) + new_min;
 
+fprintf('\n >>> Created Gabor of the template patch\n')
+
 % Marginals
 margORI_true = mean(template_true, 2);
 margSF_true  = mean(template_true, 1);
 
-%% Plot: 2D Template + ORI and SF marginals
+% Plot: 2D Template + ORI and SF marginals
 figure('Position', [0 0 2000 500])
 
 % --- 2D Template ---
@@ -250,7 +255,7 @@ for gaborCST = gaborCST_allCond
                     data_allB = IV_allB;       % Observed data for each bin
                     pred_allB = IV_allB;       % Predicted data for each bin
 
-                    for ii=1:nIterations
+                    for ii = 1:nIterations
                         % Extract IV per bin
                         IV_allB(ii, :) = pred_metrics_allB{ii}.metrics.IV_allBins;
 

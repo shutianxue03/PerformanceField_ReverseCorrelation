@@ -41,7 +41,10 @@ nTrials_allCond = [5000]; % Number of trials per condition
 noiseP_allCond = [0, 0.1, 0.2]; % Proportion of noise trials
 iModelA_sim_allCond = [1,3]; % 1=core model, 2=randomize template, 3=use IO template
 iModelB_sim_allCond = [4];
-% noiseCST=.2, gaborCST=.5, nTrials=5e3, noiseP=0, iModelB_sim=4
+
+noiseCST=.2, gaborCST=.5, nTrials=5e3, noiseP=0, iModelB_sim=4
+
+% Loop each param comb locally (VERY SLOW!!)
 % for noiseCST = noiseCST_allCond
 %     for gaborCST = gaborCST_allCond
 %         for nTrials = nTrials_allCond
@@ -58,7 +61,6 @@ clc, close all
 time_start = datetime('now')
 % Set rng seed for reproducibility
 rng(1) 
-
 
 % Add paths for custom functions
 addpath(genpath('fxn_exp'))  % Path to experimental functions
@@ -134,7 +136,7 @@ nTrialsPerSess = 100;  % Number of trials per session
 %------------------------%
 [filter_sin, filter_cos] = SX_sim02_setFilters(stim, noise.filtersSF_all, filtersOri_all, fxn_getSigma_SPdomain, 0);
 %------------------------%
-fprintf('\nPool of filters created: nORI=%d, nSF=%d\n', length(filtersOri_all), length(noise.filtersSF_all))
+fprintf('\nCreated a pool of Gabor filters: nORI=%d, nSF=%d\n', length(filtersOri_all), length(noise.filtersSF_all))
 
 % ==== Mute below when running on HPC ====
 % % Plot the energy profile of these Gabor filters

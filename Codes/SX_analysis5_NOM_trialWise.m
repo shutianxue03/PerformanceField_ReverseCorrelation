@@ -26,9 +26,9 @@ iModelB_sim_all = [4];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 nIterations = 100; % Number of iterations (100 for raw IVs, 99 for transformed IVs)
 NOM_mode = 2; % 1= aggregate model, 2 = trial-wise model
-flag_subjIsHuman = 0;
+flag_subjIsHuman = 0; % 1=human subject, 0=IO data
 
-nRows=4; nCols=6;
+nRows=4; nCols=7;
 
 iModelA_all = iModelA_sim_all;
 iModelB_all = iModelB_sim_all;
