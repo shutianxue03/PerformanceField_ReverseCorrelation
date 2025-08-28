@@ -41,9 +41,11 @@ noiseP_allCond = [0, 0.1, 0.2]; % Proportion of noise trials
 
 nTrials_allCond = [2000]; % Number of trials per condition
 iModelA_sim_allCond = [1,3]; % 1=core model, 2=randomize template, 3=use IO template
-iModelB_sim_allCond = [4];
+iModelB_sim_allCond = [4]; % 1=estimate lapse rate, 2=estimate additive noise (SDadd), 3=estimate multiplicative noise (Nmul)
+                            % 4=estimate additive noise (SDadd) and criterion;
+                            % 5=estimate multiplicative noise (Nmul) and criterion;
 
-noiseCST=.2, gaborCST=.15, nTrials=2e3, noiseP=0, iModelB_sim=4
+noiseCST=.2, gaborCST=.15, nTrials=2e3, noiseP=.5, iModelB_sim=4
 
 % Loop each param comb locally (VERY SLOW!!)
 % for noiseCST = noiseCST_allCond
@@ -226,9 +228,12 @@ parfor iPair = 1:nPairs
     e3D_noise = squeeze(e3D_noise);  % Remove singleton dimensions
 
     % Compute internal variable (cross-correlation with the true template)
-    IV_target = sum(e3D_target .* template_true, 'all');
+    IV_target = sum(e3D_target .* template_true, 'all'); 
+    % assert IV_target is not NaN
+    assert(~isnan(IV_target), 'IV_target is NaN');
     IV_target_sim_allT(iPair) = IV_target;
     IV_noise = sum(e3D_noise .* template_true, 'all');
+    assert(~isnan(IV_noise), 'IV_noise is NaN');
     IV_noise_sim_allT(iPair) = IV_noise;
 
     % Visualize patches and energy profiles (optional)
@@ -256,10 +261,6 @@ parfor iPair = 1:nPairs
 end % end of iPair
 fprintf('\n All pairs simulated.\n')
 
-%% Normalize IV
-% IV_target_sim_allT = (IV_target_sim_allT - mean(IV_target_sim_allT)) / std(IV_target_sim_allT);
-% IV_noise_sim_allT = (IV_noise_sim_allT - mean(IV_noise_sim_allT)) / std(IV_noise_sim_allT);
-
 %% Copy information from pass A to pass B
 % Since each pair of trials is simulated twice (once in each pass), copy results from pass A to pass B
 dataMatrix(nPairs+1:end, :, :) = dataMatrix(1:nPairs, :, :);
@@ -273,6 +274,10 @@ assert(sum(e3D_target_allT(nPairs+1:end, :, :) - e3D_target_allT(1:nPairs, :, :)
 assert(sum(e3D_noise_allT(nPairs+1:end, :, :) - e3D_noise_allT(1:nPairs, :, :), 'all') == 0)
 
 fprintf('\n Copied trial info from pass A to B\n')
+
+%% Normalize IV
+IV_target_sim_allT = (IV_target_sim_allT - mean(IV_target_sim_allT)) / std(IV_target_sim_allT);
+IV_noise_sim_allT = (IV_noise_sim_allT - mean(IV_noise_sim_allT)) / std(IV_noise_sim_allT);
 
 %% Save the energy profile for this IO (behav data saved later)
 save(sprintf('%s/energy_T_%d_%d.mat', nameFolder_Data_OOD_IO, nORI, nSF), 'e3D_target_allT')
@@ -401,6 +406,7 @@ for iModelA_fit = iModelA_fit_all
 
     % Simulate data and derive template via RC using the training set
     OOD_NOM_Trialwise_beforeEst({nameIO, criterion_true}, iLocComb, iModelA_fit, nIterations);
+    aaa
 
     for iModelB_fit = iModelB_fit_all
         % Predict response of the testing set, using the derived template

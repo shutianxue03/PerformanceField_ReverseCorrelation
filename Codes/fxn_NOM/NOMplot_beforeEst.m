@@ -57,9 +57,9 @@ for iMetric = 1:nmetrics
     title(sprintf('Metric %s across iterations', namesMetrics{iMetric}));
     % Set y-axis limits based on metric type
     switch iMetric
-        case 1, ylimits = [-2,2]; % dprime
-        case 2, ylimits = [-1,1]; % criterion
-        case 3, ylimits = [0,1]; % pC
+        case 1, ylimits = [0,2]; % dprime
+        case 2, ylimits = [-1,1]; yline(0, 'k--'); % criterion
+        case 3, ylimits = [0,1]; yline(.7, 'k--'); % pC; pC_titrate = 0.7 (defined in OOD_sim)
         case 4, ylimits = [0,1]; % pHit
         case 5, ylimits = [0,1]; % pFA
         case 6, ylimits = [.5,1]; % pA
