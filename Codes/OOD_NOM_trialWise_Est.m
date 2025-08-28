@@ -3,11 +3,10 @@
 % % Script name: OOD_NOM_Trialwise_Est.m
 % Script type: function
 % Author: Shutian Xue
-% Date created: 
-% Last updated: 07/15/2025
+% Last updated: 08/27/2025
 
 % Description:
-%   This function estimates parameters for the trial-wise Noisy Observer Model (NOM) using behavioral and energy data.
+%   We predict the trial-wise responses for trials in the TESTING set, based on derived template from the data in the TRAINING set (in OOD_NOM_Trialwise_beforeEst.m)
 %   It supports both human subjects and ideal observer (IO) simulations, fitting various model variants to trial-wise data.
 %   The function uses Bayesian Adaptive Direct Search (BADS) for parameter optimization and saves the estimated parameters and prediction metrics.
 %
@@ -37,6 +36,7 @@ addpath(genpath('SX_toolbox/bads-master'))
 %--------------%
 SX_RC1_setting
 %--------------%
+flag_plot = 1;
 
 % Set upper and lower bounds of each parameter
 SDadd_lb = 1e-5;  SDadd_ub = 2;  % Additive noise
@@ -52,7 +52,7 @@ options_fmin = optimoptions('fmincon','MaxIterations', 1e4, 'Display','off');
 
 %% Set up file paths and names
 if isnumeric(isubj)
-    subjList =             {'YK', 'SP', 'SX', 'LS', 'RE', 'MD', 'AS', 'HL', 'FH', 'HA', 'CS', 'DT', 'DU', 'RC','SR', 'IO'};
+    subjList =             {'YK', 'SP', 'SX', 'LS', 'RE', 'MD', 'AS', 'HL', 'FH', 'HA', 'CS', 'DT', 'DU', 'RC','SR'};
     nblocks_allSubj = [200, 240, 210, 240, 220, 220, 215, 220, 205, 210, 205, 205, 205, 205, 195, 0];
     subjName = subjList{isubj};
     nblocks = nblocks_allSubj(isubj);
@@ -88,8 +88,6 @@ params_est_allB_fmincon = params_est_allB;
 nLL_allB = nan(ni,1);
 pred_metrics_allB = cell(ni, 1);
 
-fprintf('Running ni = %d: ', ni)
-
 % Load data
 load(nameFile_beforeEst, 'data_allB')
 
@@ -109,14 +107,18 @@ switch iModelB
 end
 
 % Loop through each iteration
+fprintf('[L%d ModelA%dB%d] Running ni = %d: ', iLocComb, iModelA, iModelB, ni)
 for ii = 1:ni
+    fprintf('%d ', ii)
 
     data = data_allB{ii};
 
     % Fit the model to trial-wise data using BADS optimizer
     fxn_estParams = @(params) fxn_getError_v5(iModelB, params, data, 0);
+
     %     [params_est_fmincon, nLL] = fmincon(fxn_estParams, params0, [], [], [], [], params_lb, params_ub, [], options_fmin);
     [params_est, nLL] = bads(fxn_estParams, params0, params_lb, params_ub, [], [], [], options_bads);
+    
     %     params_est_allB_fmincon(ii, :) = params_est_fmincon;
     params_est_allB(ii, :) = params_est;
     nLL_allB(ii) = nLL;
@@ -125,35 +127,11 @@ for ii = 1:ni
     pred = PR_pred_v5(iModelB, nBins, params_est, data, 0);
     pred_metrics_allB{ii} = pred;
 
-    %     fprintf('%d ', ii)
 end % end of ii
 
 fprintf('\n\nALL iterations DONE\n')
 
-%% quick plot
-% pA_data_allB = nan(ni, nBins);
-% pA_pred_med = pA_data_allB;
-% IV_allB = pA_data_allB;
-% figure, hold on
-% for ii=1:ni
-%     IV_allB(ii, :) = pred_metrics_allB{ii}.metrics.IV_allBins;
-%     pA_data_allB(ii, :) = pred_metrics_allB{ii}.metrics.pA_data_allBins;
-%     pA_pred_allB(ii, :) = pred_metrics_allB{ii}.metrics.pA_pred_allBins;
-%     pC_data_allB(ii, :) = pred_metrics_allB{ii}.metrics.pC_data_allBins;
-%     pC_pred_allB(ii, :) = pred_metrics_allB{ii}.metrics.pC_pred_allBins;
-%
-% %     plot(IV_allB(ii, :), pC_data_allB(ii, :), 'o')
-% %     plot(IV_allB(ii, :), pC_pred_allB(ii, :), '-')
-% %     ylim([.5, 1])
-% %     pause
-% end
-% IV_med = getCI(IV_allB, 1, 1);
-% pA_data_med = getCI(pC_data_allB, 1, 1);
-% pA_pred_med = getCI(pC_pred_allB, 1, 1);
-%
-% figure, hold on
-% plot(IV_med, pA_data_med, 'o')
-% plot(IV_med, pA_pred_med, '-')
+if flag_plot, NOMplot_Est; end
 
 %% Save results
 % copy and rename the xx_beforeEst.mat file

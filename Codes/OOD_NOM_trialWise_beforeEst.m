@@ -1,14 +1,32 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% OOD_NOM_Trialwise_beforeEst.m
+% -------------------------------------------------------------------------
+% Created by Shutian Xue on August 27, 2025
+% Purpose:
+%   At each iteraction, we simulated stimuli of many trials and predict response based on a noisy observer model (NOM); 
+%   then we conducted RC analysis to derive the 2D kernels based on training set, and calculates metrics. 
+%   Results are saved for further visualization and analysis.
+%
+% Inputs:
+%     - isubj: subject index or IO info
+%     - iLocComb: location combination index
+%     - iModelA: model type (1=core, 2=permuted, 3=IO template)
+%     - ni: number of iterations
+%
+% Outputs:
+%   - Saves results (data_allB, data_metrics_allB, etc.) to a MAT file
+%   - Optionally visualizes IV distributions and metrics if flag_plotIVsDist is set
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function OOD_NOM_Trialwise_beforeEst(isubj, iLocComb, iModelA, ni)
-% The previous version is in OOD_NOM_trialWise, which makes
-% predictions for each model from different binned IVs
+
+% The previous version is in OOD_NOM_trialWise
 % INPUT
 %      isubj: index of subj
 %      iLocComb: 1=Fovea, 8=periF(6 deg ecc), 6=HM, 7=VM, 5=LVM, 3=UVM
-%      ni: number of iterations
 %      iModelA: 1=core model, 2=permuted template, 3=use IO template
 %      ni: number of iterations
-%      NOM_mode: 1=aggregate NOM; 2=trial-wise NOM
 
 close all, warning off, format compact
 time_start = datetime('now')
@@ -30,13 +48,13 @@ convolveType = 1; % IV is calcluated by 1=cross correlation of template and stim
 IVType = 1; % 1=sum, 2=the max [fxn_getIV_v3]
 flag_PatchMode = 2; %1=use target patches; 2=use noise patches
 flag_standEnergy = 1; % 1=standardize (z-score) energy
-flag_plotIVsDist = 0;
+flag_plot_beforeEst = 1;
 ratio_train = 3/4; % proportion of trials in the training set (to derive 2D kernels); others are in the test set (to estimate params)
 ORI_bound = [10, 20];
 
 %% Set names of directories
 if isnumeric(isubj) % Human subjects
-    subjList =             {'YK', 'SP', 'SX', 'LS', 'RE', 'MD', 'AS', 'HL', 'FH', 'HA', 'CS', 'DT', 'DU', 'RC','SR', 'IO'};
+    subjList =             {'YK', 'SP', 'SX', 'LS', 'RE', 'MD', 'AS', 'HL', 'FH', 'HA', 'CS', 'DT', 'DU', 'RC','SR'};
     nblocks_allSubj = [200, 240, 210, 240, 220, 220, 215, 220, 205, 210, 205, 205, 205, 205, 195, 0];
     subjName = subjList{isubj};
     nblocks = nblocks_allSubj(isubj);
@@ -72,7 +90,7 @@ else
     load(sprintf('%s/energy_%s_%d_%d.mat', nameFolder_OOD_load, namePatchMode, nORI, nSF));
 end
 
-fprintf('Behav and energy LOADED\n\n')
+fprintf('\nBehav and energy LOADED\n\n')
 
 % Determine the type of energy to use based on flag_PatchMode
 switch flag_PatchMode
@@ -117,7 +135,7 @@ nmetrics = 8; % the 9th one is CS in SX_RC1_setting, but no need for model
 data_allB = cell(ni, 1);
 data_metrics_allB = nan(ni, nmetrics);
 
-fprintf('Running ni = %d: ', ni)
+fprintf('[L%d ModelA%d] Running ni = %d: ', iLocComb, iModelA, ni)
 
 for ii = 1:ni
     fprintf('%d ', ii)
@@ -148,7 +166,7 @@ for ii = 1:ni
 
     % Calculate 2D kernel from the TRAINING set
     kernel2D = SX_sim07_RC(filtersSF_all, filtersOri_all, e3D_train_norm, resp_train); % 5 seconds
-    %         figure, imagesc(kernel2D), axis square
+    % size of kernel2D: nORI x nSF
 
     % Calculate performance metrics for the TEST set
     pHit = mean(iPRS_test==1 & resp_test==1)*2;
@@ -162,7 +180,7 @@ for ii = 1:ni
     %%%%%%%%%%%%%%%%%%%%%%%%
     %  calculate internal variable
     %%%%%%%%%%%%%%%%%%%%%%%%
-    % 1. Derive the Template from the TRAINING set
+    % 1. Derive the Template from the TRAINING set, or just the energy profile of the gabor 
     if iModelA== 3 % use IO template (the energy profile of the signal)
         load(sprintf('%s/signalEnergy.mat', nameFolder_Data_OOD), 'template_true'); % nameFolder_Data is created in SX_RC1_setting
         template = template_true;
@@ -194,13 +212,13 @@ for ii = 1:ni
 
 end % end of ii
 
-fprintf('\n\nALL iterations DONE\n')
+fprintf('\n\n[L%d ModelA%d] ALL iterations DONE\n', iLocComb, iModelA)
 
 % SAVE
 save(nameFile_beforeEst, '*_allB', 'names*', 'flag*', 'ratio_train', 'ORI_bound', '*Type')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-if flag_plotIVsDist, ModelPlot_local_perSubj, end
+if flag_plot_beforeEst, NOMplot_beforeEst, end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 time_end = datetime('now')

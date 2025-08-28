@@ -4,7 +4,8 @@
 
 clc, clear all, close all
 
-% addpath(genpath('fxn_analysis_RC_v2')) % manually add to save time
+addpath(genpath('PF_RC/Codes/')) % manually add to save time
+addpath(genpath('PF_RC/Codes/fxn_analysis_RC_v2')) % manually add to save time
 
 % Setting parameters for the analysis
 %----------------
@@ -23,6 +24,10 @@ iModelB_sim_all = [4];
 %               3 = estimate lapse rate and criterion;
 %               4 = estimate additive noise (SDadd) and criterion;
 %               5 = estimate multiplicative noise (Nmul) and criterion;
+
+% Copied from OOD_sim.m
+noiseCST=.2, gaborCST=.5, nTrials=5e3, noiseP=0, iModelB_sim=4
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 nIterations = 100; % Number of iterations (100 for raw IVs, 99 for transformed IVs)
 NOM_mode = 2; % 1= aggregate model, 2 = trial-wise model
@@ -32,11 +37,11 @@ nRows=4; nCols=7;
 
 iModelA_all = iModelA_sim_all;
 iModelB_all = iModelB_sim_all;
+
 % Define subject list
 if flag_subjIsHuman
     subjList = {'YK', 'SP', 'SX', 'LS', 'RE', 'MD', 'AS', 'HL', 'FH', 'HA', 'CS', 'DT', 'DU', 'RC', 'SR'};
     iLocComb_all = [1, 8, 6, 7, 5, 3]; % combination of locations
-
 else
     % Find folders with names starting with 'IO' in Data/Data_NOM_Trialwise_2929
     % Filter for directories whose names start with 'IO'
@@ -48,7 +53,7 @@ else
         subjList{iIO} = nameDir_IO_all(iIO).name; % Store the names of IO folders
     end
     assert(nRows * nCols >= nIOs, 'Not enough subplots for the number of subjects!');
-    iLocComb_all = 1;, % For testing with IO data only
+    iLocComb_all = 1; % For testing with IO data only
 end
 
 nsubj = length(subjList);
