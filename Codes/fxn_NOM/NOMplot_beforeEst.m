@@ -30,7 +30,7 @@
 % This script is intended to be called after running OOD_NOM_Trialwise_beforeEst.m
 % It loads the saved output and generates plots for IV distribution, bin counts, and performance metrics.
 
-% Figure 1: Distribution of IV and Trial Counts per bins for each iteration
+%% Figure 1: Distribution of IV and Trial Counts per bins for each iteration
 figure('Position', [100, 100, 1200, 600])
 for ii = 1:ni
     data = data_allB{ii};
@@ -47,7 +47,7 @@ end
 set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
 set(findall(gcf, '-property', 'linewidth'), 'linewidth',2)
 
-% Figure 2: Performance Metrics across Iterations
+%% Figure 2: Performance Metrics across Iterations
 figure('Position', [100, 100, 2e3, 2e3])
 for iMetric = 1:nmetrics
     subplot(2,4,iMetric)
@@ -71,7 +71,7 @@ end
 set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
 set(findall(gcf, '-property', 'linewidth'), 'linewidth',2)
 
-% Figure 3: 2D Kernel Visualization
+%% Figure 3: 2D Kernel Visualization
 figure('Position', [100, 100, 600, 600])   
 imagesc(axis_tuning{2}, axis_tuning{1}, kernel2D), axis square
 xline(1, 'r-'); % log gabor SF

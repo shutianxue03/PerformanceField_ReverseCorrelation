@@ -1,4 +1,3 @@
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % % Script name: OOD_NOM_Trialwise_Est.m
 % Script type: function
@@ -15,13 +14,13 @@
 %      iLocComb: for human subjects only: 1=Fovea, 8=periF(6 deg ecc), 6=HM, 7=VM, 5=LVM, 3=UVM
 %      iModelA: 1=core model, 2=permuted template, 3=use IO template
 %      iModelB: 1=only constant noise; 2=only induced noise; 3=no internal noise (only lapse rate and criterion); 4=constant noise + criterion; 5=induced noise + criterion
-%      ni: number of iterations     
+%      ni: number of iterations
 % Outputs:
 %      indicated by variable nameFile_Est: the estimated parameters and prediction metrics, saved in Data_NOM_Trialwise
 
 % This function is part of the OOD_NOM_Trialwise pipeline.
 
-function OOD_NOM_Trialwise_Est(isubj, iLocComb, iModelA, iModelB, ni)
+function OOD_NOM_Trialwise_Est(isubj, iLocComb, iModelA, iModelB, ni, flag_fminconORbads)
 
 
 close all, warning off, format compact
@@ -37,9 +36,10 @@ addpath(genpath('SX_toolbox/bads-master'))
 SX_RC1_setting
 %--------------%
 flag_plot = 1;
+flag_plotPerIter = 0;
 
 % Set upper and lower bounds of each parameter
-SDadd_lb = 1e-5;  SDadd_ub = 2;  % Additive noise
+SDadd_lb = 1e-5; SDadd_ub = 2;  % Additive noise
 Nmul_lb = 1e-5; Nmul_ub = 2;  % Multiplicative noise
 
 % Set optimization options for BADS (Bayesian Adaptive Direct Search)
@@ -48,7 +48,7 @@ options_bads.Display = 'none';   % Alternatively, use this to suppress the outpu
 options_bads.Verbosity = 0;
 
 % Set optimization options for fmincon
-options_fmin = optimoptions('fmincon','MaxIterations', 1e4, 'Display','off');
+options_fmin = optimoptions('fmincon', 'MaxIterations', 1e4, 'Display','off');
 
 %% Set up file paths and names
 if isnumeric(isubj)
@@ -71,8 +71,6 @@ end
 if isempty(dir(nameFolder_NOM_save)), mkdir(nameFolder_NOM_save), end
 
 % Define names of files to save
-% nameFile_beforeEst = sprintf('%s/n%d_A%d_beforeEst', nameFolder_NOM, ni, iModelA);
-% nameFile_Est = sprintf('%s/n%d_A%dB%d', nameFolder_NOM, ni, iModelA, iModelB);
 nameFile_beforeEst = sprintf('%s/n%d_A%d_beforeEst', nameFolder_NOM_save, ni, iModelA);
 nameFile_Est = sprintf('%s/n%d_A%dB%d', nameFolder_NOM_save, ni, iModelA, iModelB);
 
@@ -80,24 +78,23 @@ nameFile_Est = sprintf('%s/n%d_A%dB%d', nameFolder_NOM_save, ni, iModelA, iModel
 fprintf('\n%s [nblocks = %d] [ORI%d SF%d]\n - ni = %d\n - Loc: %s\n - MODEL: [A%d] %s & [B%d] %s\n\n', ...
     subjName, nblocks, nORI, nSF, ni, namesLocComb{iLocComb}, iModelA, namesModelA{iModelA}, iModelB, namesModelB{iModelB})
 
-%% MAIN LOOP
-% Preallocate variables
+%% Preallocate variables
 nParams = length(namesParamsModel_all{iModelB});
 params_est_allB = nan(ni, nParams);
 params_est_allB_fmincon = params_est_allB;
 nLL_allB = nan(ni,1);
 pred_metrics_allB = cell(ni, 1);
 
-% Load data
+%% Load data
 load(nameFile_beforeEst, 'data_allB')
 
-% Set up parameters upper and lower bound based on iModelB
+%% Set up parameters upper and lower bound based on iModelB
 c_lb = min(data_allB{1}.IV); c_ub = max(data_allB{1}.IV);
 c0 = mean([c_lb, c_ub]);
 SDadd0 = mean([SDadd_lb, SDadd_ub]);
 Nmul0 = mean([Nmul_lb, Nmul_ub]);
 
-% Compile parameter bounds
+%% Compile parameter bounds
 switch iModelB
     case 1, params0 = [lapse0, SDadd0, c0]; params_lb = [lapse_lb, SDadd_lb, c_lb]; params_ub = [lapse_ub, SDadd_ub, c_ub];
     case 2, params0 = [lapse0, Nmul0, c0]; params_lb = [lapse_lb, Nmul_lb, c_lb]; params_ub = [lapse_ub, Nmul_ub, c_ub];
@@ -106,7 +103,7 @@ switch iModelB
     case 5, params0 = [Nmul0, c0]; params_lb = [Nmul_lb, c_lb]; params_ub = [Nmul_ub, c_ub]; % not fitting lapse rate
 end
 
-% Loop through each iteration
+%% Loop through each iteration
 fprintf('[L%d ModelA%dB%d] Running ni = %d: ', iLocComb, iModelA, iModelB, ni)
 for ii = 1:ni
     fprintf('%d ', ii)
@@ -116,15 +113,19 @@ for ii = 1:ni
     % Fit the model to trial-wise data using BADS optimizer
     fxn_estParams = @(params) fxn_getError_v5(iModelB, params, data, 0);
 
-    %     [params_est_fmincon, nLL] = fmincon(fxn_estParams, params0, [], [], [], [], params_lb, params_ub, [], options_fmin);
-    [params_est, nLL] = bads(fxn_estParams, params0, params_lb, params_ub, [], [], [], options_bads);
-    
+    if flag_fminconORbads == 1
+        % Use fmincon to estimate (faster)
+        [params_est, nLL] = fmincon(fxn_estParams, params0, [], [], [], [], params_lb, params_ub, [], options_fmin);
+    else, % Use bads to estimate (slower)
+        [params_est, nLL] = bads(fxn_estParams, params0, params_lb, params_ub, [], [], [], options_bads);
+    end
+
     %     params_est_allB_fmincon(ii, :) = params_est_fmincon;
     params_est_allB(ii, :) = params_est;
     nLL_allB(ii) = nLL;
 
     % Make predictions on binned IVs based on estimated parameters
-    pred = PR_pred_v5(iModelB, nBins, params_est, data, 0);
+    pred = PR_pred_v5(iModelB, nBins, params_est, data, flag_plotPerIter);
     pred_metrics_allB{ii} = pred;
 
 end % end of ii

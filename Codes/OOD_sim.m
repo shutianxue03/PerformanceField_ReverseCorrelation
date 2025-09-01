@@ -1,17 +1,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % % Script name: OOD_sim.m
-% Script type: script
-% Author: Shutian Xue
-% Date created: 
-% Last updated: 07/15/2025
-
-% Description: 
-%       This script simulates observer responses based on a trialwise noisy observer model (NOM), and fits the model to the simulated data.
-
-% Example:
-%       noiseCST=.2, gaborCST=.5, nTrials=5e3, noiseP=0, iModelB_sim=5
-%       OOD_sim(noiseCST, gaborCST, nTrials, noiseP, iModelB_sim)
-
+% Adapted by Shutian Xue on 08/27/2025
+% This script simulates observer responses based on a trialwise noisy observer model (NOM), and fits the model to the simulated data.
 % Inputs:
 %       noiseCST: contrast of noise patches (0-1)
 %       gaborCST: contrast of Gabor patches (0-1)
@@ -23,29 +13,28 @@
 %               3 = estimate lapse rate and criterion;
 %               4 = estimate additive noise (SDadd) and criterion;
 %               5 = estimate multiplicative noise (Nmul) and criterion;
-
 % Outputs:
 %       Simulated data and energy profiles saved in the specified directories.
 
-% Dependencies: none
-% Notes:
-%       The Gabor SD was normalized by SF only when creating the filters, not when creating the Gabor patches.
+% Notes: The Gabor SD was normalized by SF only when creating the filters, not when creating the Gabor patches.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-
 % function OOD_sim(noiseCST, gaborCST, nTrials, noiseP, iModelB_sim)
-% noiseCST=.2, gaborCST=.5, nTrials=5000, noiseP=0, iModelB_sim=4
+
 noiseCST_allCond = [0, .1, .2, .5]; % Noise contrast sensitivity thresholds
 gaborCST_allCond = [.1, .5]; % Gabor contrast sensitivity thresholds
 noiseP_allCond = [0, 0.1, 0.2]; % Proportion of noise trials
-
 nTrials_allCond = [2000]; % Number of trials per condition
 iModelA_sim_allCond = [1,3]; % 1=core model, 2=randomize template, 3=use IO template
 iModelB_sim_allCond = [4]; % 1=estimate lapse rate, 2=estimate additive noise (SDadd), 3=estimate multiplicative noise (Nmul)
                             % 4=estimate additive noise (SDadd) and criterion;
                             % 5=estimate multiplicative noise (Nmul) and criterion;
 
-noiseCST=.2, gaborCST=.15, nTrials=2e3, noiseP=.5, iModelB_sim=4
+noiseCST=.2, gaborCST=.2, nTrials=2e3, noiseP=.5, iModelB_sim=5
+
+flag_logIV = 0
+nIterations = 10; % Number of iterations for simulating the data & fitting the model
+flag_fminconORbads = 2; % 1=use fmincon when fitting NOM to data, faster; 2=bads, slower
 
 % Loop each param comb locally (VERY SLOW!!)
 % for noiseCST = noiseCST_allCond
@@ -92,7 +81,6 @@ if isempty(dir(nameFolder_Data_NOM_IO)), mkdir(nameFolder_Data_NOM_IO), end
 %% Parameters for the simulation
 lapseRate=0;
 pC_titrate = .7; % the accuracy at which threshold is measured
-nIterations = 20; % Number of iterations for simulating the data & fitting the model
 iModelA_fit_all = iModelA_sim_allCond;% 1=core model, 2=randomize template, 3=use IO template
 iModelB_fit_all = iModelB_sim_allCond; % make them consistent for now; later try differ modelB for model recovery
 iLocComb = 1;
@@ -405,12 +393,11 @@ fprintf('\n\n============= Fit the trial-wise model to simulated data ==========
 for iModelA_fit = iModelA_fit_all
 
     % Simulate data and derive template via RC using the training set
-    OOD_NOM_Trialwise_beforeEst({nameIO, criterion_true}, iLocComb, iModelA_fit, nIterations);
-    aaa
+    OOD_NOM_Trialwise_beforeEst({nameIO, criterion_true}, iLocComb, iModelA_fit, nIterations, flag_logIV);
 
     for iModelB_fit = iModelB_fit_all
         % Predict response of the testing set, using the derived template
-        OOD_NOM_Trialwise_Est({nameIO, criterion_true}, iLocComb, iModelA_fit, iModelB_fit, nIterations)
+        OOD_NOM_Trialwise_Est({nameIO, criterion_true}, iLocComb, iModelA_fit, iModelB_fit, nIterations, flag_fminconORbads)
 
     end
 end

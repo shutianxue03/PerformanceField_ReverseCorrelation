@@ -19,7 +19,7 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function OOD_NOM_Trialwise_beforeEst(isubj, iLocComb, iModelA, ni)
+function OOD_NOM_Trialwise_beforeEst(isubj, iLocComb, iModelA, ni, flag_logIV)
 
 % The previous version is in OOD_NOM_trialWise
 % INPUT
@@ -40,6 +40,7 @@ addpath(genpath('SX_toolbox/bads-master'))
 %--------------%
 SX_RC1_setting
 %--------------%
+% flag_logIV = 1;
 
 iSess_start = 1; % from which session data is taken into account
 templateType = 1; % (1) mirrored kernel (2) positive kernel (3) reconstructed kernel
@@ -191,6 +192,11 @@ for ii = 1:ni
 
     % 2. Calculate the Internal variable (IV)
     IV = fxn_getIV_v3(iModelA, e3D_test, convolveType, IVType, template, ORI_bound);
+    % Normalize IV
+    IV = (IV - mean(IV)) / std(IV);
+
+    
+    if flag_logIV, IV = log10(IV); end
     ndata = length(IV);
 
     % bin IV values
