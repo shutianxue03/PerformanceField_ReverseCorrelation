@@ -1,5 +1,11 @@
-function [maxIV, maxORI, maxSF_log] = getIndMax(IV2D_ORI_nonselected, ORI_bound, axis_tuning, plotFlag)
-IV2D = IV2D_ORI_nonselected(ORI_bound(1):ORI_bound(2), :);
+function [maxIV, maxORI, maxSF_log] = getIndMax(IV2D_ORI_nonselected, ORI_bound, flag_plot)
+
+    %---------------%
+    SX_RC1_setting
+    %---------------%
+
+
+    IV2D = IV2D_ORI_nonselected(ORI_bound(1):ORI_bound(2), :);
 IV2D = IV2D_ORI_nonselected;
 
 maxIV = max(IV2D(:));
@@ -12,7 +18,7 @@ maxSF_log = axis_tuning{2}(imaxSF);
 maxORI=maxORI(1);
 maxSF_log = maxSF_log(1);
 
-if plotFlag
+if flag_plot
     hold on
     imagesc(IV2D_ORI_nonselected), plot(imaxSF, imaxORI, 'r*')
     yline(ORI_bound(1), 'r-', 'linewidth', 2);

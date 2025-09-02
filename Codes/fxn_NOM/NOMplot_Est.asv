@@ -63,7 +63,7 @@ for iBin=1:nBins
     xlim([0,1])
     ylim([0,1])
     % pause
-    title(sprintf('Bin #%d (%.1f trials)', iBin, mean(nData_allB(:, iBin))))
+    title(sprintf('Bin #%d', iBin))
 end
 
 sgtitle(sprintf('[pA] NOM ModelA%dB%d [nblocks = %d] [ORI%d SF%d] [niter = %d]', ...
@@ -77,7 +77,7 @@ if ismember(iModelB, [4,5]) % so that 1st param is noise P, 2nd param is criteri
     iParam = 1;
     subplot(1, 2, iParam);
     plot(params_est_allB(:,iParam), '-o');
-    yline(.1, 'r-'); % noiseP=0.1
+    yline(.5, 'k-'); % noiseP=0.5
     xlabel('Iteration');
     ylabel(namesParamsModel_all{iModelB}{iParam});
     title(['Parameter: ', namesParamsModel_all{iModelB}{iParam}]);
@@ -85,7 +85,7 @@ if ismember(iModelB, [4,5]) % so that 1st param is noise P, 2nd param is criteri
     iParam = 2;
     subplot(1, 2, iParam);
     plot(params_est_allB(:,iParam), '-o');
-    yline(criterion_true, 'r-'); % criterion_true
+    yline(-.1, 'k-'); % cirten
     xlabel('Iteration');
     ylabel(namesParamsModel_all{iModelB}{iParam});
     title(['Parameter: ', namesParamsModel_all{iModelB}{iParam}]);

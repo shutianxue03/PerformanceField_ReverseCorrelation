@@ -2,10 +2,11 @@
 % OOD_NOM_Trialwise_beforeEst.m
 % -------------------------------------------------------------------------
 % Created by Shutian Xue on August 27, 2025
-% Purpose:
-%   At each iteraction, we simulated stimuli of many trials and predict response based on a noisy observer model (NOM); 
-%   then we conducted RC analysis to derive the 2D kernels based on training set, and calculates metrics. 
-%   Results are saved for further visualization and analysis.
+% This script operates the following things:
+% 1. split trials into training and testing set
+% 2. estimate template from the training set (based on simulated stim energy and simulated response)
+% 3. calculate behav metrics of the testing set (ie., metrics to be matched by model pred)
+% 4. calculate, normalize, and bin empirical IVs from the testing set (in fxn_getIV3, by the settings we have, just a simple dot multiplication)
 %
 % Inputs:
 %     - isubj: subject index or IO info
@@ -19,7 +20,7 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function OOD_NOM_Trialwise_beforeEst(isubj, iLocComb, iModelA, ni, flag_logIV)
+function OOD_NOM_Trialwise_beforeEst(isubj, iLocComb, iModelA, IVType, ni, flag_logIV)
 
 % The previous version is in OOD_NOM_trialWise
 % INPUT
@@ -43,10 +44,10 @@ SX_RC1_setting
 % flag_logIV = 1;
 
 iSess_start = 1; % from which session data is taken into account
-templateType = 1; % (1) mirrored kernel (2) positive kernel (3) reconstructed kernel
+templateType = 1; % (1) raw (2) reconstructed kernel (3) mirrored template
 itype_template = 2; % 1=estimate template from PRS trials, ABS trials, or BOTH trials
 convolveType = 1; % IV is calcluated by 1=cross correlation of template and stim energy; 2=convolution [fxn_getIV_v3]
-IVType = 1; % 1=sum, 2=the max [fxn_getIV_v3]
+% IVType = 1; % 1=sum, 2=the max [fxn_getIV_v3]
 flag_PatchMode = 2; %1=use target patches; 2=use noise patches
 flag_standEnergy = 1; % 1=standardize (z-score) energy
 flag_plot_beforeEst = 1;
@@ -135,7 +136,7 @@ if rem(ntrain_perSingle, 2), ntrain_perSingle = ntrain_perSingle+1;ntest_perSing
 nmetrics = 8; % the 9th one is CS in SX_RC1_setting, but no need for model
 data_allB = cell(ni, 1);
 data_metrics_allB = nan(ni, nmetrics);
-
+kernel2D_all = nan(ni, nORI, nSF);
 fprintf('[L%d ModelA%d] Running ni = %d: ', iLocComb, iModelA, ni)
 
 for ii = 1:ni
@@ -168,6 +169,7 @@ for ii = 1:ni
     % Calculate 2D kernel from the TRAINING set
     kernel2D = SX_sim07_RC(filtersSF_all, filtersOri_all, e3D_train_norm, resp_train); % 5 seconds
     % size of kernel2D: nORI x nSF
+    kernel2D_all(ii, :, :) = kernel2D; % the ave will be plotted in NOMplot_beforeEst.m
 
     % Calculate performance metrics for the TEST set
     pHit = mean(iPRS_test==1 & resp_test==1)*2;
@@ -192,14 +194,15 @@ for ii = 1:ni
 
     % 2. Calculate the Internal variable (IV)
     IV = fxn_getIV_v3(iModelA, e3D_test, convolveType, IVType, template, ORI_bound);
+    
     % Normalize IV
     IV = (IV - mean(IV)) / std(IV);
 
-    
+    % Take log form if needed
     if flag_logIV, IV = log10(IV); end
     ndata = length(IV);
 
-    % bin IV values
+    % Bin IV values
     [nTrials_allBins, ~, iTrial4Bin] = histcounts(IV, nBins);
 
     % Compile data for the current iteration

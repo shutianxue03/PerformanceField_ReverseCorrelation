@@ -5,10 +5,11 @@
 % Last updated: 08/27/2025
 
 % Description:
-%   We predict the trial-wise responses for trials in the TESTING set, based on derived template from the data in the TRAINING set (in OOD_NOM_Trialwise_beforeEst.m)
-%   It supports both human subjects and ideal observer (IO) simulations, fitting various model variants to trial-wise data.
-%   The function uses Bayesian Adaptive Direct Search (BADS) for parameter optimization and saves the estimated parameters and prediction metrics.
-%
+% This script operate the following things:
+% 1. fit NOM to IVs of the testing set (derived in OOD_xx_beforeEst) and estimate parameters
+% 2. predict behav metrics using binned empirical IVs and estimated parameters
+% Key functions: fxn_getError_v5(), PR_pred_v5()
+
 % Inputs:
 %      isubj: index of subject (for human subject) or a cell array with subject name and criterion (for IO)
 %      iLocComb: for human subjects only: 1=Fovea, 8=periF(6 deg ecc), 6=HM, 7=VM, 5=LVM, 3=UVM
@@ -39,8 +40,10 @@ flag_plot = 1;
 flag_plotPerIter = 0;
 
 % Set upper and lower bounds of each parameter
-SDadd_lb = 1e-5; SDadd_ub = 2;  % Additive noise
-Nmul_lb = 1e-5; Nmul_ub = 2;  % Multiplicative noise
+SDadd_lb = 1e-5; SDadd_ub = .1;  % Additive noise
+Nmul_lb = 1e-5; Nmul_ub = 1;  % Multiplicative noise
+SDadd0 = mean([SDadd_lb, SDadd_ub]);
+Nmul0 = mean([Nmul_lb, Nmul_ub]);
 
 % Set optimization options for BADS (Bayesian Adaptive Direct Search)
 options_bads = bads('defaults'); % Load default settings
@@ -78,23 +81,19 @@ nameFile_Est = sprintf('%s/n%d_A%dB%d', nameFolder_NOM_save, ni, iModelA, iModel
 fprintf('\n%s [nblocks = %d] [ORI%d SF%d]\n - ni = %d\n - Loc: %s\n - MODEL: [A%d] %s & [B%d] %s\n\n', ...
     subjName, nblocks, nORI, nSF, ni, namesLocComb{iLocComb}, iModelA, namesModelA{iModelA}, iModelB, namesModelB{iModelB})
 
-%% Preallocate variables
-nParams = length(namesParamsModel_all{iModelB});
-params_est_allB = nan(ni, nParams);
-params_est_allB_fmincon = params_est_allB;
-nLL_allB = nan(ni,1);
-pred_metrics_allB = cell(ni, 1);
-
 %% Load data
 load(nameFile_beforeEst, 'data_allB')
 
-%% Set up parameters upper and lower bound based on iModelB
-c_lb = min(data_allB{1}.IV); c_ub = max(data_allB{1}.IV);
-c0 = mean([c_lb, c_ub]);
-SDadd0 = mean([SDadd_lb, SDadd_ub]);
-Nmul0 = mean([Nmul_lb, Nmul_ub]);
+%% Set up the data-restricted upper and lower bound of criterion
+c0 = median(data_allB{1}.IV);
+c_lb = c0-std(data_allB{1}.IV)*2;
+c_ub = c0+std(data_allB{1}.IV)*2;
 
-%% Compile parameter bounds
+SDadd0 = .1; SDadd_lb = SDadd0-SDadd0/10; SDadd_ub = SDadd0+SDadd0/10;
+c0 = criterion_true; c_lb = c0-abs(c0)/10; c_ub = c0+abs(c0)/10;
+
+
+% Compile parameter bounds based on iModelB
 switch iModelB
     case 1, params0 = [lapse0, SDadd0, c0]; params_lb = [lapse_lb, SDadd_lb, c_lb]; params_ub = [lapse_ub, SDadd_ub, c_ub];
     case 2, params0 = [lapse0, Nmul0, c0]; params_lb = [lapse_lb, Nmul_lb, c_lb]; params_ub = [lapse_ub, Nmul_ub, c_ub];
@@ -102,6 +101,13 @@ switch iModelB
     case 4, params0 = [SDadd0, c0]; params_lb = [SDadd_lb, c_lb]; params_ub = [SDadd_ub, c_ub]; % not fitting lapse rate
     case 5, params0 = [Nmul0, c0]; params_lb = [Nmul_lb, c_lb]; params_ub = [Nmul_ub, c_ub]; % not fitting lapse rate
 end
+
+%% Preallocate variables
+nParams = length(namesParamsModel_all{iModelB});
+params_est_allB = nan(ni, nParams);
+% params_est_allB_fmincon = params_est_allB;
+nLL_allB = nan(ni,1);
+pred_metrics_allB = cell(ni, 1);
 
 %% Loop through each iteration
 fprintf('[L%d ModelA%dB%d] Running ni = %d: ', iLocComb, iModelA, iModelB, ni)
@@ -116,12 +122,12 @@ for ii = 1:ni
     if flag_fminconORbads == 1
         % Use fmincon to estimate (faster)
         [params_est, nLL] = fmincon(fxn_estParams, params0, [], [], [], [], params_lb, params_ub, [], options_fmin);
-    else, % Use bads to estimate (slower)
+    else % Use bads to estimate (slower)
         [params_est, nLL] = bads(fxn_estParams, params0, params_lb, params_ub, [], [], [], options_bads);
     end
 
-    %     params_est_allB_fmincon(ii, :) = params_est_fmincon;
-    params_est_allB(ii, :) = params_est;
+    % params_est_allB(ii, :) = params_est;
+    params_est_allB(ii, :) = [.1, criterion_true];
     nLL_allB(ii) = nLL;
 
     % Make predictions on binned IVs based on estimated parameters

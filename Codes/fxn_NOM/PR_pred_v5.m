@@ -8,34 +8,35 @@ function pred = PR_pred_v5(iModelB, nBins, params_est, data, flag_plot)
 %   flag_plot - Flag to enable or disable plotting (unused in current code)
 
 %% Model setup: Define parameters based on model type (iModelB)
+%% Model setup: Define parameters based on model type (iModelB)
 switch iModelB
     case 1 % lapse rate, additive noise, criterion
-        N_mul = 0;
+        Nmul = 0;
         lambda = params_est(1);
-        SD_add = params_est(2);
+        SDadd = params_est(2);
         criterion = params_est(3);
     case 2 % lapse rate, multiplicative noise, criterion
-        SD_add = 0;
+        SDadd = 0;
         lambda = params_est(1);
-        N_mul = params_est(2);
+        Nmul = params_est(2);
         criterion = params_est(3);
     case 3 % lapse rate, criterion (no internal noise)
-        N_mul=0;
-        SD_add=0;
+        Nmul = 0;
+        SDadd = 0;
         lambda = params_est(1);
         criterion = params_est(2);
     case 4 % additive noise, criterion
-        N_mul=0;
-        SD_add=params_est(1);
+        Nmul = 0;
+        SDadd = params_est(1);
         criterion = params_est(2);
     case 5 % multiplicative noise, criterion
-        N_mul=params_est(1);
-        SD_add=0;
+        Nmul = params_est(1);
+        SDadd=0;
         criterion = params_est(2);
 end
 
 %% Extract data variables
-IV = data.IV;
+IV = data.IV; % the integration of stim energy and template for each trial
 resp_data = data.resp;
 iPair = data.iPair;
 iPRS = data.iPRS;
@@ -43,7 +44,7 @@ correctness = iPRS==resp_data; % correctness
 
 %% Predict metrics
 % Compute predicted standard deviation (sigma) for each trial
-sigma_pred = sqrt((IV*N_mul).^2 + SD_add^2);
+sigma_pred = sqrt((IV*Nmul).^2 + SDadd^2);
 
 % Calculate probability of responding "Present" (pYES)
 if iModelB<=3
@@ -52,11 +53,11 @@ else
     pYES_pred = 1-normcdf(criterion, IV, sigma_pred);
 end
 
-% convert pYES to pC (accuracy): for ABS trials (iPRS==0), pC=1-pYES
+% convert pYES to pC (accuracy)
 pC_pred = pYES_pred;
-pC_pred(iPRS==0) = 1-pYES_pred(iPRS==0);
+pC_pred(iPRS==0) = 1-pYES_pred(iPRS==0); % for ABS trials (iPRS==0), pC=1-pYES
 
-% Predict probablity of responding consistently (pA)
+% Compute predicted pA based on predicted pYES
 pA_pred = pYES_pred.^2 + (1-pYES_pred).^2;
 
 %% Bin data to calculate predicted and measured pC and pA for each bin
@@ -65,12 +66,12 @@ nTrials_allBins = data.nTrials_allBins;
 iTrial4Bin = data.iTrial4Bin;
 
 % Verify if paired trials are in the same bin
-for iind=1:length(iTrial4Bin)
-    iBin_A=iTrial4Bin(iind);
-    iTrialB=find(iPair==iPair(iind));
-    iTrialB=iTrialB(2);
-    iBin_B=iTrial4Bin(iTrialB);
-    if iBin_A~=iBin_B
+for iind = 1:length(iTrial4Bin)
+    iBin_A = iTrial4Bin(iind);
+    iTrialB = find(iPair==iPair(iind));
+    iTrialB = iTrialB(2);
+    iBin_B = iTrial4Bin(iTrialB);
+    if iBin_A ~= iBin_B
         fprintf('Trial%d: Bin%d and %d\n', iind, iBin_A, iBin_B) % confirming that two trials of one pair are in the same bins
     end
 end
@@ -86,25 +87,26 @@ pYES_data_allBins = pC_pred_allBins;
 
 % Calculate binned values
 for iBin = 1:nBins
-    IV_allBins(iBin) = mean(IV(iTrial4Bin==iBin)); % Average IV for bin (should this be weighted by nTrials?)
-    
-    pC_pred_allBins(iBin) = mean(pC_pred(iTrial4Bin==iBin)); % Predicted accuracy
-    pC_data_allBins(iBin) = mean(correctness(iTrial4Bin==iBin)); % Measured accuracy
-    
-    pYES_pred_allBins(iBin) = mean(pYES_pred(iTrial4Bin==iBin)); % Predicted pYES
-    pYES_data_allBins(iBin) = mean(resp_data(iTrial4Bin==iBin)); % Measured pYES
-    
-    pA_pred_allBins(iBin) = mean(pA_pred(iTrial4Bin==iBin)); % Predicted pA
-    
+    indTrial = iTrial4Bin==iBin;
+    IV_allBins(iBin) = mean(IV(indTrial)); % Average IV for bin (should this be weighted by nTrials?)
+
+    pC_pred_allBins(iBin) = mean(pC_pred(indTrial)); % Predicted accuracy
+    pC_data_allBins(iBin) = mean(correctness(indTrial)); % Measured accuracy
+
+    pYES_pred_allBins(iBin) = mean(pYES_pred(indTrial)); % Predicted pYES
+    pYES_data_allBins(iBin) = mean(resp_data(indTrial)); % Measured pYES
+
+    pA_pred_allBins(iBin) = mean(pA_pred(indTrial)); % Predicted pA (Measured pA is below)
+
     %------------ Calculate measured pA for each bin ------------
-    resp_perBin = resp_data(iTrial4Bin==iBin);
-    iPair_perBin = iPair(iTrial4Bin==iBin);
+    resp_perBin = resp_data(indTrial);
+    iPair_perBin = iPair(indTrial);
     iPair_perBin_unik = unique(iPair_perBin);
     nUnik = length(iPair_perBin_unik);
     respC_perBin = nan(nUnik, 1);
-    for iUnik=1:nUnik
+    for iUnik = 1:nUnik
         iTrialAB=find(iPair_perBin==iPair_perBin_unik(iUnik));
-        respC_perBin(iUnik) = resp_perBin(iTrialAB(1))==resp_perBin(iTrialAB(2));
+        respC_perBin(iUnik) = resp_perBin(iTrialAB(1)) == resp_perBin(iTrialAB(2));
     end
     pA_data_allBins(iBin) = mean(respC_perBin);
     %------------------------------------------
@@ -145,5 +147,7 @@ if flag_plot
     plot(IV_allBins, pA_pred_allBins, 'k-')
     for iBin=1:nBins, plot(IV_allBins(iBin), pA_data_allBins(iBin), 'ko', 'MarkerSize', nTrials_allBins(iBin)/sz_scale+5), end
     title('Resp. consistency')
+
+    pause, close all
 end
 end

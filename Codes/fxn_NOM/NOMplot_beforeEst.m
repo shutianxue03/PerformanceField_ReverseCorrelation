@@ -35,9 +35,12 @@ figure('Position', [100, 100, 1200, 600])
 for ii = 1:ni
     data = data_allB{ii};
     subplot(1,2,1); hold on;
-    histogram(data.IV, 'Normalization','probability');
+    % histogram(data.IV, 'Normalization','probability');
+    histogram(nthroot(data.IV-min(data.IV),2), 'Normalization','probability');
     title('Distribution of Internal Variable (IV) (Each color is a different iteration)');
     xlabel('IV'); ylabel('Probability');
+
+    [h, pValue, Wstat] = swtest(nthroot(data.IV-min(data.IV),2), 0.05)
 
     subplot(1,2,2); hold on;
     bar(data.nTrials_allBins);
@@ -72,14 +75,16 @@ set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
 set(findall(gcf, '-property', 'linewidth'), 'linewidth',2)
 
 %% Figure 3: 2D Kernel Visualization
+kernel2D_ave = squeeze(mean(kernel2D_all, 1));
+
 figure('Position', [100, 100, 600, 600])   
-imagesc(axis_tuning{2}, axis_tuning{1}, kernel2D), axis square
+imagesc(axis_tuning{2}, axis_tuning{1}, kernel2D_ave), axis square
 xline(1, 'r-'); % log gabor SF
 yline(0, 'r-'); % Gabor ori
 xlabel('Spatial Frequency'), ylabel('Orientation')
 xticks(axisTicks_tuning{2}), xticklabels(axisTL_tuning{2})
 yticks(axisTicks_tuning{1}), yticklabels(axisTL_tuning{1})
-title('Template derived from training data via RC')
+title(sprintf('Template derived from the training set via RC (averaged across %d iterations)', ni))
 set(findall(gcf, '-property', 'fontsize'), 'fontsize', 20)
 set(findall(gcf, '-property', 'linewidth'), 'linewidth',2)
 
