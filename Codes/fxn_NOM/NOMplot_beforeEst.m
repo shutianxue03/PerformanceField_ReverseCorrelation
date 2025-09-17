@@ -35,17 +35,17 @@ figure('Position', [100, 100, 1200, 600])
 for ii = 1:ni
     data = data_allB{ii};
     subplot(1,2,1); hold on;
-    % histogram(data.IV, 'Normalization','probability');
-    histogram(nthroot(data.IV-min(data.IV),2), 'Normalization','probability');
-    title('Distribution of Internal Variable (IV) (Each color is a different iteration)');
-    xlabel('IV'); ylabel('Probability');
+    histogram(data.IV, 'Normalization','probability');
+    % histogram(nthroot(data.IV-min(data.IV),2), 'Normalization','probability');
+    xlabel('IV (Weight x Stim energy)'); ylabel('Probability');
+    title(sprintf('Distribution of Internal Variable (IV)\nEach color is a different iteration\n!!!IV does NOT have to be normally distributed!!!'));
 
-    [h, pValue, Wstat] = swtest(nthroot(data.IV-min(data.IV),2), 0.05)
+    % [h, pValue, Wstat] = swtest(nthroot(data.IV-min(data.IV),2), 0.05)
 
     subplot(1,2,2); hold on;
     bar(data.nTrials_allBins);
-    title('Trial Counts per Bin (Each color is a different iteration)');
     xlabel('Bin #'); ylabel('Number of trials');
+    title('Trial Counts per Bin (Each color is a different iteration)');
 end
 set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
 set(findall(gcf, '-property', 'linewidth'), 'linewidth',2)

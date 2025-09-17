@@ -42,13 +42,13 @@ iPair = data.iPair;
 
 %% Predict metrics
 % Compute predicted standard deviation (sigma) for each trial
-sigma_pred = sqrt((IV*Nmul).^2 + SDadd^2);
+sigma_pred = sqrt((IV*Nmul).^2 + SDadd^2); % sigma_pred is nTrials x 1
 
-% Calculate probability of responding "Present" (pYES)
+% Calculate probability of responding "Present" (pYES), which is nTrials x 1
 if iModelB<=3
     pYES_pred = lambda/2+(1-lambda)*(1-normcdf(criterion, IV, sigma_pred));
 else
-    pYES_pred = 1-normcdf(criterion, IV, sigma_pred);
+    pYES_pred = 1-normcdf(criterion, IV, sigma_pred); % using normcdf does not require IV to be normally distributed!
 end
 
 % For each pair of passes, compute pair consistency and predicted pYES of the first pass

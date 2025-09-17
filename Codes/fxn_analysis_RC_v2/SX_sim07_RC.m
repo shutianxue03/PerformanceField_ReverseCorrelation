@@ -35,14 +35,15 @@ opts.MaxIter = 1000;  % Increase from default (100)
 
 %% multivariate GLM
 % % x: n x p; y: nx1; beta: (p+1) x 1
-% x = nan(nTrials, nORI * nSF); ii=1; indORI = nan(nORI * nSF, 1); indSF = nan(nORI * nSF, 1);
-% % reorganize
-% for iORI = 1:nORI, for iSF = 1:nSF, x(:, ii) = e3D_allT(:, iORI, iSF); indORI(ii) = iORI; indSF(ii) = iSF; ii=ii+1; end, end
-% %------------------------------------------------------
-% beta = glmfit(x, resp_allT, 'binomial', 'Link', fxnLink);
-% %------------------------------------------------------
-% beta = beta(2:end); % the 1st element is the intercept
-% kernel2D = nan(nORI, nSF); for ii=1:nORI*nSF, kernel2D(indORI(ii), indSF(ii)) = beta(ii); end % reshape
+x = nan(nTrials, nORI * nSF); ii=1; indORI = nan(nORI * nSF, 1); indSF = nan(nORI * nSF, 1);
+% reorganize
+for iORI = 1:nORI, for iSF = 1:nSF, x(:, ii) = e3D_allT(:, iORI, iSF); indORI(ii) = iORI; indSF(ii) = iSF; ii=ii+1; end, end
+%------------------------------------------------------
+beta = glmfit(x, resp_allT, 'binomial', 'Link', fxnLink);
+beta_ = glmfit(zscore(x), resp_allT,  'binomial');
+%------------------------------------------------------
+beta = beta(2:end); % the 1st element is the intercept
+kernel2D = nan(nORI, nSF); for ii=1:nORI*nSF, kernel2D(indORI(ii), indSF(ii)) = beta(ii); end % reshape
 
 %% Initialize empty containers for output variables
 

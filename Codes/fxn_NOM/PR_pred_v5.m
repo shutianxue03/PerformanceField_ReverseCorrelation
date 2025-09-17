@@ -8,7 +8,6 @@ function pred = PR_pred_v5(iModelB, nBins, params_est, data, flag_plot)
 %   flag_plot - Flag to enable or disable plotting (unused in current code)
 
 %% Model setup: Define parameters based on model type (iModelB)
-%% Model setup: Define parameters based on model type (iModelB)
 switch iModelB
     case 1 % lapse rate, additive noise, criterion
         Nmul = 0;
