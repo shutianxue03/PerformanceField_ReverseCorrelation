@@ -38,7 +38,7 @@ pCat = k;                                % Categorical p-values
 sep = nan(nTypes, 1);                    % Separability metric
 
 % Loop through each trial type (PRS, ABS, BOTH)
-for iType = 1:nTypes
+for iType = 2%1:nTypes
     % Define trial index based on type
     switch iType
         case 1, iPRS = dataMatrix(:, 6) == 1;  % PRS trials

@@ -20,7 +20,7 @@
 
 %% Navigate the scripts
 %==================================================================
-% RUN Simulation
+% Run Model Simulation
 %==================================================================
 % 1. Run OOD_sim.m on HPC to simulate trial-wise stimuli and data, which are saved in Data_OOD_2929 and Data_NOM_Trialwise_2929 on the server
 % If run on HPC, remeber to modify "nameFolder_server" in SX_RC1_setting.m;
@@ -46,11 +46,13 @@
 % For the main experiment: 
 % 1. patches presented on all trials & performances of EACH block
 % with file name formatted as subjName_exp_B#L#_yearmonthdateTtime
+
 % e.g., Data/AS/AS_exp_B001L5_20220218T1207.mat
 % corresponds to the first block completed by a subject whose initial is
 % AS, in the main experiment on Feb 18th, 2022 at 12:07, in which
 % the target is located at the Lower Vertical Meridian (indicated by the
 % number after 'L', 1=Fovea, 2=Left, 3=Upper,4=Right, 5=Lower)
+
 % 2. eye data are saved in /eyedata/ (not transfered from L1 computer yet)
 
 %==================================================================

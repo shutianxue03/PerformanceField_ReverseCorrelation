@@ -1,67 +1,84 @@
-function pred = PR_pred_v6(iModelB, nBins, params_est, data, flag_plot)
-% copied from fxn_getError_v5
 
+function pred = PR_pred_v6(iModelB, nBins, params_est, data, c_zscore, flag_plot)
+
+% INPUT:
+%   iModelB - Model type for internal noise structure and decision criterion
+%   params_est - Estimated parameters for model
+%   data - Data structure with fields for internal variables (IV) and responses
+%   flag_plot - Flag to enable or disable plotting (unused in current code)
+
+%% Model setup: Define parameters based on model type (iModelB)
 switch iModelB
-    case 1 % multiplicative, additive noise, thresh
+    case 1 % lapse rate, additive noise, criterion
+        Nmul = 0;
         lambda = params_est(1);
-        sigma_template = params_est(2); %N_mul = params_est(2);
-        SD_add = params_est(3);
-        thresh = params_est(4);
-        N_mul=0;
-        %     case 2 % additive noise, thresh
-        %         N_mul = 0;
-        %         lambda = params_est(1);
-        %         SD_add = params_est(2);
-        %         thresh = params_est(3);
-        %     case 3 % multiplicative noise, thresh
-        %         SD_add = 0;
-        %         lambda = params_est(1);
-        %         N_mul = params_est(2);
-        %         thresh = params_est(3);
-        %     case 4
-        %         N_mul=0;
-        %         SD_add=0;
-        %         lambda = params_est(1);
-        %         thresh = params_est(2);
+        SDadd = params_est(2);
+        % criterion = params_est(3);
+    case 2 % lapse rate, multiplicative noise, criterion
+        SDadd = 0;
+        lambda = params_est(1);
+        Nmul = params_est(2);
+        % criterion = params_est(3);
+    case 3 % lapse rate, criterion (no internal noise)
+        Nmul = 0;
+        SDadd = 0;
+        lambda = params_est(1);
+        % criterion = params_est(2);
+    case 4 % additive noise, criterion
+        Nmul = 0;
+        SDadd = params_est(1);
+        % criterion = params_est(2);
+    case 5 % multiplicative noise, criterion
+        Nmul = params_est(1);
+        SDadd=0;
+        % criterion = params_est(2);
 end
 
-%% predict pYES, pC and pA of each trial
-IV_noNoise = data.IV;
-e_noisy = data.e_noisy;
-IV_noisy = IV_noNoise + sigma_template*e_noisy;
+%% Extract data variables
+IV = data.IV; % the integration of stim energy and template for each trial
 resp_data = data.resp;
-iPRS = data.iPRS;
 iPair = data.iPair;
-corr = iPRS==resp_data;
+iPRS = data.iPRS;
+correctness = iPRS==resp_data; % correctness
 
-% new sigma of each trial
-sigma_pred = sqrt((IV_noisy*N_mul).^2 + SD_add^2);
+%% Predict metrics
+% Compute predicted standard deviation (sigma) for each trial
+sigma_pred = sqrt((IV*Nmul).^2 + SDadd^2);
 
-% probablity of responding yes
-pYES_pred = lambda/2+(1-lambda)*(1-normcdf(thresh, IV_noisy, sigma_pred));
+%% Predict criterion in IV unit
+criterion_IV = median(IV)+c_zscore*sigma_pred;
 
-% convert pYES to pC (accuracy): for ABS trials (iPRS==0), pC=1-pYES
+% Calculate probability of responding "Present" (pYES)
+if iModelB<=3
+    pYES_pred = lambda/2+(1-lambda)*(1-normcdf(criterion_IV, IV, sigma_pred));
+else
+    pYES_pred = 1-normcdf(criterion_IV, IV, sigma_pred);
+end
+
+% convert pYES to pC (accuracy)
 pC_pred = pYES_pred;
-pC_pred(iPRS==0) = 1-pYES_pred(iPRS==0);
+pC_pred(iPRS==0) = 1-pYES_pred(iPRS==0); % for ABS trials (iPRS==0), pC=1-pYES
 
-% prob of consistent resp
+% Compute predicted pA based on predicted pYES
 pA_pred = pYES_pred.^2 + (1-pYES_pred).^2;
 
-%% bin data to calculate predicted and measured pC and pA of each bin
+%% Bin data to calculate predicted and measured pC and pA for each bin
 % load binning info
 nTrials_allBins = data.nTrials_allBins;
 iTrial4Bin = data.iTrial4Bin;
 
-for iind=1:length(iTrial4Bin)
-    iBin_A=iTrial4Bin(iind);
-    iTrialB=find(iPair==iPair(iind));
-    iTrialB=iTrialB(2);
-    iBin_B=iTrial4Bin(iTrialB);
-    if iBin_A~=iBin_B
+% Verify if paired trials are in the same bin
+for iind = 1:length(iTrial4Bin)
+    iBin_A = iTrial4Bin(iind);
+    iTrialB = find(iPair==iPair(iind));
+    iTrialB = iTrialB(2);
+    iBin_B = iTrial4Bin(iTrialB);
+    if iBin_A ~= iBin_B
         fprintf('Trial%d: Bin%d and %d\n', iind, iBin_A, iBin_B) % confirming that two trials of one pair are in the same bins
     end
 end
 
+% Initialize containers for binned values
 IV_allBins = nan(nBins, 1);
 pC_pred_allBins = nan(nBins, 1);
 pC_data_allBins = pC_pred_allBins;
@@ -70,26 +87,28 @@ pA_data_allBins = pC_pred_allBins;
 pYES_pred_allBins = pC_pred_allBins;
 pYES_data_allBins = pC_pred_allBins;
 
-for iBin=1:nBins
-    IV_allBins(iBin) = mean(IV_noNoise(iTrial4Bin==iBin));
-    
-    pC_pred_allBins(iBin) = mean(pC_pred(iTrial4Bin==iBin));
-    pC_data_allBins(iBin) = mean(corr(iTrial4Bin==iBin));
-    
-    pYES_pred_allBins(iBin) = mean(pYES_pred(iTrial4Bin==iBin));
-    pYES_data_allBins(iBin) = mean(resp_data(iTrial4Bin==iBin));
-    
-    pA_pred_allBins(iBin) = mean(pA_pred(iTrial4Bin==iBin));
-    
-    %------------ get measured pA ------------
-    resp_perBin = resp_data(iTrial4Bin==iBin);
-    iPair_perBin = iPair(iTrial4Bin==iBin);
+% Calculate binned values
+for iBin = 1:nBins
+    indTrial = iTrial4Bin==iBin;
+    IV_allBins(iBin) = mean(IV(indTrial)); % Average IV for bin (should this be weighted by nTrials?)
+
+    pC_pred_allBins(iBin) = mean(pC_pred(indTrial)); % Predicted accuracy
+    pC_data_allBins(iBin) = mean(correctness(indTrial)); % Measured accuracy
+
+    pYES_pred_allBins(iBin) = mean(pYES_pred(indTrial)); % Predicted pYES
+    pYES_data_allBins(iBin) = mean(resp_data(indTrial)); % Measured pYES
+
+    pA_pred_allBins(iBin) = mean(pA_pred(indTrial)); % Predicted pA (Measured pA is below)
+
+    %------------ Calculate measured pA for each bin ------------
+    resp_perBin = resp_data(indTrial);
+    iPair_perBin = iPair(indTrial);
     iPair_perBin_unik = unique(iPair_perBin);
     nUnik = length(iPair_perBin_unik);
     respC_perBin = nan(nUnik, 1);
-    for iUnik=1:nUnik
+    for iUnik = 1:nUnik
         iTrialAB=find(iPair_perBin==iPair_perBin_unik(iUnik));
-        respC_perBin(iUnik) = resp_perBin(iTrialAB(1))==resp_perBin(iTrialAB(2));
+        respC_perBin(iUnik) = resp_perBin(iTrialAB(1)) == resp_perBin(iTrialAB(2));
     end
     pA_data_allBins(iBin) = mean(respC_perBin);
     %------------------------------------------
@@ -130,5 +149,7 @@ if flag_plot
     plot(IV_allBins, pA_pred_allBins, 'k-')
     for iBin=1:nBins, plot(IV_allBins(iBin), pA_data_allBins(iBin), 'ko', 'MarkerSize', nTrials_allBins(iBin)/sz_scale+5), end
     title('Resp. consistency')
+
+    pause, close all
 end
 end

@@ -346,7 +346,7 @@ metrics_sim = [dprime, c_zscore, pC, pHit, pFA, pA];  % Collect all behavioral m
 
 
 % Compare the true criterion (in IV unit) and converted criterion (also in IV unit)
-c_IV_all = median(IV_sim_allT) + c_zscore * sigma_pred_allT;
+c_IV_all = medianIV_sim_allT + c_zscore * sigma_pred_allT;
 figure, hold on
 histogram(c_IV_all)
 xline(median(c_IV_all), 'k--', 'DisplayName', 'Median');

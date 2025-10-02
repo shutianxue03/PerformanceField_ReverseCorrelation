@@ -180,8 +180,8 @@ for ii = 1:ni
 
     % Later, this c (in unit of z-score) will be converted to criterion in
     % unit of IV on each trial, so that criterion is no longer a parameter
-    c_zscore = c; 
-    % c_IV = IV+c_zscore*sqrt(SDadd^2+(IV*Nmul).^2);
+    % c_IV = IV+c_zscore*sqrt(SDadd^2+(IV.*Nmul).^2);
+    
 
     clear data % as the size of IV differs across subjects
 
@@ -199,9 +199,9 @@ for ii = 1:ni
 
     % 2. Calculate the Internal variable (IV)
     IV = fxn_getIV_v3(iModelA, e3D_test, convolveType, IVType, template, ORI_bound);
-    % 
-    % % Normalize IV
-    % IV = (IV - mean(IV)) / std(IV);
+    
+    % Normalize IV
+    IV = (IV - mean(IV)) / std(IV);
 
     % Take log form if needed
     if flag_logIV, IV = log10(IV); end
@@ -229,7 +229,7 @@ end % end of ii
 fprintf('\n\n[L%d ModelA%d] ALL iterations DONE\n', iLocComb, iModelA)
 
 % SAVE
-save(nameFile_beforeEst, 'c_zscore', '*_allB', 'names*', 'flag*', 'ratio_train', 'ORI_bound', '*Type')
+save(nameFile_beforeEst, '*_allB', 'names*', 'flag*', 'ratio_train', 'ORI_bound', '*Type')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if flag_plot_beforeEst, NOMplot_beforeEst, end

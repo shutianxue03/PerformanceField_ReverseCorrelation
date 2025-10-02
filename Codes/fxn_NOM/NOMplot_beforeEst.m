@@ -31,24 +31,24 @@
 % It loads the saved output and generates plots for IV distribution, bin counts, and performance metrics.
 
 %% Figure 1: Distribution of IV and Trial Counts per bins for each iteration
-figure('Position', [100, 100, 1200, 600])
-for ii = 1:ni
-    data = data_allB{ii};
-    subplot(1,2,1); hold on;
-    histogram(data.IV, 'Normalization','probability');
-    % histogram(nthroot(data.IV-min(data.IV),2), 'Normalization','probability');
-    xlabel('IV (Weight x Stim energy)'); ylabel('Probability');
-    title(sprintf('Distribution of Internal Variable (IV)\nEach color is a different iteration\n!!!IV does NOT have to be normally distributed!!!'));
-
-    % [h, pValue, Wstat] = swtest(nthroot(data.IV-min(data.IV),2), 0.05)
-
-    subplot(1,2,2); hold on;
-    bar(data.nTrials_allBins);
-    xlabel('Bin #'); ylabel('Number of trials');
-    title('Trial Counts per Bin (Each color is a different iteration)');
-end
-set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
-set(findall(gcf, '-property', 'linewidth'), 'linewidth',2)
+% figure('Position', [100, 100, 1200, 600])
+% for ii = 1:ni
+%     data = data_allB{ii};
+%     subplot(1,2,1); hold on;
+%     histogram(data.IV, 'Normalization','probability');
+%     % histogram(nthroot(data.IV-min(data.IV),2), 'Normalization','probability');
+%     xlabel('IV (Weight x Stim energy)'); ylabel('Probability');
+%     title(sprintf('Distribution of Internal Variable (IV)\nEach color is a different iteration\n!!!IV does NOT have to be normally distributed!!!'));
+% 
+%     % [h, pValue, Wstat] = swtest(nthroot(data.IV-min(data.IV),2), 0.05)
+% 
+%     subplot(1,2,2); hold on;
+%     bar(data.nTrials_allBins);
+%     xlabel('Bin #'); ylabel('Number of trials');
+%     title('Trial Counts per Bin (Each color is a different iteration)');
+% end
+% set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
+% set(findall(gcf, '-property', 'linewidth'), 'linewidth',2)
 
 %% Figure 2: Performance Metrics across Iterations
 figure('Position', [100, 100, 2e3, 2e3])

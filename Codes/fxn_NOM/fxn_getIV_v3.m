@@ -20,8 +20,8 @@ end
 % the true template and the energy profile.
 % e3D_noisy = e3D .* randn(size(e3D));
 
-% CANNOT permutate pixels of template
-% to have the same IV for paired trials, the template cannot be randomized
+% CANNOT permutate pixels of template here
+% Because to have the same IV for paired trials, the template cannot be randomized
 % independently across trials (at least not for the pair of trials)
 
 if iModelA == 2 % Permute pixels in the template

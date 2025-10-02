@@ -20,7 +20,7 @@ nSF = nORI;
 % if run on HPC
 nameFolder_server = '..';
 % if run on local
-nameFolder_server = '/Volumes/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC'; % the server directory of the Data and Figures folders
+% nameFolder_server = '/Volumes/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC'; % the server directory of the Data and Figures folders
 
 nameFolder_Data = sprintf('%s/Data', nameFolder_server) ;
 nameFolder_Data_OOD = sprintf('%s/Data_OOD_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
@@ -31,6 +31,11 @@ nameFolder_Figures = sprintf('%s/Figures', nameFolder_server);
 nameFolder_Figures_NOM = sprintf('%s/NOM_Trialwise_%d%d', nameFolder_Figures, nORI, nSF);
 if ~exist(nameFolder_Figures_NOM, 'dir'), mkdir(nameFolder_Figures_NOM); end
 
+
+% Print directory names
+fprintf('\n\nFolder to save analysis outputs\n  >>>%s\n\n', nameFolder_Data_OOD)
+fprintf('Folder to save NOM outputs\n  >>>%s\n\n', nameFolder_Data_NOM_Trialwise)
+fprintf('Folder to save Figures\n  >>>%s\n\n\n', nameFolder_Figures_NOM)
     % Define the function to normalize Gabor SD
 fxn_getSigma_SPdomain = @(SF) 3 * sqrt(2*log(2)) / (2 * pi * SF);
 

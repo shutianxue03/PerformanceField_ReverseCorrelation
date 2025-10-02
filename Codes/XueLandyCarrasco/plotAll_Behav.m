@@ -19,7 +19,7 @@ sz_h = 250; % height of the figure
 sz_h_comp = sz_h/1.5; % height of the figure, compressed
 load(sprintf('%s/n%d_B%d_perf_%s.mat', nameFolderCompile_behav, nsubj, nB, nameFileBehav))
 
-%% 1. plot perf of 3 locations
+%% 1. Plot perf of 3 locations
 flag_plotIDVD = 0;
 close all
 sz_wd_perBar_comp = 60;

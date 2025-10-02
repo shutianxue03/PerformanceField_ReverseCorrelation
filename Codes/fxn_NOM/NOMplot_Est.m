@@ -77,18 +77,18 @@ if ismember(iModelB, [4,5]) % so that 1st param is noise P, 2nd param is criteri
     iParam = 1;
     subplot(1, 2, iParam);
     plot(params_est_allB(:,iParam), '-o');
-    yline(.1, 'r-'); % noiseP=0.1
+    yline(.1, 'r-'); % match noiseP defined in OOD_sim
     xlabel('Iteration');
     ylabel(namesParamsModel_all{iModelB}{iParam});
     title(['Parameter: ', namesParamsModel_all{iModelB}{iParam}]);
 
-    iParam = 2;
-    subplot(1, 2, iParam);
-    plot(params_est_allB(:,iParam), '-o');
-    yline(criterion_true, 'r-'); % criterion_true
-    xlabel('Iteration');
-    ylabel(namesParamsModel_all{iModelB}{iParam});
-    title(['Parameter: ', namesParamsModel_all{iModelB}{iParam}]);
+    % iParam = 2;
+    % subplot(1, 2, iParam);
+    % plot(params_est_allB(:,iParam), '-o');
+    % yline(criterion_true, 'r-'); % criterion_true
+    % xlabel('Iteration');
+    % ylabel(namesParamsModel_all{iModelB}{iParam});
+    % title(['Parameter: ', namesParamsModel_all{iModelB}{iParam}]);
     % end
     sgtitle('Estimated Parameters Across Iterations');
 end
