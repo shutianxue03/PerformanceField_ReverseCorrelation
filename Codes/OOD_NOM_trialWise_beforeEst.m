@@ -133,7 +133,7 @@ if rem(ntrain_perSingle, 2), ntrain_perSingle = ntrain_perSingle+1;ntest_perSing
 
 %% MAIN LOOP
 % preallocate
-nmetrics = 8; % the 9th one is CS in SX_RC1_setting, but no need for model
+nmetrics = 9; 
 data_allB = cell(ni, 1);
 data_metrics_allB = nan(ni, nmetrics);
 kernel2D_all = nan(ni, nORI, nSF);
@@ -168,15 +168,20 @@ for ii = 1:ni
 
     % Calculate 2D kernel from the TRAINING set
     kernel2D = SX_sim07_RC(filtersSF_all, filtersOri_all, e3D_train_norm, resp_train); % 5 seconds
+
+    % Normalize the derived template
+    kernel2D = kernel2D / max(kernel2D(:)) * 0.2; % scale the signal energy to roughly match the range of templates derived from subbj data
+
     % size of kernel2D: nORI x nSF
     kernel2D_all(ii, :, :) = kernel2D; % the ave will be plotted in NOMplot_beforeEst.m
 
     % Calculate performance metrics for the TEST set
+    pYES = mean(resp_test==1);
     pHit = mean(iPRS_test==1 & resp_test==1)*2;
     pFA = mean(iPRS_test==0 & resp_test==1)*2;
     pC = (pHit+1-pFA)/2;
     [d,c] = SX_sim06_SDT(pHit, pFA);
-    metrics_test = [d,c, [pC, pHit, pFA], nanmean(respC_test)]; % dprime, criterion, pC, pHit, pFA, pA, pA_PRS, pA_ABS
+    metrics_test = [d,c, [pC, pHit, pFA], nanmean(respC_test), pYES]; % dprime, criterion, pC, pHit, pFA, pA, pA_PRS, pA_ABS, pYES
 
     % Later, this c (in unit of z-score) will be converted to criterion in
     % unit of IV on each trial, so that criterion is no longer a parameter

@@ -47,6 +47,7 @@ sigma_pred = sqrt((IV*Nmul).^2 + SDadd^2);
 
 %% Predict criterion in IV unit
 criterion_IV = median(IV)+c_zscore*sigma_pred;
+criterion_IV = c_zscore; % here c_zscore = criterion_true
 
 % Calculate probability of responding "Present" (pYES)
 if iModelB<=3
@@ -80,25 +81,26 @@ end
 
 % Initialize containers for binned values
 IV_allBins = nan(nBins, 1);
-pC_pred_allBins = nan(nBins, 1);
-pC_data_allBins = pC_pred_allBins;
-pA_pred_allBins = pC_pred_allBins;
-pA_data_allBins = pC_pred_allBins;
-pYES_pred_allBins = pC_pred_allBins;
-pYES_data_allBins = pC_pred_allBins;
+pYES_pred_allBins = nan(nBins, 1);
+pYES_data_allBins = pYES_pred_allBins;
+pC_pred_allBins = pYES_pred_allBins; 
+pC_data_allBins = pYES_pred_allBins;
+pA_pred_allBins = pYES_pred_allBins;
+pA_data_allBins = pYES_pred_allBins;
+
 
 % Calculate binned values
 for iBin = 1:nBins
     indTrial = iTrial4Bin==iBin;
     IV_allBins(iBin) = mean(IV(indTrial)); % Average IV for bin (should this be weighted by nTrials?)
 
+    pYES_pred_allBins(iBin) = mean(pYES_pred(indTrial)); % Predicted pYES
+    pYES_data_allBins(iBin) = mean(resp_data(indTrial)); % Measured pYES
+    
     pC_pred_allBins(iBin) = mean(pC_pred(indTrial)); % Predicted accuracy
     pC_data_allBins(iBin) = mean(correctness(indTrial)); % Measured accuracy
 
-    pYES_pred_allBins(iBin) = mean(pYES_pred(indTrial)); % Predicted pYES
-    pYES_data_allBins(iBin) = mean(resp_data(indTrial)); % Measured pYES
-
-    pA_pred_allBins(iBin) = mean(pA_pred(indTrial)); % Predicted pA (Measured pA is below)
+    pA_pred_allBins(iBin) = mean(pA_pred(indTrial)); % Predicted pA (Measured/data pA is below)
 
     %------------ Calculate measured pA for each bin ------------
     resp_perBin = resp_data(indTrial);
@@ -118,6 +120,11 @@ end % iBin
 pred.metrics.nTrials_allBins = nTrials_allBins;
 pred.metrics.IV_allBins = IV_allBins;
 
+pred.metrics.pYES_pred_allBins = pYES_pred_allBins;
+pred.metrics.pYES_data_allBins = pYES_data_allBins;
+pred.R2_pYES = getR2(pYES_data_allBins, pYES_pred_allBins, nan);
+pred.R2_weighted_pYES = getR2(pYES_data_allBins, pYES_pred_allBins, nTrials_allBins);
+
 pred.metrics.pC_pred_allBins = pC_pred_allBins;
 pred.metrics.pC_data_allBins = pC_data_allBins;
 pred.R2_pC = getR2(pC_data_allBins, pC_pred_allBins, nan);
@@ -128,26 +135,26 @@ pred.metrics.pA_data_allBins = pA_data_allBins;
 pred.R2_pA = getR2(pA_data_allBins, pA_pred_allBins, nan);
 pred.R2_weighted_pA = getR2(pA_data_allBins, pA_pred_allBins, nTrials_allBins);
 
-pred.metrics.pYES_pred_allBins = pYES_pred_allBins;
-pred.metrics.pYES_data_allBins = pYES_data_allBins;
-pred.R2_pYES = getR2(pYES_data_allBins, pYES_pred_allBins, nan);
-pred.R2_weighted_pYES = getR2(pYES_data_allBins, pYES_pred_allBins, nTrials_allBins);
-
 %%
 if flag_plot
     sz_scale = 80;
     figure('Position', [0 200 800 300 ])
     subplot(1,3,1), hold on
-    plot(IV_allBins, pC_pred_allBins, 'k-')
-    for iBin=1:nBins, plot(IV_allBins(iBin), pC_data_allBins(iBin), 'ko', 'MarkerSize', nTrials_allBins(iBin)/sz_scale+5), end
-    title('Accuracy')
-    subplot(1,3,2), hold on
     plot(IV_allBins, pYES_pred_allBins, 'k-')
     for iBin=1:nBins, plot(IV_allBins(iBin), pYES_data_allBins(iBin), 'ko', 'MarkerSize', nTrials_allBins(iBin)/sz_scale+5), end
+    xlabel('Binned IV')
     title('pYES')
+
+    subplot(1,3,2), hold on
+    plot(IV_allBins, pC_pred_allBins, 'k-')
+    for iBin=1:nBins, plot(IV_allBins(iBin), pC_data_allBins(iBin), 'ko', 'MarkerSize', nTrials_allBins(iBin)/sz_scale+5), end
+    xlabel('Binned IV')
+    title('Accuracy')
+    
     subplot(1,3,3), hold on
     plot(IV_allBins, pA_pred_allBins, 'k-')
     for iBin=1:nBins, plot(IV_allBins(iBin), pA_data_allBins(iBin), 'ko', 'MarkerSize', nTrials_allBins(iBin)/sz_scale+5), end
+    xlabel('Binned IV')
     title('Resp. consistency')
 
     pause, close all

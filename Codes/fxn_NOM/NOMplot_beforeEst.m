@@ -53,7 +53,7 @@
 %% Figure 2: Performance Metrics across Iterations
 figure('Position', [100, 100, 2e3, 2e3])
 for iMetric = 1:nmetrics
-    subplot(2,4,iMetric)
+    subplot(3,3,iMetric)
     plot(data_metrics_allB(:,iMetric),'-o');
     xlabel('Iteration'); 
     ylabel(namesMetrics{iMetric})
@@ -68,6 +68,7 @@ for iMetric = 1:nmetrics
         case 6, ylimits = [.5,1]; % pA
         case 7, ylimits = [.5,1]; % pA1
         case 8, ylimits = [.5,1]; % pA0
+        case 9, ylimits = [0,1]; % pYES
     end
     ylim(ylimits)
 end

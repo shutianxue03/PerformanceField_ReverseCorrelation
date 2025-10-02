@@ -41,6 +41,7 @@ sigma_pred = sqrt((IV*Nmul).^2 + SDadd^2); % sigma_pred is nTrials x 1
 
 %% Calculate criterion in IV unit
 criterion_IV = median(IV)+c_zscore*sigma_pred;
+criterion_IV = c_zscore;
 
 % Calculate probability of responding "Present" (pYES), which is nTrials x 1
 if iModelB<=3

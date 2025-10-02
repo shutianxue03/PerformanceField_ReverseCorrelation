@@ -26,12 +26,12 @@ noiseCST_allCond = [0, .1, .2, .5]; % Noise contrast sensitivity thresholds
 gaborCST_allCond = [.1, .5]; % Gabor contrast sensitivity thresholds
 noiseP_allCond = [0, 0.1, 0.2]; % Proportion of noise trials
 nTrials_allCond = [5000]; % Number of trials per condition
-iModelA_sim_allCond = [1,3]; % 1=core model, 2=randomize template, 3=use IO template
+iModelA_sim_allCond = [1]; % 1=core model, 2=randomize template, 3=use IO template
 iModelB_sim_allCond = [5]; % 1=estimate lapse rate, 2=estimate additive noise (SDadd), 3=estimate multiplicative noise (Nmul)
                             % 4=estimate additive noise (SDadd) and criterion;
                             % 5=estimate multiplicative noise (Nmul) and criterion;
 
-noiseCST=.2, gaborCST=.2, nTrials=2e3, noiseP=.1, iModelB_sim=iModelB_sim_allCond, 
+noiseCST=.2, gaborCST=.2, nTrials=2e3, noiseP=0, iModelB_sim=iModelB_sim_allCond, 
 
 convolveType_true=1 % 1=dot product, 2=convolution; %used in fxn_getIV_v3
 IVType_true=1 % 1=sum of the dot product/convolution; 2=max; 3=normalized
@@ -165,6 +165,10 @@ fprintf('\n Created a pool of Gabor filters: nORI=%d, nSF=%d\n', length(filtersO
 template_true = exp_CreateGabor(stim, cst_ln_template);
 template_true = SX_RC4_Energy_parfor(stim.mask, {template_true}, filter_sin, filter_cos);
 template_true = squeeze(template_true);  %  Remove singleton dimension
+
+% Normalize template (to match the value scale of derived template in OOD_xx_beforeEst)
+template_true = template_true / max(template_true(:)) * 0.2; % scale the signal energy to roughly match the range of templates derived from subbj data
+
 % % new_max =.4; new_min = -.05;
 % template_true = (template_true * (new_max - new_min)) + new_min; % scale the signal energy to roughly match the range of templates derived from subbj data
 save(sprintf('%s/signalEnergy', nameFolder_Data_OOD), 'template_true')
@@ -332,6 +336,7 @@ dataMatrix(:, 8) = iPair_allT;  % Pair index
 dataMatrix(:, 9) = resp_allT;  % Response for each trial
 
 % Behavioral metrics
+pYES = mean(resp_allT == 1);
 pHit = sum((iPRS_allT == 1) & (resp_allT == 1)) / sum(iPRS_allT == 1);
 pFA = sum((iPRS_allT == 0) & (resp_allT == 1)) / sum(iPRS_allT == 0);
 pC = (pHit + 1 - pFA) / 2;
@@ -342,7 +347,7 @@ for iPairUnik = 1:nPairs
     respC(iPairUnik) = respAB(1) == respAB(2);  % Response consistency between the two passes
 end
 pA = mean(respC);  % Average response consistency across pairs
-metrics_sim = [dprime, c_zscore, pC, pHit, pFA, pA];  % Collect all behavioral metrics
+metrics_sim = [dprime, c_zscore, pC, pHit, pFA, pA, pYES];  % Collect all behavioral metrics
 
 
 % Compare the true criterion (in IV unit) and converted criterion (also in IV unit)
