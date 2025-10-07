@@ -11,7 +11,8 @@ pA_pred_allB = pYES_data_allB;
 nData_allB = pYES_data_allB;
 IV_allBins_all = pYES_data_allB;
 
-% see OOD_xx_beforeEst Line179: % dprime, criterion, pC, pHit, pFA, pA, pA_PRS, pA_ABS
+% see OOD_xx_beforeEst Line179: % dprime, criterion, pC, pHit, pFA, pA,
+% pA_PRS, pA_ABS, pYES
 indPyes = 9;
 indPc = 3;
 indPa = 6;
@@ -19,6 +20,7 @@ indPa = 6;
 for ii=1:ni
     % IVbin_allB(ii, :) = data_allB{ii}.IV_allBins;
     IV_allBins_all(ii, :) = pred.metrics.IV_allBins;
+    
     pYES_data_allB(ii, :) = data_allB{ii}.metrics_sim(indPyes);
     pYES_pred_allB(ii, :) = pred_metrics_allB{ii}.metrics.pYES_pred_allBins;
 
@@ -53,26 +55,38 @@ for iBin=1:nBins
     plot(IV_allBins_med(iBin), pYES_data_med(iBin), 'ko', 'MarkerSize', nData_allB_med(iBin)/sz_scale+5)
     errorbar(IV_allBins_med(iBin), pYES_data_med(iBin), pYES_data_SEM_neg(iBin), pYES_data_SEM_pos(iBin), 'k', 'CapSize', 0)
 end
-
 % Pred (shaded errorbars)
 plot(IV_allBins_med, pYES_pred_med, 'k-')
 patch([IV_allBins_med, fliplr(IV_allBins_med)], [pYES_pred_lb, fliplr(pYES_pred_ub)], 'k', 'FaceAlpha', .2, 'EdgeColor', 'none');
-
 xlabel('Binned IV')
 ylabel('pYES')
 title('pYES')
 
-% subplot(1,3,2), hold on
-% plot(IV_allBins, pC_pred_allBins, 'k-')
-% for iBin=1:nBins, plot(IV_allBins(iBin), pC_data_allBins(iBin), 'ko', 'MarkerSize', nTrials_allBins(iBin)/sz_scale+5), end
-% xlabel('Binned IV')
-% title('Accuracy')
-% 
-% subplot(1,3,3), hold on
-% plot(IV_allBins, pA_pred_allBins, 'k-')
-% for iBin=1:nBins, plot(IV_allBins(iBin), pA_data_allBins(iBin), 'ko', 'MarkerSize', nTrials_allBins(iBin)/sz_scale+5), end
-% xlabel('Binned IV')
-% title('Resp. consistency')
+subplot(1,3,2), hold on
+for iBin=1:nBins
+    % Data (dot+errorbars)
+    plot(IV_allBins_med(iBin), pC_data_med(iBin), 'ko', 'MarkerSize', nData_allB_med(iBin)/sz_scale+5)
+    errorbar(IV_allBins_med(iBin), pC_data_med(iBin), pC_data_SEM_neg(iBin), pC_data_SEM_pos(iBin), 'k', 'CapSize', 0)
+end
+% Pred (shaded errorbars)
+plot(IV_allBins_med, pC_pred_med, 'k-')
+patch([IV_allBins_med, fliplr(IV_allBins_med)], [pC_pred_lb, fliplr(pC_pred_ub)], 'k', 'FaceAlpha', .2, 'EdgeColor', 'none');
+xlabel('Binned IV')
+ylabel('pC')
+title('pC')
+
+subplot(1,3,3), hold on
+for iBin=1:nBins
+    % Data (dot+errorbars)
+    plot(IV_allBins_med(iBin), pA_data_med(iBin), 'ko', 'MarkerSize', nData_allB_med(iBin)/sz_scale+5)
+    errorbar(IV_allBins_med(iBin), pA_data_med(iBin), pA_data_SEM_neg(iBin), pA_data_SEM_pos(iBin), 'k', 'CapSize', 0)
+end
+% Pred (shaded errorbars)
+plot(IV_allBins_med, pA_pred_med, 'k-');
+patch([IV_allBins_med, fliplr(IV_allBins_med)], [pA_pred_lb, fliplr(pA_pred_ub)], 'k', 'FaceAlpha', .2, 'EdgeColor', 'none');
+xlabel('Binned IV')
+ylabel('pA')
+title('pA')
 
 
 %% pYES: data vs. pred (the mean across bins will be 50%)

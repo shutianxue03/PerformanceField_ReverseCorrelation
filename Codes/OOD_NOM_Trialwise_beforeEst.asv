@@ -177,8 +177,9 @@ for ii = 1:ni
 
     % Calculate performance metrics for the TEST set
     pYES = mean(resp_test==1);
-    pHit = mean(iPRS_test==1 & resp_test==1)/mean(iPRS_test==1);
-    pFA = mean(iPRS_test==0 & resp_test==1)/mean(iPRS_test==0);
+    pHit = mean(iPRS_test==1 & resp_test==1)*2;
+    pFA = mean(iPRS_test==0 & resp_test==1)*2;
+    pC = (pHit*sum(iPRS_test==1)+(1-pFA)*sum(iPRS_test==0))/length(iPRS_test); % because number of PRS and ABS trials are unequal!!
     pC = mean((iPRS_test==0 & resp_test==0) | (iPRS_test==1 & resp_test==1));
     [d,c] = SX_sim06_SDT(pHit, pFA);
     metrics_test = [d,c, [pC, pHit, pFA], nanmean(respC_test), pYES]; % dprime, criterion, pC, pHit, pFA, pA, pA_PRS, pA_ABS, pYES

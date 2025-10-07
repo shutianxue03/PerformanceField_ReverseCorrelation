@@ -33,9 +33,9 @@ if ~exist(nameFolder_Figures_NOM, 'dir'), mkdir(nameFolder_Figures_NOM); end
 
 
 % Print directory names
-fprintf('\n\nFolder to save analysis outputs\n  >>>%s\n\n', nameFolder_Data_OOD)
-fprintf('Folder to save NOM outputs\n  >>>%s\n\n', nameFolder_Data_NOM_Trialwise)
-fprintf('Folder to save Figures\n  >>>%s\n\n\n', nameFolder_Figures_NOM)
+% fprintf('\n\nFolder to save analysis outputs\n  >>>%s\n\n', nameFolder_Data_OOD)
+% fprintf('Folder to save NOM outputs\n  >>>%s\n\n', nameFolder_Data_NOM_Trialwise)
+% fprintf('Folder to save Figures\n  >>>%s\n\n\n', nameFolder_Figures_NOM)
     % Define the function to normalize Gabor SD
 fxn_getSigma_SPdomain = @(SF) 3 * sqrt(2*log(2)) / (2 * pi * SF);
 

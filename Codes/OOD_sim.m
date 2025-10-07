@@ -33,12 +33,12 @@ iModelB_sim_allCond = [5]; % 1=estimate lapse rate, 2=estimate additive noise (S
 
 noiseCST=.2, gaborCST=.2, nTrials=2e3, noiseP=0, iModelB_sim=iModelB_sim_allCond, 
 
-convolveType_true=1 % 1=dot product, 2=convolution; %used in fxn_getIV_v3
-IVType_true=1 % 1=sum of the dot product/convolution; 2=max; 3=normalized
+convolveType_true = 1 % 1=dot product, 2=convolution; %used in fxn_getIV_v3
+IVType_true = 1 % 1=sum of the dot product/convolution; 2=max; 3=normalized
 modelA_true = 3; % as long as modelA_true ~= 2; matters for fxn_getIV_v3
 flag_logIV = 0
 nIterations = 20; % Number of iterations for simulating the data & fitting the model
-flag_fminconORbads = 2; % 1=use fmincon when fitting NOM to data, faster; 2=bads, slower
+flag_fminconORbads = 2; % 1=use fmincon when fitting NOM to data, faster; 2=bads, slower but better
 
 % Loop each param comb locally (VERY SLOW!!)
 % for noiseCST = noiseCST_allCond

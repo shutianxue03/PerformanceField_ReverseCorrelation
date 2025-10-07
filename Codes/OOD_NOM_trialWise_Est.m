@@ -37,7 +37,7 @@ addpath(genpath('SX_toolbox/bads-master'))
 SX_RC1_setting
 %--------------%
 flag_plot = 1;
-flag_plotPerIter = 0;
+flag_plotPerIter = 1;
 
 % Set upper and lower bounds of each parameter
 SDadd_lb = 1e-5; SDadd_ub = .1;  % Additive noise
@@ -90,10 +90,10 @@ load(nameFile_beforeEst, 'data_allB', 'c_zscore')
 % c0 = median(data_allB{1}.IV);
 % c_lb = c0-std(data_allB{1}.IV)*2;
 % c_ub = c0+std(data_allB{1}.IV)*2;
-% 
+%
 % SDadd0 = .1; SDadd_lb = SDadd0-SDadd0/10; SDadd_ub = SDadd0+SDadd0/10;
 % c0 = criterion_true; c_lb = c0-abs(c0)/10; c_ub = c0+abs(c0)/10;
-% 
+%
 % SDadd0 = .1; SDadd_lb = 1e-5; SDadd_ub=1;
 
 % Compile parameter bounds based on iModelB
