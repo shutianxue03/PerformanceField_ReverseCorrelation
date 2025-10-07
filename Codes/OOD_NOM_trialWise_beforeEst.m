@@ -181,7 +181,7 @@ for ii = 1:ni
     pFA = mean(iPRS_test==0 & resp_test==1)/mean(iPRS_test==0);
     pC = mean((iPRS_test==0 & resp_test==0) | (iPRS_test==1 & resp_test==1));
     [d,c] = SX_sim06_SDT(pHit, pFA);
-    metrics_test = [d,c, [pC, pHit, pFA], nanmean(respC_test), pYES]; % dprime, criterion, pC, pHit, pFA, pA, pA_PRS, pA_ABS, pYES
+    metrics_test = [d,c, [pC, pHit, pFA], nanmean(respC_test), pYES]; % dprime, criterion, 3=pC, pHit, pFA, 6=pA, pA_PRS, pA_ABS, 9=pYES
 
     % Later, this c (in unit of z-score) will be converted to criterion in
     % unit of IV on each trial, so that criterion is no longer a parameter

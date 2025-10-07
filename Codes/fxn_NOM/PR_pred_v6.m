@@ -53,7 +53,7 @@ criterion_IV = c_zscore; % here c_zscore = criterion_true
 if iModelB<=3
     pYES_pred = lambda/2+(1-lambda)*(1-normcdf(criterion_IV, IV, sigma_pred));
 else
-    pYES_pred = 1-normcdf(criterion_IV, IV, sigma_pred);
+    pYES_pred = 1-normcdf(criterion_IV, IV, sigma_pred); % when sigma_pred=0, the normal cdf is a step function, hence pYES_pred are 0/1
 end
 
 % convert pYES to pC (accuracy)
@@ -88,10 +88,10 @@ pC_data_allBins = pYES_pred_allBins;
 pA_pred_allBins = pYES_pred_allBins;
 pA_data_allBins = pYES_pred_allBins;
 
-
 % Calculate binned values
 for iBin = 1:nBins
     indTrial = iTrial4Bin==iBin;
+    assert(nTrials_allBins(iBin) == sum(indTrial), 'Error: inconsistent number of trials per bin!')
     IV_allBins(iBin) = mean(IV(indTrial)); % Average IV for bin (should this be weighted by nTrials?)
 
     pYES_pred_allBins(iBin) = mean(pYES_pred(indTrial)); % Predicted pYES
@@ -138,22 +138,27 @@ pred.R2_weighted_pA = getR2(pA_data_allBins, pA_pred_allBins, nTrials_allBins);
 %%
 if flag_plot
     sz_scale = 80;
-    figure('Position', [0 200 800 300 ])
-    subplot(1,3,1), hold on
+    figure('Position', [0 200 300 800])
+    subplot(3,1,1), hold on
     plot(IV_allBins, pYES_pred_allBins, 'k-')
     for iBin=1:nBins, plot(IV_allBins(iBin), pYES_data_allBins(iBin), 'ko', 'MarkerSize', nTrials_allBins(iBin)/sz_scale+5), end
+    yline(.5, 'k--');
+    ylim([0,1])
     xlabel('Binned IV')
     title('pYES')
 
-    subplot(1,3,2), hold on
+    subplot(3,1,2), hold on
     plot(IV_allBins, pC_pred_allBins, 'k-')
     for iBin=1:nBins, plot(IV_allBins(iBin), pC_data_allBins(iBin), 'ko', 'MarkerSize', nTrials_allBins(iBin)/sz_scale+5), end
+    yline(.5, 'k--');
+    ylim([0,1])
     xlabel('Binned IV')
     title('Accuracy')
     
-    subplot(1,3,3), hold on
+    subplot(3,1,3), hold on
     plot(IV_allBins, pA_pred_allBins, 'k-')
     for iBin=1:nBins, plot(IV_allBins(iBin), pA_data_allBins(iBin), 'ko', 'MarkerSize', nTrials_allBins(iBin)/sz_scale+5), end
+    ylim([.5,1])
     xlabel('Binned IV')
     title('Resp. consistency')
 
