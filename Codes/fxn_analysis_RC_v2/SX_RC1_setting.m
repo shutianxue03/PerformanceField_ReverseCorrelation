@@ -40,7 +40,7 @@ if ~exist(nameFolder_Figures_NOM, 'dir'), mkdir(nameFolder_Figures_NOM); end
 fxn_getSigma_SPdomain = @(SF) 3 * sqrt(2*log(2)) / (2 * pi * SF);
 
 %%  Global parameters
-nBins = 6; % to bin IVs in OOD_xx_beforeEst
+nBins = 10; % to bin IVs in OOD_xx_beforeEst
 binStrategy_all = {'equal', 'algorithm', 'manual'};
 eyeD_all = [1,1,0,1,1,1,1,1,0,0,1,0]; % 1=right eye dominant; 0=left eye dominant
 flag_block200 = 0; % 1; all observers are forced to have 200 blocks; 0=no

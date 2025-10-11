@@ -31,7 +31,7 @@ iModelB_sim_allCond = [5]; % 1=estimate lapse rate, 2=estimate additive noise (S
                             % 4=estimate additive noise (SDadd) and criterion;
                             % 5=estimate multiplicative noise (Nmul) and criterion;
 
-noiseCST=.2, gaborCST=.2, nTrials=2e3, noiseP=0, iModelB_sim=iModelB_sim_allCond, 
+noiseCST=.2, gaborCST=.2, nTrials=1e4, noiseP=.1, iModelB_sim=iModelB_sim_allCond, 
 
 convolveType_true = 1 % 1=dot product, 2=convolution; %used in fxn_getIV_v3
 IVType_true = 1 % 1=sum of the dot product/convolution; 2=max; 3=normalized
@@ -162,15 +162,13 @@ fprintf('\n Created a pool of Gabor filters: nORI=%d, nSF=%d\n', length(filtersO
 
 %% Define the TRUE template (ORI x SF)
 % stim.gaborSD = fxn_getSigma_SPdomain(stim.gaborSF); % do NOT normalize by SF here
-template_true = exp_CreateGabor(stim, cst_ln_template);
-template_true = SX_RC4_Energy_parfor(stim.mask, {template_true}, filter_sin, filter_cos);
+template_gabor_true = exp_CreateGabor(stim, stim.gaborCST);
+template_true = SX_RC4_Energy_parfor(stim.mask, {template_gabor_true}, filter_sin, filter_cos);
 template_true = squeeze(template_true);  %  Remove singleton dimension
 
 % Normalize template (to match the value scale of derived template in OOD_xx_beforeEst)
-template_true = template_true / max(template_true(:)) * 0.2; % scale the signal energy to roughly match the range of templates derived from subbj data
-
-% % new_max =.4; new_min = -.05;
-% template_true = (template_true * (new_max - new_min)) + new_min; % scale the signal energy to roughly match the range of templates derived from subbj data
+template_true = template_true / max(template_true(:)) * 0.2; % scale the signal energy to roughly match the range of templates derived from subj data
+                                                                                                 % The same as OOD_NOM_xx_beforeTest
 save(sprintf('%s/signalEnergy', nameFolder_Data_OOD), 'template_true')
 fprintf('\n Defined the true template\n')
 
@@ -202,8 +200,8 @@ fprintf('\n Running simulation (%d pairs): \n', nPairs)
 parfor iPair = 1:nPairs
 
     % Create the signal Gabor patch
-    gabor = exp_CreateGabor(stim, stim.gaborCST, 0);
-
+    % gabor = exp_CreateGabor(stim, stim.gaborCST, 0);
+    gabor = template_gabor_true;
     % Generate filtered noise
     filtered_noise = exp_CreateFilteredNoise(noise);
 
@@ -308,7 +306,7 @@ end
 
 % Sample and add internal noise to IV
 noisyIV_sim_allT = IV_sim_allT + randn(size(IV_sim_allT)) * SDadd + randn(size(IV_sim_allT)).* (IV_sim_allT*Nmul);
-noisyIV_sim_allT =IV_sim_allT +  randn(size(IV_sim_allT)) .* sqrt(SDadd^2+ (IV_sim_allT.*Nmul).^2); % this is mathematically equivalent to the above line
+noisyIV_sim_allT =IV_sim_allT + randn(size(IV_sim_allT)) .* sqrt(SDadd^2+ (IV_sim_allT.*Nmul).^2); % this is mathematically equivalent to the above line
 
 %% Derive response given noisy IVs
 % Do a simple fitting to determine the criterion_true so that accuracy matches a certain level
@@ -348,7 +346,6 @@ for iPairUnik = 1:nPairs
 end
 pA = mean(respC);  % Average response consistency across pairs
 metrics_sim = [dprime, c_zscore, pC, pHit, pFA, pA, pYES];  % Collect all behavioral metrics
-
 
 % Compare the true criterion (in IV unit) and converted criterion (also in IV unit)
 c_IV_all = median(IV_sim_allT) + c_zscore * sigma_pred_allT;

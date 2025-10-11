@@ -101,11 +101,8 @@ for iBin = 1:nBins
     assert(nTrials_allBins(iBin) == sum(indTrial), 'Error: inconsistent number of trials per bin!')
     IV_allBins(iBin) = mean(IV(indTrial)); % Average IV for bin (should this be weighted by nTrials?)
 
-    pYES_pred_allBins(iBin) = median(pYES_pred(indTrial)); % Predicted accuracy
-    pYES_data_allBins(iBin) = mean(resp_data(indTrial)); % Measured accuracy
-
     % dprime_pred_allBins(iBin) = mean(dprime_pred(indTrial)); % Predicted dprime
-    %
+    % 
     % % calculate measured dprime for each bin using iPRS and correctness
     % correctness_perBin = correctness(indTrial);
     % iPRS_perBin = iPRS(indTrial);
@@ -115,10 +112,10 @@ for iBin = 1:nBins
     % if pFA==1, pFA=1-eps; elseif pFA==0, pFA=eps; end
     % dprime_data_allBins(iBin) = norminv(pHit) - norminv(pFA);
 
-    pC_pred_allBins(iBin) = median(pC_pred(indTrial)); % Predicted accuracy
+    pC_pred_allBins(iBin) = mean(pC_pred(indTrial)); % Predicted accuracy
     pC_data_allBins(iBin) = mean(correctness(indTrial)); % Measured accuracy
 
-    pA_pred_allBins(iBin) = median(pA_pred(indTrial)); % Predicted pA (Measured/data pA is below)
+    pA_pred_allBins(iBin) = mean(pA_pred(indTrial)); % Predicted pA (Measured/data pA is below)
 
     %------------ Calculate measured pA for each bin ------------
     resp_perBin = resp_data(indTrial);
@@ -134,49 +131,7 @@ for iBin = 1:nBins
     %------------------------------------------
 end % iBin
 
-figure('Position', [0,0, 2e3, 2e3])
-% M=reshape(1:nBins*3, 3, nBins);
-% [idx_row, idx_col] = ind2sub(size(M), 1:numel(M));
-% coords = [idx_row(:), idx_col(:)];
-for iBin = 1:nBins
-    indTrial = iTrial4Bin==iBin;
-
-    subplot(nBins,3,(iBin-1)*3+1), hold on
-    histogram(pYES_pred(indTrial), 'Normalization','probability');
-    xline(median(pYES_pred(indTrial)), 'r-', 'LineWidth', 2);
-    xline(mean(pYES_pred(indTrial)), 'g-', 'LineWidth', 2);
-    % title(sprintf('Bin %d: pYES_pred distribution', iBin))
-    if iBin==nBins, xlabel('pYES');  end
-    ylabel('Probability');
-    % legend('pYES', 'Median', 'Mean')
-    % ylim([0,1])
-    xlim([0, 1])
-
-    subplot(nBins,3,(iBin-1)*3+2), hold on
-    histogram(pC_pred(indTrial), 'Normalization','probability');
-    xline(median(pC_pred(indTrial)), 'r-', 'LineWidth', 2);
-    xline(mean(pC_pred(indTrial)), 'g-', 'LineWidth', 2);
-    % title(sprintf('Bin %d: pC_pred distribution', iBin))
-    if iBin==nBins, xlabel('pC'); end
-    ylabel('Probability');
-    % legend('pC', 'Median', 'Mean')
-    % ylim([0,1])
-    xlim([0, 1])
-
-    subplot(nBins,3,(iBin-1)*3+3), hold on
-    histogram(pA_pred(indTrial), 'Normalization','probability');
-    xline(median(pA_pred(indTrial)), 'r-', 'LineWidth', 2);
-    xline(mean(pA_pred(indTrial)), 'g-', 'LineWidth', 2);
-    % title(sprintf('Bin %d: pA_pred distribution', iBin))
-    if iBin==nBins, xlabel('pA'); end
-    ylabel('Probability');
-    % legend('pA', 'Median', 'Mean')
-    % ylim([0,1])
-    xlim([.5, 1])
-end % iBin
-
-%% Save
-pred.criterion_IV = criterion_IV;
+%% save
 pred.metrics.nTrials_allBins = nTrials_allBins;
 pred.metrics.IV_allBins = IV_allBins;
 

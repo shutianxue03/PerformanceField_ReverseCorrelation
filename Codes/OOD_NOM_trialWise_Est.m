@@ -37,13 +37,13 @@ addpath(genpath('SX_toolbox/bads-master'))
 SX_RC1_setting
 %--------------%
 flag_plot = 1;
-flag_plotPerIter = 1;
+flag_plotPerIter = 0;
 
 % Set upper and lower bounds of each parameter
-SDadd_lb = 1e-5; SDadd_ub = .1;  % Additive noise
+SDadd_lb = 1e-5; SDadd_ub = 10;  % Additive noise
 Nmul_lb = 1e-5; Nmul_ub = 1;  % Multiplicative noise
-SDadd_lb = -eps; SDadd_ub = eps;  % Additive noise
-Nmul_lb = -eps; Nmul_ub = eps;  % Multiplicative noise
+% SDadd_lb = -eps; SDadd_ub = eps;  % Additive noise
+% Nmul_lb = -eps; Nmul_ub = eps;  % Multiplicative noise
 SDadd0 = mean([SDadd_lb, SDadd_ub]);
 Nmul0 = mean([Nmul_lb, Nmul_ub]);
 
@@ -122,7 +122,7 @@ nLL_allB = nan(ni,1);
 pred_metrics_allB = cell(ni, 1);
 
 %% Loop through each iteration
-fprintf('[L%d ModelA%dB%d] Running ni = %d: ', iLocComb, iModelA, iModelB, ni)
+fprintf('  ======== ESTIMATION ======== \n[L%d ModelA%dB%d] Running ni = %d: ', iLocComb, iModelA, iModelB, ni)
 for ii = 1:ni
     fprintf('%d ', ii)
 
@@ -130,7 +130,7 @@ for ii = 1:ni
 
     % Fit the model to trial-wise data using BADS optimizer
     % fxn_estParams = @(params) fxn_getError_v5(iModelB, params, data, 0);
-    fxn_estParams = @(params) fxn_getError_v6(iModelB, params, data, criterion_true); % criterion is converted from c in zscore unit
+    fxn_estParams = @(params) fxn_getError_v6(iModelB, params, data, c_zscore); % criterion is converted from c in zscore unit
 
     if flag_fminconORbads == 1
         % Use fmincon to estimate (faster)
@@ -140,14 +140,15 @@ for ii = 1:ni
     end
 
     params_est_allB(ii, :) = params_est;
-    % params_est_allB(ii, :) = [.1, criterion_true];
-    nLL_allB(ii) = nLL;
+     nLL_allB(ii) = nLL;
 
     % Make predictions on binned IVs based on estimated parameters
-    pred = PR_pred_v6(iModelB, nBins, params_est, data, criterion_true, flag_plotPerIter);
+    pred = PR_pred_v6(iModelB, nBins, params_est, data, c_zscore, flag_plotPerIter);
     pred_metrics_allB{ii} = pred;
 
 end % end of ii
+
+% pred.criterion_IV is an output of PR_pred_v6()
 
 fprintf('\n\nALL iterations DONE\n')
 

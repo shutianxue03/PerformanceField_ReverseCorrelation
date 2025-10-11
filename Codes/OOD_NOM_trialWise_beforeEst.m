@@ -137,7 +137,7 @@ nmetrics = 9;
 data_allB = cell(ni, 1);
 data_metrics_allB = nan(ni, nmetrics);
 kernel2D_all = nan(ni, nORI, nSF);
-fprintf('[L%d ModelA%d] Running ni = %d: ', iLocComb, iModelA, ni)
+fprintf('  ======== BEFORE Estimation ======== \n[L%d ModelA%d] Running ni = %d: ', iLocComb, iModelA, ni)
 
 for ii = 1:ni
     fprintf('%d ', ii)
@@ -170,12 +170,14 @@ for ii = 1:ni
     kernel2D = SX_sim07_RC(filtersSF_all, filtersOri_all, e3D_train_norm, resp_train); % 5 seconds
 
     % Normalize the derived template
-    kernel2D = kernel2D / max(kernel2D(:)) * 0.2; % scale the signal energy to roughly match the range of templates derived from subbj data
+    kernel2D = kernel2D / max(kernel2D(:)) * 0.2; % scale the signal energy to roughly match the range of templates derived from subj data
+    % The same as OOD_sim
 
     % size of kernel2D: nORI x nSF
     kernel2D_all(ii, :, :) = kernel2D; % the ave will be plotted in NOMplot_beforeEst.m
 
     % Calculate performance metrics for the TEST set
+    % ==== NOT grouped based on binned IV!! ====
     pYES = mean(resp_test==1);
     pHit = mean(iPRS_test==1 & resp_test==1)/mean(iPRS_test==1);
     pFA = mean(iPRS_test==0 & resp_test==1)/mean(iPRS_test==0);
@@ -185,9 +187,9 @@ for ii = 1:ni
 
     % Later, this c (in unit of z-score) will be converted to criterion in
     % unit of IV on each trial, so that criterion is no longer a parameter
+    % c_IV = IV+c_zscore*sqrt(SDadd^2+(IV*Nmul).^2); % this is in both 
     c_zscore = c; 
-    % c_IV = IV+c_zscore*sqrt(SDadd^2+(IV*Nmul).^2);
-
+    
     clear data % as the size of IV differs across subjects
 
     %%%%%%%%%%%%%%%%%%%%%%%%
