@@ -7,6 +7,7 @@ function pred = PR_pred_v6(iModelB, nBins, params_est, data, c_zscore, flag_plot
 %   data - Data structure with fields for internal variables (IV) and responses
 %   flag_plot - Flag to enable or disable plotting (unused in current code)
 
+flag_plot = 0;
 %% Model setup: Define parameters based on model type (iModelB)
 switch iModelB
     case 1 % lapse rate, additive noise, criterion
@@ -101,8 +102,11 @@ for iBin = 1:nBins
     assert(nTrials_allBins(iBin) == sum(indTrial), 'Error: inconsistent number of trials per bin!')
     IV_allBins(iBin) = mean(IV(indTrial)); % Average IV for bin (should this be weighted by nTrials?)
 
+    pYES_pred_allBins(iBin) = median(pYES_pred(indTrial)); % Predicted accuracy
+    pYES_data_allBins(iBin) = mean(resp_data(indTrial)); % Measured accuracy
+
     % dprime_pred_allBins(iBin) = mean(dprime_pred(indTrial)); % Predicted dprime
-    % 
+    %
     % % calculate measured dprime for each bin using iPRS and correctness
     % correctness_perBin = correctness(indTrial);
     % iPRS_perBin = iPRS(indTrial);
@@ -112,10 +116,10 @@ for iBin = 1:nBins
     % if pFA==1, pFA=1-eps; elseif pFA==0, pFA=eps; end
     % dprime_data_allBins(iBin) = norminv(pHit) - norminv(pFA);
 
-    pC_pred_allBins(iBin) = mean(pC_pred(indTrial)); % Predicted accuracy
+    pC_pred_allBins(iBin) = median(pC_pred(indTrial)); % Predicted accuracy
     pC_data_allBins(iBin) = mean(correctness(indTrial)); % Measured accuracy
 
-    pA_pred_allBins(iBin) = mean(pA_pred(indTrial)); % Predicted pA (Measured/data pA is below)
+    pA_pred_allBins(iBin) = median(pA_pred(indTrial)); % Predicted pA (Measured/data pA is below)
 
     %------------ Calculate measured pA for each bin ------------
     resp_perBin = resp_data(indTrial);
@@ -131,7 +135,83 @@ for iBin = 1:nBins
     %------------------------------------------
 end % iBin
 
-%% save
+if flag_plot
+    %% Plot the distribution of pYES/pC/pA per bin
+    figure('Position', [0,0, 2e3, 2e3])
+    for iBin = 1:nBins
+        indTrial = iTrial4Bin==iBin;
+
+        subplot(nBins,3,(iBin-1)*3+1), hold on
+        histogram(pYES_pred(indTrial), 'Normalization','probability');
+        xline(median(pYES_pred(indTrial)), 'r-', 'LineWidth', 2);
+        xline(mean(pYES_pred(indTrial)), 'g-', 'LineWidth', 2);
+        % title(sprintf('Bin %d: pYES_pred distribution', iBin))
+        if iBin==nBins, xlabel('pYES');  end
+        ylabel('Probability');
+        % legend('pYES', 'Median', 'Mean')
+        ylim([0, .5])
+        xlim([0, 1])
+
+        subplot(nBins,3,(iBin-1)*3+2), hold on
+        histogram(pC_pred(indTrial), 'Normalization','probability');
+        xline(median(pC_pred(indTrial)), 'r-', 'LineWidth', 2);
+        xline(mean(pC_pred(indTrial)), 'g-', 'LineWidth', 2);
+        % title(sprintf('Bin %d: pC_pred distribution', iBin))
+        if iBin==nBins, xlabel('pC'); end
+        ylabel('Probability');
+        % legend('pC', 'Median', 'Mean')
+        ylim([0, .5])
+        xlim([0, 1])
+
+        subplot(nBins,3,(iBin-1)*3+3), hold on
+        histogram(pA_pred(indTrial), 'Normalization','probability');
+        xline(median(pA_pred(indTrial)), 'r-', 'LineWidth', 2);
+        xline(mean(pA_pred(indTrial)), 'g-', 'LineWidth', 2);
+        % title(sprintf('Bin %d: pA_pred distribution', iBin))
+        if iBin==nBins, xlabel('pA'); end
+        ylabel('Probability');
+        % legend('pA', 'Median', 'Mean')
+        ylim([0, .5])
+        xlim([.5, 1])
+    end % iBin
+
+    %% Plot trialwise pYES/pC/pA as a fxn of trialwise IV
+    figure('Position', [0,0, 2e3, 400])
+
+    subplot(1,3,1), hold on
+    plot(IV(iPRS==1), pYES_pred(iPRS==1), 'r.');
+    plot(IV(iPRS==0), pYES_pred(iPRS==0), 'b.');
+    plot(IV(iPRS==1), resp_data(iPRS==1), 'ro');
+    plot(IV(iPRS==0), resp_data(iPRS==0), 'bo');
+    xlabel('Trialwise IV')
+    ylabel('Probability and binary resp');
+    ylim([0, 1])
+    title('pYES')
+
+    subplot(1,3,2), hold on
+    plot(IV(iPRS==1), pC_pred(iPRS==1), 'r.', 'DisplayName', 'PRS');
+    plot(IV(iPRS==0), pC_pred(iPRS==0), 'b.', 'DisplayName', 'ABS');
+    plot(IV(iPRS==1), correctness(iPRS==1), 'ro', 'DisplayName', 'PRS');
+    plot(IV(iPRS==0), correctness(iPRS==0), 'bo', 'DisplayName', 'ABS');
+    xlabel('Trialwise IV')
+    ylabel('Probability and binary resp');
+    ylim([0, 1])
+    title('pC')
+    legend('show')
+
+    subplot(1,3,3), hold on
+    plot(IV(iPRS==1), pA_pred(iPRS==1), 'r.');
+    plot(IV(iPRS==0), pA_pred(iPRS==0), 'b.');
+    % plot(IV, respC, 'o');
+    xlabel('Trialwise IV')
+    ylabel('Probability and binary resp');
+    ylim([0, 1])
+    title('pA')
+
+    sgtitle('Trialwise metrics as afxn of trialwise IVs')
+end
+%% Save
+pred.criterion_IV = criterion_IV;
 pred.metrics.nTrials_allBins = nTrials_allBins;
 pred.metrics.IV_allBins = IV_allBins;
 

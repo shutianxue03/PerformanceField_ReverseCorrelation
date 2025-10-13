@@ -78,36 +78,15 @@ set(findall(gcf, '-property', 'linewidth'), 'linewidth',2)
 %% Figure 3: 2D Kernel Visualization
 kernel2D_ave = squeeze(mean(kernel2D_all, 1));
 
-figure('Position', [100, 100, 2e3, 600])   
-subplot(1,3,1), hold on
-imagesc(axis_tuning{2}, axis_tuning{1}, kernel2D_ave), axis square, colorbar, clim([0, .2])
+figure('Position', [100, 100, 600, 600])   
+imagesc(axis_tuning{2}, axis_tuning{1}, kernel2D_ave), axis square
 xline(1, 'r-'); % log gabor SF
 yline(0, 'r-'); % Gabor ori
 xlabel('Spatial Frequency'), ylabel('Orientation')
 xticks(axisTicks_tuning{2}), xticklabels(axisTL_tuning{2})
 yticks(axisTicks_tuning{1}), yticklabels(axisTL_tuning{1})
-title(sprintf('Derived template (averaged across %d iterations)', ni))
-
-subplot(1,3,2), hold on
-imagesc(axis_tuning{2}, axis_tuning{1}, template_true), axis square, colorbar, clim([0, .2])
-xline(1, 'r-'); % log gabor SF
-yline(0, 'r-'); % Gabor ori
-xlabel('Spatial Frequency'), ylabel('Orientation')
-xticks(axisTicks_tuning{2}), xticklabels(axisTL_tuning{2})
-yticks(axisTicks_tuning{1}), yticklabels(axisTL_tuning{1})
-title('True template')
-
-subplot(1,3,3), hold on
-imagesc(axis_tuning{2}, axis_tuning{1}, kernel2D_ave-template_true), axis square, colorbar
-xline(1, 'r-'); % log gabor SF
-yline(0, 'r-'); % Gabor ori
-xlabel('Spatial Frequency'), ylabel('Orientation')
-xticks(axisTicks_tuning{2}), xticklabels(axisTL_tuning{2})
-yticks(axisTicks_tuning{1}), yticklabels(axisTL_tuning{1})
-title('Difference between the derived and the true template')
-
-
-set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
+title(sprintf('Template derived from the training set via RC (averaged across %d iterations)', ni))
+set(findall(gcf, '-property', 'fontsize'), 'fontsize', 20)
 set(findall(gcf, '-property', 'linewidth'), 'linewidth',2)
 
 % sgtitle('NOM Trialwise Output Visualization');

@@ -41,7 +41,7 @@ flag_plotPerIter = 0;
 
 % Set upper and lower bounds of each parameter
 SDadd_lb = 1e-5; SDadd_ub = 10;  % Additive noise
-Nmul_lb = 1e-5; Nmul_ub = .1;  % Multiplicative noise
+Nmul_lb = 1e-5; Nmul_ub = 1;  % Multiplicative noise
 % SDadd_lb = -eps; SDadd_ub = eps;  % Additive noise
 % Nmul_lb = -eps; Nmul_ub = eps;  % Multiplicative noise
 SDadd0 = mean([SDadd_lb, SDadd_ub]);

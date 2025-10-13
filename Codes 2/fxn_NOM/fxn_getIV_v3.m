@@ -1,0 +1,63 @@
+
+function [IV, max_allT] = fxn_getIV_v3(iModelA, e3D, convolveType, IVType, template_true, ORI_bound)
+
+flag_plotMax=0;
+
+if ndims(e3D)==3
+    [nTrials, nORI, nSF] = size(e3D);
+    IV = nan(nTrials, 1);
+    max_allT = nan(nTrials, 2);
+else
+    nTrials = 1;
+    [nORI, nSF] = size(e3D);
+    IV = nan;
+    max_allT = nan(1,2);
+end
+
+% Add Gaussian noise to the template, controlled by sigma_template.
+% This is done by multiplying a Gaussian matrix (sigma = 1) with
+% the energy profiles, then adding it to the integration between
+% the true template and the energy profile.
+% e3D_noisy = e3D .* randn(size(e3D));
+
+% CANNOT permutate pixels of template here
+% Because to have the same IV for paired trials, the template cannot be randomized
+% independently across trials (at least not for the pair of trials)
+
+if iModelA == 2 % Permute pixels in the template
+    rng('shuffle')
+    indRand = randperm(nORI*nSF);
+    template_true_v = template_true(:);
+    template_rand = template_true_v(indRand);
+    template = reshape(template_rand, nORI, nSF);
+else
+    template = template_true;
+end
+
+for iTrial = 1:nTrials
+    % This step is so important...
+    if ndims(e3D)==3
+        e2D = squeeze(e3D(iTrial, :, :));
+    else
+        e2D = e3D;
+    end
+
+    switch convolveType
+        case 1, tempCovE = template.*e2D; % cross-correlation
+        case 2 , tempCovE = conv2(template, e2D, 'same'); % convolution
+    end
+
+    % get the channel at which max value is found
+    [max_, maxORI, maxSF_log] = getIndMax(tempCovE, ORI_bound, flag_plotMax); % ORI_bound should be a vector of index of ori channels [ori_lb, ori_ub]
+    maxORI=nan;maxSF_log=nan;
+    max_allT(iTrial, :) = [maxORI, maxSF_log];
+
+    %     quickPlot_tempCovE, waitforbuttonpress
+    % decide the format of IV
+    switch IVType
+        case 1, IV(iTrial) = sum(tempCovE(:));
+        case 2, IV(iTrial) = max_;
+        case 3, IV(iTrial) = max_/(sum(tempCovE(:))); if sum(tempCovE(:)) == 0, error('ALERT: The suppressive drive is 0.'); end% SS stands for the estimated semi-saturation factor
+    end
+end % end of itrial
+

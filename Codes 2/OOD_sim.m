@@ -31,7 +31,7 @@ iModelB_sim_allCond = [5]; % 1=estimate lapse rate, 2=estimate additive noise (S
                             % 4=estimate additive noise (SDadd) and criterion;
                             % 5=estimate multiplicative noise (Nmul) and criterion;
 
-noiseCST=.2; gaborCST=.2; nTrials=8e3; noiseP=.1; iModelB_sim=iModelB_sim_allCond; 
+noiseCST=.2; gaborCST=.2; nTrials=1e4; noiseP=.1; iModelB_sim=iModelB_sim_allCond; 
 
 convolveType_true = 1; % 1=dot product, 2=convolution; %used in fxn_getIV_v3
 IVType_true = 1; % 1=sum of the dot product/convolution; 2=max; 3=normalized
