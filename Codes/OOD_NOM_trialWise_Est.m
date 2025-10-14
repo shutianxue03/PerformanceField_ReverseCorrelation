@@ -105,7 +105,7 @@ pred_metrics_allB = cell(ni, 1);
 
 %% Loop through each iteration
 fprintf('  ======== ESTIMATION ======== \n[L%d ModelA%dB%d] Running ni = %d: ', iLocComb, iModelA, iModelB, ni)
-for ii = 1:ni
+parfor ii = 1:ni
     fprintf('%d ', ii)
 
     data = data_allB{ii};
@@ -122,7 +122,7 @@ for ii = 1:ni
     end
 
     params_est_allB(ii, :) = params_est;
-     nLL_allB(ii) = nLL;
+    nLL_allB(ii) = nLL;
 
     % Make predictions on binned IVs based on estimated parameters
     pred = PR_pred_v6(iModelB, nBins, params_est, data, c_zscore, flag_plotPerIter);
