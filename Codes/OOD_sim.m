@@ -25,16 +25,18 @@ clear all, clc, close all
 noiseCST_allCond = [0, .1, .2, .5]; % Noise contrast sensitivity thresholds
 gaborCST_allCond = [.1, .5]; % Gabor contrast sensitivity thresholds
 noiseP_allCond = [0, 0.1, 0.2]; % Proportion of noise trials
-nTrials_allCond = [5000]; % Number of trials per condition
-iModelA_sim_allCond = [1]; % 1=core model, 2=randomize template, 3=use IO template
+nTrials_allCond = [1e3, 5e3, 1e4, 5e4]; % Number of trials per condition
+iModelA_sim_allCond = [1, 3, 2]; % 1=core model, 2=randomize template, 3=use IO template
 iModelB_sim_allCond = [5]; % 1=estimate lapse rate, 2=estimate additive noise (SDadd), 3=estimate multiplicative noise (Nmul)
-                            % 4=estimate additive noise (SDadd) and criterion;
-                            % 5=estimate multiplicative noise (Nmul) and criterion;
+                            % 4=estimate additive noise (SDadd);
+                            % 5=estimate multiplicative noise (Nmul);
+                            % 6=estimate both multiplicative and additive noise;
+IVType_true = [1, 2]; % 1=sum of the dot product/convolution; 2=max; 3=normalized
 
-noiseCST=.2; gaborCST=.2; nTrials=8e3; noiseP=.1; iModelB_sim=iModelB_sim_allCond; 
+%%
+noiseCST=.2; gaborCST=.2; nTrials=8e3; noiseP=.1; iModelB_sim=iModelB_sim_allCond; IVType_true=1;
 
 convolveType_true = 1; % 1=dot product, 2=convolution; %used in fxn_getIV_v3
-IVType_true = 1; % 1=sum of the dot product/convolution; 2=max; 3=normalized
 modelA_true = 3; % as long as modelA_true ~= 2; matters for fxn_getIV_v3
 flag_logIV = 0;
 nIterations = 20; % Number of iterations for simulating the data & fitting the model
@@ -185,7 +187,7 @@ ratio_gaborInTgt = noise.ratio_gaborInTgt;
 
 % Loop through each pair of trials
 fprintf('\n Running simulation (%d pairs): \n', nPairs)
-parfor iPair = 1:nPairs
+for iPair = 1:nPairs
 
     % Create the signal Gabor patch
     % gabor = exp_CreateGabor(stim, stim.gaborCST, 0);
@@ -280,7 +282,7 @@ fprintf('\n Saved simulated 3D energy (%d trials) \n', nTrials)
 %     case 'N', IV_sim_allT = IV_noise_sim_allT;
 % end
 
-% !!! I should be using the energy with signal to predict response!!!
+% !!! I should be using the energy WITHOUT signal to predict response!!!
 IV_sim_allT = IV_noise_sim_allT;
 
 % Add noise to the internal variable (IV) to simulate trial-by-trial variability
@@ -293,7 +295,7 @@ switch iModelB_sim
 end
 
 % Sample and add internal noise to IV
-noisyIV_sim_allT = IV_sim_allT + randn(size(IV_sim_allT)) * SDadd + randn(size(IV_sim_allT)).* (IV_sim_allT*Nmul);
+% noisyIV_sim_allT = IV_sim_allT + randn(size(IV_sim_allT)) * SDadd + randn(size(IV_sim_allT)).* (IV_sim_allT*Nmul);
 noisyIV_sim_allT =IV_sim_allT + randn(size(IV_sim_allT)) .* sqrt(SDadd^2+ (IV_sim_allT.*Nmul).^2); % this is mathematically equivalent to the above line
 
 %% Derive response given noisy IVs
@@ -325,7 +327,8 @@ dataMatrix(:, 9) = resp_allT;  % Response for each trial
 pYES = mean(resp_allT == 1);
 pHit = sum((iPRS_allT == 1) & (resp_allT == 1)) / sum(iPRS_allT == 1);
 pFA = sum((iPRS_allT == 0) & (resp_allT == 1)) / sum(iPRS_allT == 0);
-pC = (pHit + 1 - pFA) / 2;
+% pC = (pHit + 1 - pFA) / 2;
+pC = mean( (iPRS_allT==1 & resp_allT==1) | (iPRS_allT==0 & resp_allT==0) );
 [dprime, c_zscore] = SX_sim06_SDT(pHit, pFA);  % Sensitivity (d') and criterion (c)
 respC = nan(nPairs, 1);  % Preallocate response consistency
 for iPairUnik = 1:nPairs
@@ -415,7 +418,8 @@ for iModelA_fit = iModelA_fit_all
         % Predict response of the testing set, using the derived template
         OOD_NOM_Trialwise_Est({nameIO, criterion_true}, iLocComb, iModelA_fit, iModelB_fit, nIterations, flag_fminconORbads)
     end
-endfprintf('\n\n============= CRITERION=%.1f DONE =============\n\n', criterion_true)
+end
+fprintf('\n\n============= CRITERION=%.1f DONE =============\n\n', criterion_true)
 % end % criterion
 
 %% Clean up variables for the next iteration

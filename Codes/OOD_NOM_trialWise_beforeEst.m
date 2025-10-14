@@ -207,7 +207,7 @@ for ii = 1:ni
 
     % 2. Calculate the Internal variable (IV)
     IV = fxn_getIV_v3(iModelA, e3D_test, convolveType, IVType, template, ORI_bound);
-    % 
+    
     % % Normalize IV
     % IV = (IV - mean(IV)) / std(IV);
 

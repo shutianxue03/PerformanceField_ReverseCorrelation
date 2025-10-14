@@ -63,7 +63,10 @@ yline(.5, 'k--');
 ylim([0,1])
 xlabel('Binned IV')
 ylabel('pYES')
-title('pYES')
+% add r and R-squared
+r_pYES = corr(IV_allBins_med', pYES_data_med');
+R2_pYES = 1 - sum((pYES_data_med - pYES_pred_med).^2) / sum((pYES_data_med - mean(pYES_data_med)).^2);
+title(sprintf('pYES (r=%.2f, R²=%.2f)', r_pYES, R2_pYES));
 
 subplot(3,1,2), hold on
 for iBin=1:nBins
@@ -80,7 +83,10 @@ yline(mean(pC_data_med), 'k-');
 ylim([0,1])
 xlabel('Binned IV')
 ylabel('pC')
-title('pC')
+% add r and R-squared
+r_pC = corr(pC_pred_med', pC_data_med');
+R2_pC = 1 - sum((pC_data_med - pC_pred_med).^2) / sum((pC_data_med - mean(pC_data_med)).^2);
+title(sprintf('pC (r=%.2f, R²=%.2f)', r_pC, R2_pC));
 
 subplot(3,1,3), hold on
 for iBin=1:nBins
@@ -95,7 +101,10 @@ xline(pred.criterion_IV, 'r-');
 ylim([.5,1])
 xlabel('Binned IV')
 ylabel('pA')
-title('pA')
+% add r and R-squared
+r_pA = corr(pA_pred_med', pA_data_med');
+R2_pA = 1 - sum((pA_data_med - pA_pred_med).^2) / sum((pA_data_med - mean(pA_data_med)).^2);
+title(sprintf('pA (r=%.2f, R²=%.2f)', r_pA, R2_pA));
 
 sgtitle('Figure 1. Metrics as a fxn of binned IV')
 
@@ -120,84 +129,5 @@ if ismember(iModelB, [4,5]) % so that 1st param is noise P, 2nd param is criteri
     % ylabel(namesParamsModel_all{iModelB}{iParam});
     % title(['Parameter: ', namesParamsModel_all{iModelB}{iParam}]);
     % end
-    sgtitle('Estimated Parameters Across Iterations');
+    sgtitle('Figure 2. Estimated Parameters Across Iterations');
 end
-
-%% pYES: data vs. pred (the mean across bins will be 50%)
-% figure('Position', [100 100 2e3 1e3])
-% hold on
-% for iBin=1:nBins
-%     subplot(2, nBins/2, iBin), hold on
-%     plot(pYES_data_allB(:, iBin), pC_pred_allB(:, iBin), 'o')
-% 
-%     % plot ave and sd on top of the scatter plot
-%     errorbar(nanmean(pYES_data_allB(:, iBin)), nanmean(pYES_pred_allB(:, iBin)), nanstd(pYES_data_allB(:, iBin)), 'k', 'horizontal', 'CapSize', 0, 'LineWidth', 2)
-%     errorbar(nanmean(pYES_data_allB(:, iBin)), nanmean(pYES_pred_allB(:, iBin)), nanstd(pYES_pred_allB(:, iBin)), 'k', 'vertical', 'CapSize', 0, 'LineWidth', 2)
-% 
-%     xlabel('Emp pYES')
-%     ylabel('Pred pYES')
-%     plot([0, 1], [0, 1], 'k--')
-%     xline(.5, 'r--');
-%     yline(.5, 'r--');
-%     axis square
-%     xlim([0,1])
-%     ylim([0,1])
-%     % pause
-%     title(sprintf('Bin #%d (%.1f trials)', iBin, mean(nData_allB(:, iBin))))
-% end
-% 
-% sgtitle(sprintf('[pYES] NOM ModelA%dB%d [nblocks = %d] [ORI%d SF%d] [niter = %d]', ...
-%     iModelA, iModelB, nblocks, nORI, nSF, ni))
-% 
-% %% pC: data vs. pred
-% figure('Position', [100 100 2e3 1e3])
-% hold on
-% for iBin=1:nBins
-%     subplot(2, nBins/2, iBin), hold on
-%     plot(pC_data_allB(:, iBin), pC_pred_allB(:, iBin), 'o')
-% 
-%     % plot ave and sd on top of the scatter plot
-%     errorbar(nanmean(pC_data_allB(:, iBin)), nanmean(pC_pred_allB(:, iBin)), nanstd(pC_data_allB(:, iBin)), 'k', 'horizontal', 'CapSize', 0, 'LineWidth', 2)
-%     errorbar(nanmean(pC_data_allB(:, iBin)), nanmean(pC_pred_allB(:, iBin)), nanstd(pC_pred_allB(:, iBin)), 'k', 'vertical', 'CapSize', 0, 'LineWidth', 2)
-% 
-%     xlabel('Emp pC')
-%     ylabel('Pred pC')
-%     plot([0, 1], [0, 1], 'k--')
-%     xline(.5, 'r--');
-%     yline(.5, 'r--');
-%     axis square
-%     xlim([0,1])
-%     ylim([0,1])
-%     % pause
-%     title(sprintf('Bin #%d (%.1f trials)', iBin, mean(nData_allB(:, iBin))))
-% end
-% 
-% sgtitle(sprintf('[pC] NOM ModelA%dB%d [nblocks = %d] [ORI%d SF%d] [niter = %d]', ...
-%     iModelA, iModelB, nblocks, nORI, nSF, ni))
-% 
-% %% pA: data vs. pred
-% figure('Position', [100 100 2e3 1e3])
-% hold on
-% for iBin=1:nBins
-%     subplot(2, nBins/2, iBin), hold on
-%     plot(pA_data_allB(:, iBin), pA_pred_allB(:, iBin), 'o')
-% 
-%     % plot ave and sd on top of the scatter plot
-%     errorbar(nanmean(pA_data_allB(:, iBin)), nanmean(pA_pred_allB(:, iBin)), nanstd(pA_data_allB(:, iBin)), 'k', 'horizontal', 'CapSize', 0, 'LineWidth', 2)
-%     errorbar(nanmean(pA_data_allB(:, iBin)), nanmean(pA_pred_allB(:, iBin)), nanstd(pA_pred_allB(:, iBin)), 'k', 'vertical', 'CapSize', 0, 'LineWidth', 2)
-% 
-%     xlabel('Emp pA')
-%     ylabel('Pred pA')
-%     plot([0, 1], [0, 1], 'k--')
-%     axis square
-%     xline(.5, 'r--');
-%     yline(.5, 'r--');
-%     xlim([0,1])
-%     ylim([0,1])
-%     % pause
-%     title(sprintf('Bin #%d (%.1f trials)', iBin, mean(nData_allB(:, iBin))))
-% end
-% 
-% sgtitle(sprintf('[pA] NOM ModelA%dB%d [nblocks = %d] [ORI%d SF%d] [niter = %d]', ...
-%     iModelA, iModelB, nblocks, nORI, nSF, ni))
-

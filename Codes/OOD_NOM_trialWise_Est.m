@@ -86,25 +86,7 @@ fprintf('\n%s [nblocks = %d] [ORI%d SF%d]\n - ni = %d\n - Loc: %s\n - MODEL: [A%
 %% Load data
 load(nameFile_beforeEst, 'data_allB', 'c_zscore')
 
-%% Set up the data-restricted upper and lower bound of criterion
-% c0 = median(data_allB{1}.IV);
-% c_lb = c0-std(data_allB{1}.IV)*2;
-% c_ub = c0+std(data_allB{1}.IV)*2;
-%
-% SDadd0 = .1; SDadd_lb = SDadd0-SDadd0/10; SDadd_ub = SDadd0+SDadd0/10;
-% c0 = criterion_true; c_lb = c0-abs(c0)/10; c_ub = c0+abs(c0)/10;
-%
-% SDadd0 = .1; SDadd_lb = 1e-5; SDadd_ub=1;
-
-% Compile parameter bounds based on iModelB
-% switch iModelB
-%     case 1, params0 = [lapse0, SDadd0, c0]; params_lb = [lapse_lb, SDadd_lb, c_lb]; params_ub = [lapse_ub, SDadd_ub, c_ub];
-%     case 2, params0 = [lapse0, Nmul0, c0]; params_lb = [lapse_lb, Nmul_lb, c_lb]; params_ub = [lapse_ub, Nmul_ub, c_ub];
-%     case 3, params0 = [lapse0, c0]; params_lb=[lapse_lb, c_lb]; params_ub=[lapse_ub, c_ub];
-%     case 4, params0 = [SDadd0, c0]; params_lb = [SDadd_lb, c_lb]; params_ub = [SDadd_ub, c_ub]; % not fitting lapse rate
-%     case 5, params0 = [Nmul0, c0]; params_lb = [Nmul_lb, c_lb]; params_ub = [Nmul_ub, c_ub]; % not fitting lapse rate
-% end
-
+%% Set up the data-restricted upper and lower bound
 switch iModelB
     case 1, params0 = [lapse0, SDadd0, c0]; params_lb = [lapse_lb, SDadd_lb, c_lb]; params_ub = [lapse_ub, SDadd_ub, c_ub];
     case 2, params0 = [lapse0, Nmul0, c0]; params_lb = [lapse_lb, Nmul_lb, c_lb]; params_ub = [lapse_ub, Nmul_ub, c_ub];
