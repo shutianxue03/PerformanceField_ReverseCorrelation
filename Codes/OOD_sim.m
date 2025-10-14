@@ -156,7 +156,7 @@ template_true = squeeze(template_true);  %  Remove singleton dimension
 
 % Normalize template (to match the value scale of derived template in OOD_xx_beforeEst)
 template_true = template_true / max(template_true(:)) * 0.2; % scale the signal energy to roughly match the range of templates derived from subj data
-                                                                                                 % The same as OOD_NOM_xx_beforeTest
+% The same as OOD_NOM_xx_beforeTest
 save(sprintf('%s/signalEnergy', nameFolder_Data_OOD), 'template_true')
 fprintf('\n Defined the true template\n')
 
@@ -281,7 +281,7 @@ fprintf('\n Saved simulated 3D energy (%d trials) \n', nTrials)
 % end
 
 % !!! I should be using the energy with signal to predict response!!!
-IV_sim_allT = IV_target_sim_allT;
+IV_sim_allT = IV_noise_sim_allT;
 
 % Add noise to the internal variable (IV) to simulate trial-by-trial variability
 switch iModelB_sim
@@ -415,8 +415,7 @@ for iModelA_fit = iModelA_fit_all
         % Predict response of the testing set, using the derived template
         OOD_NOM_Trialwise_Est({nameIO, criterion_true}, iLocComb, iModelA_fit, iModelB_fit, nIterations, flag_fminconORbads)
     end
-end
-fprintf('\n\n============= CRITERION=%.1f DONE =============\n\n', criterion_true)
+endfprintf('\n\n============= CRITERION=%.1f DONE =============\n\n', criterion_true)
 % end % criterion
 
 %% Clean up variables for the next iteration

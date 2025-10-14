@@ -28,7 +28,6 @@ for oo = oo_all
         stim.gaborSF = filtersSF_all(ff); % linear SF in unit of ppd
 
         % adjust the bandwidth to ensure constant bandwidth in octave
-        %         stim.gaborSD = stim.gaborSF * bw_scaling;
         stim.gaborSD = fxn_getSigma_SPdomain(stim.gaborSF);
 
         for n = 1:2 % cos and sin % sin and cos

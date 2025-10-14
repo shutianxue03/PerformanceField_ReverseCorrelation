@@ -92,6 +92,7 @@ else
     load(sprintf('%s/energy_%s_%d_%d.mat', nameFolder_OOD_load, namePatchMode, nORI, nSF));
 end
 
+load(sprintf('%s/signalEnergy', nameFolder_Data_OOD), 'template_true')
 fprintf('\nBehav and energy LOADED\n\n')
 
 % Determine the type of energy to use based on flag_PatchMode
