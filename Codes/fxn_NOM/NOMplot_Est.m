@@ -4,7 +4,7 @@
 %% Compile data and pred for all iterations and bins
 pYES_data_allB = nan(ni, nBins);
 pYES_pred_allB = pYES_data_allB;
-pC_data_allB =pYES_data_allB;
+pC_data_allB = pYES_data_allB;
 pC_pred_allB = pYES_data_allB;
 pA_data_allB = pYES_data_allB;
 pA_pred_allB = pYES_data_allB;
@@ -12,7 +12,6 @@ pA_pred_allB = pYES_data_allB;
 % dprime_pred_allB = pYES_data_allB;
 nData_allB = pYES_data_allB;
 IV_allBins_all = pYES_data_allB;
-
 
 for ii=1:ni
     % IVbin_allB(ii, :) = data_allB{ii}.IV_allBins;
@@ -51,6 +50,7 @@ figure('Position', [0 200 300 800])
 subplot(3,1,1), hold on
 % plot(IV_allBins, pYES_pred_allBins, 'k-')
 for iBin=1:nBins
+    
     % Data (dot+errorbars)
     plot(IV_allBins_med(iBin), pYES_data_med(iBin), 'ko', 'MarkerSize', nData_allB_med(iBin)/sz_scale+5)
     errorbar(IV_allBins_med(iBin), pYES_data_med(iBin), pYES_data_SEM_neg(iBin), pYES_data_SEM_pos(iBin), 'k', 'CapSize', 0)
@@ -58,7 +58,7 @@ end
 % Pred (shaded errorbars)
 plot(IV_allBins_med, pYES_pred_med, 'k-')
 patch([IV_allBins_med, fliplr(IV_allBins_med)], [pYES_pred_lb, fliplr(pYES_pred_ub)], 'k', 'FaceAlpha', .2, 'EdgeColor', 'none');
-xline(pred.criterion_IV, 'r-');
+% xline(pred.criterion_IV, 'r-');
 yline(.5, 'k--');
 ylim([0,1])
 xlabel('Binned IV')
@@ -77,7 +77,7 @@ end
 % Pred (shaded errorbars)
 plot(IV_allBins_med, pC_pred_med, 'k-')
 patch([IV_allBins_med, fliplr(IV_allBins_med)], [pC_pred_lb, fliplr(pC_pred_ub)], 'k', 'FaceAlpha', .2, 'EdgeColor', 'none');
-xline(pred.criterion_IV, 'r-');
+% xline(pred.criterion_IV, 'r-');
 yline(.5, 'k--');
 yline(mean(pC_data_med), 'k-');
 ylim([0,1])
@@ -97,7 +97,7 @@ end
 % Pred (shaded errorbars)
 plot(IV_allBins_med, pA_pred_med, 'k-');
 patch([IV_allBins_med, fliplr(IV_allBins_med)], [pA_pred_lb, fliplr(pA_pred_ub)], 'k', 'FaceAlpha', .2, 'EdgeColor', 'none');
-xline(pred.criterion_IV, 'r-');
+% xline(pred.criterion_IV, 'r-');
 ylim([.5,1])
 xlabel('Binned IV')
 ylabel('pA')
@@ -110,16 +110,20 @@ sgtitle('Figure 1. Metrics as a fxn of binned IV')
 
 %% Plot estimated parameters across iterations
 if ismember(iModelB, [4,5]) % so that 1st param is noise P, 2nd param is criterion
-    figure('Name','Estimated Parameters','Position',[100,100,1200,400]);
+    figure('Name','Estimated Parameters','Position',[100,100,400,400]);
     % for iParam = 1:size(params_est_allB,2)
 
-    iParam = 1;
-    subplot(1, 2, iParam);
-    plot(params_est_allB(:,iParam), '-o');
-    yline(.1, 'r-'); % match noiseP defined in OOD_sim
+    % iParam = 1;
+    % subplot(1, 2, iParam);
+    plot(params_est_allB, '-o');
+    yline(.1, 'r-'); % should match noiseP defined in OOD_sim
+    switch iModelB
+        case 4, ylim([0,10])
+        case 5, ylim([0,1])
+    end
     xlabel('Iteration');
-    ylabel(namesParamsModel_all{iModelB}{iParam});
-    title(['Parameter: ', namesParamsModel_all{iModelB}{iParam}]);
+    ylabel(namesParamsModel_all{iModelB}{1});
+    title(['Parameter: ', namesParamsModel_all{iModelB}{1}]);
 
     % iParam = 2;
     % subplot(1, 2, iParam);

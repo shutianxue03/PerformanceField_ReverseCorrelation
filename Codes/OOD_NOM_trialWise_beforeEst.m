@@ -20,7 +20,7 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function OOD_NOM_Trialwise_beforeEst(isubj, iLocComb, iModelA, IVType, ni, flag_logIV)
+function OOD_NOM_Trialwise_beforeEst(isubj, iLocComb, iModelA, IVType, templateType, flag_PatchMode, ni)
 
 % The previous version is in OOD_NOM_trialWise
 % INPUT
@@ -44,11 +44,10 @@ SX_RC1_setting
 % flag_logIV = 1;
 
 iSess_start = 1; % from which session data is taken into account
-templateType = 1; % (1) raw (2) reconstructed kernel (3) mirrored template
+% templateType = 1; % (1) raw (2) reconstructed kernel (3) mirrored template
 itype_template = 2; % 1=estimate template from PRS trials, ABS trials, or BOTH trials
 convolveType = 1; % IV is calcluated by 1=cross correlation of template and stim energy; 2=convolution [fxn_getIV_v3]
-% IVType = 1; % 1=sum, 2=the max [fxn_getIV_v3]
-flag_PatchMode = 2; %1=use target patches; 2=use noise patches
+% flag_PatchMode = 2; %1=use target patches; 2=use noise patches
 flag_standEnergy = 1; % 1=standardize (z-score) energy
 flag_plot_beforeEst = 1;
 ratio_train = 3/4; % proportion of trials in the training set (to derive 2D kernels); others are in the test set (to estimate params)
@@ -60,7 +59,7 @@ if isnumeric(isubj) % Human subjects
     nblocks_allSubj = [200, 240, 210, 240, 220, 220, 215, 220, 205, 210, 205, 205, 205, 205, 195, 0];
     subjName = subjList{isubj};
     nblocks = nblocks_allSubj(isubj);
-    nameFolder_OOD_load = sprintf('%s/%s', nameFolder_Data_OOD, subjName); % To Load behav & energy
+    nameFolder_OOD_load = sprintf('%s/%s%d', nameFolder_Data_OOD, subjName, nblocks); % To Load behav & energy
     nameFolder_NOM_save = sprintf('%s/%s/L%d', nameFolder_Data_NOM_Trialwise, subjName, iLocComb); % To Save results
 else % IO
     subjName = isubj{1};
@@ -84,7 +83,7 @@ if isnumeric(isubj)
     % behavioral measurement
     load(sprintf('%s/%s%d/%s_behavMeas.mat', nameFolder_Data_OOD, subjName, nblocks, subjName));
     % energy
-    load(sprintf('%s/%s%d/%s_energy_%s_%d_%d.mat', nameFolder_OOD_load, subjName, nblocks, subjName, namePatchMode, nORI, nSF));
+    load(sprintf('%s/%s_energy_%s_%d_%d.mat', nameFolder_OOD_load, subjName, namePatchMode, nORI, nSF));
 else
     % behavioral measurement
     load(sprintf('%s/behavMeas.mat', nameFolder_OOD_load));
@@ -206,23 +205,30 @@ for ii = 1:ni
     end
 
     % 2. Calculate the Internal variable (IV)
-    IV = fxn_getIV_v3(iModelA, e3D_test, convolveType, IVType, template, ORI_bound);
+    IV_test = fxn_getIV_v3(iModelA, e3D_test, convolveType, IVType, template, ORI_bound);
     
     % % Normalize IV
     % IV = (IV - mean(IV)) / std(IV);
 
     % Take log form if needed
-    if flag_logIV, IV = log10(IV); end
-    ndata = length(IV);
+    % if flag_logIV, IV_test = log10(IV_test); end
+    ndata = length(IV_test);
 
     % Bin IV values
-    [nTrials_allBins, ~, iTrial4Bin] = histcounts(IV, nBins);
+    % NOT distinguishing signal-PRS and -ABS trials
+    % [nTrials_allBins, ~, iTrial4Bin] = histcounts(IV_test, nBins); 
+    
+    % distinguishing signal-PRS and -ABS trials
+    [nTrials_PRS_allBins, ~, iTrial4Bin_PRS] = histcounts(IV_test(iPRS_test==1), nBins);
+    [nTrials_ABS_allBins, ~, iTrial4Bin_ABS] = histcounts(IV_test(iPRS_test==0), nBins);
 
     % Compile data for the current iteration
     data.ndata = ndata;
-    data.IV=IV;
-    data.nTrials_allBins = nTrials_allBins;
-    data.iTrial4Bin = iTrial4Bin;
+    data.IV=IV_test;
+    data.nTrials_PRS_allBins = nTrials_PRS_allBins;
+    data.iTrial4Bin_PRS = iTrial4Bin_PRS;
+    data.nTrials_ABS_allBins = nTrials_ABS_allBins;
+    data.iTrial4Bin_ABS = iTrial4Bin_ABS;
     data.iPRS = iPRS_test;
     data.resp = resp_test;
     data.cst = cst_test;

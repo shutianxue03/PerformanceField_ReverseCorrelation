@@ -61,8 +61,9 @@ if isnumeric(isubj)
     nblocks_allSubj = [200, 240, 210, 240, 220, 220, 215, 220, 205, 210, 205, 205, 205, 205, 195, 0];
     subjName = subjList{isubj};
     nblocks = nblocks_allSubj(isubj);
-    nameFolder_NOM = sprintf('%s/ORI%dSF%d/%s/L%d', nameFolder_NOM0, nORI, nSF, subjName, iLocComb);
+    % nameFolder_NOM = sprintf('%s/ORI%dSF%d/%s/L%d', nameFolder_NOM0, nORI, nSF, subjName, iLocComb);
     % nameFolder_OOD_load = sprintf('%s/%s', nameFolder_Data_OOD, subjName); % To Load behav & energy
+    nameFolder_OOD_load = sprintf('%s/%s', nameFolder_Data_OOD, subjName); % To load behav & energy
     nameFolder_NOM_save = sprintf('%s/%s/L%d', nameFolder_Data_NOM_Trialwise, subjName, iLocComb); % To Save results
 else % IO
     subjName = isubj{1};
@@ -88,11 +89,12 @@ load(nameFile_beforeEst, 'data_allB', 'c_zscore')
 
 %% Set up the data-restricted upper and lower bound
 switch iModelB
-    case 1, params0 = [lapse0, SDadd0, c0]; params_lb = [lapse_lb, SDadd_lb, c_lb]; params_ub = [lapse_ub, SDadd_ub, c_ub];
-    case 2, params0 = [lapse0, Nmul0, c0]; params_lb = [lapse_lb, Nmul_lb, c_lb]; params_ub = [lapse_ub, Nmul_ub, c_ub];
-    case 3, params0 = [lapse0, c0]; params_lb=[lapse_lb, c_lb]; params_ub=[lapse_ub, c_ub];
+    case 1, params0 = [lapse0, SDadd0]; params_lb = [lapse_lb, SDadd_lb]; params_ub = [lapse_ub, SDadd_ub];
+    case 2, params0 = [lapse0, Nmul0]; params_lb = [lapse_lb, Nmul_lb]; params_ub = [lapse_ub, Nmul_ub];
+    case 3, params0 = [lapse0]; params_lb=[lapse_lb]; params_ub=[lapse_ub];
     case 4, params0 = [SDadd0]; params_lb = [SDadd_lb]; params_ub = [SDadd_ub]; % not fitting lapse rate
     case 5, params0 = [Nmul0]; params_lb = [Nmul_lb]; params_ub = [Nmul_ub]; % not fitting lapse rate
+    case 6, params0 = [SDadd0, Nmul0]; params_lb = [SDadd_lb, Nmul_lb]; params_ub = [SDadd_ub, Nmul_ub]; % not fitting lapse rate
 end
 
 %% Preallocate variables
@@ -105,7 +107,7 @@ pred_metrics_allB = cell(ni, 1);
 
 %% Loop through each iteration
 fprintf('  ======== ESTIMATION ======== \n[L%d ModelA%dB%d] Running ni = %d: ', iLocComb, iModelA, iModelB, ni)
-parfor ii = 1:ni
+for ii = 1:ni
     fprintf('%d ', ii)
 
     data = data_allB{ii};

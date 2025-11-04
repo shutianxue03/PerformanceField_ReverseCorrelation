@@ -31,16 +31,19 @@ iModelB_sim_allCond = [5]; % 1=estimate lapse rate, 2=estimate additive noise (S
                             % 4=estimate additive noise (SDadd);
                             % 5=estimate multiplicative noise (Nmul);
                             % 6=estimate both multiplicative and additive noise;
+templateType = 3; % (1) raw (2) reconstructed kernel (3) mirrored template
 IVType_true = [1, 2]; % 1=sum of the dot product/convolution; 2=max; 3=normalized
+flag_PatchMode = 1; if flag_PatchMode == 1, patchMode = 'T'; else, patchMode = 'N'; end
+% patchMode = 'T'; % 'T'=energy calculated from target-patches; 'N'=from noise patches
 
 %%
-noiseCST=.2; gaborCST=.2; nTrials=8e3; noiseP=.1; iModelB_sim=iModelB_sim_allCond; IVType_true=1;
+noiseCST=.2; gaborCST=.2; nTrials=8e3; noiseP=.1; iModelB_sim=5; IVType_true=1;
 
 convolveType_true = 1; % 1=dot product, 2=convolution; %used in fxn_getIV_v3
-modelA_true = 3; % as long as modelA_true ~= 2; matters for fxn_getIV_v3
-flag_logIV = 0;
-nIterations = 20; % Number of iterations for simulating the data & fitting the model
+modelA_true = 3; % as long as modelA_true is not 2; matters for fxn_getIV_v3
+nIterations = 10; % Number of iterations for simulating the data & fitting the model
 flag_fminconORbads = 2; % 1=use fmincon when fitting NOM to data, faster; 2=bads, slower but better
+% flag_logIV = 0;
 
 clc, close all
 time_start = datetime('now')
@@ -78,7 +81,6 @@ pC_titrate = .7; % the accuracy at which threshold is measured
 iModelA_fit_all = iModelA_sim_allCond;% 1=core model, 2=randomize template, 3=use IO template
 iModelB_fit_all = iModelB_sim_allCond; % make them consistent for now; later try differ modelB for model recovery
 iLocComb = 1;
-patchMode = 'N'; % 'T'=energy calculated from target-patches; 'N'=from noise patches
 
 % Define the noise sampling range based on pre-set values
 noise.SF_low_sampling = noise.SF_low;
@@ -155,6 +157,7 @@ fprintf('\n Created a pool of Gabor filters: nORI=%d, nSF=%d\n', length(filtersO
 template_gabor_true = exp_CreateGabor(stim, stim.gaborCST);
 template_true = SX_RC4_Energy_parfor(stim.mask, {template_gabor_true}, filter_sin, filter_cos);
 template_true = squeeze(template_true);  %  Remove singleton dimension
+template_true = fxn_getTemplate(template_true, templateType, 0);
 
 % Normalize template (to match the value scale of derived template in OOD_xx_beforeEst)
 template_true = template_true / max(template_true(:)) * 0.2; % scale the signal energy to roughly match the range of templates derived from subj data
@@ -185,9 +188,9 @@ mask = stim.mask;
 ratio_base = noise.ratio_base;
 ratio_gaborInTgt = noise.ratio_gaborInTgt;
 
-% Loop through each pair of trials
+%% Loop through each pair of trials
 fprintf('\n Running simulation (%d pairs): \n', nPairs)
-for iPair = 1:nPairs
+parfor iPair = 1:nPairs
 
     % Create the signal Gabor patch
     % gabor = exp_CreateGabor(stim, stim.gaborCST, 0);
@@ -282,8 +285,8 @@ fprintf('\n Saved simulated 3D energy (%d trials) \n', nTrials)
 %     case 'N', IV_sim_allT = IV_noise_sim_allT;
 % end
 
-% !!! I should be using the energy WITHOUT signal to predict response!!!
-IV_sim_allT = IV_noise_sim_allT;
+% I should be using the energy with the signal to predict response
+IV_sim_allT = IV_target_sim_allT;
 
 % Add noise to the internal variable (IV) to simulate trial-by-trial variability
 switch iModelB_sim
@@ -295,8 +298,7 @@ switch iModelB_sim
 end
 
 % Sample and add internal noise to IV
-% noisyIV_sim_allT = IV_sim_allT + randn(size(IV_sim_allT)) * SDadd + randn(size(IV_sim_allT)).* (IV_sim_allT*Nmul);
-noisyIV_sim_allT =IV_sim_allT + randn(size(IV_sim_allT)) .* sqrt(SDadd^2+ (IV_sim_allT.*Nmul).^2); % this is mathematically equivalent to the above line
+noisyIV_sim_allT =IV_sim_allT + randn(size(IV_sim_allT)) .* sqrt(SDadd^2+ (IV_sim_allT.*Nmul).^2); 
 
 %% Derive response given noisy IVs
 % Do a simple fitting to determine the criterion_true so that accuracy matches a certain level
@@ -375,11 +377,12 @@ plot(IV_sim_allT, resp_allT, 'ro', 'displayname', 'Binary response (0 or 1)')
 plot(IV_sim_allT, pYES_pred_allT, 'k+', 'displayname', 'Pred pYES')
 xline(criterion_true, 'linewidth', 2, 'displayname', 'True criterion'); 
 xlabel('IV space'), ylabel('pYES')
+yline(.5, 'k--')
 xlim([min(noisyIV_sim_allT), max(noisyIV_sim_allT)])
-metrics_sim_ = metrics_sim; metrics_sim_(3:6) = metrics_sim_(3:6)*100;
+metrics_sim_ = metrics_sim; metrics_sim_(3:end) = metrics_sim_(3:end)*100;
 % add legend
 legend('show', 'location', 'best')
-sgtitle(sprintf('IV 95%% CI [%.1f, %.1f] Median = %.1f\n[TRUE] GaborCST=%.0f%%, criterion=%.1f, %s=%.2f\n[MEASURED] criterion=%.1f, pC=%.0f%%, pHit=%.0f%%, pFA=%.0f%%, pA=%.0f%%', ...
+sgtitle(sprintf('IV 95%% CI [%.1f, %.1f] Median = %.1f\n[TRUE] GaborCST=%.0f%%, criterion=%.1f, %s=%.2f\n[MEASURED] criterion=%.1f, pC=%.0f%%, pHit=%.0f%%, pFA=%.0f%%, pA=%.0f%%, pYES=%.0f%%', ...
     round(quantile(noisyIV_sim_allT, [.05, .95, .5]), 1), ...
     gaborCST*100, criterion_true, namesParamsModel_all{iModelB_sim}{1}, noiseP, ...
     metrics_sim_(2:end)))
@@ -388,9 +391,9 @@ sgtitle(sprintf('IV 95%% CI [%.1f, %.1f] Median = %.1f\n[TRUE] GaborCST=%.0f%%, 
 % saveas(gcf, sprintf('%s/%s.jpg', nameFolder_Fig_hist, nameCond_NOM))
 
 %% Standardize the energy to normalize across trials
-switch patchMode
-    case 'T', e3D_allT = e3D_target_allT;
-    case 'N', e3D_allT = e3D_noise_allT;
+switch flag_PatchMode
+    case 1, e3D_allT = e3D_target_allT;
+    case 2, e3D_allT = e3D_noise_allT;
 end
 e3D_norm = normEnergy(e3D_allT, dataMatrix(:, 11), iPRS_allT);
 % size of e3D_norm is nTrials x nORI x nSF (some-k x 29 x 29)
@@ -398,6 +401,7 @@ e3D_norm = normEnergy(e3D_allT, dataMatrix(:, 11), iPRS_allT);
 
 % Perform reverse correlation to derive kernels (templates) for signal-present and signal-absent trials
 kernels2D = SX_RC6_kernel_parfor(e3D_norm, dataMatrix, filtersSF_all, filtersOri_all);
+kernels2D = fxn_getTemplate(kernels2D, templateType, 0);
 % size of kernels2D: nTypes x nORI x nSF
 
 % Save the derived kernels for future use
@@ -412,13 +416,14 @@ fprintf('\n\n============= Fit the trial-wise model to simulated data ==========
 for iModelA_fit = iModelA_fit_all
 
     % Simulate data and derive template via RC using the training set
-    OOD_NOM_Trialwise_beforeEst({nameIO, criterion_true}, iLocComb, iModelA_fit, IVType_true, nIterations, flag_logIV);
+    OOD_NOM_Trialwise_beforeEst({nameIO, criterion_true}, iLocComb, iModelA_fit, IVType_true, templateType, flag_PatchMode, nIterations);
 
     for iModelB_fit = iModelB_fit_all
         % Predict response of the testing set, using the derived template
         OOD_NOM_Trialwise_Est({nameIO, criterion_true}, iLocComb, iModelA_fit, iModelB_fit, nIterations, flag_fminconORbads)
     end
 end
+
 fprintf('\n\n============= CRITERION=%.1f DONE =============\n\n', criterion_true)
 % end % criterion
 

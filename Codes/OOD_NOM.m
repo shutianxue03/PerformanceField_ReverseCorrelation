@@ -37,11 +37,17 @@ iSess_start = 6; % from which session data is taken into account
 minResample = 1;
 flagConstrainThresh=0;
 
+Nmul0 = .1;
+Nmul_lb = 0;
+Nmul_ub = 1;
 switch iModelB
-    case 4, params0=[nan];params_lb=[nan];params_ub=[nan];
+    % case 4, params0=[nan];params_lb=[nan];params_ub=[nan];
     case 1, params0 = [1, .5, nan]; params_lb = [1e-5, 1e-5, nan]; params_ub = [5, 2, nan];
     case 2, params0 = [.5, nan]; params_lb = [1e-5, nan]; params_ub = [5, nan];
     case 3, params0 = [1, nan]; params_lb = [1e-5, nan]; params_ub = [5, nan];
+        case 4, params0 = [SDadd0]; params_lb = [SDadd_lb]; params_ub = [SDadd_ub]; % not fitting lapse rate
+    case 5, params0 = [Nmul0]; params_lb = [Nmul_lb]; params_ub = [Nmul_ub]; % not fitting lapse rate
+        
 end
 
 %%

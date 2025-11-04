@@ -1,4 +1,4 @@
-function OOD_NOM_Trialwise(isubj, iLocComb, iModelA, ni)
+function OOD_NOM_Trialwise(isubj, iLocComb, iModelA,nIterations)
 
 % OOD_NOM_trialWise: This function generates IVs and fits different models to them.
 % Inputs:
@@ -7,16 +7,24 @@ function OOD_NOM_Trialwise(isubj, iLocComb, iModelA, ni)
 %      iModelA: 1=core model, 2=permuted template, 3=use IO template
 %      ni: number of iterations
 
-% generate IVs
+%% Generate IVs
 fprintf('\n\n=====================\nGenerating IVs\n=====================\n\n')
-nameFolder_Data = '/Volumes/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC/Data';
-% nameFolder_NOM0 = 'Data_NOM_trialWise';
-OOD_NOM_Trialwise_beforeEst(isubj, iLocComb, iModelA, ni, nameFolder_Data, nameFolder_NOM0);
 
-% fit different models to IVs and make predictions
-iModelB_all = 1:5; % 1=only constant noise; 2=only induced noise;3=no noise ()only lapse rate and criterion); 4=constant noise + criterion; 5=induced noise +criterion
+% The settings below can be placed in SX_RC1_setting
+IVType = 1;            % 1=sum of the dot product/convolution; 2=max; 3=normalized
+templateType = 1; % (1) raw (2) reconstructed kernel (3) mirrored template
+flag_fminconORbads = 2; % 1=use fmincon when fitting NOM to data, faster; 2=bads, slower but better
+
+%------------------------------%
+OOD_NOM_Trialwise_beforeEst(isubj, iLocComb, iModelA, IVType, templateType, nIterations);
+%------------------------------%
+
+%% Fit different models to IVs and make predictions
+iModelB_all = 5; % 4=only SDadd; 5=only Nmul
 for iModelB=iModelB_all
     fprintf('\n\n=====================\nModelB #%d\n=====================\n\n', iModelB)
-    OOD_NOM_Trialwise_Est(isubj, iLocComb, iModelA, iModelB, ni, nameFolder_Data, nameFolder_NOM0)
+    %------------------------------%
+    OOD_NOM_Trialwise_Est(isubj, iLocComb, iModelA, iModelB, nIterations, flag_fminconORbads)
+    %------------------------------%
 end
-end
+
