@@ -33,6 +33,9 @@ switch iModelB
         Nmul = params_est(1);
         SDadd=0;
         % criterion = params_est(2);
+    case 6 % multiplicative and constant noise
+        Nmul = params_est(1);
+        SDadd = params_est(2);
 end
 
 %% Extract data variables

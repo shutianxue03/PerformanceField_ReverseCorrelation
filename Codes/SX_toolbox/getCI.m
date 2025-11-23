@@ -15,7 +15,7 @@ if nargin < 5, ntrialsProp = 1; end
 if nargin < 6, CI_level = .68; end
 
 %%
-if errType == 2, nsubj = size(mat, 1); end
+if errType == 2, nsubj = size(mat, dim); end
 
 switch errType
     case 1 % get median and 68% CI
@@ -27,7 +27,7 @@ switch errType
         
     case 2 % get mean and SEM
         ave = squeeze(nanmean(mat, dim));
-        SEM_neg = squeeze(nanstd(mat, [], 1))/sqrt(nsubj);
+        SEM_neg = squeeze(nanstd(mat, [], dim))/sqrt(nsubj);
         SEM_pos = SEM_neg;
         lb = ave - SEM_neg;
         ub = ave + SEM_pos;

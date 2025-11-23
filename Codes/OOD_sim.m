@@ -13,6 +13,8 @@
 %               3 = estimate lapse rate and criterion;
 %               4 = estimate additive noise (SDadd) and criterion;
 %               5 = estimate multiplicative noise (Nmul) and criterion;
+%               6 = estimate multiplicative noise (Nmul) and SDadd;
+%               7 = estimate multiplicative noise (Nmul) and SDadd, and a corr param reflecting shared noise across passes;
 % Outputs:
 %       Simulated data and energy profiles saved in the specified directories.
 
@@ -33,6 +35,7 @@ iModelB_sim_allCond = iModelB_sim; % 1=estimate lapse rate, 2=estimate additive 
 %                             % 4=estimate additive noise (SDadd);
 %                             % 5=estimate multiplicative noise (Nmul);
 %                             % 6=estimate both multiplicative and additive noise;
+%                             % 7=estimate both multiplicative and additive noise, and a shared noise across passes;
 templateType_true = 1; % (1) raw (2) reconstructed kernel (3) mirrored template
 IVType_true = 1; % 1=sum of the dot product/convolution; 2=max; 3=normalized
 itype_template_true = 2; % 1=estimate template from PRS trials, ABS trials, or BOTH trials
@@ -43,7 +46,7 @@ convolveType_true = 1; % 1=dot product, 2=convolution; %used in fxn_getIV_v3
 flag_PatchMode_true = 1; if flag_PatchMode_true == 1, patchMode = 'T'; else, patchMode = 'N'; end % T'=energy calculated from target-patches; 'N'=from noise patches
 
 modelA_true = 3; % as long as modelA_true is not 2; matters for fxn_getIV_v3
-nIterations = 2; % Number of iterations for simulating the data & fitting the model
+nIterations = 10; % Number of iterations for simulating the data & fitting the model
 flag_fminconORbads = 2; % 1=use fmincon when fitting NOM to data, faster; 2=bads, slower but better
 % flag_logIV = 0;
 
@@ -55,6 +58,7 @@ rng(1)
 
 % Add paths for custom functions
 addpath(genpath('fxn_exp'))  % Path to experimental functions
+addpath(genpath('fxn_NOM'))  % Path to experimental functions
 addpath(genpath('fxn_analysis_RC_v2'))  % Path to analysis functions
 addpath(genpath('SX_toolbox'))  % Path to analysis functions
 
@@ -62,13 +66,29 @@ addpath(genpath('SX_toolbox'))  % Path to analysis functions
 %--------------%
 SX_RC1_setting
 %--------------%
+nParams = length(noiseP_true);
 
-fprintf('\nnoiseCST=%.1f, gaborCST=%.1f, nTrials=%d, noiseP=%.3f, iModelB_sim=%d, nORI=%d\n', ...
-    noiseCST, gaborCST, nTrials, noiseP_true, iModelB_sim, nORI)
+switch iModelB_sim
+    case 6
+        fprintf('\nnoiseCST=%.1f, gaborCST=%.1f, nTrials=%d, Nmul=%.3f, SDadd = %.3f, iModelB_sim=%d, nORI=%d\n', ...
+            noiseCST, gaborCST, nTrials, noiseP_true, iModelB_sim, nORI)
+    case 7
+        fprintf('\nnoiseCST=%.1f, gaborCST=%.1f, nTrials=%d, Nmul=%.3f, SDadd = %.3f, sharedN = %.3f, iModelB_sim=%d, nORI=%d\n', ...
+            noiseCST, gaborCST, nTrials, noiseP_true, iModelB_sim, nORI)
+    otherwise
+        fprintf('\nnoiseCST=%.1f, gaborCST=%.1f, nTrials=%d, noiseP=%.3f, iModelB_sim=%d, nORI=%d\n', ...
+            noiseCST, gaborCST, nTrials, noiseP_true, iModelB_sim, nORI)
+end
 
 % Define the IO's name based on stim and condition parameters
-nameIO = sprintf('IO_nC%.0f_gC%.0f_nT%s_N%.3f_B%d', noiseCST*100, gaborCST*100, format_num2exp(nTrials), noiseP_true, iModelB_sim);
-
+switch iModelB_sim
+    case 6
+        nameIO = sprintf('IO_nC%.0f_gC%.0f_nT%s_Nmul%.3f_SDadd%.3f_B%d', noiseCST*100, gaborCST*100, format_num2exp(nTrials), noiseP_true, iModelB_sim);
+    case 7
+        nameIO = sprintf('IO_nC%.0f_gC%.0f_nT%s_Nmul%.3f_SDadd%.3fShared%.3f_B%d', noiseCST*100, gaborCST*100, format_num2exp(nTrials), noiseP_true, iModelB_sim);
+    otherwise
+        nameIO = sprintf('IO_nC%.0f_gC%.0f_nT%s_N%.3f_B%d', noiseCST*100, gaborCST*100, format_num2exp(nTrials), noiseP_true, iModelB_sim);
+end
 % Define folder to save results in Data_OOD
 nameFolder_Data_OOD_IO = sprintf('%s/%s', nameFolder_Data_OOD, nameIO); % nameFolder_Data_OOD is created in SX_RC1_setting
 if isempty(dir(nameFolder_Data_OOD_IO)), mkdir(nameFolder_Data_OOD_IO), end
@@ -297,6 +317,8 @@ switch iModelB_sim
     case 3, Nmul_true=0; SDadd_true=0;
     case 4, Nmul_true=0; SDadd_true=noiseP_true; lapseRate_true = 0;
     case 5, Nmul_true=noiseP_true; SDadd_true=0; lapseRate_true = 0;
+    case 6, Nmul_true=noiseP_true(1); SDadd_true=noiseP_true(2); lapseRate_true = 0;
+    case 7, Nmul_true=noiseP_true(1); SDadd_true=noiseP_true(2); shared = noiseP_true(3); lapseRate_true = 0;
 end
 
 % Sample and add internal noise to IV
@@ -384,10 +406,19 @@ xlim([min(noisyIV_sim_allT), max(noisyIV_sim_allT)])
 metrics_sim_ = metrics_sim; metrics_sim_(3:end) = metrics_sim_(3:end)*100;
 % add legend
 legend('show', 'location', 'best')
-sgtitle(sprintf('IV 95%% CI [%.1f, %.1f] Median = %.1f\n[TRUE] GaborCST=%.0f%%, criterion=%.1f, %s=%.2f\n[MEASURED] criterion=%.1f, pC=%.0f%%, pHit=%.0f%%, pFA=%.0f%%, pA=%.0f%%, pYES=%.0f%%', ...
-    round(quantile(noisyIV_sim_allT, [.05, .95, .5]), 1), ...
-    gaborCST*100, criterion_true, namesParamsModel_all{iModelB_sim}{1}, noiseP_true, ...
-    metrics_sim_(2:end)))
+if iModelB_sim==6
+    sgtitle(sprintf('IV 95%% CI [%.1f, %.1f] Median = %.1f\n[TRUE] GaborCST=%.0f%%, criterion=%.1f, %s=%.2f, %s=%.2f\n[MEASURED] criterion=%.1f, pC=%.0f%%, pHit=%.0f%%, pFA=%.0f%%, pA=%.0f%%, pYES=%.0f%%', ...
+        round(quantile(noisyIV_sim_allT, [.05, .95, .5]), 1), ...
+        gaborCST*100, criterion_true, ...
+        namesParamsModel_all{iModelB_sim}{1}, noiseP_true(1), ...
+        namesParamsModel_all{iModelB_sim}{2}, noiseP_true(2), ...
+        metrics_sim_(2:end)))
+else
+    sgtitle(sprintf('IV 95%% CI [%.1f, %.1f] Median = %.1f\n[TRUE] GaborCST=%.0f%%, criterion=%.1f, %s=%.2f\n[MEASURED] criterion=%.1f, pC=%.0f%%, pHit=%.0f%%, pFA=%.0f%%, pA=%.0f%%, pYES=%.0f%%', ...
+        round(quantile(noisyIV_sim_allT, [.05, .95, .5]), 1), ...
+        gaborCST*100, criterion_true, namesParamsModel_all{iModelB_sim}{1}, noiseP_true, ...
+        metrics_sim_(2:end)))
+end
 
 % Save the figure
 saveas(gcf, sprintf('%s/SimulatedPerfHist.jpg', nameFolder_Fig_IO))

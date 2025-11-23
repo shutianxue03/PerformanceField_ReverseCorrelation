@@ -2,8 +2,8 @@
 % % Script name: SX_RC1_setting.m
 % Script type: script
 % Author: Shutian Xue
-% Date created: 
-% Last updated: 07/16/2025
+
+% Last updated: 11/09/2025
 
 % Description:
 %   This script creates the settings for the PF-RC ANALYSIS pipeline.
@@ -16,14 +16,15 @@
 nORI = 29;
 nSF = nORI;
 
-% Define names of folders to load/save data (on the server)
+%% Define names of folders to load/save data (on the server)
 % if run on HPC
-nameFolder_server = '..';
+% nameFolder_server = '/scratch/sx712/PF_RC';
+
 % if run on server (OOD)
-% nameFolder_server = '/Volumes/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC'; % the server directory of the Data and Figures folders
+nameFolder_server = '/Volumes/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC'; % the server directory of the Data and Figures folders
 
 % if run on local for model simulation
-nameFolder_server = '/Users/xueshutian/Desktop/GitHub_local/PF_RC';
+% nameFolder_server = '/Users/xueshutian/Desktop/GitHub_local/PF_RC';
 
 nameFolder_Data = sprintf('%s/Data', nameFolder_server) ;
 nameFolder_Data_OOD = sprintf('%s/Data_OOD_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
@@ -32,15 +33,16 @@ nameFolder_Data_NOM_Trialwise = sprintf('%s/Data_NOM_Trialwise_%d%d', nameFolder
 % Define names of folders to save figures (on the server)
 nameFolder_Figures = sprintf('%s/Figures', nameFolder_server);
 nameFolder_Figures_NOM = sprintf('%s/NOM_Trialwise_%d%d', nameFolder_Figures, nORI, nSF);
-% if ~exist(nameFolder_Figures_NOM, 'dir'), mkdir(nameFolder_Figures_NOM); end
+% nameFolder_Figures_local = sprintf('/Users/xueshutian/Desktop/GitHub_local/PF_RC/Figures/Temp');
 
+% if ~exist(nameFolder_Figures_NOM, 'dir'), mkdir(nameFolder_Figures_NOM); end
 
 % Print directory names
 % fprintf('\n\nFolder to save analysis outputs\n  >>>%s\n\n', nameFolder_Data_OOD)
 % fprintf('Folder to save NOM outputs\n  >>>%s\n\n', nameFolder_Data_NOM_Trialwise)
 % fprintf('Folder to save Figures\n  >>>%s\n\n\n', nameFolder_Figures_NOM)
 
-% Define the function to normalize Gabor SD
+%% Define the function to normalize Gabor SD
 fxn_getSigma_SPdomain = @(SF) 3 * sqrt(2*log(2)) / (2 * pi * SF);
 % fxn_getSigma_SPdomain = @(SF) SF;
 
@@ -86,7 +88,7 @@ stim.mask = exp_CreateCircularApertureSin(stim);
 
 % Define noise parameters
 noise.noiseCST = .2;
-noise.SF_low = 1;  % Lower limit of SF sampling
+noise.SF_low = 1;  % Lower limit %               6 = estimate multiplicative noise (Nmul) and SDadd;of SF sampling
 noise.SF_high = 4;  % Upper limit of SF sampling
 noise.ppd = ppd;
 noise.sz=sz_dva;
@@ -145,6 +147,27 @@ ncomb4 = 4;
 ncomb2 = 2;
 ncomb6 = 6;
 ncomb8 = 8;
+
+%% NOM fitting
+% Parameter bounds and initial values
+% Internal noise parameters
+Nmul_lb = 1e-5;  Nmul_ub = 2;     % multiplicative noise
+SDadd_lb = 1e-5; SDadd_ub = 30;   % additive noise (20–30 range from sims)
+% Correlation parameter (rhoDV)
+rho_lb  = 1e-5;  rho_ub = 1 - rho_lb;
+
+% Midpoint initial guesses
+Nmul0 = mean([Nmul_lb,  Nmul_ub]);
+SDadd0 = mean([SDadd_lb, SDadd_ub]);
+rho0   = mean([rho_lb,   rho_ub]);
+
+% BADS options
+options_bads = bads('defaults');
+options_bads.Display  = 'none';
+options_bads.Verbosity = 0;
+
+% fmincon options
+options_fmin = optimoptions('fmincon', 'MaxIterations', 1e4, 'Display', 'off');
 
 %% Tuning function params
 % names of the MODEL
@@ -254,16 +277,21 @@ namesParamsMode = {'estP', 'tunC'};
 namesModelA = {'Core', 'RandTemp', 'IO-Core'};
 % nModelsA = length(namesModelA);
 
-namesModelB = {'Constant', 'Induced', 'noNoise', 'ConstantNoLapse', 'InducedNoLapse'};
-% nModelsB = length(namesModelB);
+namesModelB = {'FullModel', 'NoRho', 'NoNoise', 'NoInduced', 'NoInducedNoRho', 'NoConstant', 'NoConstantNoRho'};
+namesParamsModel_all = {...
+    {'Induced noise', 'Additive noise', 'Rho'}, ... 
+    {'Induced noise', 'Additive noise'          }, ...
+    {                                                    'Rho'}, ...
+    {                          'Additive noise', 'Rho'}, ...
+    {                          'Additive noise',         }, ...
+    {'Induced noise',                            'Rho'}, ...
+    {'Induced noise',                                   }};
+
 
 namesParams2 = {'Thresh', 'mu [PRS]', 'sigma [PRS]','mu [ABS]', 'sigma [ABS]'};
 nparams2 = length(namesParams2);
 
-namesParamsModel_all = {{'Lapse rate', 'Constant noise', 'Criterion'}, {'Lapse rate', 'Induced noise', 'Criterion'}, {'Lapse rate', 'Criterion'}, ...
-    {'Constant noise', 'Criterion'}, {'induced noise', 'Criterion'}};
-% namesParamsNOM = {'Induced noise', 'Constant noise', 'Threshold'};
-% namesParamsModel = {'Induced noise', 'Constant noise', 'Threshold'};
+
 namesNormalityTest = {'Raw', 'Exp', 'Sqrt', 'boxcox'}; % reciprocal is deleted
 nNormTests = length(namesNormalityTest);
 
@@ -299,3 +327,4 @@ colors_comb = [
 colorsType = {'r', 'b', 'k'};
 % colors2 = {'r', 'b'};
 colors2 = {[1,0,0], [0,0,1]}; % when only present fovea and peri
+

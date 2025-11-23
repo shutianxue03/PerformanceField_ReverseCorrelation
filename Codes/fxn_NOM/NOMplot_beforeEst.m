@@ -30,32 +30,13 @@
 % This script is intended to be called after running OOD_NOM_Trialwise_beforeEst.m
 % It loads the saved output and generates plots for IV distribution, bin counts, and performance metrics.
 
-%% Figure 1: Distribution of IV and Trial Counts per bins for each iteration
-% figure('Position', [100, 100, 1200, 600])
-% for ii = 1:ni
-%     data = data_allB{ii};
-%     subplot(1,2,1); hold on;
-%     histogram(data.IV, 'Normalization','probability');
-%     % histogram(nthroot(data.IV-min(data.IV),2), 'Normalization','probability');
-%     xlabel('IV (Weight x Stim energy)'); ylabel('Probability');
-%     title(sprintf('Distribution of Internal Variable (IV)\nEach color is a different iteration\n!!!IV does NOT have to be normally distributed!!!'));
-% 
-%     % [h, pValue, Wstat] = swtest(nthroot(data.IV-min(data.IV),2), 0.05)
-% 
-%     subplot(1,2,2); hold on;
-%     bar(data.nTrials_allBins);
-%     xlabel('Bin #'); ylabel('Number of trials');
-%     title('Trial Counts per Bin (Each color is a different iteration)');
-% end
-% set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
-% set(findall(gcf, '-property', 'linewidth'), 'linewidth',2)
-
-%% Figure 2: Performance Metrics across Iterations
+%% Figure 1: Performance Metrics across Iterations
 figure('Position', [100, 100, 2e3, 2e3])
 for iMetric = 1:nmetrics
     subplot(3,3,iMetric)
     plot(data_metrics_allB(:,iMetric),'-o');
-    xlabel('Iteration'); 
+    yline(getCI(data_metrics_allB(:,iMetric), 1, 1),'k-');
+    xlabel('Iteration');
     ylabel(namesMetrics{iMetric})
     title(sprintf('Metric %s across iterations', namesMetrics{iMetric}));
     % Set y-axis limits based on metric type
@@ -74,58 +55,68 @@ for iMetric = 1:nmetrics
 end
 set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
 set(findall(gcf, '-property', 'linewidth'), 'linewidth',2)
-saveas(gcf, sprintf('Figures/PerfPerIteraction.jpg'))
+% saveas(gcf, sprintf('%s/1PerfPerIteraction.jpg', nameFolder_Figures_local))
+sgtitle(sprintf('Figure 1. Measured metrics as a fxn of iteration\n%s (ModelA%d %s, niterations=%d)', ...
+    subjName, iModelA, namesModelA{iModelA}, nIterations))
+saveas(gcf, sprintf('%s/1MetricMeasured_%s_A%d.jpg', nameFolder_Figures_NOM, subjName, iModelA))
 
-%% Figure 3: 2D Kernel Visualization
-kernel2D_ave = squeeze(mean(kernel2D_allB, 1));
+%% Figure 2: 2D Kernel
 
-figure('Position', [100, 100, 2e3, 600])   
+% if exist('template_true', 'var')
+    kernel2D_ave = squeeze(mean(kernel2D_allB, 1));
 
-subplot(1,3,1), hold on
-imagesc(axis_tuning{2}, axis_tuning{1}, template_true), axis square, colorbar, clim([0, .2])
-xline(1, 'r-'); % log gabor SF
-yline(0, 'r-'); % Gabor ori
-xlabel('Spatial Frequency'), ylabel('Orientation')
-xticks(axisTicks_tuning{2}), xticklabels(axisTL_tuning{2})
-yticks(axisTicks_tuning{1}), yticklabels(axisTL_tuning{1})
-title('True template')
+    figure('Position', [100, 100, 2e3, 600])
 
-subplot(1,3,2), hold on
-imagesc(axis_tuning{2}, axis_tuning{1}, kernel2D_ave), axis square, colorbar, clim([0, .2])
-xline(1, 'r-'); % log gabor SF
-yline(0, 'r-'); % Gabor ori
-xlabel('Spatial Frequency'), ylabel('Orientation')
-xticks(axisTicks_tuning{2}), xticklabels(axisTL_tuning{2})
-yticks(axisTicks_tuning{1}), yticklabels(axisTL_tuning{1})
-title(sprintf('Derived template (averaged across %d iterations)', ni))
+    subplot(1,3,1), hold on
+    imagesc(axis_tuning{2}, axis_tuning{1}, template_true), axis square, colorbar, %clim([0, .2])
+    xline(1, 'r-'); % log gabor SF
+    yline(0, 'r-'); % Gabor ori
+    xlabel('Spatial Frequency'), ylabel('Orientation')
+    xticks(axisTicks_tuning{2}), xticklabels(axisTL_tuning{2})
+    yticks(axisTicks_tuning{1}), yticklabels(axisTL_tuning{1})
+    title('True template')
 
-subplot(1,3,3), hold on
-imagesc(axis_tuning{2}, axis_tuning{1}, kernel2D_ave-template_true), axis square, colorbar
-xline(1, 'r-'); % log gabor SF
-yline(0, 'r-'); % Gabor ori
-xlabel('Spatial Frequency'), ylabel('Orientation')
-xticks(axisTicks_tuning{2}), xticklabels(axisTL_tuning{2})
-yticks(axisTicks_tuning{1}), yticklabels(axisTL_tuning{1})
-title('Difference between the derived and the true template')
+    subplot(1,3,2), hold on
+    imagesc(axis_tuning{2}, axis_tuning{1}, kernel2D_ave), axis square, colorbar, %clim([0, .2])
+    xline(1, 'r-'); % log gabor SF
+    yline(0, 'r-'); % Gabor ori
+    xlabel('Spatial Frequency'), ylabel('Orientation')
+    xticks(axisTicks_tuning{2}), xticklabels(axisTL_tuning{2})
+    yticks(axisTicks_tuning{1}), yticklabels(axisTL_tuning{1})
+    title(sprintf('Derived template (averaged across %d iterations)', nIterations))
 
-set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
-set(findall(gcf, '-property', 'linewidth'), 'linewidth',2)
+    subplot(1,3,3), hold on
+    imagesc(axis_tuning{2}, axis_tuning{1}, kernel2D_ave-template_true), axis square, colorbar
+    xline(1, 'r-'); % log gabor SF
+    yline(0, 'r-'); % Gabor ori
+    xlabel('Spatial Frequency'), ylabel('Orientation')
+    xticks(axisTicks_tuning{2}), xticklabels(axisTL_tuning{2})
+    yticks(axisTicks_tuning{1}), yticklabels(axisTL_tuning{1})
+    title('Difference between the derived and the true template')
 
-% Calculate Pearson's corr
-r_all = nan(ni, 1);
-p_all = r_all;
-for ii = 1:ni
-    kA = kernel2D_allB(ii, :, :);
-    kA = kA(:);
-    kB = template_true(:);
-    [r, p] = corr(kA, kB);
-    r_all(ii) = r;
-    p_all(ii) = p;
-end
-[r_ave, ~, ~, r_SEM] = getCI(r_all, 2, 1);
-[p_ave, ~, ~, p_SEM] = getCI(p_all, 2, 1);
-sgtitle(sprintf('Averaged Pearson''s corr: r=%.2f (%.2f), p=%.3f (%.2f)', r_ave, r_SEM, p_ave, p_SEM))
+    set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
+    set(findall(gcf, '-property', 'linewidth'), 'linewidth',2)
 
-saveas(gcf, sprintf('Figures/RecoveredTemplate_AveIteraction.jpg'))
-% sgtitle('NOM Trialwise Output Visualization');
+    % Calculate Pearson's corr
+    r_all = nan(nIterations, 1);
+    p_all = r_all;
+    for ii = 1:nIterations
+        kA = kernel2D_allB(ii, :, :);
+        kA = kA(:);
+        kB = template_true(:);
+        [r, p] = corr(kA, kB);
+        r_all(ii) = r;
+        p_all(ii) = p;
+    end
+    [r_ave, ~, ~, r_SEM] = getCI(r_all, 2, 1);
+    [p_ave, ~, ~, p_SEM] = getCI(p_all, 2, 1);
+    
 
+    sgtitle(sprintf('Figure 2. Recovered template\n%s (ModelA%d %s, niterations=%d)\nAveraged Pearson''s corr: r=%.2f (%.2f), p=%.3f (%.2f)', ...
+    subjName, iModelA, namesModelA{iModelA}, nIterations, r_ave, r_SEM, p_ave, p_SEM))
+
+    % saveas(gcf, sprintf('%s/2RecoveredTemplate_AveIteraction_%s_A%dB%d.jpg', nameFolder_Figures_local))
+    saveas(gcf, sprintf('%s/2Template_%s_A%d.jpg', nameFolder_Figures_NOM, subjName, iModelA))
+    % sgtitle('NOM Trialwise Output Visualization');
+
+% end

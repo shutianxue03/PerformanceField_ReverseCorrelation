@@ -1,12 +1,12 @@
 #!/bin/bash
-# Created by Shutian Xue on 07/16/2025
-# Last modified by Shutian Xue on 07/16/2025
+# Created by Shutian Xue on 11/23/2025
+# Last modified by Shutian Xue on 11/23/2025
 
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=32G
 #SBATCH --time=1:00:00
-#SBATCH --output=zzz_Sim_%j.out
+#SBATCH --output=zzz_NOM_%j.out
 #SBATCH --mail-user=vivanxuest@gmail.com
 #SBATCH --mail-type=END
 
@@ -25,13 +25,12 @@ echo "job name: $SLURM_JOB_NAME"
 cat<<EOF | srun matlab -nodisplay
 
 %===============
-noiseCST=$1;
-gaborCST=$2;
-nTrials=$3;
-noiseP=$4;
-iModelB_sim=$5;
+isubj=$1;
+iLocComb=$2;
+iModelA=$3;
+nIterations=$4;
 
-OOD_sim(noiseCST, gaborCST, nTrials, noiseP, iModelB_sim)
+OOD_NOM_Trialwise(isubj, iLocComb, iModelA, nIterations)
 
 %===============
 exit

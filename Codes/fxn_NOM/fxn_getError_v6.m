@@ -22,12 +22,15 @@ switch iModelB
         Nmul = 0;
         SDadd = 0;
         lambda = params_est(1);
-    case 4 % additive noise, criterion
+    case 4 % additive noise
         Nmul = 0;
         SDadd = params_est(1);
-    case 5 % multiplicative noise, criterion
+    case 5 % multiplicative noise
         Nmul = params_est(1);
         SDadd=0;
+    case 6 % multiplicative and constant noise
+        Nmul = params_est(1);
+        SDadd = params_est(2);
 end
 
 %% Extract data variables (saved in a struct in OOD_NOM_Trialwise_beforeEst)
@@ -60,7 +63,7 @@ for iUnik = 1:nUnik
     respA = resp_data(iTrialAB(1)); % Response of the first trial in this pair
     respB = resp_data(iTrialAB(2)); % Response of the second trial in this pair
     consistency(iUnik) = respA == respB; % 1 if consistent, 0 if not
-    pYES_pred_A = pYES_pred(iTrialAB(1)); 
+    pYES_pred_A = pYES_pred(iTrialAB(1));
     pYES_pred_B = pYES_pred(iTrialAB(2));
     assert(pYES_pred_A == pYES_pred_B, 'Predicted probabilities for pair trials should match');
     pYES_pred_pair(iUnik) = pYES_pred_A; % Store predicted probability for pair

@@ -18,7 +18,7 @@ gaborCST_all = [.1, .5]; % Gabor contrast sensitivity thresholds
 nTrials_all = [5000]; % Number of trials per condition
 noiseP_all = [0, 0.1, 0.2]; % Proportion of noise trials
 iModelA_sim_all = [1,3]; % 1=core model, 2=randomize template, 3=use IO template
-iModelB_sim_all = [4];
+iModelB_sim_all = [];
 %               1 = estimate lapse rate, additive noise (SDadd) and criterion;
 %               2 = estimate lapse rate, multiplicative noise (Nmul) and criterion;
 %               3 = estimate lapse rate and criterion;
@@ -65,7 +65,7 @@ nsubj = length(subjList);
 % end
 
 % Names of the performance metrics being analyzed
-namesMetrics = {'pC', 'pYES', 'pA'};
+namesMetrics = {'pYES', 'pC', 'pA'};
 nMetrics = length(namesMetrics);
 nModelsA = 3; % do not use length()!!
 nModelsB = 5; % do not use length()!!
