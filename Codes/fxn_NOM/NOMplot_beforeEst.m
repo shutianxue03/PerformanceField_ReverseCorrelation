@@ -74,9 +74,10 @@ for iMetric = 1:nmetrics
 end
 set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
 set(findall(gcf, '-property', 'linewidth'), 'linewidth',2)
+saveas(gcf, sprintf('Figures/PerfPerIteraction.jpg'))
 
 %% Figure 3: 2D Kernel Visualization
-kernel2D_ave = squeeze(mean(kernel2D_all, 1));
+kernel2D_ave = squeeze(mean(kernel2D_allB, 1));
 
 figure('Position', [100, 100, 2e3, 600])   
 
@@ -107,8 +108,24 @@ xticks(axisTicks_tuning{2}), xticklabels(axisTL_tuning{2})
 yticks(axisTicks_tuning{1}), yticklabels(axisTL_tuning{1})
 title('Difference between the derived and the true template')
 
-
 set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
 set(findall(gcf, '-property', 'linewidth'), 'linewidth',2)
 
+% Calculate Pearson's corr
+r_all = nan(ni, 1);
+p_all = r_all;
+for ii = 1:ni
+    kA = kernel2D_allB(ii, :, :);
+    kA = kA(:);
+    kB = template_true(:);
+    [r, p] = corr(kA, kB);
+    r_all(ii) = r;
+    p_all(ii) = p;
+end
+[r_ave, ~, ~, r_SEM] = getCI(r_all, 2, 1);
+[p_ave, ~, ~, p_SEM] = getCI(p_all, 2, 1);
+sgtitle(sprintf('Averaged Pearson''s corr: r=%.2f (%.2f), p=%.3f (%.2f)', r_ave, r_SEM, p_ave, p_SEM))
+
+saveas(gcf, sprintf('Figures/RecoveredTemplate_AveIteraction.jpg'))
 % sgtitle('NOM Trialwise Output Visualization');
+

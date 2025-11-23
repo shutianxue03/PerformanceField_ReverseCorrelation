@@ -65,12 +65,11 @@ pC_pred(iPRS==0) = 1-pYES_pred(iPRS==0); % for ABS trials (iPRS==0), pC=1-pYES
 % Compute predicted pA based on predicted pYES
 pA_pred = pYES_pred.^2 + (1-pYES_pred).^2;
 
-% Predict dprime
-% dprime_pred = norminv(pYES_pred(iPRS==1)) - norminv(pYES_pred(iPRS==0));
-% dprime_pred(isinf(dprime_pred)) = NaN; % Handle infinite values from norminv
-
-%% Bin data to calculate predicted and measured pC and pA for each bin
+%% Bin data and calculate predicted and measured pC and pA for each bin
 % load binning info
+nTrials_allBins = data.nTrials_allBins;
+iTrial4Bin = data.iTrial4Bin;
+
 nTrials_PRS_allBins = data.nTrials_PRS_allBins;
 iTrial4Bin_PRS = data.iTrial4Bin_PRS;
 
@@ -79,17 +78,25 @@ iTrial4Bin_ABS = data.iTrial4Bin_ABS;
 
 % Verify if paired trials are in the same bin
 iPair_PRS = iPair(iPRS==1); % Get iPair of signal-PRS trials
-iPair_PRS = iPair_PRS(iTrial4Bin_PRS); % Get iPair of a bin
-for iind = 1:length(iTrial4Bin_PRS)
-    
-    iBin_A = iTrial4Bin_PRS(iind);
-    iTrialB = find(iPair_PRS==iPair_PRS(iind));
-    assert(length(iTrialB)==2, 'ALERT: There are more than two trials in the same pass!')
-    iTrialB = iTrialB(2); % This is wrong!! iTrialB has 270 elements, not 2!! 
-    iBin_B = iTrial4Bin_PRS(iTrialB);
-    if iBin_A ~= iBin_B
-        fprintf('Trial%d: Bin%d and %d\n', iind, iBin_A, iBin_B) % confirming that two trials of one pair are in the same bins
-    end
+indPair = unique(iPair_PRS);
+nPairs = length(indPair);
+for iiPair = 1:nPairs
+    iTrial_PassAB = iPair_PRS == indPair(iiPair); assert(sum(iTrial_PassAB)==2)
+    iTrial_PassAB = find(iTrial_PassAB==1);
+    iBin_PassA = iTrial4Bin_PRS(iTrial_PassAB(1));
+    iBin_PassB = iTrial4Bin_PRS(iTrial_PassAB(2));
+    assert(iBin_PassA == iBin_PassB, 'ALERT: two trials in a pair do not belong to the same bin!') % confirming that two trials of one pair are in the same bins
+end
+
+iPair_ABS = iPair(iPRS==0); % Get iPair of signal-ABS trials
+indPair = unique(iPair_ABS);
+nPairs = length(indPair);
+for iiPair = 1:nPairs
+    iTrial_PassAB = iPair_ABS == indPair(iiPair); assert(sum(iTrial_PassAB)==2)
+    iTrial_PassAB = find(iTrial_PassAB==1);
+    iBin_PassA = iTrial4Bin_ABS(iTrial_PassAB(1));
+    iBin_PassB = iTrial4Bin_ABS(iTrial_PassAB(2));
+    assert(iBin_PassA == iBin_PassB, 'ALERT: two trials in a pair do not belong to the same bin!') % confirming that two trials of one pair are in the same bins
 end
 
 % Initialize containers for binned values
@@ -100,14 +107,8 @@ pC_pred_allBins = pYES_pred_allBins;
 pC_data_allBins = pYES_pred_allBins;
 pA_pred_allBins = pYES_pred_allBins;
 pA_data_allBins = pYES_pred_allBins;
-% dprime_pred_allBins = pYES_pred_allBins;
-% dprime_data_allBins = pYES_pred_allBins;
 
-% Calculate binned values
-iTrial4Bin = iTrial4Bin_PRS;
-nTrials_allBins =nTrials_PRS_allBins;
-resp_data = resp_data(i)
-, iPair
+% Calculate metrics for each bin
 for iBin = 1:nBins
     indTrial = iTrial4Bin==iBin;
     assert(nTrials_allBins(iBin) == sum(indTrial), 'Error: inconsistent number of trials per bin!')
@@ -128,46 +129,7 @@ for iBin = 1:nBins
     nUnik = length(iPair_perBin_unik);
     respC_perBin = nan(nUnik, 1);
     for iUnik = 1:nUnik
-        iTrialAB=find(iPair_perBin==iPair_perBin_unik(iUnik));
-        respC_perBin(iUnik) = resp_perBin(iTrialAB(1)) == resp_perBin(iTrialAB(2));
-    end
-    pA_data_allBins(iBin) = mean(respC_perBin);
-    %------------------------------------------
-end % iBin
- iTrial4Bin = iTrial4Bin_ABS;
- nTrials_allBins =nTrials_ABS_allBins;
-for iBin = 1:nBins
-    indTrial = iTrial4Bin==iBin;
-    assert(nTrials_allBins(iBin) == sum(indTrial), 'Error: inconsistent number of trials per bin!')
-    IV_allBins(iBin) = mean(IV(indTrial)); % Average IV for bin (should this be weighted by nTrials?)
-
-    pYES_pred_allBins(iBin) = mean(pYES_pred(indTrial)); % Predicted accuracy
-    pYES_data_allBins(iBin) = mean(resp_data(indTrial)); % Measured accuracy
-
-    % dprime_pred_allBins(iBin) = mean(dprime_pred(indTrial)); % Predicted dprime
-    %
-    % % calculate measured dprime for each bin using iPRS and correctness
-    % correctness_perBin = correctness(indTrial);
-    % iPRS_perBin = iPRS(indTrial);
-    % pHit = sum(correctness_perBin(iPRS_perBin==1))/sum(iPRS_perBin==1);
-    % pFA = sum(correctness_perBin(iPRS_perBin==0))/sum(iPRS_perBin==0);
-    % if pHit==1, pHit=1-eps; elseif pHit==0, pHit=eps; end
-    % if pFA==1, pFA=1-eps; elseif pFA==0, pFA=eps; end
-    % dprime_data_allBins(iBin) = norminv(pHit) - norminv(pFA);
-
-    pC_pred_allBins(iBin) = mean(pC_pred(indTrial)); % Predicted accuracy
-    pC_data_allBins(iBin) = mean(correctness(indTrial)); % Measured accuracy
-
-    pA_pred_allBins(iBin) = mean(pA_pred(indTrial)); % Predicted pA (Measured/data pA is below)
-
-    %------------ Calculate measured pA for each bin ------------
-    resp_perBin = resp_data(indTrial);
-    iPair_perBin = iPair(indTrial);
-    iPair_perBin_unik = unique(iPair_perBin);
-    nUnik = length(iPair_perBin_unik);
-    respC_perBin = nan(nUnik, 1);
-    for iUnik = 1:nUnik
-        iTrialAB=find(iPair_perBin==iPair_perBin_unik(iUnik));
+        iTrialAB=find(iPair_perBin==iPair_perBin_unik(iUnik)); assert(length(iTrialAB)==2)
         respC_perBin(iUnik) = resp_perBin(iTrialAB(1)) == resp_perBin(iTrialAB(2));
     end
     pA_data_allBins(iBin) = mean(respC_perBin);

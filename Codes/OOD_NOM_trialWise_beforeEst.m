@@ -20,7 +20,7 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function OOD_NOM_Trialwise_beforeEst(isubj, iLocComb, iModelA, IVType, templateType, flag_PatchMode, ni)
+function OOD_NOM_Trialwise_beforeEst(isubj, iLocComb, iModelA, IVType, templateType, flag_PatchMode, itype_template, ni)
 
 % The previous version is in OOD_NOM_trialWise
 % INPUT
@@ -45,7 +45,7 @@ SX_RC1_setting
 
 iSess_start = 1; % from which session data is taken into account
 % templateType = 1; % (1) raw (2) reconstructed kernel (3) mirrored template
-itype_template = 2; % 1=estimate template from PRS trials, ABS trials, or BOTH trials
+% itype_template = 2; % 1=estimate template from PRS trials, ABS trials, or BOTH trials
 convolveType = 1; % IV is calcluated by 1=cross correlation of template and stim energy; 2=convolution [fxn_getIV_v3]
 % flag_PatchMode = 2; %1=use target patches; 2=use noise patches
 flag_standEnergy = 1; % 1=standardize (z-score) energy
@@ -62,7 +62,7 @@ if isnumeric(isubj) % Human subjects
     nameFolder_OOD_load = sprintf('%s/%s%d', nameFolder_Data_OOD, subjName, nblocks); % To Load behav & energy
     nameFolder_NOM_save = sprintf('%s/%s/L%d', nameFolder_Data_NOM_Trialwise, subjName, iLocComb); % To Save results
 else % IO
-    subjName = isubj{1};
+    subjName = isubj{1}; % "nameIO" in OOD_sim
     criterion_true = isubj{2};
     nblocks=0;
     nameFolder_OOD_load = sprintf('%s/%s', nameFolder_Data_OOD, subjName);% To Load behav & energy
@@ -86,12 +86,12 @@ if isnumeric(isubj)
     load(sprintf('%s/%s_energy_%s_%d_%d.mat', nameFolder_OOD_load, subjName, namePatchMode, nORI, nSF));
 else
     % behavioral measurement
-    load(sprintf('%s/behavMeas.mat', nameFolder_OOD_load));
+    load(sprintf('%s/behavMeas.mat', nameFolder_OOD_load)); % "nameFolder_Data_NOM_IO" in OOD_sim
     % energy
     load(sprintf('%s/energy_%s_%d_%d.mat', nameFolder_OOD_load, namePatchMode, nORI, nSF));
 end
 
-load(sprintf('%s/signalEnergy', nameFolder_Data_OOD), 'template_true')
+load(sprintf('%s/truth.mat', nameFolder_OOD_load), 'template_true')
 fprintf('\nBehav and energy LOADED\n\n')
 
 % Determine the type of energy to use based on flag_PatchMode
@@ -136,7 +136,7 @@ if rem(ntrain_perSingle, 2), ntrain_perSingle = ntrain_perSingle+1;ntest_perSing
 nmetrics = 9; 
 data_allB = cell(ni, 1);
 data_metrics_allB = nan(ni, nmetrics);
-kernel2D_all = nan(ni, nORI, nSF);
+kernel2D_allB = nan(ni, nORI, nSF);
 fprintf('  ======== BEFORE Estimation ======== \n[L%d ModelA%d] Running ni = %d: ', iLocComb, iModelA, ni)
 
 for ii = 1:ni
@@ -149,15 +149,16 @@ for ii = 1:ni
     % standardize the energy for the training set
     switch itype_template
         case 1
-            e3D_train = e3D_train(iPRS_train, :, :);
-            cst_train = cst_train(iPRS_train);
-            resp_train = resp_train(iPRS_train);
-            iPRS_train = iPRS_train(iPRS_train);
+            e3D_train = e3D_train(iPRS_train==1, :, :);
+            cst_train = cst_train(iPRS_train==1);
+            resp_train = resp_train(iPRS_train==1);
+            iPRS_train = iPRS_train(iPRS_train==1);
         case 2
             e3D_train = e3D_train(iPRS_train==0, :, :); % only use signal-ABS trials to derive the template
             cst_train = cst_train(iPRS_train==0);
             resp_train = resp_train(iPRS_train==0);
             iPRS_train = iPRS_train(iPRS_train==0);
+        % case 3, continue,
     end
 
     if flag_standEnergy
@@ -167,14 +168,14 @@ for ii = 1:ni
     end
 
     % Calculate 2D kernel from the TRAINING set
-    kernel2D = SX_sim07_RC(filtersSF_all, filtersOri_all, e3D_train_norm, resp_train); % 5 seconds
+    kernels2D = SX_sim07_RC(filtersSF_all, filtersOri_all, e3D_train_norm, resp_train); % 5 seconds
 
     % Normalize the derived template
-    kernel2D = kernel2D / max(kernel2D(:)) * 0.2; % scale the signal energy to roughly match the range of templates derived from subj data
+    kernels2D = kernels2D / max(kernels2D(:)) * 0.2; % scale the signal energy to roughly match the range of templates derived from subj data
     % The same as OOD_sim
 
     % size of kernel2D: nORI x nSF
-    kernel2D_all(ii, :, :) = kernel2D; % the ave will be plotted in NOMplot_beforeEst.m
+    kernel2D_allB(ii, :, :) = kernels2D; % the ave will be plotted in NOMplot_beforeEst.m
 
     % Calculate performance metrics for the TEST set
     % ==== NOT grouped based on binned IV!! ====
@@ -197,11 +198,11 @@ for ii = 1:ni
     %%%%%%%%%%%%%%%%%%%%%%%%
     % 1. Derive the Template from the TRAINING set, or just the energy profile of the gabor 
     if iModelA== 3 % use IO template (the energy profile of the signal)
-        load(sprintf('%s/signalEnergy.mat', nameFolder_Data_OOD), 'template_true'); % nameFolder_Data is created in SX_RC1_setting
+        load(sprintf('%s/truth.mat', nameFolder_OOD_load), 'template_true'); % nameFolder_Data is created in SX_RC1_setting
         template = template_true;
     else
         flag_plot = 0;
-        template = fxn_getTemplate(kernel2D, templateType, flag_plot);
+        template = fxn_getTemplate(kernels2D, templateType, flag_plot);
     end
 
     % 2. Calculate the Internal variable (IV)
@@ -222,9 +223,13 @@ for ii = 1:ni
     [nTrials_PRS_allBins, ~, iTrial4Bin_PRS] = histcounts(IV_test(iPRS_test==1), nBins);
     [nTrials_ABS_allBins, ~, iTrial4Bin_ABS] = histcounts(IV_test(iPRS_test==0), nBins);
 
+    [nTrials_allBins, ~, iTrial4Bin] = histcounts(IV_test, nBins);
+
     % Compile data for the current iteration
     data.ndata = ndata;
     data.IV=IV_test;
+    data.nTrials_allBins = nTrials_allBins;
+    data.iTrial4Bin = iTrial4Bin;
     data.nTrials_PRS_allBins = nTrials_PRS_allBins;
     data.iTrial4Bin_PRS = iTrial4Bin_PRS;
     data.nTrials_ABS_allBins = nTrials_ABS_allBins;

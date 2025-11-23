@@ -40,7 +40,7 @@ flag_plot = 1;
 flag_plotPerIter = 0;
 
 % Set upper and lower bounds of each parameter
-SDadd_lb = 1e-5; SDadd_ub = 10;  % Additive noise
+SDadd_lb = 1e-5; SDadd_ub = 20;  % Additive noise % 20 is derived from model simulation
 Nmul_lb = 1e-5; Nmul_ub = 1;  % Multiplicative noise
 % SDadd_lb = -eps; SDadd_ub = eps;  % Additive noise
 % Nmul_lb = -eps; Nmul_ub = eps;  % Multiplicative noise
@@ -134,10 +134,10 @@ end % end of ii
 
 % pred.criterion_IV is an output of PR_pred_v6()
 
-fprintf('\n\nALL iterations DONE\n')
+fprintf('\n\nAll iterations DONE\n')
 
 if flag_plot, NOMplot_Est; end
-
+close all
 %% Save results
 % copy and rename the xx_beforeEst.mat file
 copyfile([nameFile_beforeEst, '.mat'], [nameFile_Est, '.mat']);

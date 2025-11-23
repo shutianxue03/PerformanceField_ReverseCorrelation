@@ -26,6 +26,9 @@ function [k, i, margORI, margSF, R2, R2_Tjur, p, pCat, sep] = SX_RC6_kernel_parf
 nTypes = 3;
 [ntrials, nORI, nSF] = size(e3D);
 
+assert(mean(dataMatrix(:, 6) == 1) == 1/2)
+assert(mean(dataMatrix(:, 6) == 0) == 1/2)
+
 %% Initialize empty containers for outputs
 k = nan(nTypes, nORI, nSF);              % Kernel values for each type
 i = k;                                   % Intercepts for each type
@@ -38,7 +41,7 @@ pCat = k;                                % Categorical p-values
 sep = nan(nTypes, 1);                    % Separability metric
 
 % Loop through each trial type (PRS, ABS, BOTH)
-for iType = 2%1:nTypes
+for iType = 1:nTypes
     % Define trial index based on type
     switch iType
         case 1, iPRS = dataMatrix(:, 6) == 1;  % PRS trials

@@ -14,9 +14,11 @@ fprintf('\n\n=====================\nGenerating IVs\n=====================\n\n')
 IVType = 1;            % 1=sum of the dot product/convolution; 2=max; 3=normalized
 templateType = 1; % (1) raw (2) reconstructed kernel (3) mirrored template
 flag_fminconORbads = 2; % 1=use fmincon when fitting NOM to data, faster; 2=bads, slower but better
+flag_PatchMode = 1; if flag_PatchMode == 1, patchMode = 'T'; else, patchMode = 'N'; end
+itype_template = 2; % 1=estimate template from PRS trials, ABS trials, or BOTH trials
 
 %------------------------------%
-OOD_NOM_Trialwise_beforeEst(isubj, iLocComb, iModelA, IVType, templateType, nIterations);
+OOD_NOM_Trialwise_beforeEst(isubj, iLocComb, iModelA, IVType, templateType, flag_PatchMode, itype_template, nIterations);
 %------------------------------%
 
 %% Fit different models to IVs and make predictions

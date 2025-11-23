@@ -108,17 +108,20 @@ title(sprintf('pA (r=%.2f, R²=%.2f)', r_pA, R2_pA));
 
 sgtitle('Figure 1. Metrics as a fxn of binned IV')
 
+saveas(gcf, sprintf('Figures/MetricPerBin.jpg'))
+
 %% Plot estimated parameters across iterations
 if ismember(iModelB, [4,5]) % so that 1st param is noise P, 2nd param is criterion
-    figure('Name','Estimated Parameters','Position',[100,100,400,400]);
+    load(sprintf('%s/truth.mat', nameFolder_OOD_load), 'noiseP_true')
+    figure('Name','Estimated Parameters','Position', [100,100,400,400]);
     % for iParam = 1:size(params_est_allB,2)
 
     % iParam = 1;
     % subplot(1, 2, iParam);
     plot(params_est_allB, '-o');
-    yline(.1, 'r-'); % should match noiseP defined in OOD_sim
+    yline(noiseP_true, 'r-'); % should match noiseP defined in OOD_sim
     switch iModelB
-        case 4, ylim([0,10])
+        case 4, ylim([0,20])
         case 5, ylim([0,1])
     end
     xlabel('Iteration');
@@ -135,3 +138,5 @@ if ismember(iModelB, [4,5]) % so that 1st param is noise P, 2nd param is criteri
     % end
     sgtitle('Figure 2. Estimated Parameters Across Iterations');
 end
+
+saveas(gcf, sprintf('Figures/RecoveredNoiseP.jpg'))

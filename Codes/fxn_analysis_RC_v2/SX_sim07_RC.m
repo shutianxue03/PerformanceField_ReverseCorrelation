@@ -22,7 +22,7 @@ function [kernel2D, intercept2D, R2, R2_Tjur, pValues, pCat, yfit] = SX_sim07_RC
 %   pCat             - 2D matrix of categorical prediction accuracy (ORI x SF)
 %   yfit             - 3D matrix of fitted responses for each trial (trials x ORI x SF)
 
-flag_GLM = 'multivariate';
+% flag_GLM = 'multivariate';
 flag_GLM = 'univariate';
 
 % Set default link function to 'probit' if not specified

@@ -19,8 +19,11 @@ nSF = nORI;
 % Define names of folders to load/save data (on the server)
 % if run on HPC
 nameFolder_server = '..';
-% if run on local
+% if run on server (OOD)
 % nameFolder_server = '/Volumes/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC'; % the server directory of the Data and Figures folders
+
+% if run on local for model simulation
+nameFolder_server = '/Users/xueshutian/Desktop/GitHub_local/PF_RC';
 
 nameFolder_Data = sprintf('%s/Data', nameFolder_server) ;
 nameFolder_Data_OOD = sprintf('%s/Data_OOD_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
@@ -29,15 +32,17 @@ nameFolder_Data_NOM_Trialwise = sprintf('%s/Data_NOM_Trialwise_%d%d', nameFolder
 % Define names of folders to save figures (on the server)
 nameFolder_Figures = sprintf('%s/Figures', nameFolder_server);
 nameFolder_Figures_NOM = sprintf('%s/NOM_Trialwise_%d%d', nameFolder_Figures, nORI, nSF);
-if ~exist(nameFolder_Figures_NOM, 'dir'), mkdir(nameFolder_Figures_NOM); end
+% if ~exist(nameFolder_Figures_NOM, 'dir'), mkdir(nameFolder_Figures_NOM); end
 
 
 % Print directory names
 % fprintf('\n\nFolder to save analysis outputs\n  >>>%s\n\n', nameFolder_Data_OOD)
 % fprintf('Folder to save NOM outputs\n  >>>%s\n\n', nameFolder_Data_NOM_Trialwise)
 % fprintf('Folder to save Figures\n  >>>%s\n\n\n', nameFolder_Figures_NOM)
-    % Define the function to normalize Gabor SD
+
+% Define the function to normalize Gabor SD
 fxn_getSigma_SPdomain = @(SF) 3 * sqrt(2*log(2)) / (2 * pi * SF);
+% fxn_getSigma_SPdomain = @(SF) SF;
 
 %%  Global parameters
 nBins = 10; % to bin IVs in OOD_xx_beforeEst
