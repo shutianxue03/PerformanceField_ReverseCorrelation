@@ -1,6 +1,6 @@
-function OOD_NOM_Trialwise_beforeEst(isubj, iLocComb, iModelA, IVType, templateType, flag_PatchMode, itype_template, nIterations)
+function OOD_NOM_Trialwise_compIV(isubj, iLocComb, iModelA, nIterations)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% OOD_NOM_Trialwise_beforeEst.m
+% OOD_NOM_Trialwise_compIV.m
 %
 % Trial-wise noisy observer model – PRE-ESTIMATION STAGE
 %
@@ -44,7 +44,7 @@ function OOD_NOM_Trialwise_beforeEst(isubj, iLocComb, iModelA, IVType, templateT
 %   nIterations    : number of resampling iterations (bootstraps)
 %
 % OUTPUTS (saved to disk)
-%   nameFile_beforeEst = '.../n%d_A%d_beforeEst.mat', containing:
+%   nameFile_compIV = '.../n%d_A%d_compIV.mat', containing:
 %     - c_zscore          : SDT criterion (z units) per iteration
 %     - data_allB         : cell array of "data" structs per iteration
 %     - data_metrics_allB : behavioral metrics per iteration
@@ -63,6 +63,7 @@ close all;
 warning off;              % (You may want to remove this once things are stable.)
 format compact;
 time_start = datetime('now');
+rng(123);   % define see for reproducibility
 
 addpath(genpath('fxn_exp'));
 addpath(genpath('fxn_NOM'));
@@ -75,11 +76,15 @@ addpath(genpath('SX_toolbox/bads-master'));
 % --------------%
 SX_RC1_setting;   % defines nameFolder_*, nORI, nSF, namesLocComb, namesModelA, etc.
 % --------------%
+IVType = 1;            % 1=sum of the dot product/convolution; 2=max; 3=normalized
+templateType = 3; % (1) raw (2) reconstructed kernel (3) mirrored template
+itype_template = 2; % 1=estimate template from PRS trials, ABS trials, or BOTH trials
+flag_PatchMode = 1; % if flag_PatchMode == 1, patchMode = 'T'; else, patchMode = 'N'; end
 
 iSess_start        = 1;    % first session included
 convolveType       = 1;    % IV from 1=cross-correlation; 2=convolution (fxn_getIV_v3)
 flag_standEnergy   = 1;    % 1=z-score energy before RC
-flag_plot_beforeEst = 1;   % plot IV distributions and kernels at the end
+flag_plot_compIV = 1;   % plot IV distributions and kernels at the end
 ratio_train        = 3/4;  % proportion of trials in training set (for RC)
 ORI_bound          = [10, 20];  % orientation window, passed to fxn_getIV_v3
 if flag_PatchMode == 1
@@ -98,33 +103,32 @@ if isnumeric(isubj)  % Human subjects
 
     % Folder to load behav + energy
     nameFolder_OOD_load = sprintf('%s/%s%d', nameFolder_Data_OOD, subjName, nblocks);
-
+    
     % Folder to save NOM trial-wise results
     nameFolder_NOM_save = sprintf('%s/%s/L%d', nameFolder_Data_NOM_Trialwise, subjName, iLocComb);
-
+    
     % Behavioral measurements
-    load(sprintf('%s/%s%d/%s_behavMeas.mat', ...
-        nameFolder_Data_OOD, subjName, nblocks, subjName), ...
-        'dataMatrix');  % ensure dataMatrix is loaded
+    load(sprintf('%s/%s%d/%s_behavMeas.mat', nameFolder_Data_OOD, subjName, nblocks, subjName), 'dataMatrix');  % ensure dataMatrix is loaded
 
     % Energy
-    load(sprintf('%s/%s_energy_%s_%d_%d.mat', ...
-        nameFolder_OOD_load, subjName, namePatchMode, nORI, nSF), ...
+    load(sprintf('%s/%s_energy_%s_%d_%d.mat', nameFolder_OOD_load, subjName, namePatchMode, nORI, nSF), ...
         'e3D_target_allT', 'e3D_noise_allT', 'noise', 'filtersOri_all', 'stim', 'nBins');
 
 else  % Ideal observer (IO)
     subjName = isubj{1};  % "nameIO" from OOD_sim
     nblocks  = 0;
 
+    % Folder to load behav + energy
     nameFolder_OOD_load = sprintf('%s/%s', nameFolder_Data_OOD, subjName);
+    
+    % Folder to save NOM trial-wise results
     nameFolder_NOM_save = sprintf('%s/%s',   nameFolder_Data_NOM_Trialwise, subjName);
 
     % Behavioral measurements
     load(sprintf('%s/behavMeas.mat', nameFolder_OOD_load), 'dataMatrix');
 
     % Energy
-    load(sprintf('%s/energy_%s_%d_%d.mat', ...
-        nameFolder_OOD_load, namePatchMode, nORI, nSF), ...
+    load(sprintf('%s/energy_%s_%d_%d.mat', nameFolder_OOD_load, namePatchMode, nORI, nSF), ...
         'e3D_target_allT', 'e3D_noise_allT', 'noise', 'filtersOri_all', 'stim', 'nBins');
 end
 
@@ -135,19 +139,24 @@ end
 % fprintf('\nBehav and energy LOADED\n\n');
 
 % Output file name (before estimation)
-nameFile_beforeEst = sprintf('%s/n%d_A%d_beforeEst', nameFolder_NOM_save, nIterations, iModelA);
+nameFile_compIV = sprintf('%s/n%d_A%d_compIV', nameFolder_NOM_save, nIterations, iModelA);
 
 %% Print run info
-fprintf(['\nSubject/IO name: %s [nblocks = %d] [nORI=%d | nSF=%d]', ...
-    '\n - Number of iterations (ni) = %d', ...
-    '\n - Location: %s', ...
+fprintf(['\nSubject/IO name: %s ' ...
+    '\n - L%d [%s]', ...
     '\n - A%d [%s]', ...
+    '\n - Number of iterations = %d', ...
+    '\n - Number of blocks = %d', ...
+    '\n - nORI=%d | nSF=%d', ...
     '\n - Template derived from %s trials', ...
     '\n - Energy source: %d (1=TARGET, 2=NOISE)', ...
     '\n - Convolve type: %s', ...
     '\n - IV type: %s\n\n'], ...
-    subjName, nblocks, nORI, nSF, nIterations, ...
-    namesLocComb{iLocComb}, iModelA, namesModelA{iModelA}, ...
+    subjName, ...
+    iLocComb, namesLocComb{iLocComb}, ...
+    iModelA, namesModelA{iModelA}, ...
+    nIterations, ...
+    nblocks, nORI, nSF, ...
     namesType{itype_template}, flag_PatchMode, ...
     namesConvolveType{convolveType}, namesIVType{IVType});
 
@@ -164,7 +173,7 @@ switch flag_PatchMode
 end
 
 %% -------------------- Sanity check: iPRS consistent within pairs -------------------- %%
-% Col#1 = itrial_allT; Col#6 = iPRS; Col#8 = iPair; 
+% Col#1 = itrial_allT; Col#6 = iPRS; Col#8 = iPair;
 for ipair = 1:max(dataMatrix(:, 8))
     ii = find(dataMatrix(:, 8) == ipair);
     iPRS_A = dataMatrix(dataMatrix(:, 1) == ii(1), 6);
@@ -267,10 +276,9 @@ data_allB         = cell(nIterations, 1);
 data_metrics_allB = nan(nIterations, nmetrics);
 kernel2D_allB     = nan(nIterations, nORI, nSF);
 
-fprintf('\n[L%d ModelA%d] Running ni = %d: ', iLocComb, iModelA, nIterations);
+fprintf('\n\nRunning ni = %d: ', nIterations);
 
 for ii = 1:nIterations
-    fprintf('%d ', ii);
 
     %% 1. Resample trials into TRAIN / TEST
     % This function uses the precomputed non-random pools above and creates:
@@ -385,24 +393,25 @@ for ii = 1:nIterations
     data_allB{ii}           = data;
     data_metrics_allB(ii,:) = metrics_test;
 
+    fprintf('%d ', ii);
 end  % end for ii
 
 % fprintf('\n\n[L%d ModelA%d] ALL iterations DONE\n', iLocComb, iModelA);
 
 %% -------------------- SAVE -------------------- %%
-save(nameFile_beforeEst, 'c_zscore', '*_allB', 'names*', 'flag*', 'ratio_train', 'ORI_bound', '*Type');
+save(nameFile_compIV, 'c_zscore', '*_allB', 'names*', 'flag*', 'ratio_train', 'ORI_bound', '*Type');
 % fprintf('\n========== Binned IV saved ==========\n\n\n\n\n');
 
 %% -------------------- Plot (optional) -------------------- %%
-if flag_plot_beforeEst
-    NOMplot_beforeEst;
+if flag_plot_compIV
+    NOMplot_compIV;
 end
 close all;
 
 %% -------------------- End timing -------------------- %%
 time_end = datetime('now');
 elapsed = time_end - time_start;
-fprintf('\nDONE (time used: %s)\n', char(elapsed));
+fprintf('\n\nDONE (time used: %s)\n', char(elapsed));
 
 
 end

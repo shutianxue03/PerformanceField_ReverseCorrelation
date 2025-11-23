@@ -1,6 +1,6 @@
-function OOD_NOM_Trialwise_Est(isubj, iLocComb, iModelA, iModelB, nIterations, flag_fminconORbads)
+function OOD_NOM_Trialwise_fitNOM(isubj, iLocComb, iModelA, iModelB, nIterations)
 %==========================================================================%
-% OOD_NOM_Trialwise_Est.m
+% OOD_NOM_Trialwise_fitNOM.m
 %--------------------------------------------------------------------------
 % Author:      Shutian Xue
 % Last update: 2025-08-27
@@ -10,7 +10,7 @@ function OOD_NOM_Trialwise_Est(isubj, iLocComb, iModelA, iModelB, nIterations, f
 % This function:
 %   1) Fits a trial-wise noisy observer model (NOM; Model B) to internal
 %      variables (IVs) for the TEST set, precomputed in
-%      OOD_NOM_Trialwise_beforeEst.m.
+%      OOD_NOM_Trialwise_compIV.m.
 %   2) Uses the fitted parameters to predict behavioral metrics (pYES, pC,
 %      pA) based on binned empirical IVs.
 %
@@ -40,16 +40,13 @@ function OOD_NOM_Trialwise_Est(isubj, iLocComb, iModelA, iModelB, nIterations, f
 %                    5 = SDadd only
 %                    6 = Nmul + rho (no SDadd)
 %                    7 = Nmul only
-%   nIterations  : number of resampling iterations (same as in *_beforeEst)
-%   flag_fminconORbads :
-%                    1 = use fmincon (faster, local)
-%                    2 = use BADS    (slower, more robust)
+%   nIterations  : number of resampling iterations (same as in *_compIV)
 %
 % OUTPUTS
 %   Results are saved to:
-%       nameFile_Est = '<Data_NOM_Trialwise>/<subj>/L<iLocComb>/n<nIterations>_A<iModelA>B<iModelB>.mat'
+%       nameFile_fitNOM = '<Data_NOM_Trialwise>/<subj>/L<iLocComb>/n<nIterations>_A<iModelA>B<iModelB>.mat'
 %
-%   Saved variables (appended to *_beforeEst.mat):
+%   Saved variables (appended to *_compIV.mat):
 %       params_est_allB   : [nIterations x nParams] fitted parameters
 %       nLL_allB          : [nIterations x 1] negative log-likelihood
 %       pred_metrics_allB : {nIterations x 1} predictions from PR_pred_v7
@@ -60,6 +57,7 @@ close all;
 warning off;
 format compact;
 time_start = datetime('now');
+rng(123);   % define see for reproducibility
 
 addpath(genpath('fxn_NOM'));
 addpath(genpath('fxn_RCplot'));
@@ -70,7 +68,7 @@ addpath(genpath('SX_toolbox/bads-master'));
 %--------------%
 SX_RC1_setting;  % defines nORI, nSF, namesLocComb, namesModelA, namesModelB, nBins, etc.
 %--------------%
-
+flag_fminconORbads = 2; % 1 = use fmincon (faster, local); 2 = use BADS    (slower, more robust)
 flag_plot_allIter = 1;   % 1 = make summary plots across iterations
 flag_plot_perIter = 0;   % 1 = plot per-iteration fits (can be slow)
 
@@ -100,8 +98,8 @@ if isempty(dir(nameFolder_NOM_save))
 end
 
 % File names:
-nameFile_beforeEst = sprintf('%s/n%d_A%d_beforeEst', nameFolder_NOM_save, nIterations, iModelA);
-nameFile_Est       = sprintf('%s/n%d_A%dB%d',        nameFolder_NOM_save, nIterations, iModelA, iModelB);
+nameFile_compIV = sprintf('%s/n%d_A%d_compIV', nameFolder_NOM_save, nIterations, iModelA);
+nameFile_fitNOM       = sprintf('%s/n%d_A%dB%d',        nameFolder_NOM_save, nIterations, iModelA, iModelB);
 
 %% Print header
 fprintf(['\nSubject/IO name: %s ' ...
@@ -116,7 +114,7 @@ fprintf(['\nSubject/IO name: %s ' ...
     nIterations);
 
 %% Load trial-wise data and criterion
-load(nameFile_beforeEst, 'data_allB', 'c_zscore');
+load(nameFile_compIV, 'data_allB', 'c_zscore');
 
 %% Parameter vectors per Model B
 switch iModelB
@@ -156,7 +154,7 @@ switch iModelB
         params_ub = [Nmul_ub];
 
     otherwise
-        error('OOD_NOM_Trialwise_Est: Unknown iModelB = %d', iModelB);
+        error('OOD_NOM_Trialwise_fitNOM: Unknown iModelB = %d', iModelB);
 end
 
 %% Preallocate outputs
@@ -201,14 +199,14 @@ end % end of ii
 %% Plot summary across iterations (optional)
 
 if flag_plot_allIter
-    NOMplot_Est;
+    NOMplot_fitNOM;
 end
 close all;
 
-%% Save results (append onto *_beforeEst.mat)
+%% Save results (append onto *_compIV.mat)
 
-copyfile([nameFile_beforeEst, '.mat'], [nameFile_Est, '.mat']);  % backup structure from beforeEst
-save(nameFile_Est, '*_allB', '-append');
+copyfile([nameFile_compIV, '.mat'], [nameFile_fitNOM, '.mat']);  % backup structure from compIV
+save(nameFile_fitNOM, '*_allB', '-append');
 
 %% Timing info
 time_end = datetime('now');

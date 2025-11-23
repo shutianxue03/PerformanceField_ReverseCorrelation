@@ -1,8 +1,4 @@
-% function OOD_NOM_Trialwise(isubj, iLocComb, iModelA, nIterations)
-isubj=2;
-iLocComb=1;
-iModelA=1;
-nIterations=10;
+function OOD_NOM_Trialwise(isubj, iLocComb, iModelA, nIterations)
 % OOD_NOM_trialWise: This function generates IVs and fits different models to them.
 % Inputs:
 %      isubj: index of subj
@@ -18,16 +14,13 @@ time_start = datetime('now');
 fprintf('\n\n=====================\nGenerating IVs (Model A%d)\n=====================\n\n', iModelA)
 
 % The settings below can be placed in SX_RC1_setting
-IVType = 1;            % 1=sum of the dot product/convolution; 2=max; 3=normalized
-templateType = 3; % (1) raw (2) reconstructed kernel (3) mirrored template
-itype_template = 2; % 1=estimate template from PRS trials, ABS trials, or BOTH trials
-
-% Add to SX_RC1_setting later:
-flag_fminconORbads = 2; % 1=use fmincon when fitting NOM to data, faster; 2=bads, slower but better
-flag_PatchMode = 1; % if flag_PatchMode == 1, patchMode = 'T'; else, patchMode = 'N'; end
+% IVType = 1;            % 1=sum of the dot product/convolution; 2=max; 3=normalized
+% templateType = 3; % (1) raw (2) reconstructed kernel (3) mirrored template
+% itype_template = 2; % 1=estimate template from PRS trials, ABS trials, or BOTH trials
+% flag_PatchMode = 1; % if flag_PatchMode == 1, patchMode = 'T'; else, patchMode = 'N'; end
 
 %------------------------------%
-OOD_NOM_Trialwise_beforeEst(isubj, iLocComb, iModelA, IVType, templateType, flag_PatchMode, itype_template, nIterations);
+OOD_NOM_Trialwise_compIV(isubj, iLocComb, iModelA, nIterations);
 %------------------------------%
 
 %% Fit different models to IVs and make predictions
@@ -35,9 +28,9 @@ iModelB_all = 1:7; % Check the full list of models in SX_RC1_setting, search "na
 % iModelB_all = 2;
 for iModelB = iModelB_all
     fprintf('\n\n=====================\nModel B%d\n=====================\n', iModelB)
-    %------------------------------%
-    OOD_NOM_Trialwise_Est(isubj, iLocComb, iModelA, iModelB, nIterations, flag_fminconORbads)
-    %------------------------------%
+    % ------------------------------%
+    OOD_NOM_Trialwise_fitNOM(isubj, iLocComb, iModelA, iModelB, nIterations)
+    % ------------------------------%
 end
 
 %% Ending
