@@ -24,12 +24,6 @@
 set -euo pipefail
 
 #############################
-# Performance evaluation hook
-#############################
-wk_dir=$(pwd)
-bash "$wk_dir/evaluation-performance/evaluation-performance.sh" "$wk_dir/evaluation-performance/"
-
-#############################
 # MATLAB setup
 #############################
 module purge
@@ -42,9 +36,8 @@ MATLAB_PREFDIR=$(mktemp -d -t matlab-XXXX)
 echo
 echo "SLURM job ID  : $SLURM_JOB_ID"
 echo "SLURM job name: $SLURM_JOB_NAME"
-echo "Subj=$1  Loc=$2  ModelA=$3  nIter=$5"
+echo "Subj=$1  Loc=$2  ModelA=$3  ModelB=$4 nIter=$5"
 echo
-
 
 #############################
 # Run MATLAB non-interactively

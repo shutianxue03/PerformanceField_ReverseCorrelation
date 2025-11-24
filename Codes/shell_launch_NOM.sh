@@ -17,7 +17,7 @@ nIterations=20  # number of iterations
 
 for isubj in {1..15}; do        # subject indices
   for iLocComb in {1..8}; do    # location combinations
-    for iModelA in 1 3; do      # see SX_RC1_setting (A1: core, A3: IO template)
+    for iModelA in {1..2}; do      # see SX_RC1_setting (A1: core, A2: IO template)
 
       if [ "$flag_stage" -eq 1 ]; then
         echo "Submitting compIV: subj=${isubj}, loc=${iLocComb}, modelA=${iModelA}, nIter=${nIterations}"

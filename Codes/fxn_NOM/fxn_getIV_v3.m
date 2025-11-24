@@ -24,8 +24,7 @@ end
 % Because to have the same IV for paired trials, the template cannot be randomized
 % independently across trials (at least not for the pair of trials)
 
-if iModelA == 2 % Permute pixels in the template
-    rng('shuffle')
+if iModelA == 3 % Permute pixels in the template
     indRand = randperm(nORI*nSF);
     template_true_v = template_true(:);
     template_rand = template_true_v(indRand);

@@ -29,9 +29,9 @@ function OOD_NOM_Trialwise_fitNOM(isubj, iLocComb, iModelA, iModelB, nIterations
 %                    5 = LVM
 %                    3 = UVM
 %   iModelA      : template / IV model index (defined in SX_RC1_setting)
-%                    1 = core model
-%                    2 = permuted template
-%                    3 = IO template
+%                    1 = RC-derived template
+%                    2 = IO template
+%                    3 = permuted template
 %   iModelB      : internal noise / correlation model index (see fxn_getError_v7)
 %                    1 = Nmul + SDadd + rho
 %                    2 = Nmul + SDadd (no rho)
@@ -53,12 +53,13 @@ function OOD_NOM_Trialwise_fitNOM(isubj, iLocComb, iModelA, iModelB, nIterations
 %
 %==========================================================================%
 
-close all;
+clc; close all;
 warning off;
 format compact;
-time_start = datetime('now');
+time_start = datetime('now')
 rng(123);   % define see for reproducibility
 
+addpath(genpath('fxn_exp'));
 addpath(genpath('fxn_NOM'));
 addpath(genpath('fxn_RCplot'));
 addpath(genpath('fxn_analysis_RC_v2'));
@@ -106,7 +107,7 @@ fprintf(['\nSubject/IO name: %s ' ...
     '\n - L%d [%s]', ...
     '\n - A%d [%s]', ...
     '\n - B%d [%s]', ...
-    '\n - Number of iterations = %d'], ...
+    '\n - Number of iterations = %d\n\n'], ...
     subjName, ...
     iLocComb, namesLocComb{iLocComb}, ...
     iModelA, namesModelA{iModelA}, ...
@@ -166,10 +167,9 @@ pred_metrics_allB  = cell(nIterations, 1);
 
 %% Main estimation loop across iterations
 
-% fprintf('\n\nRunning ni = %d: ', nIterations);
+fprintf('\n\nRunning ni = %d: ', nIterations);
 
 for ii = 1:nIterations
-    fprintf('%d ', ii);
 
     data = data_allB{ii};
 
@@ -196,6 +196,11 @@ end % end of ii
 
 % fprintf('\n\nAll iterations DONE\n');
 
+%% Save results (append onto *_compIV.mat)
+% copyfile([nameFile_compIV, '.mat'], [nameFile_fitNOM, '.mat']);  % backup structure from compIV
+save(nameFile_fitNOM, '*_allB');
+fprintf('\n========== Fitting saved ==========\n\n\n\n\n');
+
 %% Plot summary across iterations (optional)
 
 if flag_plot_allIter
@@ -203,13 +208,8 @@ if flag_plot_allIter
 end
 close all;
 
-%% Save results (append onto *_compIV.mat)
-
-copyfile([nameFile_compIV, '.mat'], [nameFile_fitNOM, '.mat']);  % backup structure from compIV
-save(nameFile_fitNOM, '*_allB', '-append');
-
 %% Timing info
-time_end = datetime('now');
+time_end = datetime('now')
 elapsed = time_end - time_start;
 fprintf('\n\nDONE (time used: %s)\n', char(elapsed));
 

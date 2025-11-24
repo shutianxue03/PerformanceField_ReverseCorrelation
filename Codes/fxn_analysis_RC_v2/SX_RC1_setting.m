@@ -274,8 +274,7 @@ namesYLabel = {'Deviance', 'Deviance', 'IC'};
 namesParamsMode = {'estP', 'tunC'};
 
 % Noisy observer model names
-namesModelA = {'Core', 'RandTemp', 'IO-Core'};
-% nModelsA = length(namesModelA);
+namesModelA = {'RC', 'IO', 'RandTemp'};
 
 namesModelB = {'FullModel', 'NoRho', 'NoNoise', 'NoInduced', 'NoInducedNoRho', 'NoConstant', 'NoConstantNoRho'};
 namesParamsModel_all = {...

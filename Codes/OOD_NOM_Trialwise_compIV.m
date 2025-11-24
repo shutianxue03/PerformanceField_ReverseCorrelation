@@ -25,9 +25,9 @@ function OOD_NOM_Trialwise_compIV(isubj, iLocComb, iModelA, nIterations)
 %                    1=fovea; 8=periF (6 deg ecc);
 %                    6=HM; 7=VM; 5=LVM; 3=UVM
 %   iModelA        : template model
-%                    1 = core model
-%                    2 = permuted template
-%                    3 = IO template (ideal observer template)
+%                    1 = RC-derived template
+%                    2 = IO template
+%                    3 = permuted template
 %   IVType         : how IV is computed from template × energy
 %                    1 = sum of dot product / convolution
 %                    2 = max
@@ -59,10 +59,10 @@ function OOD_NOM_Trialwise_compIV(isubj, iLocComb, iModelA, nIterations)
 % Created by Shutian Xue on August 27, 2025
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-close all;
+clc; close all;
 warning off;              % (You may want to remove this once things are stable.)
 format compact;
-time_start = datetime('now');
+time_start = datetime('now')
 rng(123);   % define see for reproducibility
 
 addpath(genpath('fxn_exp'));
@@ -399,8 +399,8 @@ end  % end for ii
 % fprintf('\n\n[L%d ModelA%d] ALL iterations DONE\n', iLocComb, iModelA);
 
 %% -------------------- SAVE -------------------- %%
-save(nameFile_compIV, 'c_zscore', '*_allB', 'names*', 'flag*', 'ratio_train', 'ORI_bound', '*Type');
-% fprintf('\n========== Binned IV saved ==========\n\n\n\n\n');
+save(nameFile_compIV, 'template_true', 'c_zscore', '*_allB', 'names*', 'flag*', 'ratio_train', 'ORI_bound', '*Type');
+fprintf('\n========== Binned IV saved ==========\n\n\n\n\n');
 
 %% -------------------- Plot (optional) -------------------- %%
 if flag_plot_compIV
@@ -409,7 +409,7 @@ end
 close all;
 
 %% -------------------- End timing -------------------- %%
-time_end = datetime('now');
+time_end = datetime('now')
 elapsed = time_end - time_start;
 fprintf('\n\nDONE (time used: %s)\n', char(elapsed));
 
