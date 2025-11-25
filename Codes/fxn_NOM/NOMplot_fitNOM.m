@@ -2,7 +2,7 @@
 % This script generates plots for the estimated parameters and prediction metrics of the Noisy Observer Model (NOM).
 
 %% Compile data and pred for all iterations and bins
-pYES_data_allBins = nan(nIterations, nBins);
+pYES_data_allBins = nan(nBoot, nBins);
 pYES_pred_allBins = pYES_data_allBins;
 pC_data_allBins = pYES_data_allBins;
 pC_pred_allBins = pYES_data_allBins;
@@ -11,23 +11,23 @@ pA_pred_allBins = pYES_data_allBins;
 nData_allBins = pYES_data_allBins;
 IV_allBins_all = pYES_data_allBins;
 
-for ii=1:nIterations
+for iBoot = 1:nBoot
     % IVbin_allB(ii, :) = data_allB{ii}.IV_allBins;
-    IV_allBins_all(ii, :) = pred.metrics.IV_allBins;
+    IV_allBins_all(iBoot, :) = pred.metrics.IV_allBins;
 
-    % dprime_data_allB(ii, :) = pred_metrics_allB{ii}.metrics.dprime_data_allBins;
-    % dprime_pred_allB(ii, :) = pred_metrics_allB{ii}.metrics.dprime_pred_allBins;
+    % dprime_data_allB(ii, :) = pred_metrics_allBoot{ii}.metrics.dprime_data_allBins;
+    % dprime_pred_allB(ii, :) = pred_metrics_allBoot{ii}.metrics.dprime_pred_allBins;
 
-    pYES_data_allBins(ii, :) = pred_metrics_allB{ii}.metrics.pYES_data_allBins;
-    pYES_pred_allBins(ii, :) = pred_metrics_allB{ii}.metrics.pYES_pred_allBins;
+    pYES_data_allBins(iBoot, :) = pred_metrics_allBoot{iBoot}.metrics.pYES_data_allBins;
+    pYES_pred_allBins(iBoot, :) = pred_metrics_allBoot{iBoot}.metrics.pYES_pred_allBins;
 
-    pC_data_allBins(ii, :) = pred_metrics_allB{ii}.metrics.pC_data_allBins;
-    pC_pred_allBins(ii, :) = pred_metrics_allB{ii}.metrics.pC_pred_allBins;
+    pC_data_allBins(iBoot, :) = pred_metrics_allBoot{iBoot}.metrics.pC_data_allBins;
+    pC_pred_allBins(iBoot, :) = pred_metrics_allBoot{iBoot}.metrics.pC_pred_allBins;
 
-    pA_data_allBins(ii, :) = pred_metrics_allB{ii}.metrics.pA_data_allBins;
-    pA_pred_allBins(ii, :) = pred_metrics_allB{ii}.metrics.pA_pred_allBins;
+    pA_data_allBins(iBoot, :) = pred_metrics_allBoot{iBoot}.metrics.pA_data_allBins;
+    pA_pred_allBins(iBoot, :) = pred_metrics_allBoot{iBoot}.metrics.pA_pred_allBins;
 
-    nData_allBins(ii, :) = data_allB{ii}.nTrials_allBins;
+    nData_allBins(iBoot, :) = data_allBoot{iBoot}.nTrials_allBins;
 end
 
 %% pYES/pC/pA as a fxn of binned IV
@@ -48,7 +48,6 @@ figure('Position', [0 200 300 800])
 subplot(3,1,1), hold on
 % plot(IV_allBins, pYES_pred_allBins, 'k-')
 for iBin=1:nBins
-
     % Data (dot+errorbars)
     plot(IV_allBins_med(iBin), pYES_data_med(iBin), 'ko', 'MarkerSize', nData_allB_med(iBin)/sz_scale+5)
     errorbar(IV_allBins_med(iBin), pYES_data_med(iBin), pYES_data_SEM_neg(iBin), pYES_data_SEM_pos(iBin), 'k', 'CapSize', 0)
@@ -67,7 +66,7 @@ R2_pYES = 1 - sum((pYES_data_med - pYES_pred_med).^2) / sum((pYES_data_med - mea
 title(sprintf('pYES (r=%.2f, R²=%.2f)', r_pYES, R2_pYES));
 
 subplot(3,1,2), hold on
-for iBin=1:nBins
+for iBin = 1:nBins
     % Data (dot+errorbars)
     plot(IV_allBins_med(iBin), pC_data_med(iBin), 'ko', 'MarkerSize', nData_allB_med(iBin)/sz_scale+5)
     errorbar(IV_allBins_med(iBin), pC_data_med(iBin), pC_data_SEM_neg(iBin), pC_data_SEM_pos(iBin), 'k', 'CapSize', 0)
@@ -87,7 +86,7 @@ R2_pC = 1 - sum((pC_data_med - pC_pred_med).^2) / sum((pC_data_med - mean(pC_dat
 title(sprintf('pC (r=%.2f, R²=%.2f)', r_pC, R2_pC));
 
 subplot(3,1,3), hold on
-for iBin=1:nBins
+for iBin = 1:nBins
     % Data (dot+errorbars)
     plot(IV_allBins_med(iBin), pA_data_med(iBin), 'ko', 'MarkerSize', nData_allB_med(iBin)/sz_scale+5)
     errorbar(IV_allBins_med(iBin), pA_data_med(iBin), pA_data_SEM_neg(iBin), pA_data_SEM_pos(iBin), 'k', 'CapSize', 0)
@@ -107,9 +106,9 @@ R2_pA = 1 - sum((pA_data_med - pA_pred_med).^2) / sum((pA_data_med - mean(pA_dat
 title(sprintf('pA (r=%.2f, R²=%.2f)', r_pA, R2_pA));
 
 sgtitle(sprintf('Figure 1. Metrics as a fxn of binned IV\n%s (ModelA%dB%d %s, niterations=%d)', ...
-    subjName, iModelA, iModelB, namesModelB{iModelB}, nIterations))
+    subjName, iModelA, iModelB, namesModelB{iModelB}, nBoot))
 
-saveas(gcf, sprintf('%s/3Metrics_%s_A%dB%d.jpg', nameFolder_Figures_NOM, subjName, iModelA, iModelB))
+saveas(gcf, sprintf('%s/3Metrics_%s_L%d_A%dB%d.jpg', nameFolder_Figures_NOM, subjName, iLocComb, iModelA, iModelB))
 
 %% Plot estimated parameters across iterations
 
@@ -117,22 +116,21 @@ figure('Position', [100,100,nParams*400,400]);
 for iParam = 1:nParams
 
     subplot(1, nParams, iParam);
-    plot(params_est_allB(:, iParam), '-o');
-    yline(mean(params_est_allB(:, iParam)), 'k-')
+    plot(params_est_allBoot(:, iParam), '-o');
+    yline(mean(params_est_allBoot(:, iParam)), 'k-')
 
     % Load and plot the true param
     % load(sprintf('%s/truth.mat', nameFolder_OOD_load), 'noiseP_true')
     % yline(noiseP_true, 'r-'); % should match noiseP defined in OOD_sim
 
     ylim([params_lb(iParam), params_ub(iParam)])
-    xlabel('Iteration');
-    ylabel(namesParamsModel_all{iModelB}{iParam});
-    title(['Parameter: ', namesParamsModel_all{iModelB}{iParam}]);
+    xlabel('Bootstrap');
+    ylabel(namesModelBparams{iModelB}{iParam});
+    title(['Parameter: ', namesModelBparams{iModelB}{iParam}]);
 
 end
 
-sgtitle(sprintf('Figure 2. Estimated Parameters Across Iterations\n%s (ModelA%dB%d %s, niterations=%d)', ...
-    subjName, iModelA, iModelB, namesModelB{iModelB}, nIterations))
+sgtitle(sprintf('Figure 2. Estimated Parameters Across Bootstraps\n%s (ModelA%dB%d %s, niterations=%d)', ...
+    subjName, iModelA, iModelB, namesModelB{iModelB}, nBoot))
 
-
-saveas(gcf, sprintf('%s/4Params_%s_A%dB%d.jpg', nameFolder_Figures_NOM, subjName, iModelA, iModelB))
+saveas(gcf, sprintf('%s/4Params_%s_L%d_A%dB%d.jpg', nameFolder_Figures_NOM, subjName, iLocComb, iModelA, iModelB))

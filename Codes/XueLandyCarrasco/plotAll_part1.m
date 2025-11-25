@@ -40,7 +40,6 @@ if nLoc == 2, nameFileLoc = sprintf('L%d%d', iLocComb_all(1), iLocComb_all(2)); 
 % if flag_mirrorMapping == 1
 %     name_numFilters_Fitting = sprintf('%d_%d_m_ORI%d_SF%d', nORI, nSF, flag_mirrorMapping, ifamily_perF);
 % end
-
     
 
 %% 1. 2D kernels
@@ -259,38 +258,6 @@ flag_plotIDVD = 0;
 flag_plotDiff = 1;
 
 plot6_params_grant
-
-%% plot raw vs. reconstructed 2D kernel
-% axisTicks_tuning = {-60:30:60, [0.3571, 0.6429, 1, 1.3571, 1.6429]}; % ticks (SF is on log scale)
-% axisTL_tuning = {axisTicks_tuning{1}, round(2.^axisTicks_tuning{2},2)}; % label (SF is on linear scale)
-% axisLim = {[-99, 99], [-.1, 2.1]};
-%
-% itype=2;
-% for iiLoc = 1:2
-%     folderName = sprintf('%s/%s/idvd/separability/L%d/', nameFigFolder, name_numFilters_Fitting, iLocComb_all(iiLoc));
-%     folderDir = dir(folderName); if isempty(folderDir), mkdir(folderName), end
-%     for isubj=1:12
-%         e2D_raw = getCI(e2D_med_allSubj(isubj, iiLoc, itype, :,: ), 2, 1);
-%         e2D_raw = e2D_raw-min(e2D_raw(:))+eps;
-%         margORI = mean(e2D_raw, 2);
-%         margSF = mean(e2D_raw, 1);
-%         e2D_recon = mtimes(margORI, margSF);
-%         % only select the thin slice around ORI=0
-%         sep_full = corr2(e2D_raw, e2D_recon);
-%         buffer = 4;
-%         sep_partial = corr2(e2D_raw((nORI+1)/2-buffer: (nORI+1)/2+buffer, :), e2D_recon((nORI+1)/2-buffer: (nORI+1)/2+buffer, :));
-%
-%         figure('Position', [0 0 785 440])
-%         subplot(3,5, [2,3,7,8]), imagesc(axis_tuning{2}, axis_tuning{1}, e2D_raw), axis square, xticks(axisTicks_tuning{2}), xticklabels(round(2.^axisTicks_tuning{2}, 2)), yticks(axisTicks_tuning{1}), yline(0, 'r-'); xline(1, 'r-');
-%         subplot(3,5, [4,5,9,10]), imagesc(axis_tuning{2}, axis_tuning{1}, e2D_recon), axis square, xticks(axisTicks_tuning{2}), xticklabels(round(2.^axisTicks_tuning{2}, 2)), yticks(axisTicks_tuning{1}), yline(0, 'r-'); xline(1, 'r-');
-%         subplot(3,5, [1,6]), plot(margORI, axis_tuning{1}), set(gca,'YDir','reverse'); yline(0, 'r-');
-%         subplot(3,5, [12, 13]), plot(axis_tuning{2}, margSF), xticks(axisTicks_tuning{2}), xticklabels(round(2.^axisTicks_tuning{2}, 2)), xline(1, 'r-');
-%         set(findall(gcf, '-property', 'LineWidth'), 'LineWidth',2)
-%         set(findall(gcf, '-property', 'fontsize'), 'fontsize',15)
-%         sgtitle(sprintf('%s-L%d (%d%%/%d%%)', subjList{isubj}, iLocComb_all(iiLoc), round(sep_full*100), round(sep_partial*100)))
-%         saveas(gcf, sprintf('%s%s_%d.jpg', folderName, subjList{isubj}, round(sep_full*100)))
-%     end
-% end
 
 %% reorganize two peaks based on dominance
 if ifamily_perF(2)==12

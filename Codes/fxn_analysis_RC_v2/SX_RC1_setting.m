@@ -18,13 +18,13 @@ nSF = nORI;
 
 %% Define names of folders to load/save data (on the server)
 % if run on HPC
-% nameFolder_server = '/scratch/sx712/PF_RC';
+% nameFolder_server = '/scratch/sx712/PF_RC'; str_envir = 'HPC'; 
 
-% if run on server (OOD)
-nameFolder_server = '/Volumes/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC'; % the server directory of the Data and Figures folders
+% if run on server
+nameFolder_server = '/Volumes/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC'; str_envir = 'Server'; 
 
 % if run on local for model simulation
-% nameFolder_server = '/Users/xueshutian/Desktop/GitHub_local/PF_RC';
+% nameFolder_server = '/Users/xueshutian/Desktop/GitHub_local/PF_RC'; str_envir = 'Local'; 
 
 nameFolder_Data = sprintf('%s/Data', nameFolder_server) ;
 nameFolder_Data_OOD = sprintf('%s/Data_OOD_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
@@ -151,8 +151,8 @@ ncomb8 = 8;
 %% NOM fitting
 % Parameter bounds and initial values
 % Internal noise parameters
-Nmul_lb = 1e-5;  Nmul_ub = 2;     % multiplicative noise
-SDadd_lb = 1e-5; SDadd_ub = 30;   % additive noise (20–30 range from sims)
+Nmul_lb = 1e-5;  Nmul_ub = 1;     % multiplicative noise
+SDadd_lb = 1e-5; SDadd_ub = 40;   % additive noise (20–30 range from simulations)
 % Correlation parameter (rhoDV)
 rho_lb  = 1e-5;  rho_ub = 1 - rho_lb;
 
@@ -205,12 +205,12 @@ namesParams_all = {
 if ~exist('flag_standEnergy', 'var'), flag_standEnergy = 1; end
 
 % lb and ub that are consistent across models
-ORI_gain_lb = 1e-3; ORI_gain_ub = .2;
+ORI_gain_lb = 1e-3; ORI_gain_ub = .5;
 ORI_width_lb = 1e-3; ORI_width_ub = 40;
 ORI_base_lb = -.2; ORI_base_ub = ORI_gain_ub;
 
 SF_peak_lb = 1e-3; SF_peak_ub = 4;
-SF_gain_lb = 1e-3; SF_gain_ub = .2;
+SF_gain_lb = 1e-3; SF_gain_ub = .5;
 SF_width_lb = 1e-3; SF_width_ub = .4; % .2 is arbitrary
 SF_base_lb = -.1; SF_base_ub = SF_gain_ub;
 
@@ -273,31 +273,29 @@ namesYLabel = {'Deviance', 'Deviance', 'IC'};
 
 namesParamsMode = {'estP', 'tunC'};
 
-% Noisy observer model names
+%% Noisy observer model names
 namesModelA = {'RC', 'IO', 'RandTemp'};
 
-namesModelB = {'FullModel', 'NoRho', 'NoNoise', 'NoInduced', 'NoInducedNoRho', 'NoConstant', 'NoConstantNoRho'};
-namesParamsModel_all = {...
+namesModelB = {'FullModel', 'NoRho', 'NoInduced', 'NoInducedNoRho', 'NoConstant', 'NoConstantNoRho', 'NoNoise'};
+namesModelBparams = {...
     {'Induced noise', 'Additive noise', 'Rho'}, ... 
     {'Induced noise', 'Additive noise'          }, ...
-    {                                                    'Rho'}, ...
     {                          'Additive noise', 'Rho'}, ...
     {                          'Additive noise',         }, ...
     {'Induced noise',                            'Rho'}, ...
-    {'Induced noise',                                   }};
+    {'Induced noise',                                   }, ...
+    {                                                    'Rho'}};
 
+% namesParams2 = {'Thresh', 'mu [PRS]', 'sigma [PRS]','mu [ABS]', 'sigma [ABS]'};
+% nparams2 = length(namesParams2);
 
-namesParams2 = {'Thresh', 'mu [PRS]', 'sigma [PRS]','mu [ABS]', 'sigma [ABS]'};
-nparams2 = length(namesParams2);
-
-
-namesNormalityTest = {'Raw', 'Exp', 'Sqrt', 'boxcox'}; % reciprocal is deleted
-nNormTests = length(namesNormalityTest);
+% namesNormalityTest = {'Raw', 'Exp', 'Sqrt', 'boxcox'}; % reciprocal is deleted
+% nNormTests = length(namesNormalityTest);
 
 namesConvolveType = {'dot product', 'convolution'}; nConvolveType = length(namesConvolveType);
 namesIVType = {'sum all channels', 'channel with max IV'}; nIVType = length(namesIVType);
 
-% For plotting
+%% For plotting
 namesFeature_axis = {'Orientation (deg)', 'Spatial frequency (cpd)'};
 % names of the estParams/tuningC
 clear namesTunC_unit_perF
@@ -312,7 +310,7 @@ namesTunC_unit_perF{8,2} = {'Pref ORI (deg)', 'peak amp. (a.u.)', 'trough ori (d
 namesTunC_unit_perF{12,2} = {'peak SF1 (cpd)', 'peak amp. 1 (a.u.)', 'bandwidth 1 (octave)', 'peak SF2 (cpd)', 'peak amp. 2 (a.u.)', 'bandwidth 2 (octave)'};
 namesTunC_unit_perF{13,2} = {'peak amp. (a.u.)', 'trough ori (deg)', 'trough mag, (a.u.)', 'bandwidth (deg)', 'baseline (a.u.)'};
 
-%% Colors
+% Colors
 colors_comb = [
     0,0,0; ...,     % center; black
     0, .75, 0; ..., % Left: light green

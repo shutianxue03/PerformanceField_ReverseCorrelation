@@ -458,8 +458,6 @@ end
 
 fprintf(text_symmary)
 
-%% raw data
-
 %%
 close all
 % end

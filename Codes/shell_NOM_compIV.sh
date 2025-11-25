@@ -5,12 +5,12 @@
 # Last modified: 2025-11-23
 #
 # Usage (from launcher script):
-#   sbatch shell_NOM_compIV.sh isubj iLocComb iModelA nIterations
+# sbatch shell_NOM_compIV.sh isubj iLocComb iModelA nBoot
 #
 # This script:
-#   1. Runs a small performance evaluation script (optional monitoring)
-#   2. Launches MATLAB and calls:
-#        OOD_NOM_Trialwise_compIV(isubj, iLocComb, iModelA, nIterations)
+# 1. Runs a small performance evaluation script (optional monitoring)
+# 2. Launches MATLAB and calls:
+# OOD_NOM_Trialwise_compIV(isubj, iLocComb, iModelA, nBoot)
 # ============================================================
 
 #SBATCH --nodes=1
@@ -34,9 +34,9 @@ export MATLAB_PREFDIR
 MATLAB_PREFDIR=$(mktemp -d -t matlab-XXXX)
 
 echo
-echo "SLURM job ID  : $SLURM_JOB_ID"
+echo "SLURM job ID : $SLURM_JOB_ID"
 echo "SLURM job name: $SLURM_JOB_NAME"
-echo "Subj=$1  Loc=$2  ModelA=$3  nIter=$4"
+echo "Subj=$1 Loc=$2 ModelA=$3 nIter=$4"
 echo
 
 
@@ -46,18 +46,18 @@ echo
 cat <<EOF | srun matlab -nodisplay -nosplash -nodesktop
 
 disp('====================================');
-disp('  Starting OOD_NOM_Trialwise_compIV...');
+disp(' Starting OOD_NOM_Trialwise_compIV...');
 disp('====================================');
 
-isubj     = $1;
-iLocComb  = $2;
-iModelA   = $3;
-nIterations = $4;
+isubj = $1;
+iLocComb = $2;
+iModelA = $3;
+nBoot = $4;
 
-OOD_NOM_Trialwise_compIV(isubj, iLocComb, iModelA, nIterations);
+OOD_NOM_Trialwise_compIV(isubj, iLocComb, iModelA, nBoot);
 
 disp('====================================');
-disp('  OOD_NOM_Trialwise_compIV finished.');
+disp(' OOD_NOM_Trialwise_compIV finished.');
 disp('====================================');
 
 exit

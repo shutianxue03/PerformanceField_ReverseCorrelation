@@ -37,30 +37,31 @@ switch iModelB
         SDadd = params_est(2);
         rhoDV = 0;
 
-    case 3 % No Noise
+    case 3 % No induced noise
+        Nmul = 0;
+        SDadd = params_est(1);
+        rhoDV = params_est(2);
+
+    case 4 % No induced noise or rho
+        Nmul = 0;
+        SDadd = params_est(1);
+        rhoDV = 0;
+
+    case 5 % No constant noise
+        Nmul = params_est(1);
+        SDadd = 0;
+        rhoDV = params_est(2);
+
+    case 6 % No constant noise or rho
+        Nmul = params_est(1);
+        SDadd = 0;
+        rhoDV = 0;
+
+
+    case 7 % No Noise [the worst model]
         Nmul = 0;
         SDadd = 0;
         rhoDV = params_est(1);
-
-    case 4 % No induced noise
-        Nmul = 0;
-        SDadd = params_est(1);
-        rhoDV = params_est(2);
-
-    case 5 % No induced noise or rho
-        Nmul = 0;
-        SDadd = params_est(1);
-        rhoDV = 0;
-
-    case 6 % No constant noise
-        Nmul = params_est(1);
-        SDadd = 0;
-        rhoDV = params_est(2);
-
-    case 7 % No constant noise or rho
-        Nmul = params_est(1);
-        SDadd = 0;
-        rhoDV = 0;
 
     otherwise
         error('fxn_getError_v7: Unknown iModelB = %d', iModelB);

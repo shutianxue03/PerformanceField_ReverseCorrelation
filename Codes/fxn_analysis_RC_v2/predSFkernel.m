@@ -1,5 +1,5 @@
 
-function y = predSFkernel(x, ifamily, params, plotFlag)
+function y = predSFkernel(x, ifamily, params, flag_plot)
 
 SX_normPDF = @(x,mu,sigma) exp(-((x-mu)/sigma).^2);
 
@@ -117,7 +117,8 @@ switch ifamily
         y = gain1*(SX_normPDF(x, 0, sigma1).^power - gain2*SX_normPDF(x, 0, sigma1*sigma_r))+ baseline;
 end
 
-if plotFlag
+%% Plot
+if flag_plot
     figure, hold on
     plot(x, y, 'o-')
     ylimit = ylim;

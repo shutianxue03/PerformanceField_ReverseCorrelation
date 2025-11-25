@@ -5,12 +5,12 @@
 # Last modified: 2025-11-23
 #
 # Usage (from launcher script):
-#   sbatch shell_NOM_fitNOM.sh isubj iLocComb iModelA iModelB nIterations
+# sbatch shell_NOM_fitNOM.sh isubj iLocComb iModelA iModelB nBoot
 #
 # This script:
-#   1. Runs a small performance evaluation script (optional monitoring)
-#   2. Launches MATLAB and calls:
-#        OOD_NOM_Trialwise_fitNOM(isubj, iLocComb, iModelA, iModelB, nIterations)
+# 1. Runs a small performance evaluation script (optional monitoring)
+# 2. Launches MATLAB and calls:
+# OOD_NOM_Trialwise_fitNOM(isubj, iLocComb, iModelA, iModelB, nBoot)
 # ============================================================
 
 #SBATCH --nodes=1
@@ -34,9 +34,9 @@ export MATLAB_PREFDIR
 MATLAB_PREFDIR=$(mktemp -d -t matlab-XXXX)
 
 echo
-echo "SLURM job ID  : $SLURM_JOB_ID"
+echo "SLURM job ID : $SLURM_JOB_ID"
 echo "SLURM job name: $SLURM_JOB_NAME"
-echo "Subj=$1  Loc=$2  ModelA=$3  ModelB=$4 nIter=$5"
+echo "Subj=$1 Loc=$2 ModelA=$3 ModelB=$4 nIter=$5"
 echo
 
 #############################
@@ -45,19 +45,19 @@ echo
 cat <<EOF | srun matlab -nodisplay -nosplash -nodesktop
 
 disp('====================================');
-disp('  Starting OOD_NOM_Trialwise_fitNOM...');
+disp(' Starting OOD_NOM_Trialwise_fitNOM...');
 disp('====================================');
 
-isubj     = $1;
-iLocComb  = $2;
-iModelA   = $3;
+isubj = $1;
+iLocComb = $2;
+iModelA = $3;
 iModelB=$4;
-nIterations = $5;
+nBoot = $5;
 
-OOD_NOM_Trialwise_fitNOM(isubj, iLocComb, iModelA, iModelB, nIterations);
+OOD_NOM_Trialwise_fitNOM(isubj, iLocComb, iModelA, iModelB, nBoot);
 
 disp('====================================');
-disp('  OOD_NOM_Trialwise_fitNOM finished.');
+disp(' OOD_NOM_Trialwise_fitNOM finished.');
 disp('====================================');
 
 exit
