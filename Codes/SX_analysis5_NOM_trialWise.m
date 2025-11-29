@@ -17,14 +17,17 @@ SX_RC1_setting
 % gaborCST_all = [.1, .5]; % Gabor contrast sensitivity thresholds
 % nTrials_all = [5000]; % Number of trials per condition
 % noiseP_all = [0, 0.1, 0.2]; % Proportion of noise trials
-iModelA_sim_all = [1]; % 1=RC-derived template, 2=use IO template, 2=randomize template,
-iModelB_sim_all = [1,2]; % see SX_RC1_setting for namesModelB
-nBoot = 10; % Number of bootstraps (100 for raw IVs, 99 for transformed IVs)
-iLocComb_all = [1,8, 6, 7]; % combination of locations
-iLocGroups_all = {[1,8], [6, 7]} ;
-nGroups = length(iLocGroups_all);
+iModelA_sim_all = [1:2]; % 1=RC-derived template, 2=use IO template, 2=randomize template,
+iModelB_sim_all = [1:6]; % see SX_RC1_setting for namesModelB
+nBoot = 100; % Number of bootstraps (100 for raw IVs, 99 for transformed IVs)
+iLocComb_all = [1,8, 6,7, 5,3]; % combination of locations
+iLocGroups_all = {[1,8], [6,7], [5,3]} ; nGroups = length(iLocGroups_all);
 iFamily_ORI = 1; %1=scaled Gaussian
 iFamily_SF = 2; % 2=log parabola
+namesMetrics = {'pYES', 'pA'}; nMetrics = length(namesMetrics);
+
+iModelA_plot = 1; % just plot the RC-derived
+iModelB_plot = 1; % 1=full model; 2=No Rho; 3=No induced noise
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 NOM_mode = 2; % 1= aggregate model, 2 = trial-wise model
@@ -35,9 +38,13 @@ iModelB_all = iModelB_sim_all;
 
 % Define subject list
 if flag_subjIsHuman
-    subjList = {'YK', 'SP', 'SX', 'LS', 'RE', 'MD', 'AS', 'HL', 'FH', 'HA', 'CS', 'DT', 'DU', 'RC', 'SR'};
-    subjList = {'YK', 'SX'};
-    nRows = 3; nCols = 5; assert(nRows * nCols >= length(subjList), 'ALERT: Not enough subplots for the number of subjects!');
+    subjList = {'YK', 'SP', 'SX', 'LS', 'RE', 'MD', 'AS', 'HL', 'FH', 'HA', 'CS', 'DT', 'DU', 'RC', 'SR'}; nRows = 3; nCols = 5; 
+    nblocks_allSubj = [200, 240, 210, 240, 220, 220, 215, 220, 205, 210, 205, 205, 205, 195, 205];
+
+    subjList = {'YK', 'SP', 'SX', 'LS', 'RE', 'MD', 'HL', 'FH', 'HA', 'DT', 'DU', 'SR'}; nRows = 3; nCols = 4; 
+    nblocks_allSubj = [200, 240, 210, 240, 220, 220, 220, 205, 210, 205, 205, 195];
+
+    assert(nRows * nCols >= length(subjList), 'ALERT: Not enough subplots for the number of subjects!');
 
 else
     % Find folders with names starting with 'IO' in Data/Data_NOM_Trialwise_2929
@@ -56,12 +63,9 @@ end
 nsubj = length(subjList);
 
 % Names of the performance metrics being analyzed
-% namesMetrics = {'pYES', 'pC', 'pA'};
-namesMetrics = {'pYES', 'pA'};
-nMetrics = length(namesMetrics);
-nModelsA = 2; % do not use length()!!
-nModelsB = 2; % do not use length()!!
-nLocComb8 = 2; % do not use length()!!
+nModelsA = length(iModelA_all);
+nModelsB = length(iModelB_all);
+nLocComb8 = length(iLocComb_all);
 nBins = 10; % Number of bins for the analysis
 iIC_plot = 3; % % Which information criterion to plot (1 = AIC, 2 = AICc, 3 = BIC)
 
@@ -70,39 +74,50 @@ getAIC_nLL = @(nLL, nParams) 2*nParams+2*nLL;
 getAICc_nLL = @(nLL, nParams, nData) getAIC_nLL(nLL, nParams) + (2*nParams*(nParams+1))/(nData-nParams-1);
 getBIC_nLL = @(nLL, nParams, nData) nParams*log(nData)+2*nLL;
 
-% getAIC_SSE = @(SSE, nParams, nData) nData * log(SSE / nData) + 2 * nParams;
-% getAICc_SSE = @(SSE, nParams, nData) nData * log(SSE / nData) + 2 * nParams + 2 * nParams * (nParams + 1) / (nData - nParams - 1);
-% getBIC_SSE = @(SSE, nParams, nData) nData * log(SSE / nData) + nParams * log(nData);
-
-%% Define folder to save figures
+% Define folder to save figures
 nameFolder_Fig_NOM_Trialwise = sprintf('%s/NOM_Trialwise_%d%d', nameFolder_Figures, nORI, nSF);
 if isempty(dir(nameFolder_Fig_NOM_Trialwise)), mkdir(nameFolder_Fig_NOM_Trialwise), end
 
-%% (time-consuming!) Compile data from boostrapped data
-clc
+% Print a header to summarize the setting
+fprintf('NOM trial-wise analysis settings:\n')
+fprintf(' - nsubj = %d\n', nsubj)
+fprintf(' - Models A: %s\n', strjoin(string(iModelA_all), ', '));
+fprintf(' - Models B: %s\n', strjoin(string(iModelB_all), ', '));
+fprintf(' - Number of bootstraps: %d\n', nBoot);
+fprintf(' - Combined locations:  %s\n', strjoin(string(iLocComb_all), ', '));
+fprintf(' - ORI tuning function:  %s\n', namesFamily_all{iFamily_ORI});
+fprintf(' - SF tuning function:  %s\n', namesFamily_all{iFamily_SF});
+fprintf(' - Number of Bins: %d\n', nBins);
+fprintf(' - Information Criterion to plot: %s\n', namesIC{iIC_plot});
+
+%% (Time-consuming!) Compile data from boostrapped data
+
 % Preallocate arrays for storing results across all conditions
 template_train_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nORI, nSF);
 template_full_allCond = template_train_allCond;
 IV_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nBoot, nBins);
 nTrials_allCond = IV_allCond;
-metric_allCond = nan(nModelsA, nModelsB, nLocComb8, nMetrics, nsubj, nBoot, nBins);
-pred_allCond = metric_allCond;
-nLL_allCond = nan(nModelsA, nModelsB, nLocComb8, nMetrics, nsubj, nBoot);
+metric_data_allCond = nan(nModelsA, nModelsB, nLocComb8, nMetrics, nsubj, nBoot, nBins);
+metric_pred_allCond = metric_data_allCond;
+nLL_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nBoot);
 params_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nBoot, 3); % Pre-allocate for max params
-IC_nLL_allCond = nan(nModelsA, nModelsB, nLocComb8, nMetrics, nsubj, nBoot, 3); % AIC, AICc, BIC (3)
+IC_nLL_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nBoot, 3); % AIC, AICc, BIC (3)
 
 % Fitting tuning curves
-sep_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nBoot, 2); % 2 is for 1=training set and 2=full set
+nDatasets = 2; %1=template is derived from training set; 2=full dataset
+sep_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nBoot, nDatasets); % 2 is for 1=training set and 2=full set
 
-margORI_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nBoot, 2, nORI);
-margPred_ORI_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nBoot, 2, nORI);
-margParams_ORI_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nBoot, 2, length(namesParams_all{iFamily_ORI}));
-margR2_ORI_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nBoot, 2);
+margORI_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nBoot, nDatasets, nORI);
+margPred_ORI_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nBoot, nDatasets, nORI);
+margParams_ORI_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nBoot, nDatasets, length(namesParams_all{iFamily_ORI}));
+margR2_ORI_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nBoot, nDatasets);
+margTunC_ORI_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nBoot, nDatasets, length(namesTunC_unit_perF{iFamily_ORI, 2}));
 
-margSF_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nBoot, 2, nSF);
-margPred_SF_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nBoot, 2, nSF);
-margParams_SF_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nBoot, 2, length(namesParams_all{iFamily_SF}));
-margR2_SF_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nBoot, 2);
+margSF_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nBoot, nDatasets, nSF);
+margPred_SF_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nBoot, nDatasets, nSF);
+margParams_SF_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nBoot, nDatasets, length(namesParams_all{iFamily_SF}));
+margR2_SF_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nBoot, nDatasets);
+margTunC_SF_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nBoot, nDatasets, length(namesTunC_unit_perF{iFamily_SF, 2}));
 
 % The main analysis loop for all conditions for each subject (Models x Loc x Metrics)
 for iModelA = iModelA_all %1:nModelsA
@@ -115,261 +130,632 @@ for iModelA = iModelA_all %1:nModelsA
         for iLocComb = iLocComb_all
             fprintf(' L%d ', iLocComb)
 
-            for iMetric = 1:nMetrics
-                % fprintf(' Metric%d: ', iMetric)
+            for isubj = 1:nsubj
 
-                for isubj = 1:nsubj
+                subjName = subjList{isubj};
 
-                    subjName = subjList{isubj};
+                if flag_subjIsHuman
+                    % nameFolder_NOM_save = sprintf('%s/%s', nameFolder_Data_NOM_Trialwise, nameIO);
+                    nameFolder_NOM_save = sprintf('%s/%s/L%d', nameFolder_Data_NOM_Trialwise, subjName, iLocComb); % MUST be the same as OOD_NOM_Trialwise_compIV.m, Line 61
+                else
+                    % nameFolder_NOM_save = sprintf('%s/ORI%dSF%d/%s/L%d', nameFolder_NOM0, nORI, nSF, subjName, iLocComb);
+                    nameFolder_NOM_save = sprintf('%s/%s', nameFolder_Data_NOM_Trialwise, subjName); % MUST be the same as OOD_NOM_Trialwise_compIV.m, Line 68
+                end
 
-                    if flag_subjIsHuman
-                        % nameFolder_NOM_save = sprintf('%s/%s', nameFolder_Data_NOM_Trialwise, nameIO);
-                        nameFolder_NOM_save = sprintf('%s/%s/L%d', nameFolder_Data_NOM_Trialwise, subjName, iLocComb); % MUST be the same as OOD_NOM_Trialwise_compIV.m, Line 61
-                    else
-                        % nameFolder_NOM_save = sprintf('%s/ORI%dSF%d/%s/L%d', nameFolder_NOM0, nORI, nSF, subjName, iLocComb);
-                        nameFolder_NOM_save = sprintf('%s/%s', nameFolder_Data_NOM_Trialwise, subjName); % MUST be the same as OOD_NOM_Trialwise_compIV.m, Line 68
-                    end
-
-                    % Load IVs and derived templates
-                    nameFile_compIV = sprintf('%s/n%d_A%d_compIV.mat', nameFolder_NOM_save, nBoot, iModelA);
-                    if isempty(dir(nameFile_compIV)), error('ALERT: File %s does not exist!', nameFile_compIV); end
+                % Load IVs and derived templates
+                nameFile_compIV = sprintf('%s/n%d_A%d_compIV.mat', nameFolder_NOM_save, nBoot, iModelA);
+                % if isempty(dir(nameFile_compIV)), error('ALERT: File %s does not exist!', nameFile_compIV); end
+                if isempty(dir(nameFile_compIV))
+                    fprintf(' "%sL%dA%d" ', subjName, iLocComb, iModelA)
+                else
                     load(nameFile_compIV, '*_allBoot')
+                end
 
-                    % Load predictions
-                    nameFile_fitNOM = sprintf('%s/n%d_A%dB%d.mat', nameFolder_NOM_save, nBoot, iModelA, iModelB);
-                    if isempty(dir(nameFile_fitNOM)), error('ALERT: File %s does not exist!', nameFile_fitNOM); end
+                % Load predictions
+                nameFile_fitNOM = sprintf('%s/n%d_A%dB%d.mat', nameFolder_NOM_save, nBoot, iModelA, iModelB);
+                % if isempty(dir(nameFile_fitNOM)), error('ALERT: File %s does not exist!', nameFile_fitNOM); end
+                if isempty(dir(nameFile_fitNOM))
+                    fprintf(' "%sL%dA%dB%d" ', subjName, iLocComb, iModelA, iModelB)
+                else
                     load(nameFile_fitNOM, '*_allBoot')
+                end
 
-                    % Pre-allocate temporary arrays for this subject and model
-                    IV_allBoot = nan(nBoot, nBins); % IV for each bin
-                    nTrials_allBoot = IV_allBoot; % Trial count for each bin
-                    meas_allBoot = IV_allBoot; % Measured data for each bin
-                    pred_allBoot = IV_allBoot; % Predicted data for each bin
+                % Pre-allocate temporary arrays for this subject and model
+                IV_allBoot = nan(nBoot, nBins); % IV for each bin
+                nTrials_allBoot = IV_allBoot; % Trial count for each bin
+                metric_data_allBoot = nan(nMetrics, nBoot, nBins); % Measured data for each bin
+                metric_pred_allBoot = metric_data_allBoot; % Predicted data for each bin
+                margTuningC_ORI_allBoot = nan(nBoot, nDatasets, length(namesTunC_unit_perF{iFamily_ORI, 2}));
+                margTuningC_SF_allBoot = nan(nBoot, nDatasets, length(namesTunC_unit_perF{iFamily_SF, 2}));
 
-                    for iBoot = 1:nBoot
-                        % Extract IV per bin
-                        IV_allBoot(iBoot, :) = pred_metrics_allBoot{iBoot}.metrics.IV_allBins;
+                for iBoot = 1:nBoot
+                    % Extract IV per bin
+                    IV_allBoot(iBoot, :) = pred_metrics_allBoot{iBoot}.metrics.IV_allBins;
 
-                        % Extract the number of trials per bin
-                        nTrials_allBoot(iBoot, :) = pred_metrics_allBoot{iBoot}.metrics.nTrials_allBins;
+                    % Extract the number of trials per bin
+                    nTrials_allBoot(iBoot, :) = pred_metrics_allBoot{iBoot}.metrics.nTrials_allBins;
 
-                        % Extract metrics (data and predictions) per bin
-                        pred_metrics = pred_metrics_allBoot{iBoot}.metrics; % Extract once for faster access
-
+                    % Extract metrics (data and predictions) per bin
+                    pred_metrics = pred_metrics_allBoot{iBoot}.metrics; % Extract once for faster access
+                    for iMetric = 1:nMetrics
                         switch namesMetrics{iMetric}
                             case 'pYES'
-                                meas_allBoot(iBoot, :) = pred_metrics.pYES_data_allBins;
-                                pred_allBoot(iBoot, :) = pred_metrics.pYES_pred_allBins;
+                                metric_data_allBoot(iMetric, iBoot, :) = pred_metrics.pYES_data_allBins;
+                                metric_pred_allBoot(iMetric, iBoot, :) = pred_metrics.pYES_pred_allBins;
                             case 'pA'
-                                meas_allBoot(iBoot, :) = pred_metrics.pA_data_allBins;
-                                pred_allBoot(iBoot, :) = pred_metrics.pA_pred_allBins;
+                                metric_data_allBoot(iMetric, iBoot, :) = pred_metrics.pA_data_allBins;
+                                metric_pred_allBoot(iMetric, iBoot, :) = pred_metrics.pA_pred_allBins;
                             case 'pC'
-                                meas_allBoot(iBoot, :) = pred_metrics.pC_data_allBins;
-                                pred_allBoot(iBoot, :) = pred_metrics.pC_pred_allBins;
+                                metric_data_allBoot(iMetric, iBoot, :) = pred_metrics.pC_data_allBins;
+                                metric_pred_allBoot(iMetric, iBoot, :) = pred_metrics.pC_pred_allBins;
                         end
+                    end % iMetric
+                    % Calculate information critertion based on nLL
+                    nData = sum(nTrials_allBoot(iBoot, :));
 
-                        % Calculate information critertion based on nLL
-                        nData = sum(nTrials_allBoot(iBoot, :));
+                    % nLL_allBoot
+                    nLL = nLL_allBoot(iBoot);
+                    IC_nLL = [getAIC_nLL(nLL, nParamsB), getAICc_nLL(nLL, nParamsB, nData), getBIC_nLL(nLL, nParamsB, nData)];
+                    IC_nLL_allCond(iModelA, iModelB, iLocComb, isubj, iBoot, :) = IC_nLL;
 
-                        % nLL_allBoot
-                        nLL = nLL_allBoot(iBoot);
-                        IC_nLL = [getAIC_nLL(nLL, nParamsB), getAICc_nLL(nLL, nParamsB, nData), getBIC_nLL(nLL, nParamsB, nData)];
-                        IC_nLL_allCond(iModelA, iModelB, iLocComb, iMetric, isubj, iBoot, :) = IC_nLL;
+                    % Compute tuning characteristics based on the fitted parameters
+                    for iDataset=1:2
+                        % ORI
+                        iFeature= 1;
+                        margTuningC_ORI_allBoot(iBoot, iDataset, :) = fxn_getTuningC(axis_tuning{iFeature}, iFeature, iFamily_ORI, squeeze(margPred_ORI_allBoot(iBoot, iDataset, :)), squeeze(margParams_ORI_allBoot(iBoot, iDataset, :)));
+                        % fxn_getTuningC(axis_tuning{iFeature}, iFeature, iFamily_ORI, squeeze(margPred_ORI_allBoot(iBoot, iDataset, :)), squeeze(margParams_ORI_allBoot(iBoot, iDataset, :)))
 
-                    end % end of iBoot
+                        % SF
+                        iFeature=2;
+                        margTuningC_SF_allBoot(iBoot, iDataset, :) = fxn_getTuningC(axis_tuning{iFeature}, iFeature, iFamily_SF, squeeze(margPred_SF_allBoot(iBoot, iDataset, :)), squeeze(margParams_SF_allBoot(iBoot, iDataset, :)));
+                    end
+                end % end of iBoot
 
-                    % Store results
-                    % Templates
-                    [template_train_med, ~, ~, template_train_sem] = getCI(template_train_allBoot, 1, 1);
-                    [template_full_med, ~, ~, template_full_sem] = getCI(template_full_allBoot, 1, 1);
-                    template_train_allCond(iModelA, iModelB, iLocComb, isubj, :, :) = template_train_med;
-                    template_full_allCond(iModelA, iModelB, iLocComb, isubj, :, :) = template_full_med;
+                % Store results
+                % Templates
+                [template_train_med, ~, ~, template_train_sem] = getCI(template_train_allBoot, 1, 1);
+                [template_full_med, ~, ~, template_full_sem] = getCI(template_full_allBoot, 1, 1);
+                template_train_allCond(iModelA, iModelB, iLocComb, isubj, :, :) = template_train_med;
+                template_full_allCond(iModelA, iModelB, iLocComb, isubj, :, :) = template_full_med;
 
-                    % Tuning functions: marg, predictions, estimated parameters and separability
-                    sep_allCond(iModelA, iModelB, iLocComb, isubj, :, :) = sep_allBoot;
+                % Tuning functions: marg, predictions, estimated parameters and separability
+                sep_allCond(iModelA, iModelB, iLocComb, isubj, :, :) = sep_allBoot;
 
-                    margORI_allCond(iModelA, iModelB, iLocComb, isubj, :, :, :) = margORI_allBoot;
-                    margPred_ORI_allCond(iModelA, iModelB, iLocComb, isubj, :, :, :) = margPred_ORI_allBoot;
-                    margParams_ORI_allCond(iModelA, iModelB, iLocComb, isubj, :, :, :) = margParams_ORI_allBoot;
-                    margR2_ORI_allCond(iModelA, iModelB, iLocComb, isubj, :, :) = margR2_ORI_allBoot;
+                margORI_allCond(iModelA, iModelB, iLocComb, isubj, :, :, :) = margORI_allBoot; % directly loaded
+                margR2_ORI_allCond(iModelA, iModelB, iLocComb, isubj, :, :) = margR2_ORI_allBoot; % directly loaded
+                margPred_ORI_allCond(iModelA, iModelB, iLocComb, isubj, :, :, :) = margPred_ORI_allBoot; % directly loaded
+                margParams_ORI_allCond(iModelA, iModelB, iLocComb, isubj, :, :, :) = margParams_ORI_allBoot; % directly loaded
+                margTunC_ORI_allCond(iModelA, iModelB, iLocComb, isubj, :, :, :) = margTuningC_ORI_allBoot;
 
-                    margSF_allCond(iModelA, iModelB, iLocComb, isubj, :, :, :) = margSF_allBoot;
-                    margPred_SF_allCond(iModelA, iModelB, iLocComb, isubj, :, :, :) = margPred_SF_allBoot;
-                    margParams_SF_allCond(iModelA, iModelB, iLocComb, isubj, :, :, :) = margParams_SF_allBoot;
-                    margR2_SF_allCond(iModelA, iModelB, iLocComb, isubj, :, :) = margR2_SF_allBoot;
+                margSF_allCond(iModelA, iModelB, iLocComb, isubj, :, :, :) = margSF_allBoot; % directly loaded
+                margR2_SF_allCond(iModelA, iModelB, iLocComb, isubj, :, :) = margR2_SF_allBoot; % directly loaded
+                margPred_SF_allCond(iModelA, iModelB, iLocComb, isubj, :, :, :) = margPred_SF_allBoot; % directly loaded
+                margParams_SF_allCond(iModelA, iModelB, iLocComb, isubj, :, :, :) = margParams_SF_allBoot; % directly loaded
+                margTunC_SF_allCond(iModelA, iModelB, iLocComb, isubj, :, :, :) = margTuningC_SF_allBoot;
 
-                    % NOM: IVs, predictions, nLL and parameters
-                    IV_allCond(iModelA, iModelB, iLocComb, isubj, :, :) = IV_allBoot;
-                    nTrials_allCond(iModelA, iModelB, iLocComb, isubj, :, :) = nTrials_allBoot;
-                    metric_allCond(iModelA, iModelB, iLocComb, iMetric, isubj, :, :) = meas_allBoot;
-                    pred_allCond(iModelA, iModelB, iLocComb, iMetric, isubj, :, :) = pred_allBoot;
-                    nLL_allCond(iModelA, iModelB, iLocComb, iMetric, isubj, :) = nLL_allBoot;
-                    params_allCond(iModelA, iModelB, iLocComb, isubj, :, 1:nParamsB) = params_est_allBoot;
+                % NOM: IVs, predictions, nLL and parameters
+                IV_allCond(iModelA, iModelB, iLocComb, isubj, :, :) = IV_allBoot;
+                nTrials_allCond(iModelA, iModelB, iLocComb, isubj, :, :) = nTrials_allBoot;
+                metric_data_allCond(iModelA, iModelB, iLocComb, :, isubj, :, :) = metric_data_allBoot;
+                metric_pred_allCond(iModelA, iModelB, iLocComb, :, isubj, :, :) = metric_pred_allBoot;
+                nLL_allCond(iModelA, iModelB, iLocComb, isubj, :) = nLL_allBoot;
+                % IC_nLL_allCond is compiled above
+                params_allCond(iModelA, iModelB, iLocComb, isubj, :, 1:nParamsB) = params_est_allBoot;
 
-                    clear *allBoot
+                % clear *allBoot
 
-                end % isubj
-            end % iMetric
+            end % isubj
+            % end % iMetric
         end % iLocComb
     end % iModelB
 end % iModelA
 
 fprintf('\n\n========= ORGANIZATION DONE =============\n\n')
 
-% Save the organized data for all subjects
-save(sprintf('%s/n%d_n%d', nameFolder_Data_NOM_Trialwise, nsubj, nBoot), '*_allCond')
+%% Compile behavioral data 
 
-%% Plot RC-derived template for ech idvd (on the same figure)
+CS_allSubj = nan(nsubj, 8);
+dprime_allSubj = CS_allSubj;
+criterion_allSubj = CS_allSubj;
+RT_allSubj = CS_allSubj;
+pC_allSubj = CS_allSubj;
+% pYES_allSubj = CS_allSubj;
+pA_allSubj = CS_allSubj;
+
+for isubj=1:nsubj
+    subjName = subjList{isubj};
+    nblocks = nblocks_allSubj(isubj);
+    nameFile_behavMeas = sprintf('%s/%s%d/%s_behavMeas.mat', nameFolder_Data_OOD, subjName, nblocks, subjName);
+
+    load(nameFile_behavMeas)
+    
+    for iLocComb = iLocComb_all
+        switch iLocComb
+            case 6, iLoc_allLoc = [2,4];
+            case 7, iLoc_allLoc = [5,3];
+            case 8, iLoc_allLoc = 2:5;
+            otherwise
+                iLoc_allLoc = iLocComb;
+        end
+        CS_allSubj(isubj, iLocComb) = 1./mean(cst_perSess_perLoc(:, iLoc_allLoc), 'all');
+        dprime_allSubj(isubj, iLocComb) = mean(dprime_perSess_perLoc(:, iLoc_allLoc), 'all');
+        criterion_allSubj(isubj, iLocComb) = mean(criterion_perSess_perLoc(:, iLoc_allLoc), 'all');
+        RT_allSubj(isubj, iLocComb) = median(RT_perSess_perLoc(:, iLoc_allLoc), 'all');
+        pC_allSubj(isubj, iLocComb) = mean(pC3_perSess_perLoc(:, iLoc_allLoc, 1), 'all');
+        % pYES_allSubj(isubj, iLocComb) = mean(pYES_perSess_perLoc(:, iLoc_allLoc));
+        pA_allSubj(isubj, iLocComb) = mean(pA3_perSess_perLoc(:, iLoc_allLoc, 1), 'all');
+    end
+
+    delete *_allT *_perSess *_perLoc dataMatrix
+end
+
+% Save the organized data for all subjects
+save(sprintf('%s/n%d_n%d', nameFolder_Data_NOM_Trialwise, nsubj, nBoot), '*_allCond', '*_allSubj')
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+% Later, use "plotAll_Behav" to plot behav
+%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% Plot templates for IDVD and group averages
+clc, fprintf('\n\n Plotting STARTING\n\n')
 % Define folder for saving figures
 nameFolder_Fig_NOM_Template = sprintf('%s/Template', nameFolder_Fig_NOM_Trialwise);
 if isempty(dir(nameFolder_Fig_NOM_Template)), mkdir(nameFolder_Fig_NOM_Template), end
 
-iModelA_RC = 1; % just plot the RC-derived
-iModelB_RC = 1; % just plot the full model
-
 for i = 1:2
     switch i
         case 1
-            template_allSubj = squeeze(template_train_allCond(iModelA_RC, iModelB_RC, :, :, :, :)); % ... nLoc x nSubj x nORI x nSF
-            str_title = 'TrainingData';
+            template_allSubj = squeeze(template_train_allCond(iModelA_plot, iModelB_plot, :, :, :, :)); % ... nLoc x nSubj x nORI x nSF
+            str_dataset = 'TrainingData';
         case 2
-            template_allSubj = squeeze(template_full_allCond(iModelA_RC, iModelB_RC, :, :, :, :)); % ... nLoc x nSubj x nORI x nSF
-            str_title = 'AllData';
+            template_allSubj = squeeze(template_full_allCond(iModelA_plot, iModelB_plot, :, :, :, :)); % ... nLoc x nSubj x nORI x nSF
+            str_dataset = 'AllData';
     end
 
     %%%% Group ave %%%%%
-    figure('Position', [0, 0, 2e3, 1.8e3])
+    
     for iiLoc = 1:nLocComb8
+        figure('Position', [0 0 1e3 1e3])
         e2D_ave = getCI(template_allSubj(iLocComb_all(iiLoc), :, :, :), 2, 2);
         e2D_ave = e2D_ave';
+        fprintf('\n%s L%d: Min = %.3f, Max=%.3f\n', str_dataset, iLocComb_all(iiLoc), min(e2D_ave(:)), max(e2D_ave(:)))
+        % subplot(1, nLocComb8, iiLoc),
+        hold on
+        if iLocComb_all(iiLoc)==1, cLim = [-.03, .26];
+        else, cLim = [-.03, .13];
+        end
+        RCplot_2Dkernel(e2D_ave, cLim)
+        title(sprintf('n=%d L%d %s (%s)', nsubj, iLocComb_all(iiLoc), namesLocComb{iLocComb_all(iiLoc)}, str_dataset))
+        % set(findall(gcf, '-property', 'FontSize'), 'FontSize',12)
+        % sgtitle(sprintf('n=%d [A%dB%d] (%s)', nsubj, iModelA_plot, iModelB_plot, str_title), 'FontSize',20)
 
-        subplot(1, nLocComb8, iiLoc), hold on
-        RCplot_2Dkernel(e2D_ave)
-        title(sprintf('L%d %s', iLocComb_all(iiLoc), namesLocComb{iLocComb_all(iiLoc)}))
-        set(findall(gcf, '-property', 'FontSize'), 'FontSize',12)
-        sgtitle(sprintf('n=%d (%s)', nsubj, str_title), 'FontSize',20)
+        % title(namesLocComb{iLocComb_all(1)}, 'FontSize', sz_title)
+        saveas(gcf, sprintf('%s/n%d_group_L%d_A%dB%d_%s.jpg', nameFolder_Fig_NOM_Template, nsubj, iLocComb_all(iiLoc), iModelA_plot, iModelB_plot, str_dataset))
 
     end % iiLoc
     % save
-    saveas(gcf, sprintf('%s/n%d_ave_%s.jpg', nameFolder_Fig_NOM_Template, nsubj, str_title))
+    % saveas(gcf, sprintf('%s/n%d_group_A%dB%d_%s.jpg', nameFolder_Fig_NOM_Template, nsubj, iModelA_plot, iModelB_plot, str_title))
     close all
 
     %%%%% Idvd data in one figure, per loc %%%%%
-    for iiLoc = 1:nLocComb8
-
-        figure('Position', [0, 0, 2e3, 1.8e3])
-        for isubj = 1:nsubj
-
-            e2D = squeeze(template_allSubj(iLocComb_all(iiLoc), isubj, :,:))';
-
-            subplot(nRows, nCols, isubj), hold on
-            RCplot_2Dkernel(e2D)
-            title(subjList{isubj})
-
-        end % isubj
-        set(findall(gcf, '-property', 'FontSize'), 'FontSize',12)
-        sgtitle(sprintf('L%d %s (%s)', iLocComb_all(iiLoc), namesLocComb{iLocComb_all(iiLoc)}, str_title), 'FontSize',20)
-
-        % save
-        saveas(gcf, sprintf('%s/n%d_L%d_%s.jpg', nameFolder_Fig_NOM_Template, nsubj, iLocComb_all(iiLoc), str_title))
-        close all
-
-    end % iiLoc
+    % for iiLoc = 1:nLocComb8
+    % 
+    %     figure('Position', [0, 0, 2e3, 1.8e3])
+    %     for isubj = 1:nsubj
+    % 
+    %         e2D = squeeze(template_allSubj(iLocComb_all(iiLoc), isubj, :,:))';
+    % 
+    %         subplot(nRows, nCols, isubj), hold on
+    %         RCplot_2Dkernel(e2D)
+    %         title(subjList{isubj})
+    % 
+    %     end % isubj
+    %     set(findall(gcf, '-property', 'FontSize'), 'FontSize',12)
+    %     sgtitle(sprintf('L%d %s [A%dB%d] (%s)', iLocComb_all(iiLoc), namesLocComb{iLocComb_all(iiLoc)}, iModelA_plot, iModelB_plot, str_title), 'FontSize',20)
+    % 
+    %     % save
+    %     saveas(gcf, sprintf('%s/n%d_L%d_A%dB%d_%s.jpg', nameFolder_Fig_NOM_Template, nsubj, iLocComb_all(iiLoc), iModelA_plot, iModelB_plot, str_title))
+    %     close all
+    % 
+    % end % iiLoc
 end % i
+fprintf('\n\n Plotting DONE\n\n')
 
-%% Plot marginal tuning curves (data+prediction) for two locations in one pair for each idvd (per panel) for each location (per figure)
-fprintf('\n\n Plotting STARTING\n\n')
+%% Plot tuning functions for idvd
+clc, fprintf('\n\n Plotting STARTING\n\n')
+% Define folder for saving figures
+nameFolder_Fig_NOM_Tuning = sprintf('%s/Tuning', nameFolder_Fig_NOM_Trialwise);
+if isempty(dir(nameFolder_Fig_NOM_Tuning)), mkdir(nameFolder_Fig_NOM_Tuning), end
+
 wd_border = 4; % default 5
 sz_ticks = 30;% default 35
-for iGroup = 1:nGroups % e.g., {[1, 8]} or more pairs if desired
-    iLocPair = iLocGroups_all{iGroup};
 
+for iGroup = 1:nGroups % e.g., {[1, 8]} or more pairs if desired
+    iLocPair_all = iLocGroups_all{iGroup};
 
     for iFeature = 1:nFeatures
 
         xaxis = axis_tuning{iFeature};
 
-        figure('Position', [0 0 2e3 2e3])
-
-
-        for iLoc = iLocPair
-            fprintf('\nL%d...', iLoc)
-            color = colors_comb(iLoc, :);
-            % Set y-ticks
-            if iFeature==1
-                if iLoc==1, yticks_ = [-.03, 0, .05, .10, .15]; % fov vs. peri, higher ub
-                else, yticks_ = [-.02, linspace(0, .12, 4)];
-                end
-            else
-                if iLoc==1, yticks_ = [-.01, linspace(0, .08, 4)];
-                else, yticks_ = [-.01, linspace(0, .06, 4)]; %[-.02, 0, .02, .04, .06];
-                end
+        for i=1:2
+            switch i
+                case 1
+                    markerStyle = 'o';
+                    lineStyle = '-';
+                    str_dataset = 'TrainingSet';
+                case 2
+                    markerStyle = 's';
+                    lineStyle = '--';
+                    str_dataset = 'FullSet';
             end
 
-            ymax = max(yticks_);
-            ymin = min(yticks_);
+            figure('Position', [0 0 2e3 2e3])
 
             for isubj = 1:nsubj
                 subplot(nRows, nCols, isubj), hold on
 
                 subjName = subjList{isubj};
-                for i=1:2
-                    switch i
-                        case 1
-                            markerStyle = 'o';
-                            lineStyle = '-';
-                            str_name = 'TrainingSet';
-                        case 2
-                            markerStyle = 's';
-                            lineStyle = '--';
-                            str_name = 'FullSet';
+
+                for iLoc = iLocPair_all
+                    % fprintf('\nL%d...', iLoc)
+                    % Set color
+                    color_comb = colors_comb(iLoc, :);
+                    % Set y-ticks
+                    if iFeature==1
+                        marg_allCond = margORI_allCond;
+                        margPred_allCond = margPred_ORI_allCond;
+
+                        if iLoc==1, yticks_ = [-.03, 0, .05, .10, .15]; % fov vs. peri, higher ub
+                        else, yticks_ = [-.02, linspace(0, .12, 4)];
+                        end
+                    else
+                        marg_allCond = margSF_allCond;
+                        margPred_allCond = margPred_SF_allCond;
+
+                        if iLoc==1, yticks_ = [-.01, linspace(0, .08, 4)];
+                        else, yticks_ = [-.01, linspace(0, .06, 4)]; %[-.02, 0, .02, .04, .06];
+                        end
                     end
-                    % ORI tuning
-                    [marg_med, ~, ~, marg_lb, marg_ub] = getCI(margORI_allCond(iModelA_RC, iModelB_RC, iLoc, isubj, :, i, :), 1, 5);
-                    [margPred_med, margPred_lb, margPred_ub] = getCI(margPred_ORI_allCond(iModelA_RC, iModelB_RC, iLoc, isubj, :, i, :), 1, 5);
+
+                    ymax = max(yticks_);
+                    ymin = min(yticks_);
+
+                    % Obtain data and prediction
+                    [marg_med, ~, ~, marg_lb, marg_ub] = getCI(marg_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, i, :), 1, 5);
+                    [margPred_med, margPred_lb, margPred_ub] = getCI(margPred_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, i, :), 1, 5);
 
                     % Data (dots + errorbars)
-                    errorbar(xaxis, marg_med, marg_lb, marg_ub, markerStyle, 'Color', 'k', 'CapSize',0)
-                    plot(xaxis, marg_med, 'ko', 'MarkerFaceColor', 'w', 'MarkerSize', 6, 'HandleVisibility','off')
+                    errorbar(xaxis, marg_med, marg_lb, marg_ub, markerStyle, 'Color', color_comb, 'CapSize',0)
+                    plot(xaxis, marg_med, markerStyle, 'color', color_comb, 'MarkerFaceColor', 'w', 'MarkerSize', 6, 'HandleVisibility','off')
 
                     % Prediction (lines + bands)
-                    patch([xaxis, flip(xaxis)], [margPred_lb', flip(margPred_ub')], 'k', 'FaceAlpha', .3, 'linestyle', 'none')
-                    plot(xaxis, margPred_med, 'k-')
-                end % i=1:2
+                    patch([xaxis, flip(xaxis)], [margPred_lb', flip(margPred_ub')], color_comb, 'FaceAlpha', .3, 'linestyle', 'none')
+                    plot(xaxis, margPred_med, '-', 'color', color_comb)
+
+                end % iLoc
 
                 % Draw reference lines
                 yline(0, 'handlevisibility', 'off', 'linewidth', wd_border, 'color', [.7, .7, .7]);
                 xline(iFeature-1, 'handlevisibility', 'off', 'linewidth', wd_border, 'color', [.7, .7, .7]);
 
-
                 xlabel('Orientation (deg)')
                 ylabel('Amplitude')
-                title(sprintf('%s - L%d %s tuning', subjName, iLoc, namesFeature{iFeature}))
+                title(sprintf('%s', subjName))
                 % legend('Location', 'best')
 
             end % isubj
-
-            sgtitle(sprintf('n=%d L%d %s tuning (Data vs. Prediction)', nsubj, iLoc, namesFeature{iFeature}))
+            sgtitle(sprintf('n=%d L%d%d [A%dB%d] %s tuning (%s)', nsubj, iLocPair_all,iModelA_plot, iModelB_plot, namesFeature{iFeature}, str_dataset))
             set(findall(gcf, '-property', 'fontsize'), 'fontsize', 12)
 
             % Save the figure
-            saveas(gcf, sprintf('%s/n%d_L%d_%stuning.jpg', nameFolder_Fig_NOM_Trialwise, nsubj, iLoc, namesFeature{iFeature}))
+            saveas(gcf, sprintf('%s/n%d_L%d%d_A%dB%d_%s_%s.jpg', nameFolder_Fig_NOM_Tuning, nsubj, iLocPair_all, iModelA_plot, iModelB_plot, namesFeature{iFeature}, str_dataset))
             close all
-        end % iFeature
-    end % iLoc
+        end % i=1:2
+    end % iFeature
 end % iGroup
 
 fprintf('\n\n Plotting DONE\n\n')
 
+%% Plot tuning functions for group averages
+clc, fprintf('\n\n Plotting STARTING\n\n')
+% Define folder for saving figures
+nameFolder_Fig_NOM_Tuning = sprintf('%s/Tuning', nameFolder_Fig_NOM_Trialwise);
+if isempty(dir(nameFolder_Fig_NOM_Tuning)), mkdir(nameFolder_Fig_NOM_Tuning), end
+
+wd_border = 4; % default 5
+sz_ticks = 35;% default 35
+
+iplots = reshape((1:nGroups*nFeatures)', nGroups, nFeatures)';
+for i=1:2
+    switch i
+        case 1
+            markerStyle = 'o';
+            lineStyle = '-';
+            str_dataset = 'TrainingSet';
+        case 2
+            markerStyle = 's';
+            lineStyle = '--';
+            str_dataset = 'FullSet';
+    end
+
+    for iGroup = 1:nGroups % e.g., {[1, 8]} or more pairs if desired
+        iLocPair_all = iLocGroups_all{iGroup};
+
+        for iFeature = 1:nFeatures
+
+            xaxis = axis_tuning{iFeature};
+
+            figure('Position', [0 0 1.1e3 8e2]) % default 8e2
+            hold on
+            for iLoc = iLocPair_all
+
+                % Set color
+                color_comb = colors_comb(iLoc, :);
+                
+                % Set y-ticks
+                if iFeature==1 % ORI tuning fxn
+                    marg_allCond = margORI_allCond;
+                    margPred_allCond = margPred_ORI_allCond;
+                    margR2_allCond = margR2_ORI_allCond;
+
+                    if find(iLocPair_all==1), yticks_ = [-.03, linspace(0, .24, 4)]; % fov vs. peri, higher ub
+                    else, yticks_ = [-.03, linspace(0, .12, 4)];
+                    end
+                else % SF tuning fxn
+                    marg_allCond = margSF_allCond;
+                    margPred_allCond = margPred_SF_allCond;
+                    margR2_allCond = margR2_SF_allCond;
+
+                    if find(iLocPair_all==1), yticks_ = [-.01, linspace(0, .12, 4)];
+                    else, yticks_ = [-.01, linspace(0, .06, 4)]; %[-.02, 0, .02, .04, .06];
+                    end
+                end
+
+                ymax = max(yticks_);
+                ymin = min(yticks_);
+
+                % Obtain data and prediction
+                [marg_ave, ~, ~, marg_sem] = getCI(getCI(marg_allCond(iModelA_plot, iModelB_plot, iLoc, :, :, i, :), 1, 5), 2, 1);
+                [margPred_ave, ~, ~, margPred_sem] = getCI(getCI(margPred_allCond(iModelA_plot, iModelB_plot, iLoc, :, :, i, :), 1, 5), 2, 1);
+
+                % Data (dots + errorbars)
+                errorbar(xaxis, marg_ave, marg_sem, markerStyle, 'Color', color_comb, 'CapSize',0)
+                plot(xaxis, marg_ave, 'o', 'color', color_comb, 'MarkerFaceColor', 'w', 'MarkerSize', 6, 'HandleVisibility','off')
+
+                % Prediction (lines + bands)
+                patch([xaxis, flip(xaxis)], [margPred_ave-margPred_sem, flip(margPred_ave+margPred_sem)], color_comb, 'FaceAlpha', .3, 'linestyle', 'none')
+                plot(xaxis, margPred_ave, '-', 'color', color_comb)
+
+            end % iLoc
+
+            % Draw reference lines
+            yline(0, 'handlevisibility', 'off', 'linewidth', wd_border, 'color', [.7, .7, .7]);
+            xline(iFeature-1, 'handlevisibility', 'off', 'linewidth', wd_border, 'color', [.7, .7, .7]);
+
+            xlabel(namesFeature_axis{iFeature})
+            ylabel(namesFeature_axis_Tuning{iFeature})
+            
+            xlim(axisLim{iFeature})
+            %     xlabel(xlabels_tuning{ifeature}, 'FontSize', sz_label)
+            xticks(axisTicks_tuning{iFeature})
+            xticklabels(axisTL_tuning{iFeature})
+            if iFeature==2, xticklabels(round(axisTL_tuning{iFeature}, 2)), end
+
+            yticks(yticks_)
+            yticklabels(round(yticks_, 2))
+            ylim(yticks_([1, end]))
+
+            ax = gca;
+            ax.XAxis.FontSize = sz_ticks;
+            ax.YAxis.FontSize = sz_ticks;
+            ax.LineWidth = wd_border/1.5;
+
+            [R2_ave, ~, ~, R2_sem] = getCI(getCI(margR2_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, i), 1, 5), 2, 2);
+
+            title(sprintf('n=%d L%d%d [A%dB%d] %s tuning (%s)\nR2: L%d: %.2f (+-%.2f) L%d: %.2f (+-%.2f) ', ...
+                nsubj, iLocPair_all, iModelA_plot, iModelB_plot, namesFeature{iFeature}, str_dataset, ...
+                iLocPair_all(1), R2_ave(1), R2_sem(1), iLocPair_all(2), R2_ave(2), R2_sem(2)))
+            % set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
+            set(findall(gcf, '-property', 'linewidth'), 'linewidth', 2)
+
+            % Save the figure
+            saveas(gcf, sprintf('%s/n%d_group_L%d%d_A%dB%d_%s_%s.jpg', nameFolder_Fig_NOM_Tuning, nsubj, iLocPair_all, iModelA_plot, iModelB_plot, namesFeature{iFeature}, str_dataset))
+            close all
+        end % iFeature
+    end % iGroup
+
+
+end % i=1:2
+fprintf('\n\n Plotting DONE\n\n')
+
+%% Tuning characteristics
+nameFolder_Fig_tunC = sprintf('%s/TuningCs', nameFolder_Fig_NOM_Trialwise);
+if isempty(dir(nameFolder_Fig_tunC)), mkdir(nameFolder_Fig_tunC), end
+
+iDataset_plot = 2; %1=Training set; 2=Full set
+iFamily_perF = [iFamily_ORI, iFamily_SF];
+flag_plotIDVD = 1;
+flag_plotDiff = 1;
+paramMode = 2;
+sz_fig = [350 300]; % size of the figure canvas
+
+for iGroup = 1:nGroups % e.g., {[1, 8]} or more pairs if desired
+    iLocPair_all = iLocGroups_all{iGroup};
+
+    % Plotting settings
+    colors = colors_comb(iLocPair_all, :);
+    x_ticks = namesLocComb(iLocPair_all);
+
+    % Loop through each feature
+    for iFeature = 1:nFeatures
+
+        % Define the x-axis and parameters for the current feature
+        xaxis = axis_tuning{iFeature};
+        nfilters = length(xaxis);
+        iFamily = iFamily_perF(iFeature);
+        namesTunC = namesTunC_unit_perF{iFamily, paramMode};
+        nTunC_full = length(namesTunC);
+
+        y_ticks_all = [];
+
+        % Obtain y_ticks of ORI/SF domain (3 values)
+        switch iFamily_perF(iFeature)
+            case 1 % ORI tuniningC | Scaled Gaussian
+                if flag_plotIDVD
+                    if find(iLocPair_all==1)
+                        y_ticks_all{1} = linspace(0, .3, 5); % ORI peak amp
+                    else
+                        y_ticks_all{1} = linspace(0, .2, 5); % ORI peak amp
+                    end
+                    y_ticks_all{2} = linspace(10, 50, 5); % ORI band
+                    y_ticks_all{3} = linspace(-.05, .03, 5); % ORI baseline
+                else
+                    if find(iLocPair_all==1)
+                        y_ticks_all{1} = linspace(0, .24, 5); % ORI peak amp
+                    else
+                        y_ticks_all{1} = linspace(0, .12, 5); % ORI peak amp
+                    end
+                    
+                    y_ticks_all{2} = linspace(10, 50, 5); % ORI band
+                    y_ticks_all{3} = linspace(-.05, .03, 5); % ORI baseline
+                end
+
+            case 2 % SF tuniningC | log parabola
+                if flag_plotIDVD
+                    
+                    y_ticks_all{1} = linspace(0, 2, 5); % peak SF
+                    if find(iLocPair_all==1)
+                        y_ticks_all{2} = linspace(.01, .2, 5); % SF peak amp
+                    else
+                        y_ticks_all{2} = linspace(.01, .09, 5); % SF peak amp
+                    end                    
+                    y_ticks_all{3} = linspace(0, 2, 5); % SF bandwidth
+                    y_ticks_all{4} = linspace(-.08, 0, 5); % SF baseline
+                else
+                    y_ticks_all{1} = linspace(0, 2, 5); % peak SF
+                    
+                    if find(iLocPair_all==1)
+                        y_ticks_all{2} = linspace(.02, .12, 5); % SF peak amp
+                    else
+                        y_ticks_all{2} = linspace(.02, .06, 5); % SF peak amp
+                    end
+                    y_ticks_all{3} = linspace(.3, 1.5, 5); % SF bandwidth
+                    y_ticks_all{4} = linspace(-.08, 0, 5); % SF baseline
+                end
+
+        end
+
+        % Loop through each tuning characteristic
+        for iTunC = 1:nTunC_full
+
+            text_title = sprintf('%s %s', namesFeature{iFeature}, namesTunC{iTunC});
+
+            % Compute median for each observer
+            % margTunC_ORI_allCond: nModelA x nModelB x nLoc_pair x nsubj x nBoot x nDataset x nTunC
+            % tunC_allSubj_allBoot: nLoc_pair x nsubj x nBoot
+            switch iFeature
+                case 1, tunC_allSubj_allBoot = squeeze(margTunC_ORI_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iDataset_plot, iTunC));
+                case 2, tunC_allSubj_allBoot = squeeze(margTunC_SF_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iDataset_plot, iTunC));
+            end
+
+            tunC_med_allSubj = getCI(tunC_allSubj_allBoot, 1, 3)'; % rotate to match the format of basicFxn_drawBars()
+
+            % Obtain ytick labels and ref
+            y_ticklabels = round(y_ticks_all{iTunC}, 2);
+            ref = nan;
+            switch iFamily_perF(iFeature)
+                case 1, if find(iTunC==3), ref = 0; end
+
+                case 2 % log parabola
+                    switch iTunC
+                        case 1, y_ticklabels = round(2.^y_ticks_all{iTunC}, 1); ref = log2(2); tunC_med_allSubj = log2(tunC_med_allSubj); % pref SF
+                        case 4, ref = 0; % baseline
+                    end
+            end
+
+            % Obtain CI of t-test statistics (to print in the title)
+            p_allBoot = nan(nBoot, 1);
+            t_allBoot = p_allBoot;
+            cohenD_allBoot = p_allBoot;
+            for iBoot = 1:nBoot
+                x=squeeze(tunC_allSubj_allBoot(:, :, iBoot));
+                [~, p, ~, stats] = ttest(x(1, :), x(2, :));
+                cohenD = fxn_getES(x(1, :), x(2, :));
+                p_allBoot(iBoot) = p;
+                t_allBoot(iBoot) = stats.tstat;
+                cohenD_allBoot(iBoot) = cohenD;
+            end
+            [p_med, p_lb, p_ub] = getCI(p_allBoot, 1, 1);
+            [t_med, t_lb, t_ub] = getCI(t_allBoot, 1, 1);
+            [d_med, d_lb, d_ub] = getCI(cohenD_allBoot, 1, 1);
+
+            % Define the title for the plot
+            title_CI = sprintf('t=%.3f [%.3f, %.3f], p=%.3f [%.3f, %.3f], d=%.3f [%.3f, %.3f]', t_med, t_lb, t_ub, p_med, p_lb, p_ub, d_med, d_lb, d_ub);
+
+            % Plot the data
+            text_title = sprintf('n=%d L%d%d [A%dB%d] [%s]\n%s\n%s', nsubj, iLocPair_all, iModelA_plot, iModelB_plot, namesDataset{iDataset_plot}, text_title, title_CI);
+            %------------------------------%
+            flag_sig = basicFxn_drawBars(tunC_med_allSubj, ref, colors, x_ticks, y_ticks_all{iTunC}, y_ticklabels, flag_plotIDVD, flag_plotDiff, text_title, 0, sz_fig);
+            %------------------------------%
+            ylabel(sprintf('%s %s', namesFeature{iFeature}, namesTunC_unit_perF{iFamily, 2}{iTunC}))
+            % Save the figure
+            saveas(gcf, sprintf('%s/n%d_L%d%d_A%dB%d_%s%d%s.jpg', nameFolder_Fig_tunC, nsubj, iLocPair_all, iModelA_plot, iModelB_plot, namesFeature{iFeature}, iTunC, flag_sig))
+
+        end % end of iTunC
+    end % end of iFeature
+
+    close all
+end % end of iGroup
+
+%% Behavioral metrics in grouped locations
+nameFolder_Fig_behav = sprintf('%s/behav', nameFolder_Fig_NOM_Trialwise);
+if isempty(dir(nameFolder_Fig_behav)), mkdir(nameFolder_Fig_behav), end
+
+sz_wd_perBar = 100;
+nBars = 2;
+sz_fig = [nBars*sz_wd_perBar, 250];
+flag_plotIDVD = 1;
+namesMetrics_behav = {'CS', 'pA', 'dprime', 'criterion', 'pC', 'RT'}; nMetrics_behav = length(namesMetrics_behav);
+[d70,~] = SX_sim06_SDT(.7, .3);
+for iGroup=1:nGroups
+    iLocPair_all = iLocGroups_all{iGroup};
+    for iMetric=1:nMetrics_behav
+        switch iMetric
+            case 1, data_allSubj = CS_allSubj; x_ticks = linspace(1.6, 3.6, 5); flag_plotIDVD = 1; ref=nan;
+            case 2, data_allSubj = pA_allSubj; x_ticks = linspace(.5, .9, 5); flag_plotIDVD = 1; ref=nan;
+            case 3, data_allSubj = dprime_allSubj; x_ticks = linspace(0, 1.6, 5); flag_plotIDVD = 0; ref=d70;
+            case 4, data_allSubj = criterion_allSubj; x_ticks = linspace(-1,1, 5); flag_plotIDVD = 0; ref=0;
+            case 5, data_allSubj = pC_allSubj; x_ticks = linspace(.5, .9, 5); flag_plotIDVD = 0; ref=nan;
+            case 6, data_allSubj = RT_allSubj; x_ticks = linspace(0, .2, 5); flag_plotIDVD = 0; ref=nan;
+        end
+        x_ticks = round(x_ticks, 2);
+        data_allSubj = data_allSubj(:, iLocPair_all);
+        
+        basicFxn_drawBars(data_allSubj, ref, colors_comb(iLocPair_all, :), namesLocComb(iLocPair_all), x_ticks, x_ticks, flag_plotIDVD, 1, namesMetrics_behav{iMetric}, 0, sz_fig);
+        saveas(gcf, sprintf('%s/n%d_L%d%d_%s.jpg', nameFolder_Fig_behav, nsubj, iLocPair_all, namesMetrics_behav{iMetric}))
+    end % iMetric
+    close all
+end % iGroup
+
+%% Corr between extents of EE/HVA/VMA (CS and tunC)
+for iGroup=1:nGroups
+    iLocPair_all = iLocGroups_all{iGroup};
+    CS_allSubj; 
+
+
+end
+
 %% Plot metrics vs. IV for each idvd
-fprintf('\n\n Plotting STARTING\n\n')
+clc, fprintf('\n\n Plotting STARTING\n\n')
 lineStyle_all = {'-', '-', '--', ':', '-.', '-', '--', ':', '-.'};
 
-iModelA_metric = 1;%iModelA_all % just plot pred of the model using RC-derived template (happens to be yhe best model)
-iModelA = iModelA_metric;
-
+% iModelA_plot = 1;%iModelA_all % just plot pred of the model using RC-derived template (happens to be yhe best model)
+% iModelA = iModelA_plot;
+iModelB_all_plot = [1:3];
 % Define folder for saving figures for each model A and model B
-nameFolder_Fig_NOM_metrics = sprintf('%s/A%d', nameFolder_Fig_NOM_Trialwise, iModelA_metric);
+nameFolder_Fig_NOM_metrics = sprintf('%s/A%d', nameFolder_Fig_NOM_Trialwise, iModelA_plot);
 if isempty(dir(nameFolder_Fig_NOM_metrics)), mkdir(nameFolder_Fig_NOM_metrics), end
 
 for iLocComb = iLocComb_all
@@ -388,27 +774,27 @@ for iLocComb = iLocComb_all
             % Create a string to store parameter estimates for display
             str_est = [];
             params_allCond(isnan(params_allCond))=0;
-            for iModelB = iModelB_all
-                vals = strjoin(string(round(getCI(params_allCond(iModelA, iModelB, iLocComb, isubj, :, :), 1, 5)',2)), ", ");
+            for iModelB = iModelB_all_plot
+                vals = strjoin(string(round(getCI(params_allCond(iModelA_plot, iModelB, iLocComb, isubj, :, :), 1, 5)',2)), ", ");
                 str_est = [str_est, sprintf('B%d: %s\n', iModelB, vals)];
             end
 
-            for iModelB = iModelB_all
+            for iModelB = iModelB_all_plot
 
                 % % Define file names for loading data
                 % nameFile_compIV = sprintf('%s/n%d_A%dB%d', nameFolder_NOM_save, nBoot, iModelA, iModelB); % MUST be the same as OOD_NOM_Trialwise_compIV.m, Line 77
 
                 % Compute medians and CIs
-                [IV_allBins, ~, ~, IV_allBins_neg, IV_allBins_pos] = getCI(IV_allCond(iModelA, iModelB, iLocComb, isubj, :, :), 1, 5);
-                [nTrials_allBins, nTrials_allBins_lb, nTrials_allBins_ub] = getCI(nTrials_allCond(iModelA, iModelB, iLocComb, isubj, :, :), 1, 5);
-                [data_allBins, ~, ~, data_allBins_neg, data_allBins_pos] = getCI(metric_allCond(iModelA, iModelB, iLocComb, iMetric, isubj, :, :), 1, 6);
-                [pred_allBins, pred_allBins_lb, pred_allBins_ub] = getCI(pred_allCond(iModelA, iModelB, iLocComb, iMetric, isubj, :, :), 1, 6);
-                [params_allBins, params_allBins_lb, params_allBins_ub] = getCI(params_allCond(iModelA, iModelB, iLocComb, isubj, :, :), 1, 5);
+                [IV_allBins, ~, ~, IV_allBins_neg, IV_allBins_pos] = getCI(IV_allCond(iModelA_plot, iModelB, iLocComb, isubj, :, :), 1, 5);
+                [nTrials_allBins, nTrials_allBins_lb, nTrials_allBins_ub] = getCI(nTrials_allCond(iModelA_plot, iModelB, iLocComb, isubj, :, :), 1, 5);
+                [data_allBins, ~, ~, data_allBins_neg, data_allBins_pos] = getCI(metric_data_allCond(iModelA_plot, iModelB, iLocComb, iMetric, isubj, :, :), 1, 6);
+                [pred_allBins, pred_allBins_lb, pred_allBins_ub] = getCI(metric_pred_allCond(iModelA_plot, iModelB, iLocComb, iMetric, isubj, :, :), 1, 6);
+                [params_allBins, params_allBins_lb, params_allBins_ub] = getCI(params_allCond(iModelA_plot, iModelB, iLocComb, isubj, :, :), 1, 5);
 
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 % Plot prediction
-                if iModelB==1, color_pred = colors_comb(iLocComb, :); lw = 2;
-                else, color_pred='k';lw = 1;
+                if iModelB==1, color_pred = colors_comb(iLocComb, :); lw = 3;
+                else, color_pred='k'; lw = 1;
                 end
                 patch([IV_allBins; flip(IV_allBins)], [pred_allBins_lb; flip(pred_allBins_ub)], ones(1, 3) / 2, 'FaceAlpha', .3, 'linestyle', 'none', 'handlevisibility', 'off')
                 plot(IV_allBins, pred_allBins, 'lineStyle', lineStyle_all{iModelB}, 'color', color_pred, 'linewidth', lw)
@@ -439,11 +825,11 @@ for iLocComb = iLocComb_all
             title(subjName)
         end % isubj
 
-        sgtitle(sprintf('[A%d] [L%d] [nBoot=%d] %s', iModelA, iLocComb, nBoot, namesMetrics{iMetric}))
+        sgtitle(sprintf('n=%d [A%d] [L%d] [nBoot=%d] %s', nsubj, iModelA_plot, iLocComb, nBoot, namesMetrics{iMetric}))
         set(findall(gcf, '-property', 'fontsize'), 'fontsize', 12)
 
         % Save the figure
-        saveas(gcf, sprintf('%s/n%d_L%d_%s_vs_IV.jpg', nameFolder_Fig_NOM_metrics, nsubj, iLocComb, namesMetrics{iMetric}))
+        saveas(gcf, sprintf('%s/n%d_L%d_A%d_%s.jpg', nameFolder_Fig_NOM_metrics, nsubj, iLocComb, iModelA_plot, namesMetrics{iMetric}))
         close all
     end % iMetric
 
@@ -454,8 +840,8 @@ end % iLocComb
 
 fprintf('\n\n Plotting DONE\n\n')
 
-%% Plot metrics vs. IV for group ave
-fprintf('\n\n Plotting STARTING\n\n')
+%% Plot metrics vs. IV for group averages
+clc, fprintf('\n\n Plotting STARTING\n\n')
 lineStyle_all = {'-', '-', '--', ':', '-.', '-', '--', ':', '-.'};
 
 % Define folder for saving figures
@@ -477,20 +863,21 @@ for iModelA = 1%iModelA_all % just plot pred of the model using RC-derived templ
         for iMetric = 1:nMetrics
 
             subplot(1, nMetrics, iMetric), hold on
-            for iModelB = iModelB_all
+
+            for iModelB = iModelB_all_plot
 
                 % Compute medians and CIs
                 [IV_ave, ~, ~, IV_SEM] = getCI(getCI(IV_allCond(iModelA, iModelB, iLocComb, :, :, :), 1, 5), 2, 1);
                 [nTrials_ave, ~, ~, nTrials_SEM] = getCI(getCI(nTrials_allCond(iModelA, iModelB, iLocComb, :, :, :), 1, 5), 2, 1);
-                [data_ave, ~, ~, data_SEM] = getCI(getCI(metric_allCond(iModelA, iModelB, iLocComb, iMetric, :, :, :), 1, 6), 2, 1);
-                [pred_ave, ~, ~, pred_SEM] = getCI(getCI(pred_allCond(iModelA, iModelB, iLocComb, iMetric, :, :, :), 1, 6), 2, 1);
+                [data_ave, ~, ~, data_SEM] = getCI(getCI(metric_data_allCond(iModelA, iModelB, iLocComb, iMetric, :, :, :), 1, 6), 2, 1);
+                [pred_ave, ~, ~, pred_SEM] = getCI(getCI(metric_pred_allCond(iModelA, iModelB, iLocComb, iMetric, :, :, :), 1, 6), 2, 1);
 
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 % Plot prediction
-                if iModelB==1, color_pred = colors_comb(iLocComb, :); lw = 2;
-                else, color_pred='k';lw = 1;
+                if iModelB==1, color_pred = colors_comb(iLocComb, :); lw = 3;
+                else, color_pred='k'; lw = 1;
                 end
-                patch([IV_ave; flip(IV_ave)], [pred_ave-pred_SEM; flip(pred_ave-pred_SEM)], ones(1, 3) / 2, 'FaceAlpha', .3, 'linestyle', 'none', 'handlevisibility', 'off')
+                patch([IV_ave; flip(IV_ave)], [pred_ave-pred_SEM; flip(pred_ave+pred_SEM)], ones(1, 3) / 2, 'FaceAlpha', .3, 'linestyle', 'none', 'handlevisibility', 'off')
                 plot(IV_ave, pred_ave, 'lineStyle', lineStyle_all{iModelB}, 'color', color_pred, 'linewidth', lw)
                 % measurement
                 errorbar(IV_ave, data_ave, IV_SEM, '.', 'horizontal', 'CapSize', 0, 'color', colors_comb(iLocComb, :), 'handlevisibility', 'off')
@@ -510,7 +897,7 @@ for iModelA = 1%iModelA_all % just plot pred of the model using RC-derived templ
                 ylim([0, 1])
                 ylabel(namesMetrics{iMetric})
                 xlabel('Internal variable')
-                if isubj == 1, legend(namesModelB(iModelB_all), 'Location', 'best'), end
+                if isubj == 1, legend(namesModelB(iModelB_all_plot), 'Location', 'best'), end
 
             end % iModelB
 
@@ -522,10 +909,10 @@ for iModelA = 1%iModelA_all % just plot pred of the model using RC-derived templ
 
         sgtitle(sprintf('n=%d [A%d] [L%d] [nBoot=%d] %s', nsubj, iModelA, iLocComb, nBoot, namesMetrics{iMetric}))
         set(findall(gcf, '-property', 'fontsize'), 'fontsize', 20)
-        set(findall(gcf, '-property', 'linewidth'), 'linewidth', 2)
+        % set(findall(gcf, '-property', 'linewidth'), 'linewidth', 2)
 
         % Save the figure
-        saveas(gcf, sprintf('%s/n%d_L%d_group.jpg', nameFolder_Fig_NOM_metrics, nsubj, iLocComb))
+        saveas(gcf, sprintf('%s/n%d_L%d_A%d_group.jpg', nameFolder_Fig_NOM_metrics, nsubj, iLocComb, iModelA_plot))
         close all
         fprintf('DONE\n')
     end % iLocComb
@@ -537,12 +924,12 @@ fprintf('\n\n Plotting DONE\n\n')
 
 %% Plot GoF for ModelA x ModelB x Loc
 clc
-fprintf('\n\n Plotting STARTING\n\n')
+clc, fprintf('\n\n Plotting STARTING\n\n')
 % Define folder for saving GoF figures
 nameFolder_Fig_NOM_GoF = fullfile(nameFolder_Fig_NOM_Trialwise, 'GoF');
-if isempty(dir(nameFolder_Fig_NOM_GoF))
-    mkdir(nameFolder_Fig_NOM_GoF);
-end
+if isempty(dir(nameFolder_Fig_NOM_GoF)), mkdir(nameFolder_Fig_NOM_GoF); end
+
+flag_plotIDVD = 0;
 
 % Goodness-of-fit (GoF) measures to plot
 namesGoF = {'AIC-nLL', 'AICc-nLL', 'BIC-nLL'}; % no raw nLL
@@ -555,7 +942,7 @@ y_lim = [0, 2e3];
 for iGoF = 1:nGoFs
 
     % Extract the relevant GoF tensor (AIC, AICc, BIC based on iGoF)
-    GoF_allCond = squeeze(IC_nLL_allCond(:, :, :, :, :, :, iGoF));
+    GoF_allCond = squeeze(IC_nLL_allCond(:, :, :, :, :, iGoF));
 
     figure('Position', [0 200 2e3 600])
 
@@ -563,15 +950,15 @@ for iGoF = 1:nGoFs
     for iLocComb = iLocComb_all
 
         % data: [ModelA x ModelB x LocComb x Metric x Subj x Iteration]
-        data = GoF_allCond(:, iModelB_all, iLocComb, iMetric, :, :);
-        data_delta = nan(size(data));
+        GoF = GoF_allCond(:, iModelB_all, iLocComb, :, :);
+        data_delta = nan(size(GoF));
 
         % For each subject and each bootstrap, subtract the minimum across models
         for isubj = 1:nsubj
             parfor iBoot = 1:nBoot
-                d = data(:, :, :, :, isubj, iBoot);
+                d = GoF(:, :, :, isubj, iBoot);
                 d_min = min(d(:));
-                data_delta(:, :, :, :, isubj, iBoot) = d - d_min;
+                data_delta(:, :, :, isubj, iBoot) = d - d_min;
             end
         end
 
@@ -580,7 +967,7 @@ for iGoF = 1:nGoFs
         subplot(1, numel(iLocComb_all), subplotIdx); hold on
 
         % First: median across bootstraps within each subject
-        GoF_delta_med_allSubj = getCI(data_delta, 1, 6);
+        GoF_delta_med_allSubj = getCI(data_delta, 1, 5);
 
         % Then: mean and SEM across subjects
         [GoF_delta_ave, ~, ~, GoF_delta_sem] = getCI(GoF_delta_med_allSubj, 2, 3);
@@ -590,48 +977,26 @@ for iGoF = 1:nGoFs
 
             switch iModelA
                 case 1 % RC-derived template: bar
-                    bar(1:nModelsB, ...
-                        GoF_delta_ave(iModelA, :), ...
-                        'FaceColor', 'w', ...
-                        'EdgeColor', colors_comb(iLocComb, :), ...
-                        'LineWidth', 2);
+                    bar(1:nModelsB, GoF_delta_ave(iModelA, :), 'FaceColor', 'w', 'EdgeColor', colors_comb(iLocComb, :), 'LineWidth', 2);
 
                 case 2 % Ideal template: circle markers
-                    plot(1:nModelsB, ...
-                        GoF_delta_ave(iModelA, :), ...
-                        'o', ...
-                        'MarkerFaceColor', 'w', ...
-                        'MarkerEdgeColor', colors_comb(iLocComb, :), ...
-                        'LineWidth', 2);
+                    plot(1:nModelsB, GoF_delta_ave(iModelA, :), 'o', 'MarkerFaceColor', 'w', 'MarkerEdgeColor', colors_comb(iLocComb, :), 'LineWidth', 2);
             end
 
             % Error bars (SEM across subjects)
-            errorbar(1:nModelsB, ...
-                GoF_delta_ave(iModelA, :), ...
-                GoF_delta_sem(iModelA, :), ...
-                '.', ...
-                'CapSize', 0, ...
-                'Color', colors_comb(iLocComb, :), ...
-                'LineWidth', 2);
+            errorbar(1:nModelsB, GoF_delta_ave(iModelA, :), GoF_delta_sem(iModelA, :), '.', 'CapSize', 0, 'Color', colors_comb(iLocComb, :), 'LineWidth', 2);
         end
 
         % Individual-subject data (for ModelA = 1 only)
-        iModelA_idvd = 1;
-        for isubj = 1:nsubj
+        if flag_plotIDVD
+            iModelA_idvd = 1;
+            for isubj = 1:nsubj
 
-            if isubj <= nMarkersMax
-                faceColor = 'w';
-            else
-                faceColor = ones(1, 3) / 2;
+                if isubj <= nMarkersMax, faceColor = 'w'; else, faceColor = ones(1, 3) / 2; end
+
+                plot(1:nModelsB, GoF_delta_med_allSubj(iModelA_idvd, :, isubj), ['-', markers_allSubj{isubj}], 'Color', ones(1, 3) / 2, 'MarkerFaceColor', faceColor);
             end
-
-            plot(1:nModelsB, ...
-                GoF_delta_med_allSubj(iModelA_idvd, :, isubj), ...
-                ['-', markers_allSubj{isubj}], ...
-                'Color', ones(1, 3) / 2, ...
-                'MarkerFaceColor', faceColor);
         end
-
         % Axes formatting
         xticks(1:nModelsB);
         xticklabels(namesModelB(iModelB_all));
@@ -647,8 +1012,7 @@ for iGoF = 1:nGoFs
 
     sgtitle(sprintf('%s', namesGoF{iGoF}));
 
-    saveas(gcf, fullfile(nameFolder_Fig_NOM_GoF, ...
-        sprintf('n%d_%s.jpg', nsubj, namesGoF{iGoF})));
+    saveas(gcf, fullfile(nameFolder_Fig_NOM_GoF, sprintf('n%d_%s.jpg', nsubj, namesGoF{iGoF})));
 
 end % iGoF
 
@@ -656,104 +1020,125 @@ close all
 
 fprintf('\n\n Plotting DONE\n\n')
 
+%% ANOVA on models
+iModelB_ANOVA_all = [1,3];
+nModelB_ANOVA = length(iModelB_ANOVA_all);
+GoF_perBoot = squeeze(GoF_allCond(1, iModelB_ANOVA_all, iLocComb_all, :, 1));
+IV_NOMmodel = nan(size(GoF_perBoot));
+IV_Loc = IV_NOMmodel;
+for iModelB = 1:nModelB_ANOVA
+    IV_NOMmodel(iModelB, :, :) = ones(length(iLocComb_all), nsubj)*iModelB_ANOVA_all(iModelB);
+end
+for iiLoc = 1:length(iLocComb_all)
+    IV_Loc(:, iiLoc, :) = ones(nModelB_ANOVA, nsubj)*iLocComb_all(iiLoc);
+end
+
+p_modelB_allBoot = nan(nBoot, 1);
+p_loc_allBoot = p_modelB_allBoot;
+p_interaction_allBoot = p_modelB_allBoot;
+t_allBoot = p_modelB_allBoot;
+p_ttest_allBoot = p_modelB_allBoot;
+diff_allBoot = p_modelB_allBoot;
+for iBoot= 1:nBoot
+    GoF_perBoot = squeeze(GoF_allCond(1, iModelB_ANOVA_all, iLocComb_all, :, iBoot));
+
+    [~, tbl] = print_nANOVA({'NOMmodel', 'Loc'}, GoF_perBoot(:), {IV_NOMmodel(:), IV_Loc(:)}, nsubj);
+    p_modelB_allBoot(iBoot) = tbl{2,6};
+    p_loc_allBoot(iBoot) = tbl{3,6};
+    p_interaction_allBoot(iBoot) = tbl{4,6};
+    if nModelB_ANOVA==2
+        % conduct t-test
+        [~, p_ttest, ~, stats] = ttest(GoF_perBoot(1, :), GoF_perBoot(2, :));
+        t_allBoot(iBoot) = stats.tstat;
+        p_ttest_allBoot(iBoot) = p_ttest;
+        diff_allBoot(iBoot) = mean(GoF_perBoot(1, :)-GoF_perBoot(2, :));
+    end
+end
+
+% Print median and CI of p-values
+clc
+fprintf('\n\nModelB ANOVA: B%d-%s vs. B%d-%s\n', iModelB_ANOVA_all(1), namesModelB{iModelB_ANOVA_all(1)}, iModelB_ANOVA_all(2), namesModelB{iModelB_ANOVA_all(2)})
+for i=1:3
+    switch i
+        case 1
+            p_allBoot = p_modelB_allBoot;
+            str_name = 'ModelB';
+        case 2
+            p_allBoot = p_loc_allBoot;
+            str_name = 'Loc';
+        case 3
+            p_allBoot = p_interaction_allBoot;
+            str_name = 'Interaction';
+    end
+    [p_med, p_lb, p_ub] = getCI(p_allBoot, 1, 1);
+    fprintf('   %s effect: p=%.3f [CI=%.3f, %.3f]\n', str_name, p_med, p_lb, p_ub);
+end
+% Print t-test
+if nModelB_ANOVA==2
+    fprintf('\n\nModelB t-test: B%d-%s vs. B%d-%s\n', iModelB_ANOVA_all(1), namesModelB{iModelB_ANOVA_all(1)}, iModelB_ANOVA_all(2), namesModelB{iModelB_ANOVA_all(2)})
+    [t_med, t_lb, t_ub] = getCI(t_allBoot, 1, 1);
+    [p_med, p_lb, p_ub] = getCI(p_ttest_allBoot, 1, 1);
+    [diff_med, diff_lb, diff_ub] = getCI(diff_allBoot, 1, 1);
+    fprintf('   t=%.3f [CI=%.3f, %.3f]\n', t_med, t_lb, t_ub);
+    fprintf('   p=%.3f [CI=%.3f, %.3f]\n', p_med, p_lb, p_ub);
+    fprintf('   diff=%.3f [CI=%.3f, %.3f]\n', diff_med, diff_lb, diff_ub);
+end
+
 %% Assess corr between pA and parameters
 % Define folder for saving figures
 nameFolder_Fig_NOM_corr = sprintf('%s/corr_pAxParams', nameFolder_Fig_NOM_Trialwise);
 if isempty(dir(nameFolder_Fig_NOM_corr)), mkdir(nameFolder_Fig_NOM_corr), end
 
-iModelA = 1; % models with RC-derived templates
-iModelB = 1; % Full model with mul., add. noise and rho
-iMetric_pA = 2; % pA
+iMetric_plot = 2; % pA
+iLocComb_corr = [1, 6, 5, 3];
 
-iLocComb_corr = [6, 5, 3];
-
-nParams = length(namesModelBparams{iModelB});
+nParams = length(namesModelBparams{iModelB_plot});
 
 figure('Position', [0 100 2e3 1e3])
 
 for iParam = 1:nParams
-    pA_allLoc = getCI(metric_allCond(iModelA, iModelB, :, iMetric_pA, :, :, :), 2, 7); % averaged across all bins
-    param_allLoc = squeeze(params_allCond(iModelA, iModelB, :, :, :, iParam));
+    pA_allLoc = getCI(metric_data_allCond(iModelA_plot, iModelB_plot, :, iMetric_plot, :, :, :), 2, 7); % averaged across all bins
+    param_allLoc = squeeze(params_allCond(iModelA_plot, iModelB_plot, :, :, :, iParam));
 
+    
+    switch iParam
+        case 1 % induced noise
+            y_ticks = linspace(0, .6, 5);
+            case 2 % induced noise
+            y_ticks = linspace(0, 40, 5);
+            case 3 % induced noise
+            y_ticks = linspace(0,1, 5);
+    end
     subplot(1, nParams, iParam), hold on, axis square
 
-    for iLocComb = iLocComb_corr
 
-        if ~flag_subjIsHuman
-            pA_med = getCI(pA_allLoc(iLocComb, :, :), 1, 2);
-            param_med = getCI(param_allLoc(iLocComb, :, :), 1, 2);
-        else
-            pA_med = getCI(pA_allLoc(iLocComb, :, :), 1, 3);
-            param_med = getCI(param_allLoc(iLocComb, :, :), 1, 3);
-        end
+    pA_med = getCI(pA_allLoc(iLocComb_corr, :, :), 1, 3)'; % rotate to match format of basicFxn_drawCorr()
+    param_med = getCI(param_allLoc(iLocComb_corr, :, :), 1, 3)';
 
-        % idvd data
-        for isubj = 1:nsubj
-            edgecolor = colors_comb(iLocComb, :);
-            if isubj <= nMarkersMax, facecolor = 'w'; else, facecolor = ones(1, 3) / 2; end
-            plot(pA_med(isubj), param_med(isubj), markers_allSubj{isubj}, 'markeredgecolor', edgecolor', 'markerfacecolor', facecolor, 'LineWidth', 2, 'MarkerSize', 10)
-        end
+    x_ticks=linspace(.6, .9, 4); x_ticklabels = x_ticks; y_ticklabels=y_ticks;
+    flag_zeroMean=0;
+    type_corr = 'pearson';
+    type_tail = 'both';
+    text_title = '';
+    [str_sig, str_dataset] = basicFxn_drawCorr(pA_med, param_med, colors_comb(iLocComb_corr, :), x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, type_corr, type_tail, text_title, markers_allSubj);
 
-        % group ave per loc
-        [pA_ave, ~, ~, pA_sem] = getCI(pA_med(:), 2, 1);
-        [param_ave, ~, ~, param_sem] = getCI(param_med(:), 2, 1);
-        errorbar(pA_ave, param_ave, pA_sem, 'horizontal', '.', 'color', edgecolor, 'CapSize', 0, 'LineWidth', 2)
-        errorbar(pA_ave, param_ave, param_sem, 'vertical', '.', 'color', edgecolor, 'CapSize', 0, 'LineWidth', 2)
-    end
+    legend(subjList, 'NumColumns', nRows, 'Location', 'best')
+    xlabel(sprintf('%s', namesMetrics{iMetric_plot}))
+    ylabel(sprintf('[A%dB%d] %s', iModelA_plot, iModelB_plot, namesModelBparams{iModelB_plot}{iParam}))
 
-    % group ave per subj
-    % for isubj=1:nsubj
-    % pA_med = getCI(pA_allLoc(:, isubj, :), 1, 3);
-    % paramIN_med = getCI(paramIN_allLoc(:, isubj, :), 1, 3);
-    %
-    % [pA_ave, ~, ~, pA_sem] = getCI(pA_med(:), 2, 1);
-    % [paramIN_ave, ~, ~, paramIN_sem] = getCI(paramIN_med(:), 2, 1);
-    % errorbar(pA_ave, paramIN_ave, pA_sem, 'horizontal', '.', 'color', ones(1,3)/2, 'CapSize', 0, 'LineWidth', 1.5)
-    % errorbar(pA_ave, paramIN_ave, paramIN_sem, 'vertical', '.', 'color', ones(1,3)/2, 'CapSize', 0, 'LineWidth', 1.5)
-    % if isubj<=nMarkersMax, facecolor='w'; else, facecolor=ones(1,3)/2; end
-    % plot(pA_ave, paramIN_ave, markers_allSubj{isubj}, 'markeredgecolor', ones(1,3)/2', 'markerfacecolor', facecolor, 'LineWidth', 1.5)
-    % end
-
-    r_allBoot = [];
-    p_allBoot = [];
-
-    for iBoot = 1:nBoot
-
-        if ~flag_subjIsHuman
-            a = squeeze(pA_allLoc(iLocComb_corr, iBoot));
-            b = squeeze(param_allLoc(iLocComb_corr, iBoot));
-        else
-            a = squeeze(pA_allLoc(iLocComb_corr, :, iBoot));
-            b = squeeze(param_allLoc(iLocComb_corr, :, iBoot));
-        end
-
-        % a=a-mean(a,1);
-        % b=b-mean(b,1);
-        % [r, p] = corr(a(:),b(:),'type', 'Kendall');
-        [r, p] = corr(a(:), b(:));
-        r_allBoot(iBoot) = r;
-        p_allBoot(iBoot) = p;
-    end % ii
-
-    [r_med, r_lb, r_ub] = getCI(r_allBoot(:), 1, 1);
-    [p_med, p_lb, p_ub] = getCI(p_allBoot(:), 1, 1);
-
-    legend(subjList, 'NumColumns', 3, 'Location', 'best')
-    xlabel(sprintf('%s', namesMetrics{iMetric_pA}))
-    ylabel(sprintf('[A%dB%d] %s', iModelA, iModelB, namesModelBparams{iModelB}{iParam}))
-
-    title(sprintf('%s\nr=%.2f [%.2f, %.2f], p=%.3f [%.3f, %.3f]', namesModelBparams{iModelB}{iParam}, r_med, r_lb, r_ub, p_med, p_lb, p_ub))
+    title(sprintf('%s\n%s', namesModelBparams{iModelB_plot}{iParam}, str_dataset))
 end % iParam
 
 
-sgtitle(sprintf('[A%dB%d] n=%d [Location: %s]', iModelA, iModelB, nsubj, num2str(iLocComb_corr)))
+sgtitle(sprintf('[A%dB%d] n=%d [Location: %s]', iModelA_plot, iModelB_plot, nsubj, num2str(iLocComb_corr)))
 set(findall(gcf, '-property', 'LineWidth'), 'LineWidth', 2);
-set(findall(gcf, '-property', 'FontSize'), 'FontSize', 20);
+set(findall(gcf, '-property', 'FontSize'), 'FontSize', 18);
 
 % Save the figure
-saveas(gcf, sprintf('%s/n%d_B%d.jpg', nameFolder_Fig_NOM_corr, nsubj, iModelB))
+saveas(gcf, sprintf('%s/n%d_A%dB%d.jpg', nameFolder_Fig_NOM_corr, nsubj, iModelA_plot, iModelB_plot))
 
 close all
+
 
 %% Compare parameters across locations
 % Define folder for saving comparison figures
@@ -762,14 +1147,12 @@ if isempty(dir(nameFolder_Fig_NOM_compParams))
     mkdir(nameFolder_Fig_NOM_compParams);
 end
 
-% Fix Model A (e.g., RC-derived template)
-iModelA = 1;
 nParamsMax = 3; % max three params
 
 % Layout for subplots (row = location-pair index, column = parameter index)
 isubplots = reshape(1:12, 4, 3)'; % 3x4 mapping
-iModelB_compParam = 1;
-for iModelB = iModelB_compParam %iModelB_all % just plot the best model
+
+for iModelB = iModelB_plot %iModelB_all % just plot the best model
 
     % Number of parameters for this Model B
     nParamsB = numel(namesModelBparams{iModelB});
@@ -783,26 +1166,26 @@ for iModelB = iModelB_compParam %iModelB_all % just plot the best model
     iplots = reshape(1:nGroups*nParamsMax, [nParamsMax, nGroups])';
 
     for iGroup = 1:nGroups % e.g., {[1, 8]} or more pairs if desired
-        iLocPair = iLocGroups_all{iGroup};
+        iLocPair_all = iLocGroups_all{iGroup};
         % iLoc = iLoc_{1}; % numeric vector of location indices (e.g., [6 7])
 
         for iParam = 1:nParamsB
             subplot(nGroups, nParamsMax, iplots(iGroup, iParam)); hold on;
 
             % params_allSubj: [nLoc (here 2) x nSubj x nBoot]
-            params_allSubj = squeeze(params_allCond(iModelA, iModelB, iLocPair, :, :, iParam));
+            params_allSubj = squeeze(params_allCond(iModelA_plot, iModelB, iLocPair_all, :, :, iParam));
             params_allSubj_med = getCI(params_allSubj, 1, 3); % median across bootstraps
             [params_ave, ~, ~, params_sem] = getCI(params_allSubj_med, 2, 2); % mean and SEM across subjects
 
             % Group-level bars with error bars
-            for iiLoc = 1:length(iLocPair)
+            for iiLoc = 1:length(iLocPair_all)
                 bar(iiLoc, params_ave(iiLoc), ...
                     'FaceColor', 'w', ...
-                    'EdgeColor', colors_comb(iLocPair(iiLoc), :), ...
+                    'EdgeColor', colors_comb(iLocPair_all(iiLoc), :), ...
                     'BarWidth', 0.5);
                 errorbar(iiLoc, params_ave(iiLoc), params_sem(iiLoc), ...
                     'CapSize', 0, ...
-                    'Color', colors_comb(iLocPair(iiLoc), :));
+                    'Color', colors_comb(iLocPair_all(iiLoc), :));
             end
 
             % Individual subject traces (paired between the two locations)
@@ -833,8 +1216,8 @@ for iModelB = iModelB_compParam %iModelB_all % just plot the best model
                 p_allBoot(iBoot) = p;
             end
 
-            xticks(1:numel(iLocPair));
-            xticklabels(namesLocComb(iLocPair));
+            xticks(1:numel(iLocPair_all));
+            xticklabels(namesLocComb(iLocPair_all));
 
             % CI of t and p across bootstraps
             [t_med, t_lb, t_ub] = getCI(t_allBoot, 1, 2);
@@ -849,13 +1232,12 @@ for iModelB = iModelB_compParam %iModelB_all % just plot the best model
 
     end % iLoc_
 
-    sgtitle(sprintf('A%d [%s] B%d [%s]\n[n = %d] [ni = %d]', iModelA, namesModelA{iModelA}, iModelB, namesModelB{iModelB}, nsubj, nBoot));
+    sgtitle(sprintf('A%d [%s] B%d [%s]\n[n = %d] [ni = %d]', iModelA_plot, namesModelA{iModelA_plot}, iModelB, namesModelB{iModelB}, nsubj, nBoot));
     set(findall(gcf, '-property', 'LineWidth'), 'LineWidth', 1.5);
     set(findall(gcf, '-property', 'FontSize'), 'FontSize', 16);
 
     % Save the figure
-    saveas(gcf, fullfile(nameFolder_Fig_NOM_compParams, ...
-        sprintf('n%d_A%dB%d.jpg', nsubj, iModelA, iModelB)));
+    saveas(gcf, fullfile(nameFolder_Fig_NOM_compParams, sprintf('n%d_A%dB%d.jpg', nsubj, iModelA_plot, iModelB)));
 
 end % iModelB
 
@@ -901,42 +1283,42 @@ close all;
 % str_ANOVA = print_nANOVA({'ModelA', 'ModelB', 'LocComb', 'Metric', 'GoF'}, GoF_all_perIte(:), {indModelA(:), indModelB(:), indLocComb(:), indMetric(:), indGoF(:)}, nsubj)
 % end
 
-% %% Compare across ModelAs x ModelBs
+%% Compare across ModelAs x ModelBs
 % % IC_nLL_allCond: nModelsA x nModelsB x nLoc8 x nMetrics x nsubj x nBoot x nGoF
 % namesGoF = {'AIC-nLL', 'AICc-nLL', 'BIC-nLL'}; % no raw nLL
 % nGoFs = numel(namesGoF);
-%
+% 
 % % 2-way ANOVA: Model A x Model B; for each Loc x Metric x GoF
 % namesANOVA_Var = {'A', 'B', 'AxB'}; % 1 = main effect of ModelA, 2 = main effect of ModelB, 3 = interaction
 % nANOVA_Var = numel(namesANOVA_Var);
-%
+% 
 % % Preallocate:
 % % p_allB_allCond(loc, metric, gof, bootstrap, anovaVar)
 % p_allB_allCond = nan(nLocComb8, nMetrics, nGoFs, nBoot, nANOVA_Var);
-%
-% for iGoF = 1:nGoFs
-%
+% 
+% for iGoF = [1,3]%1:nGoFs
+% 
 %     for iLocComb = iLocComb_all
-%
+% 
 %         for iMetric = 1:nMetrics
-%
+% 
 %             parfor iBoot = 1:nBoot
-%
+% 
 %                 % Select data for this GoF, location, metric, and bootstrap
 %                 % GoF_all_perIte: [nModelsA x nModelsB x nsubj]
-%                 GoF_all_perIte = squeeze(IC_nLL_allCond(:, :, iLocComb, iMetric, :, iBoot, iGoF));
-%
+%                 GoF_all_perIte = squeeze(IC_nLL_allCond(:, :, iLocComb, :, iBoot, iGoF));
+% 
 %                 % Build factor indices for ANOVA (same size as GoF_all_perIte)
 %                 indModelA = nan(size(GoF_all_perIte));
 %                 indModelB = nan(size(GoF_all_perIte));
-%
+% 
 %                 for iModelA = iModelA_all
 %                     for iModelB = iModelB_all
 %                         indModelA(iModelA, iModelB, :) = iModelA * ones(nsubj, 1);
 %                         indModelB(iModelA, iModelB, :) = iModelB * ones(nsubj, 1);
 %                     end
 %                 end
-%
+% 
 %                 % Conduct 2-way ANOVA: factors = ModelA, ModelB
 %                 [~, tbl] = print_nANOVA( ...
 %                     {'ModelA', 'ModelB'}, ...
@@ -944,65 +1326,65 @@ close all;
 %                     {indModelA(:), indModelB(:)}, ...
 %                     nsubj, ...
 %                     0);
-%
+% 
 %                 % p-values: row 2 = A, row 3 = B, row 4 = A×B, col 7 = p
 %                 p_allB_allCond(iLocComb, iMetric, iGoF, iBoot, :) = ...
 %                     [tbl{2, 7}, tbl{3, 7}, tbl{4, 7}];
-%
+% 
 %             end % iBoot
-%
+% 
 %         end % iMetric
-%
+% 
 %     end % iLocComb
-%
+% 
 % end % iGoF
-%
+% 
 % % Plotting
 % nameFolder_Fig_NOM_ANOVA_AxB = sprintf('%s/ANOVA/ANOVA_AxB', nameFolder_Fig_NOM_Trialwise);
 % if isempty(dir(nameFolder_Fig_NOM_ANOVA_AxB)), mkdir(nameFolder_Fig_NOM_ANOVA_AxB), end
-%
+% 
 % for iGoF = 1:nGoFs
 %     figure('Position', [0 200 numel(iLocComb_all) * 333 1e3])
-%
+% 
 %     for iLocComb = iLocComb_all
-%
+% 
 %         % p_allB_allCond(loc, metric, gof, bootstrap, anovaVar)
 %         [p_med, p_lb, p_ub] = getCI(p_allB_allCond(iLocComb, iMetric, iGoF, :, :), 1, 4);
-%
+% 
 %         subplot(nGoFs, numel(iLocComb_all), find(iLocComb == iLocComb_all)); hold on
-%
+% 
 %         bar(1:nANOVA_Var, p_med, ...
 %             'EdgeColor', colors_comb(iLocComb, :), ...
 %             'FaceColor', 'w', ...
 %             'LineWidth', 1.5);
-%
+% 
 %         errorbar(1:nANOVA_Var, p_med, p_lb, p_ub, ...
 %             '.', ...
 %             'Color', colors_comb(iLocComb, :), ...
 %             'CapSize', 0, ...
 %             'LineWidth', 1.5);
-%
+% 
 %         xticks(1:nANOVA_Var);
 %         xticklabels(namesANOVA_Var);
 %         ylabel('p-value')
-%
+% 
 %         yline(0.05, 'k--');
 %         xlim([0, nANOVA_Var + 1]);
 %         ylim([0, max(p_ub)]);
-%
+% 
 %         % text(0, 0.09, sprintf('%s - L%d', namesGoF{iGoF}, iLocComb));
-%
+% 
 %         title(sprintf('L%d', iLocComb));
 %     end % iLocComb
-%
+% 
 %     % Figure-level formatting and save
 %     set(findall(gcf, '-property', 'LineWidth'), 'LineWidth', 2);
 %     set(findall(gcf, '-property', 'FontSize'), 'FontSize', 20);
-%
+% 
 %     sgtitle(sprintf('%s', namesGoF{iGoF}));
-%
-%     saveas(gcf, fullfile(nameFolder_Fig_NOM_ANOVA_AxB, ...
-%         sprintf('n%d_%s.jpg', nsubj, namesGoF{iGoF})));
+% 
+%     % saveas(gcf, fullfile(nameFolder_Fig_NOM_ANOVA_AxB, ...
+%     %     sprintf('n%d_%s.jpg', nsubj, namesGoF{iGoF})));
 % end
 % close all
 

@@ -293,6 +293,8 @@ fprintf('\n\nRunning nBoot = %d: ', nBoot);
 
 for iBoot = 1:nBoot
 
+    fprintf('%d... ', iBoot);
+    
     %% 1. Resample trials into FULL or TRAIN / TEST
     % For combined locations, trials are resampled within each location, and DOWNsampled (to equate number of pairs per loc, like for fovea (1 single loc) vs. perifovea (4 single loc)).
     %----------------%
@@ -459,7 +461,6 @@ for iBoot = 1:nBoot
     data_allBoot{iBoot} = data;
     data_metrics_allBoot(iBoot,:) = metrics_test;
 
-    fprintf('%d ', iBoot);
 end % end for ii
 
 % fprintf('\n\n[L%d ModelA%d] ALL  bootstraps DONE\n', iLocComb, iModelA);

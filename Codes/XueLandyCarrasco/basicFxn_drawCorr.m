@@ -1,4 +1,4 @@
-function  flag_sig = basicFxn_drawCorr(x_med_allSubj, y_med_allSubj, colors, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, type_corr, type_tail, text_title, markers_allSubj)
+function  [str_sig, str_title] = basicFxn_drawCorr(x_med_allSubj, y_med_allSubj, colors, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, type_corr, type_tail, text_title, markers_allSubj)
 
 % flag_sig = basicFxn_drawCorr(x_med_allSubj, y_med_allSubj, colors, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, type_corr, type_tail, text_title, markers_allSubj)
 % to plot and compare two values across locations for (1) performance and (2) tuning characteristics
@@ -13,15 +13,15 @@ function  flag_sig = basicFxn_drawCorr(x_med_allSubj, y_med_allSubj, colors, x_t
 %    y_ticklabels: vector, containing 5 values
 %    flag_zeroMean: 1=subtract mean; 0=NOT
 %    typeCorr: string, 'pearson'=Pearson's r; 'spearman'=spearman's rho, 'kendall'=Kendall's tau
-%    type_tail: 'both' (two tail), 'left', 'right'
+%    type_tail: 'both' (two tail), 'left' (negative), 'right' (positive)
 %    text_title
 %    markers_allSubj
 
 %% figure setting
-wd_border = 4; % 4
-sz_ticks = 40; % 30
-sz_marker = 30;
-nMarkerMax = 11;
+wd_border = 2; % default=4
+sz_ticks = 18; % default=30
+sz_marker = 10;% default=30
+nMarkerMax = 11;% default=11
 
 %% extract nsubj and nLoc and make assertion
 [nsubj, nLoc] = size(x_med_allSubj);
@@ -45,7 +45,8 @@ end
 % [y_ave, ~, ~, y_sem] = getCI(y_med_0mean_allSubj, 2, 1);
 
 %%
-figure('Position', [0 200 1e3 1e3]); hold on, box on
+% figure('Position', [0 200 1e3 1e3]); 
+hold on, box on
 
 %% idvd data
 for iLoc = 1:nLoc
@@ -72,7 +73,7 @@ switch flag_zeroMean
         [r_partial, p_partial] = partialcorr(x_med_allSubj(:), y_med_allSubj(:), ANOVA_indSubj(:), ...
             'type', type_corr, 'tail', type_tail);
 end
-flag_sig=''; if p_partial<.05, flag_sig='_sig'; elseif p_partial<.1, flag_sig = '_mg'; end
+str_sig='ns'; if p_partial<.05, str_sig='_sig'; elseif p_partial<.1, str_sig = '_mg'; end
 
 %% corr for each loc
 text_corr_perL = [];
@@ -104,8 +105,10 @@ ax.YAxis.FontSize = sz_ticks;
 ax.LineWidth = wd_border;
 
 %% title
-title(sprintf('%s\nPartial r = %.2f (p = %.3f) eta^2=%.2f\n%s', ...
-    text_title, r_partial, p_partial, eta2, text_corr_perL))
+str_title = sprintf('%s\nPartial r = %.2f (p = %.3f) eta^2=%.2f\n%s', ...
+    text_title, r_partial, p_partial, eta2, text_corr_perL);
+title(str_title)
+
 
 
 

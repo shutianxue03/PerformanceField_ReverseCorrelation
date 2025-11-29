@@ -6,6 +6,7 @@ iModelB = 1;
 iLocComb_all = ii{1};
 
 switch iLocComb_all(1)
+    case 1, nameAsymX = 'EE'; nameAsymY = 'EE';
     case 6, nameAsymX = 'HVA'; nameAsymY = 'HVA';
     case 5, nameAsymX = 'VMA'; nameAsymY = 'VMA';
 end

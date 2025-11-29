@@ -12,30 +12,12 @@ sz_ticks = 30;% default 35
 
 shift = [0,0];
 
-for ifeature = 1:nFeatures
+for iFeature = 1:nFeatures
 
     % Define directory to save the figure
-    nameFolder_Fig_marg = sprintf('%s/%s/marg_%s/', nameFigFolder, name_numFilters_Fitting, namesFeature{ifeature});
-    if isempty(dir(nameFolder_Fig_marg)), mkdir(nameFolder_Fig_marg), end
+    
 
-    % Set y-ticks
-    if ifeature==1
-        if iLocComb_all(1)==1, yticks_ = [-.03, 0, .05, .10, .15]; % fov vs. peri, higher ub
-        else, yticks_ = [-.02, linspace(0, .12, 4)];
-        end
-    else,
-        if iLocComb_all(1)==1, yticks_ = [-.01, linspace(0, .08, 4)];
-        else, yticks_ = [-.01, linspace(0, .06, 4)]; %[-.02, 0, .02, .04, .06];
-        end
-    end
-
-    ymax = max(yticks_);
-    ymin = min(yticks_);
-    %     yrange = ymax - ymin;
-    %     ytext_R2_all = [ymax-yrange/10.5, ymax-yrange/6.5];
-    %     ystars  = ymax-yrange/7.5;
-
-    xaxis = axis_tuning{ifeature};
+    xaxis = axis_tuning{iFeature};
     nfilters = length(xaxis);
 
     % Set parameters for ANOVA
@@ -43,7 +25,7 @@ for ifeature = 1:nFeatures
     ind_channel = nan(nsubj, nLoc, nfilters);
     for isubj = 1:nsubj, ind_channel(isubj, :, :) = repmat(1:nfilters, nLoc, 1); end
 
-    if ifeature == 1
+    if iFeature == 1
         [marg_med, marg_CI_lb, marg_CI_ub, marg_neg, marg_pos] = getCI(margORI_allSubj(:, :, :, iType, :), 1, 2);
         [margPred_med, margPred_CI_lb, margPred_CI_ub] = getCI(margPredORI_allSubj(:, :, :, iType, :), 1, 2);
         [margR2_med, margR2_neg, margR2_pos] = getCI(margR2ORI_allSubj(:, :, :, iType), 1, 2);
@@ -78,7 +60,7 @@ for ifeature = 1:nFeatures
 
     % Draw reference lines
     yline(0, 'handlevisibility', 'off', 'linewidth', wd_border, 'color', [.7, .7, .7]);
-    xline(ifeature-1, 'handlevisibility', 'off', 'linewidth', wd_border, 'color', [.7, .7, .7]);
+    xline(iFeature-1, 'handlevisibility', 'off', 'linewidth', wd_border, 'color', [.7, .7, .7]);
 
     % Loop through each location
     for iiLoc = 1:nLoc
@@ -116,7 +98,7 @@ for ifeature = 1:nFeatures
         %         margR2_ub2(iiLoc) = margR2_ub;
 
         % plot raw data
-        xaxis_ = xaxis + shift(ifeature) * (-1) ^ iiLoc;
+        xaxis_ = xaxis + shift(iFeature) * (-1) ^ iiLoc;
         %         if flag_interpolate>1
         %             xaxis_itp =  linspace(axis_tuning{ifeature}(1), axis_tuning{ifeature}(end), flag_interpolate);
         %         else
@@ -148,56 +130,31 @@ for ifeature = 1:nFeatures
                 patch([xaxis_itp, flip(xaxis_itp)], [margPred_lb, flip(margPred_ub)], color, 'FaceAlpha', .3, 'linestyle', 'none')
             end
         end
-
-        %% Plot where the peak SF is (ifamily=12)
-        if ifeature == 2 && flag_plotSFPeak
-            plot([peakSF_log_ave(iiLoc), peakSF_log_ave(iiLoc)], [0, peakAmp_ave(iiLoc)], 'color', color, 'linewidth', 2)
-            patch([peakSF_log_lb(iiLoc), peakSF_log_ub(iiLoc), peakSF_log_ub(iiLoc), peakSF_log_lb(iiLoc)], ...
-                [0, 0, peakAmp_ave(iiLoc), peakAmp_ave(iiLoc)], color, 'FaceAlpha', .1, 'linestyle', 'none')%
-            %                     switch flag_LR
-            %                         case 1, % left peak
-            %                             plot([peakSF_L_log_ave(iiLoc), peakSF_L_log_ave(iiLoc)], [0, peakAmp_L_ave(iiLoc)], 'color', color, 'linewidth', 2)
-            %                             patch([peakSF_L_log_lb(iiLoc), peakSF_L_log_ub(iiLoc), peakSF_L_log_ub(iiLoc), peakSF_L_log_lb(iiLoc)], ...
-            %                                 [0, 0, peakAmp_L_ave(iiLoc), peakAmp_L_ave(iiLoc)], color, 'FaceAlpha', .1, 'linestyle', 'none')
-            %                         case 2, % right peak
-            %                             plot([peakSF_R_log_ave(iiLoc), peakSF_R_log_ave(iiLoc)], [0, peakAmp_R_ave(iiLoc)], 'color', color, 'linewidth', 2)
-            %                             patch([peakSF_R_log_lb(iiLoc), peakSF_R_log_ub(iiLoc), peakSF_R_log_ub(iiLoc), peakSF_R_log_lb(iiLoc)], ...
-            %                                 [0, 0, peakAmp_R_ave(iiLoc), peakAmp_R_ave(iiLoc)], color, 'FaceAlpha', .1, 'linestyle', 'none')%
-            %                     end
-            for isubj=1:nsubj
-                plot([peakSF_log_med(isubj, iiLoc),peakSF_log_med(isubj, iiLoc)], [-1e-3, peakAmp_med(isubj, iiLoc)], [markers_allSubj{isubj}, '-'], 'color', color, 'linewidth', 1, 'MarkerSize', 12),
-                %                         switch flag_LR
-                %                             case 1, plot([peakSF_L_log_med(isubj, iiLoc),peakSF_L_log_med(isubj, iiLoc)], [-1e-3, peakAmp_L_med(isubj, iiLoc)], [markers_allSubj{isubj}, '-'], 'color', color, 'linewidth', 1, 'MarkerSize', 12),
-                %                             case 2, plot([peakSF_R_log_med(isubj, iiLoc), peakSF_R_log_med(isubj, iiLoc)], [-1e-3, peakAmp_R_med(isubj, iiLoc)], [markers_allSubj{isubj}, '--'], 'color', color, 'linewidth', 1, 'MarkerSize', 12)
-                %                         end
-            end
-        end
-
     end % end of iiLoc
 
     % xaxis
-    xlim(axisLim{ifeature})
+    xlim(axisLim{iFeature})
     %     xlabel(xlabels_tuning{ifeature}, 'FontSize', sz_label)
-    xticks(axisTicks_tuning{ifeature})
-    xticklabels(axisTL_tuning{ifeature})
-    if ifeature==2, xticklabels(round(axisTL_tuning{ifeature}, 1)), end
+    xticks(axisTicks_tuning{iFeature})
+    xticklabels(axisTL_tuning{iFeature})
+    if iFeature==2, xticklabels(round(axisTL_tuning{iFeature}, 1)), end
 
     yticks(yticks_)
     yticklabels(round(yticks_, 2))
     ylim(yticks_([1, end]))
 
     %% pairwise one-tailed t-tests at each channel
-    for ifilter = 1:nfilters
+    for iFilter = 1:nfilters
         %             xline(xaxis(ifilter), 'k-');
-        [h,p_] = ttest(squeeze(marg_med(:, 1, ifilter)), squeeze(marg_med(:, 2, ifilter)));
+        [h,p_] = ttest(squeeze(marg_med(:, 1, iFilter)), squeeze(marg_med(:, 2, iFilter)));
         %         [h,p_] = ttest(squeeze(marg_med(:, 1, ifilter)), squeeze(marg_med(:, 2, ifilter)), 'tail', 'right');
         p = p_*nfilters;
-        if p<.05, ifilter, end%plot(xaxis(ifilter), ystars(ifeature), 'k*', 'MarkerSize', sz_stars, 'linewidth', wd_border), end
+        if p<.05, iFilter, end%plot(xaxis(ifilter), ystars(ifeature), 'k*', 'MarkerSize', sz_stars, 'linewidth', wd_border), end
     end
     fprintf('\nPairwise comparison printed\n\n')
     
     % manually enter below:
-    if ifeature==1, x_band = {}; else, x_band = {}; end
+    if iFeature==1, x_band = {}; else, x_band = {}; end
     nband = length(x_band);
     for iband=1:nband
         x_band_ = xaxis_(x_band{iband});
@@ -224,7 +181,7 @@ for ifeature = 1:nFeatures
         namesLocComb{iLocComb_all(2)}, margR2_ave2(2), margR2_SEM2(2)), 'fontsize', 20)
 
     %% Save figure
-    saveas(gcf, sprintf('%sn%d_%s_%s.jpg', nameFolder_Fig_marg, nsubj, title_, namesType{iType}))
+    saveas(gcf, sprintf('%sn%d_%s_%s.jpg', nameFolder_Fig_NOM_Tuning, nsubj, title_, namesType{iType}))
 
 end % end of ifeature
 

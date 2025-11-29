@@ -18,7 +18,7 @@ nSF = nORI;
 
 %% Define names of folders to load/save data (on the server)
 % if run on HPC
-% nameFolder_server = '/scratch/sx712/PF_RC'; str_envir = 'HPC'; 
+nameFolder_server = '/scratch/sx712/PF_RC'; str_envir = 'HPC'; 
 
 % if run on server
 nameFolder_server = '/Volumes/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC'; str_envir = 'Server'; 
@@ -133,7 +133,7 @@ axis_tuning{1} = filtersOri_all - 90;
 axis_tuning{2} = filtersSF_all_log;
 axisTicks_tuning = {-90:45:90, linspace(log2(noise.SF_low), log2(noise.SF_high), 5)}; % ticks (SF is on log scale)
 axisTL_tuning = {axisTicks_tuning{1}, round(2.^axisTicks_tuning{2}, 2)}; % label (SF is on linear scale)
-axisLim = {[-99, 99], [-.1, 2.1]};
+axisLim = {[-99, 99], [.1719, 1.8281]};
 
 limit0to1 = @(x) min(max(x, 0), 1);
 nTrialsPerSess = 100;  % Number of trials per session
@@ -152,7 +152,7 @@ ncomb8 = 8;
 % Parameter bounds and initial values
 % Internal noise parameters
 Nmul_lb = 1e-5;  Nmul_ub = 1;     % multiplicative noise
-SDadd_lb = 1e-5; SDadd_ub = 40;   % additive noise (20–30 range from simulations)
+SDadd_lb = 1e-5; SDadd_ub = 30;   % additive noise (20–30 range from simulations)
 % Correlation parameter (rhoDV)
 rho_lb  = 1e-5;  rho_ub = 1 - rho_lb;
 
@@ -263,6 +263,7 @@ namesTitles3 = {'', 'Meridian', 'Vertical Meridian', 'HM'}; % in black
 % namesCI = {'mean', 'mean norm', 'var', 'var norm'};
 namesIC = {'AIC', 'AICc', 'BIC'}; nICs = length(namesIC);
 publishOptions = struct('format','pdf','outputDir','publishedPDFs/', 'showCode', 0);
+namesDataset = {'TrainingSet', 'FullSet'};
 
 % Model comparison names
 namesMCmode = {'10-CV', 'LOOCV',   'InfoCriterion'}; nMCmode = length(namesMCmode);
@@ -296,16 +297,18 @@ namesConvolveType = {'dot product', 'convolution'}; nConvolveType = length(names
 namesIVType = {'sum all channels', 'channel with max IV'}; nIVType = length(namesIVType);
 
 %% For plotting
-namesFeature_axis = {'Orientation (deg)', 'Spatial frequency (cpd)'};
+namesFeature_axis = {'Orientation (º)', 'Spatial frequency (cpd)'};
+namesFeature_axis_Tuning = {'Marginalized ORI kernel (a.u.)', 'Marginalized SF kernel (a.u.)'};
 % names of the estParams/tuningC
 clear namesTunC_unit_perF
-namesTunC_unit_perF{1,1} = {'Gain (a.u.)', 'Sigma (deg)', 'Baseline (a.u.)'};
-namesTunC_unit_perF{1,2} = {'Pref ORI (deg)', 'Peak amp. (a.u.)', 'Bandwith (deg)', 'Baseline (a.u.)'};
-namesTunC_unit_perF{2,1} = {'Peak SF (cpd)', 'Gain (a.u.)', 'Sigma (cpd)', 'Baseline (a.u.)'};
-namesTunC_unit_perF{2,2} = {'Peak SF (cpd)', 'Peak amp. (a.u.)', 'Bandwith (octave)', 'Baseline (a.u.)'};
-namesTunC_unit_perF{3,1} = {'Peak SF (cpd)', 'Gain (a.u.)', 'Sigma (cpd)', 'Baseline (a.u.)', 'Truncation (a.u.)'};
-namesTunC_unit_perF{3,2} = {'Peak SF (cpd)', 'Peak amp. (a.u.)', 'Bandwith (octave)', 'Baseline (a.u.)', 'Truncation (a.u.)'};
-namesTunC_unit_perF{8,1} = {'Gain 1 (a.u.)', 'Gain 2 (a.u.)', 'Sigma 1 (deg)', 'ratio (a.u.)', 'Baseline (a.u.)'};
+namesTunC_unit_perF{1,1} = {'Gain (a.u.)', 'Sigma (deg)', 'baseline (a.u.)'};
+% namesTunC_unit_perF{1,2} = {'Pref ORI (deg)', 'peak amp. (a.u.)', 'bandwith (deg)', 'baseline (a.u.)'};
+namesTunC_unit_perF{1,2} = {'peak amp. (a.u.)', 'bandwith (º)', 'baseline (a.u.)'};
+namesTunC_unit_perF{2,1} = {'peak SF (cpd)', 'Gain (a.u.)', 'Sigma (cpd)', 'baseline (a.u.)'};
+namesTunC_unit_perF{2,2} = {'peak SF (cpd)', 'peak amp. (a.u.)', 'bandwith (octave)', 'baseline (a.u.)'};
+namesTunC_unit_perF{3,1} = {'peak SF (cpd)', 'Gain (a.u.)', 'Sigma (cpd)', 'baseline (a.u.)', 'Truncation (a.u.)'};
+namesTunC_unit_perF{3,2} = {'peak SF (cpd)', 'peak amp. (a.u.)', 'bandwith (octave)', 'baseline (a.u.)', 'Truncation (a.u.)'};
+namesTunC_unit_perF{8,1} = {'Gain 1 (a.u.)', 'Gain 2 (a.u.)', 'Sigma 1 (deg)', 'ratio (a.u.)', 'baseline (a.u.)'};
 namesTunC_unit_perF{8,2} = {'Pref ORI (deg)', 'peak amp. (a.u.)', 'trough ori (deg)', 'trough mag. (a.u.)', 'bandwidth (deg)', 'baseline (a.u.)'};
 namesTunC_unit_perF{12,2} = {'peak SF1 (cpd)', 'peak amp. 1 (a.u.)', 'bandwidth 1 (octave)', 'peak SF2 (cpd)', 'peak amp. 2 (a.u.)', 'bandwidth 2 (octave)'};
 namesTunC_unit_perF{13,2} = {'peak amp. (a.u.)', 'trough ori (deg)', 'trough mag, (a.u.)', 'bandwidth (deg)', 'baseline (a.u.)'};

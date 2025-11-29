@@ -36,8 +36,8 @@ if nargin == 4
     contour(axis_tuning{1}, axis_tuning{2}, outline_neg, 1, 'k', 'linewidth', wd_contour)
 end
 
-% caxis(caxisLim) % make sure this is at the end!!
-% ch.Ticks = linspace(caxisLim(1), caxisLim(2), 4);
+caxis(caxisLim) % make sure this is at the end!!
+ch.Ticks = round(linspace(caxisLim(1), caxisLim(2), 4), 2);
 ch.FontSize = sz_colorbar;
 
 ax = gca;

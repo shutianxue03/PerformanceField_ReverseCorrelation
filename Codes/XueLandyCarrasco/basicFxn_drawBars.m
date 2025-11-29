@@ -110,8 +110,8 @@ if ~isnan(ref)
 end
 
 %% conduct ANOVA (regardless of nBars)
-indBar = repmat(1:nBars, nsubj, 1);
-text_ANOVA = print_nANOVA({'Loc'}, med_allSubj(:), {indBar(:)}, nsubj, 1);
+% indBar = repmat(1:nBars, nsubj, 1);
+% text_ANOVA = print_nANOVA({'Loc'}, med_allSubj(:), {indBar(:)}, nsubj, 1);
 
 %% if nBars>2, compare every pair
 text_testPairs = '';
@@ -166,6 +166,8 @@ ax.YAxis.FontSize = fsz_ticks;
 ax.LineWidth = wd;
 
 %% title
-title(sprintf('%s\n%s%s', text_title, text_ANOVA, text_testPairs), 'fontsize', fsz_title)
+% title(sprintf('%s\n%s%s', text_title, text_ANOVA, text_testPairs), 'fontsize', fsz_title)
+
+title(sprintf('%s\n%s', text_title, text_testPairs), 'fontsize', fsz_title)
 
 

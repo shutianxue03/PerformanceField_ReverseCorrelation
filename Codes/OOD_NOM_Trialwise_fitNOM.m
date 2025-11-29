@@ -40,7 +40,7 @@ function OOD_NOM_Trialwise_fitNOM(isubj, iLocComb, iModelA, iModelB, nBoot)
 % 5 = Nmul + rho (no SDadd)
 % 6 = Nmul only
 % 7 = rho only (i.e., no internal noise) [the worst model]
-% nIterations : number of resampling iterations (same as in *_compIV)
+% nIterations : number of resampling bootstraps (same as in *_compIV)
 %
 % OUTPUTS
 % Results are saved to:
@@ -69,9 +69,9 @@ addpath(genpath('SX_toolbox/bads-master'));
 %--------------%
 SX_RC1_setting; % defines nORI, nSF, namesLocComb, namesModelA, namesModelB, nBins, etc.
 %--------------%
-flag_fminconORbads = 2; % 1 = use fmincon (faster, local); 2 = use BADS (slower, more robust)
-flag_plot_allIter = 0; % 1 = make summary plots across iterations
-flag_plot_perIter = 0; % 1 = plot per-iteration fits (can be slow)
+flag_fminconORbads = 1; % 1 = use fmincon (faster, local); 2 = use BADS (slower, more robust)
+flag_plot_allIter = 0; % 1 = make summary plots across bootstraps
+flag_plot_perIter = 0; % 1 = plot per-bootstrap fits (can be slow)
 if ~strcmp('HPC', str_envir), flag_plot_allIter = 1; end % don't plot when running on HPC
 
 %% Set up file paths and names
@@ -109,15 +109,16 @@ fprintf(['\nSubject/IO name: %s ' ...
     '\n - L%d [%s]', ...
     '\n - A%d [%s]', ...
     '\n - B%d [%s]', ...
-    '\n - Number of iterations = %d\n\n'], ...
+    '\n - Number of bootstraps = %d\n\n'], ...
     subjName, ...
     iLocComb, namesLocComb{iLocComb}, ...
     iModelA, namesModelA{iModelA}, ...
     iModelB, namesModelB{iModelB}, ...
     nBoot);
 
-%% Load trial-wise data and criterion
+%% Load trial-wise data and criterion from xx_compIV.mat file
 load(nameFile_compIV, 'data_allBoot', 'c_zscore');
+fprintf('\n Loaded xx_compIV.mat for "data_allBoot" and "c_zscore"\n')
 
 %% Parameter vectors per Model B
 switch iModelB
@@ -166,13 +167,16 @@ params_est_allBoot = nan(nBoot, nParams);
 nLL_allBoot = nan(nBoot, 1);
 pred_metrics_allBoot = cell(nBoot, 1);
 
-%% Main estimation loop across iterations
+%% Main estimation loop across bootstraps
 
-fprintf('\n\nRunning nBoot = %d: ', nBoot);
+fprintf('\nRunning nBoot = %d: ', nBoot);
 
-for ii = 1:nBoot
+for iBoot = 1:nBoot
 
-    data = data_allBoot{ii};
+    fprintf('%d... ', iBoot);
+
+    % Extract data
+    data = data_allBoot{iBoot};
 
     % Objective function for optimizer: nLL from trial-wise pYES + pairwise pA
     fxn_estParams = @(paramsNOM) fxn_getError_v7(iModelB, paramsNOM, data, c_zscore);
@@ -185,24 +189,23 @@ for ii = 1:nBoot
     end
 
     % Compile
-    params_est_allBoot(ii, :) = params_est(:).';
-    nLL_allBoot(ii) = nLL;
+    params_est_allBoot(iBoot, :) = params_est(:).';
+    nLL_allBoot(iBoot) = nLL;
 
     % Predict binned metrics from estimated parameters
     pred = PR_pred_v7(iModelB, params_est, data, c_zscore, nBins, flag_plot_perIter);
-    pred_metrics_allBoot{ii} = pred;
+    pred_metrics_allBoot{iBoot} = pred;
 
-    fprintf('%d ', ii);
-end % end of ii
+end % end of iBoot
 
-% fprintf('\n\nAll iterations DONE\n');
+% fprintf('\n\nAll bootstraps DONE\n');
 
 %% Save results (append onto *_compIV.mat)
 % copyfile([nameFile_compIV, '.mat'], [nameFile_fitNOM, '.mat']); % backup structure from compIV
 save(nameFile_fitNOM, '*_allBoot');
 fprintf('\n========== Fitting saved ==========\n\n\n\n\n');
 
-%% Plot summary across iterations (optional)
+%% Plot summary across bootstraps (optional)
 
 if flag_plot_allIter
     NOMplot_fitNOM;
