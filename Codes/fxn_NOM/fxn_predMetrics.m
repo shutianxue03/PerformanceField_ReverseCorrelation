@@ -69,11 +69,11 @@ end
 
 %% -------- 2. Extract data --------
 IV_allT = data.IV(:); % nTrials x 1
-resp__allT = data.resp(:); % 1 = YES, 0 = NO
+resp_allT = data.resp(:); % 1 = YES, 0 = NO
 iPair_allT = data.iPair(:); % pair id per trial
 
 nTrials = numel(IV_allT);
-if numel(resp__allT) ~= nTrials || numel(iPair_allT) ~= nTrials
+if numel(resp_allT) ~= nTrials || numel(iPair_allT) ~= nTrials
     error('fxn_getError_v7: Data fields IV, resp, iPair must have same length.');
 end
 
@@ -117,8 +117,8 @@ for iUnik = 1:nPairs
 
     pairIdx(iUnik,:) = [PassA, PassB];
 
-    respA = resp__allT(PassA);
-    respB = resp__allT(PassB);
+    respA = resp_allT(PassA);
+    respB = resp_allT(PassB);
     consistency_allPairs(iUnik) = (respA == respB);
 end
 

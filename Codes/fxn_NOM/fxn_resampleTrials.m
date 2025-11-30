@@ -6,6 +6,7 @@ iPRS_full_rand = [];
 resp_full_rand = [];
 cst_full_rand = [];
 respC_full_rand = [];
+RT_full_rand = [];
 
 % Training set
 e3D_train_rand = [];
@@ -13,6 +14,7 @@ iPRS_train_rand = [];
 resp_train_rand = [];
 cst_train_rand = [];
 respC_train_rand = [];
+RT_train_rand = [];
 
 % Test set
 e3D_test_rand = [];
@@ -21,6 +23,7 @@ resp_test_rand = [];
 cst_test_rand = [];
 respC_test_rand = [];
 iPair_test_rand = [];
+RT_test_rand = [];
 
 for iiLoc = 1:length(iLoc_all)
 
@@ -32,6 +35,7 @@ for iiLoc = 1:length(iLoc_all)
     iPair_nonrand = [];
     resp_nonrand = [];
     cst_nonrand = [];
+    RT_nonrand = [];
 
     for iSS = 1:length(iSess_select)
         indLoc = (dataMatrix(:, 5) == iLoc_all(iiLoc)) & (dataMatrix(:, 2) == iSess_select(iSS));
@@ -43,6 +47,8 @@ for iiLoc = 1:length(iLoc_all)
         iPair_nonrand = [iPair_nonrand; dataMatrix(indLoc, 8)];
         resp_nonrand = [resp_nonrand; dataMatrix(indLoc, 9)];
         cst_nonrand = [cst_nonrand; dataMatrix(indLoc, 11)];
+        RT_nonrand = [RT_nonrand; dataMatrix(indLoc, 10)];
+        
     end % iSS
 
     cst_unik_nonrand = unique(cst_nonrand);
@@ -52,14 +58,15 @@ for iiLoc = 1:length(iLoc_all)
     indUnikPair_rand = randperm(ntrials_perSingleLoc/2, ntrials_perSingleLoc/2); % range: [1, ntrials_perSingleLoc/2]
 
     % ALL trials (no split)
-    [e3D_full_, iPRS_full_, resp_full_, cst_full_, respC_full_] = fxn_getRespC(e3D_nonrand, indUnikPair_rand, ...
-        iPair_nonrand, iPair_unik_nonrand, iPRS_nonrand, resp_nonrand, cst_nonrand);
+    [e3D_full_, iPRS_full_, resp_full_, cst_full_, respC_full_, RT_full_] = fxn_getRespC(e3D_nonrand, indUnikPair_rand, ...
+        iPair_nonrand, iPair_unik_nonrand, iPRS_nonrand, resp_nonrand, cst_nonrand, RT_nonrand);
 
     e3D_full_rand = cat(1, e3D_full_rand, e3D_full_);
     iPRS_full_rand = [iPRS_full_rand; iPRS_full_];
     resp_full_rand = [resp_full_rand; resp_full_];
     cst_full_rand = [cst_full_rand; cst_full_];
     respC_full_rand = [respC_full_rand; respC_full_];
+    RT_full_rand = [RT_full_rand; RT_full_];
 
     %% With split
     nPairs_train = ntrain_perSingle/2;
@@ -68,18 +75,19 @@ for iiLoc = 1:length(iLoc_all)
     indUnikPair_rand_test_ = indUnikPair_rand(nPairs_train+1:end); assert(length(indUnikPair_rand_test_) == nPairs_test) % range: [1, ntrialsPerLoc/2]
 
     % TRAIN group
-    [e3D_train_, iPRS_train_, resp_train_, cst_train_, respC_train_] = fxn_getRespC(e3D_nonrand, indUnikPair_rand_train_, ...
-        iPair_nonrand, iPair_unik_nonrand, iPRS_nonrand, resp_nonrand, cst_nonrand);
+    [e3D_train_, iPRS_train_, resp_train_, cst_train_, respC_train_, RT_train_] = fxn_getRespC(e3D_nonrand, indUnikPair_rand_train_, ...
+        iPair_nonrand, iPair_unik_nonrand, iPRS_nonrand, resp_nonrand, cst_nonrand, RT_nonrand);
 
     % TEST group
-    [e3D_test_, iPRS_test_, resp_test_, cst_test_, respC_test_, iPair_test_] = fxn_getRespC(e3D_nonrand, indUnikPair_rand_test_, ...
-        iPair_nonrand, iPair_unik_nonrand, iPRS_nonrand, resp_nonrand, cst_nonrand);
+    [e3D_test_, iPRS_test_, resp_test_, cst_test_, respC_test_, iPair_test_, RT_test_] = fxn_getRespC(e3D_nonrand, indUnikPair_rand_test_, ...
+        iPair_nonrand, iPair_unik_nonrand, iPRS_nonrand, resp_nonrand, cst_nonrand, RT_nonrand);
 
     e3D_train_rand = cat(1, e3D_train_rand, e3D_train_);
     iPRS_train_rand = [iPRS_train_rand; iPRS_train_];
     resp_train_rand = [resp_train_rand; resp_train_];
     cst_train_rand = [cst_train_rand; cst_train_];
     respC_train_rand = [respC_train_rand; respC_train_];
+    RT_train_rand = [RT_train_rand; RT_train_];
 
     e3D_test_rand = cat(1, e3D_test_rand, e3D_test_);
     iPRS_test_rand = [iPRS_test_rand; iPRS_test_];
@@ -87,5 +95,6 @@ for iiLoc = 1:length(iLoc_all)
     cst_test_rand = [cst_test_rand; cst_test_];
     iPair_test_rand = [iPair_test_rand; iPair_test_];
     respC_test_rand = [respC_test_rand; respC_test_];
+    RT_test_rand = [RT_test_rand; RT_test_];
 
 end % iLoc_

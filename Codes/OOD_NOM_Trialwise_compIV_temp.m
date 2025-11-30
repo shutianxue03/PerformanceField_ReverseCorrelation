@@ -234,55 +234,10 @@ if rem(ntrain_perSingle, 2)
     ntest_perSingle = ntest_perSingle - 1;
 end
 
-%% -------------------- Precompute non-random pools -------------------- %%
-% Needed for creating the ideal template
-e3D_nonrand = [];
-resp_nonrand = [];
-cst_nonrand = [];
-
-for iSS = 1:length(iSess_select)
-    inSess = (dataMatrix(:, 2) == iSess_select(iSS));
-    inLoc = ismember(dataMatrix(:, 5), iLoc_all); % supports single or multiple locations
-    indLoc = inSess & inLoc;
-    e3D_nonrand = cat(1, e3D_nonrand, e3D_allT(indLoc, :, :));
-    cst_nonrand = [cst_nonrand; dataMatrix(indLoc,11)];
-end
-
-%% -------------------- Ideal template -------------------- %%
-% For human observers, we still use this "ideal" Gabor-energy template when
-% iModelA == 3 (IO template). Otherwise, templates are derived from RC.
-
-gaborCST = mean(cst_nonrand);
-templateType_true = 1; % doesn't matter much for the IO Gabor template
-
-stim.gaborCST = gaborCST;
-
-% Create a pool of Gabor filters
-[filter_sin, filter_cos] = SX_sim02_setFilters(stim, noise.filtersSF_all, ...
-    filtersOri_all, fxn_getSigma_SPdomain, 0);
-
-% Define the TRUE template (ORI x SF)
-template_gabor_true = exp_CreateGabor(stim, stim.gaborCST);
-template_true = SX_RC4_Energy_parfor(stim.mask, {template_gabor_true}, filter_sin, filter_cos);
-template_true = squeeze(template_true); % remove singleton dim
-template_true = fxn_getTemplate(template_true, templateType_true, 0);
 
 %% -------------------- MAIN LOOP over  bootstraps -------------------- %%
 nMetrics = 11; % see fxn_getMetrics
-data_metrics_allBoot = nan(nBoot, 2, nMetrics); %for 3: 1=full, 2=test
-data_allBoot = cell(nBoot, 1);
-template_train_allBoot = nan(nBoot, nORI, nSF);
-template_full_allBoot = template_train_allBoot;
-
-sep_allBoot = nan(nBoot, 2); % 1=training set, 2=full set
-margORI_allBoot = nan(nBoot, 2, nORI);
-margPred_ORI_allBoot = nan(nBoot, 2, nORI);
-margParams_ORI_allBoot = nan(nBoot, 2, length(namesParams_all{iFamily_ORI}));
-margR2_ORI_allBoot = nan(nBoot, 2);
-margSF_allBoot = nan(nBoot, 2, nSF);
-margPred_SF_allBoot = nan(nBoot, 2, nSF);
-margParams_SF_allBoot = nan(nBoot, 2, length(namesParams_all{iFamily_SF}));
-margR2_SF_allBoot = nan(nBoot, 2);
+data_metrics_allBoot = nan(nBoot, 2, nMetrics); %for 3: 1=train, 2=test
 
 fprintf('\n\nRunning nBoot = %d: ', nBoot);
 
@@ -300,168 +255,33 @@ for iBoot = 1:nBoot
     switch itype_template
         case 1 % PRS trials only
             useIdx_train = (iPRS_train_rand == 1);
-            useIdx_full = (iPRS_full_rand == 1);
-            useIdx_test = (iPRS_test_rand == 1);
+            % useIdx_full = (iPRS_full_rand == 1);
+            % useIdx_test = (iPRS_test_rand == 1);
         case 2 % ABS trials only
             useIdx_train = (iPRS_train_rand == 0);
-            useIdx_full = (iPRS_full_rand == 0);
-            useIdx_test = (iPRS_test_rand == 0);
+            % useIdx_full = (iPRS_full_rand == 0);
+            % useIdx_test = (iPRS_test_rand == 0);
         otherwise % 3 = both PRS and ABS (here we just keep everything)
             useIdx_train = true(size(iPRS_train_rand));
-            useIdx_full = true(size(iPRS_full_rand));
-            useIdx_test = true(size(iPRS_test_rand));
+            % useIdx_full = true(size(iPRS_full_rand));
+            % useIdx_test = true(size(iPRS_test_rand));
     end
 
     % sel for "selected"
-    e3D_train_rand_sel = e3D_train_rand(useIdx_train, :, :);
+    % e3D_train_rand_sel = e3D_train_rand(useIdx_train, :, :);
     cst_train_rand_sel = cst_train_rand(useIdx_train);
     resp_train_rand_sel = resp_train_rand(useIdx_train);
+    respC_train_rand_sel = respC_train_rand(useIdx_train);
     iPRS_train_rand_sel = iPRS_train_rand(useIdx_train);
     RT_train_rand_sel = RT_train_rand(useIdx_train);
-
-    e3D_full_rand_sel = e3D_full_rand(useIdx_full, :, :);
-    cst_full_rand_sel = cst_full_rand(useIdx_full);
-    resp_full_rand_sel = resp_full_rand(useIdx_full);
-    iPRS_full_rand_sel = iPRS_full_rand(useIdx_full);
-    RT_full_rand_sel = RT_full_rand(useIdx_full);
-
-    e3D_test_rand_sel = e3D_test_rand(useIdx_test, :, :);
-    cst_test_rand_sel = cst_test_rand(useIdx_test);
-    resp_test_rand_sel = resp_test_rand(useIdx_test);
-    iPRS_test_rand_sel = iPRS_test_rand(useIdx_test);
-    RT_test_rand_sel = RT_test_rand(useIdx_test);
-
-    % Standardize energy if requested
-    if flag_standEnergy
-        e3D_train_rand_norm = normEnergy(e3D_train_rand_sel, cst_train_rand_sel, iPRS_train_rand_sel);
-        e3D_full_rand_norm = normEnergy(e3D_full_rand_sel, cst_full_rand_sel, iPRS_full_rand_sel);
-    else
-        e3D_train_rand_norm = e3D_train_rand_sel;
-        e3D_full_rand_norm = e3D_full_rand_sel;
-    end
-
-    %% 3. Estimate the template
-    % from TRAIN set
-    template_train = SX_sim07_RC(filtersSF_all, filtersOri_all, e3D_train_rand_norm, resp_train_rand_sel);
-    % Normalize the derived template to a fixed amplitude range
-    % template_train = template_train / max(template_train(:)) * 0.2; % match OOD_sim scaling
-    % Store kernel for this  bootstrap
-    template_train = fxn_getTemplate(template_train, templateType, flag_plot_template);
-    template_train_allBoot(iBoot, :, :) = template_train;
-
-    % from the FULL set
-    template_full = SX_sim07_RC(filtersSF_all, filtersOri_all, e3D_full_rand_norm, resp_full_rand_sel);
-    % template_full = template_full / max(template_full(:)) * 0.2; % match OOD_sim scaling
-    template_full = fxn_getTemplate(template_full, templateType, flag_plot_template);
-    template_full_allBoot(iBoot, :, :) = template_full;
-
-    %% Marginalization and fit tuning functions
-    for iDataset = 1:2
-        switch iDataset
-            case 1
-                template = template_train;
-            case 2
-                template = template_full;
-        end
-
-        % Calculate separability
-        templateType_recon = 2; % 2=reconstructed template
-        template_recon = fxn_getTemplate(template, templateType_recon, flag_plot_template);
-        sep = corr(template(:), template_recon(:));
-
-        % Marginalize the template into 1D ORI and SF profiles
-        margORI = mean(template, 2)';
-        margSF = mean(template, 1);
-
-        % Fitting
-        xORI = axis_tuning{1};
-        fxn_tuningLoss_ORI = @(param_est) sum((margORI - predSFkernel(xORI, iFamily_ORI, param_est, flag_plot_tuning)).^2);
-        problem_ORI = createOptimProblem('fmincon','objective', fxn_tuningLoss_ORI,'x0', (ub_full_all{iFamily_ORI}+lb_full_all{iFamily_ORI})/2,'lb',lb_full_all{iFamily_ORI},'ub',ub_full_all{iFamily_ORI},'options',options_fmin);
-        margParams_ORI = run(problem_setting, problem_ORI, nRep);
-        margPred_ORI = predSFkernel(xORI, iFamily_ORI, margParams_ORI, flag_plot_tuning);
-        margR2_ORI = 1-sumsqr(margORI-margPred_ORI)/sumsqr(margORI-mean(margORI));
-
-        xSF = axis_tuning{2};
-        xSF_ln = 2.^xSF; % fit in linear SF space
-        fxn_tuningLoss_SF = @(param_est) sum((margSF - predSFkernel(xSF_ln, iFamily_SF, param_est, flag_plot_tuning)).^2);
-        problem_SF = createOptimProblem('fmincon','objective', fxn_tuningLoss_SF,'x0', (ub_full_all{iFamily_SF}+lb_full_all{iFamily_SF})/2,'lb',lb_full_all{iFamily_SF},'ub',ub_full_all{iFamily_SF},'options',options_fmin);
-        margParams_SF = run(problem_setting, problem_SF, nRep);
-        margPred_SF = predSFkernel(xSF_ln, iFamily_SF, margParams_SF, flag_plot_tuning);
-        margR2_SF = 1-sumsqr(margSF-margPred_SF)/sumsqr(margSF-mean(margSF));
-
-        % Store
-        sep_allBoot(iBoot, iDataset) = sep;
-
-        margORI_allBoot(iBoot, iDataset, :) = margORI;
-        margPred_ORI_allBoot(iBoot, iDataset, :) = margPred_ORI;
-        margParams_ORI_allBoot(iBoot, iDataset, :) = margParams_ORI;
-        margR2_ORI_allBoot(iBoot, iDataset) = margR2_ORI;
-
-        margSF_allBoot(iBoot, iDataset, :) = margSF;
-        margPred_SF_allBoot(iBoot, iDataset, :) = margPred_SF;
-        margParams_SF_allBoot(iBoot, iDataset, :) = margParams_SF;
-        margR2_SF_allBoot(iBoot, iDataset) = margR2_SF;
-    end % end for i=1:2
 
     %% 4. Compute test-set behavioral metrics (not binned by IV)
     metrics_full = fxn_getMetrics(resp_full_rand, iPRS_full_rand, respC_full_rand, cst_full_rand, RT_full_rand);
     metrics_test = fxn_getMetrics(resp_test_rand, iPRS_test_rand, respC_test_rand, cst_test_rand, RT_test_rand);
-
-    % metrics: [dprime, criterion, [pC, pHit, pFA], nanmean(respC), pYES, mean(1./contrast), median(RT)];
+    % metrics_train = fxn_getMetrics(resp_train_rand_sel, iPRS_train_rand_sel, respC_train_rand_sel, cst_train_rand_sel, RT_train_rand_sel);
     metrics = [metrics_full; metrics_test];
 
-    % Save criterion in z units; later used to convert to criterion in IV
-    c_zscore = metrics_test(2);
-
-    clear data; % size of IV differs across subjects and  bootstraps
-
-    %% 5. Compute internal variable (IV) from template and energy (TEST set)
-    % 5.1 Derive template
-    if iModelA == 1 % Use RC-derived template
-    else % Use the ideal template (Gabor energy profile)
-        if ~isnumeric(isubj) % for IO, you may reload 'template_true' from disk
-            load(sprintf('%s/truth.mat', nameFolder_OOD_load), 'template_true');
-        end
-        template_train = template_true;
-    end
-
-    % 5.2 Compute IV for test trials
-    %---------------%
-    IV_test = fxn_getIV_v3(iModelA, e3D_test_rand, convolveType, IVType, template_train, ORI_bound);
-    %---------------%
-    ndata = length(IV_test);
-
-    %% 6. Bin IV values
-    % Separately for PRS and ABS trials
-    [nTrials_PRS_allBins, ~, iTrial4Bin_PRS] = histcounts(IV_test(iPRS_test_rand == 1), nBins);
-    [nTrials_ABS_allBins, ~, iTrial4Bin_ABS] = histcounts(IV_test(iPRS_test_rand == 0), nBins);
-
-    % For all trials combined
-    [nTrials_allBins, ~, iTrial4Bin] = histcounts(IV_test, nBins);
-
     %% 7. Compile data struct for this  bootstrap
-    data.ndata = ndata;
-    data.IV = IV_test;
-
-    data.nTrials_allBins = nTrials_allBins;
-    data.iTrial4Bin = iTrial4Bin;
-    data.nTrials_PRS_allBins = nTrials_PRS_allBins;
-    data.iTrial4Bin_PRS = iTrial4Bin_PRS;
-    data.nTrials_ABS_allBins = nTrials_ABS_allBins;
-    data.iTrial4Bin_ABS = iTrial4Bin_ABS;
-
-    data.iPRS = iPRS_test_rand;
-    data.resp = resp_test_rand;
-    data.cst = cst_test_rand;
-    data.iPair = iPair_test_rand;
-    data.respC = respC_test_rand;
-
-    data.metrics_sim = metrics_test; % keep field name 'metrics_sim'
-    % data.template_train = template_train;
-    % data.template_allData = template_allData;
-
-    data_allBoot{iBoot} = data;
-    % data_metrics_allBoot(iBoot,:) = metrics_test;
     data_metrics_allBoot(iBoot, :, :) = metrics;
 
 end % end for ii
@@ -469,14 +289,9 @@ end % end for ii
 % fprintf('\n\n[L%d ModelA%d] ALL  bootstraps DONE\n', iLocComb, iModelA);
 
 %% -------------------- SAVE -------------------- %%
-save(nameFile_compIV, 'template_true', 'c_zscore', '*_allBoot', 'names*', 'flag*', 'ratio_train', 'ORI_bound', '*Type');
+save(nameFile_compIV, 'data_metrics_allBoot', '-append');
 fprintf('\n========== Binned IV saved ==========\n\n\n\n\n');
 
-%% -------------------- Plot (optional) -------------------- %%
-if flag_plot_compIV
-    NOMplot_compIV;
-end
-close all;
 
 %% -------------------- End timing -------------------- %%
 time_end = datetime('now')

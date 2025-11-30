@@ -1,6 +1,9 @@
-function [e3D, iPRS, resp, cst, respC, iPair] = fxn_getRespC(e3D_nonrand, indUnikPair_rand, iPair_nonrand, iPair_unik_nonrand, iPRS_nonrand, resp_nonrand, cst_nonrand)
+function [e3D, iPRS, resp, cst, respC, iPair, RT] = fxn_getRespC(e3D_nonrand, indUnikPair_rand, iPair_nonrand, iPair_unik_nonrand, iPRS_nonrand, resp_nonrand, cst_nonrand, RT_nonrand)
 
-% indRand = indRand_unikPair_train; % range: [1, ntrialsPerLoc/2], not repeated
+% indRand = indRand_unikPair_train; % range: [1, ntrialsPerLoc/2], not
+% repeated
+
+
 iPair_unik = iPair_unik_nonrand(indUnikPair_rand);
 nUNIK = length(iPair_unik);
 indTrial = nan(nUNIK, 2);
@@ -15,6 +18,7 @@ iPRS = iPRS_nonrand(indTrial(:), :, :);
 resp = resp_nonrand(indTrial(:), :, :);
 cst = cst_nonrand(indTrial(:));
 iPair = iPair_nonrand(indTrial(:));
+RT = RT_nonrand(indTrial(:));
 
 %% get pA
 respC = nan(nUNIK, 3); % pA_both/PRS/ABS (must be in this order)

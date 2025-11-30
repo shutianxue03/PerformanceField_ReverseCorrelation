@@ -14,7 +14,7 @@ function flag_sig = basicFxn_drawCorrAsym(asymX_med_allSubj, asymY_med_allSubj, 
 wd_ref = 3; % line width of the reference line
 wd_border = 4; % default =4
 fsz_ticks = 45; % RC: 45
-sz_marker = 30;
+sz_marker = 40;
 nMarkerMax = 11;
 % markers_allSubj = {'o', 's', 'd', '^','v',  '<', '+','p', 'h', 'x', '>',     'o', 's', 'd', '^'}; % for each subjclc
 
@@ -28,7 +28,7 @@ figure('Position', [0 200 1e3 1e3]); hold on, box on
 %% idvd data
 for isubj = 1:nsubj
 %     if isubj<=nMarkerMax, 
-        faceColor = 'k'; edgeColor = 'w';
+        faceColor = 'w'; edgeColor = 'k';
 %     else, 
 %         faceColor = 'k'; edgeColor = 'w';
 %     end

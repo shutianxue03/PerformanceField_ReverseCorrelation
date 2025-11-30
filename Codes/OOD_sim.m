@@ -297,28 +297,25 @@ fprintf('\n Copied trial info of pass A to B\n')
 
 %% Save the energy profile for this IO (behav data saved later)
 save(sprintf('%s/energy_T_%d_%d.mat', nameFolder_Data_OOD_IO, nORI, nSF), 'e3D_target_allT')
-save(sprintf('%s/energy_N_%d_%d.mat', nameFolder_Data_OOD_IO, nORI, nSF), 'e3D_noise_allT')
+% save(sprintf('%s/energy_N_%d_%d.mat', nameFolder_Data_OOD_IO, nORI, nSF), 'e3D_noise_allT')
 
 fprintf('\n Saved simulated 3D energy (%d trials) \n', nTrials)
 
 %% Sample internal noise and create noisy IVs
-% switch patchMode
-%     case 'T', IV_sim_allT = IV_target_sim_allT;
-%     case 'N', IV_sim_allT = IV_noise_sim_allT;
-% end
 
 % I should be using the energy with the signal to predict response
 IV_sim_allT = IV_target_sim_allT;
 
+lapseRate_true = 0;
 % Add noise to the internal variable (IV) to simulate trial-by-trial variability
 switch iModelB_sim
-    case 1, Nmul_true=0; SDadd_true=noiseP_true;
-    case 2, Nmul_true=noiseP_true; SDadd_true=0;
-    case 3, Nmul_true=0; SDadd_true=0;
-    case 4, Nmul_true=0; SDadd_true=noiseP_true; lapseRate_true = 0;
-    case 5, Nmul_true=noiseP_true; SDadd_true=0; lapseRate_true = 0;
-    case 6, Nmul_true=noiseP_true(1); SDadd_true=noiseP_true(2); lapseRate_true = 0;
-    case 7, Nmul_true=noiseP_true(1); SDadd_true=noiseP_true(2); shared = noiseP_true(3); lapseRate_true = 0;
+    case 1, Nmul_true=noiseP_true(1); SDadd_true=noiseP_true(2); rho = noiseP_true(3); 
+    case 2, Nmul_true=noiseP_true(1); SDadd_true=noiseP_true(2); rho = noiseP_true(3); 
+    case 3, Nmul_true=noiseP_true(1); SDadd_true=noiseP_true(2); rho = noiseP_true(3); 
+    case 4, Nmul_true=noiseP_true(1); SDadd_true=noiseP_true(2); rho = noiseP_true(3); 
+    case 5, Nmul_true=noiseP_true(1); SDadd_true=noiseP_true(2); rho = noiseP_true(3); 
+    case 6, Nmul_true=noiseP_true(1); SDadd_true=noiseP_true(2); rho = noiseP_true(3); 
+    case 7, Nmul_true=noiseP_true(1); SDadd_true=noiseP_true(2); rho = noiseP_true(3); 
 end
 
 % Sample and add internal noise to IV
@@ -502,11 +499,11 @@ fprintf('\n\n============= Fit the trial-wise model to simulated data ==========
 for iModelA_fit = iModelA_fit_all
 
     % Simulate data and derive template via RC using the training set
-    OOD_NOM_Trialwise_beforeEst({nameIO, criterion_true}, iLocComb, iModelA_fit, IVType_true, templateType_true, flag_PatchMode_true, itype_template_true, nIterations);
+    OOD_NOM_Trialwise_compIV({nameIO, criterion_true}, iLocComb, iModelA_fit, IVType_true, templateType_true, flag_PatchMode_true, itype_template_true, nIterations);
 
     for iModelB_fit = iModelB_fit_all
         % Predict response of the testing set, using the derived template
-        OOD_NOM_Trialwise_Est({nameIO, criterion_true}, iLocComb, iModelA_fit, iModelB_fit, nIterations, flag_fminconORbads)
+        OOD_NOM_Trialwise_fitNOM({nameIO, criterion_true}, iLocComb, iModelA_fit, iModelB_fit, nIterations, flag_fminconORbads)
     end
 end
 

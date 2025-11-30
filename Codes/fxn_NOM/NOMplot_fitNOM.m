@@ -120,8 +120,8 @@ for iParam = 1:nParams
     yline(mean(params_est_allBoot(:, iParam)), 'k-')
 
     % Load and plot the true param
-    % load(sprintf('%s/truth.mat', nameFolder_OOD_load), 'noiseP_true')
-    % yline(noiseP_true, 'r-'); % should match noiseP defined in OOD_sim
+    load(sprintf('%s/truth.mat', nameFolder_OOD_load), 'noiseP_true')
+    yline(noiseP_true, 'r-'); % should match noiseP defined in OOD_sim
 
     ylim([params_lb(iParam), params_ub(iParam)])
     xlabel('Bootstrap');

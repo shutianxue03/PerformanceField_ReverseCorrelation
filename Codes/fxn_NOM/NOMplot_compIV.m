@@ -31,16 +31,18 @@
 % It loads the saved output and generates plots for IV distribution, bin counts, and performance metrics.
 
 %% Figure 1: Performance Metrics across Iterations
+iDataset = 2; %1=full, 2=test
 figure('Position', [100, 100, 2e3, 2e3])
 for iMetric = 1:nmetrics
     subplot(3,3,iMetric)
-    plot(data_metrics_allBoot(:,iMetric),'-o');
-    yline(getCI(data_metrics_allBoot(:,iMetric), 1, 1),'k-');
+    plot(data_metrics_allBoot(:, iDataset, iMetric),'-o');
+    yline(getCI(data_metrics_allBoot(:,iDataset, iMetric), 1, 1),'k-');
     xlabel('Iteration');
     ylabel(namesMetrics{iMetric})
     title(sprintf('Metric %s across iterations', namesMetrics{iMetric}));
     % Set y-axis limits based on metric type
     switch iMetric
+        % metrics: [dprime, criterion, [pC, pHit, pFA], nanmean(respC), pYES, mean(1./contrast), median(RT)];
         case 1, ylimits = [0,2]; % dprime
         case 2, ylimits = [-1,1]; yline(0, 'k--'); % criterion
         case 3, ylimits = [0,1]; yline(.7, 'k--'); % pC; pC_titrate = 0.7 (defined in OOD_sim)
