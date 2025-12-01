@@ -748,6 +748,86 @@ for iGroup=1:nGroups
     close all
 end % iGroup
 
+%% Corr between CS and tunC
+nameVarX = 'CS';
+nameVarY = 'tunC';
+
+nameFolder_Fig_NOM_corr = sprintf('%s/corr/%s_%s', nameFolder_Fig_NOM_Trialwise, nameVarX, nameVarY);
+if isempty(dir(nameFolder_Fig_NOM_corrAsym)); mkdir(nameFolder_Fig_NOM_corrAsym), end
+
+    iLocCorr_all = [1,6,5,3];
+
+    asymX_allSubj = CS_allSubj(:, iLocCorr_all);
+    x_ticks = linspace(0, 20, 5); % EE
+        case 6, x_ticks = linspace(-4, 12, 5); % HVA
+        case 5, x_ticks = linspace(0, 12, 5); % VMA (extent is smaller)
+    end
+    asymX_med_allSubj = asymX_allSubj;
+
+    for iFeature = 1:nFeatures
+        iFamily = iFamily_perF(iFeature);
+        namesTunCs = namesTunC_unit_perF{iFamily, 2};
+        nTunCs_full = length(namesTunCs);
+        for iTunC = 1:nTunCs_full
+            switch iFeature
+                case 1, tunC_allSubj_allBoot = squeeze(margTunC_ORI_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iDataset_plot, iTunC));
+                case 2, tunC_allSubj_allBoot = squeeze(margTunC_SF_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iDataset_plot, iTunC));
+            end
+
+            asymY_allSubj = squeeze((tunC_allSubj_allBoot(1, :, :)-tunC_allSubj_allBoot(2, :, :))./(tunC_allSubj_allBoot(1, :, :)+tunC_allSubj_allBoot(2, :, :)));
+            asymY_med_allSubj = getCI(asymY_allSubj, 1, 2);
+
+            switch iLocPair_all(1)
+                case 1 % EE
+                    switch iFamily
+                        case 1, y_ticks_allTunC_lb = -[100, 50, 50, 100]; y_ticks_allTunC_ub = [100, 50, 50, 100];
+                        case 8, y_ticks_allTunC_lb = -[60, 30, 45, 160, 20, 220]; y_ticks_allTunC_ub = [100, 40, 55, 160, 40, 220];
+                        case 2, y_ticks_allTunC_lb = -[50, 60, 50, 145]; y_ticks_allTunC_ub = [50, 60, 70, 265];
+                    end
+
+                case 6 % HVA
+                    switch iFamily
+                        case 1, y_ticks_allTunC_lb = -[100, 50, 50, 100]; y_ticks_allTunC_ub = [100, 50, 50, 100];
+                        case 8, y_ticks_allTunC_lb = -[60, 30, 45, 160, 20, 220]; y_ticks_allTunC_ub = [100, 40, 55, 160, 40, 220];
+                        case 2, y_ticks_allTunC_lb = -[50, 60, 50, 145]; y_ticks_allTunC_ub = [50, 60, 70, 265];
+                    end
+                case 5 % VMA
+                    switch iFamily
+                        case 1, y_ticks_allTunC_lb = -[100, 50, 50, 50]; y_ticks_allTunC_ub = [100, 50, 50, 50];
+                        case 8, y_ticks_allTunC_lb = -[100, 40, 300, 320, 50, 320]; y_ticks_allTunC_ub = [100, 44, 300, 320, 50, 320];
+                        case 2, y_ticks_allTunC_lb = -[50, 60, 60, 250]; y_ticks_allTunC_ub = [50, 60, 60, 250];
+                    end
+            end
+            y_ticks = linspace(y_ticks_allTunC_lb(iTunC), y_ticks_allTunC_ub(iTunC), 5);
+
+            x_ticklabels = nan;
+            y_ticklabels = nan;
+
+            nameVarY_figTitle = sprintf('%s %s', namesFeature{iFeature}, namesTunC_unit_perF{iFamily_perF(iFeature), 2}{iTunC});
+            nameVarY_fileTitle = sprintf('%s%d', namesFeature{iFeature}, iTunC);
+
+            text_title = sprintf('%s (%s) vs. %s (%s)', nameVarX, nameAsymX, nameVarY_figTitle, nameAsymY);
+
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            text_CI = ''; r_allBoot = nan(nBoot, 1); p_allBoot = r_allBoot;
+            for iBoot=1:nBoot,[r, p] = corr(asymX_allSubj, asymY_allSubj(:, iBoot), 'Type', 'Kendall', 'Tail','right'); p_allBoot(iBoot) = p; r_allBoot(iBoot) = r; end
+            [p_med, p_lb, p_ub] = getCI(p_allBoot, 1, 1); [r_med, r_lb, r_ub] = getCI(r_allBoot, 1, 1);
+            text_CI = sprintf('r=%.3f [%.3f, %.3f], p=%.3f [%.3f, %.3f]', r_med, r_lb, r_ub, p_med, p_lb, p_ub);
+            text_title = sprintf('%s\n%s', text_title, text_CI);
+            % flag_sig = basicFxn_drawCorrAsym(asymX_med_allSubj*100, asymY_med_allSubj*100, x_ticks, y_ticks, x_ticklabels, y_ticklabels, text_title, markers_allSubj);
+            flag_sig = basicFxn_drawCorrAsym(asymX_med_allSubj*100, asymY_med_allSubj*100, [], [], [], [], text_title, markers_allSubj);
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            % if flag_noOL, saveas(gcf, sprintf('%sn%d%s%s_noOL.jpg', folderNameFig, nsubj, nameVarY_fileTitle, flag_sig))
+            % else,
+            saveas(gcf, sprintf('%s/n%d_L%d%d_%s_%s.jpg', nameFolder_Fig_NOM_corrAsym, nsubj, iLocPair_all, nameVarY_fileTitle, flag_sig))
+            % end
+
+        end % iTunC
+        close all
+    end % iFeature
+
+end % iGroup
+
 %% Corr between extents of EE/HVA/VMA (CS and tunC)
 nameVarX = 'CS';
 nameVarY = 'tunC';
@@ -822,8 +902,8 @@ for iGroup = 1:nGroups
             [p_med, p_lb, p_ub] = getCI(p_allBoot, 1, 1); [r_med, r_lb, r_ub] = getCI(r_allBoot, 1, 1);
             text_CI = sprintf('r=%.3f [%.3f, %.3f], p=%.3f [%.3f, %.3f]', r_med, r_lb, r_ub, p_med, p_lb, p_ub);
             text_title = sprintf('%s\n%s', text_title, text_CI);
-            flag_sig = basicFxn_drawCorrAsym(asymX_med_allSubj*100, asymY_med_allSubj*100, ...
-                x_ticks, y_ticks, x_ticklabels, y_ticklabels, text_title, markers_allSubj);
+            % flag_sig = basicFxn_drawCorrAsym(asymX_med_allSubj*100, asymY_med_allSubj*100, x_ticks, y_ticks, x_ticklabels, y_ticklabels, text_title, markers_allSubj);
+            flag_sig = basicFxn_drawCorrAsym(asymX_med_allSubj*100, asymY_med_allSubj*100, [], [], [], [], text_title, markers_allSubj);
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             % if flag_noOL, saveas(gcf, sprintf('%sn%d%s%s_noOL.jpg', folderNameFig, nsubj, nameVarY_fileTitle, flag_sig))
             % else,
@@ -931,7 +1011,7 @@ fprintf('\n\n Plotting DONE\n\n')
 
 %% Plot metrics vs. IV for group averages
 clc, fprintf('\n\n Plotting STARTING\n\n')
-lineStyle_all = {'-', '-', '--', ':', '-.', '-', '--', ':', '-.'};
+lineStyle_all = {'-', '--', '-', ':', '-.', '-', '--', ':', '-.'};
 
 % Define folder for saving figures
 nameFolder_Fig_NOM_Trialwise = sprintf('%s/NOM_Trialwise_%d%d', nameFolder_Figures, nORI, nSF);
@@ -970,15 +1050,15 @@ for iModelA = 1%iModelA_all % just plot pred of the model using RC-derived templ
                     else, color_pred='k'; lw = 1;
                     end
                     patch([IV_ave; flip(IV_ave)], [pred_ave-pred_SEM; flip(pred_ave+pred_SEM)], ones(1, 3) / 2, 'FaceAlpha', .3, 'linestyle', 'none', 'handlevisibility', 'off')
-                    plot(IV_ave, pred_ave, 'lineStyle', lineStyle_all{iModelB}, 'color', color_pred, 'linewidth', lw)
+                    plot(IV_ave, pred_ave, 'lineStyle', lineStyle_all{iModelB}, 'color', colors_comb(iLocPair_all(iiLoc), :), 'linewidth', lw)
                     % measurement
-                    errorbar(IV_ave, data_ave, IV_SEM, '.', 'horizontal', 'CapSize', 0, 'color', color_pred, 'handlevisibility', 'off')
-                    errorbar(IV_ave, data_ave, data_SEM, '.', 'vertical', 'CapSize', 0, 'color', color_pred, 'handlevisibility', 'off')
+                    errorbar(IV_ave, data_ave, IV_SEM, '.', 'horizontal', 'CapSize', 0, 'color', colors_comb(iLocPair_all(iiLoc), :), 'handlevisibility', 'off')
+                    errorbar(IV_ave, data_ave, data_SEM, '.', 'vertical', 'CapSize', 0, 'color', colors_comb(iLocPair_all(iiLoc), :), 'handlevisibility', 'off')
 
                     % Plot averaged data of each bin
                     for iBin = 1:nBins
                         facecolor = 'w';
-                        plot(IV_ave(iBin), data_ave(iBin), 'o', 'markeredgecolor', color_pred, ...
+                        plot(IV_ave(iBin), data_ave(iBin), 'o', 'markeredgecolor', colors_comb(iLocPair_all(iiLoc), :), ...
                             'markerfacecolor', facecolor, 'MarkerSize', nTrials_ave(iBin) / scalingF + 5, 'LineWidth', 1, 'LineStyle', 'none', 'handlevisibility', 'off')
                     end
                 end % iiLoc
@@ -998,12 +1078,12 @@ for iModelA = 1%iModelA_all % just plot pred of the model using RC-derived templ
             % end % isubj
         end % iMetric
 
-        sgtitle(sprintf('n=%d [A%d] [L%d%d] [nBoot=%d] %s', nsubj, iModelA, iLocP, nBoot, namesMetrics{iMetric}))
+        sgtitle(sprintf('n=%d [A%d] [L%d%d] [nBoot=%d] %s', nsubj, iModelA, iLocPair_all, nBoot, namesMetrics{iMetric}))
         set(findall(gcf, '-property', 'fontsize'), 'fontsize', 20)
         % set(findall(gcf, '-property', 'linewidth'), 'linewidth', 2)
 
         % Save the figure
-        saveas(gcf, sprintf('%s/n%d_L%d_A%d_group.jpg', nameFolder_Fig_NOM_metrics, nsubj, iLocComb, iModelA_plot))
+        saveas(gcf, sprintf('%s/n%d_L%d%d_A%d_group.jpg', nameFolder_Fig_NOM_metrics, nsubj, iLocPair_all, iModelA_plot))
         close all
         fprintf('DONE\n')
     end % iLocComb

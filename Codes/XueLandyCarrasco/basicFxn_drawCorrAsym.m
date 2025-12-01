@@ -69,7 +69,7 @@ flag_sig='';
 % if p_tR<.05, flag_sig='_sig'; elseif p_tR<.1, flag_sig = '_mg'; end
 
 %% linear regression
-if any([p_tauB, p_tauL, p_tauR]<.05)
+if any([p_rB, p_rL, p_rR, p_rhoB, p_rhoL, p_rhoR, p_tauB, p_tauL, p_tauR]<=.1)
 % if p_tR<.1
     lm = polyfit(asymX_med_allSubj, asymY_med_allSubj, 1);
     x_lm2 = linspace(min(asymX_med_allSubj), max(asymX_med_allSubj), 2);

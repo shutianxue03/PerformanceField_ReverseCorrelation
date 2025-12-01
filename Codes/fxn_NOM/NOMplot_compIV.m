@@ -102,7 +102,7 @@ yline(0, 'r-'); % Gabor ori
 xlabel('Spatial Frequency'), ylabel('Orientation')
 xticks(axisTicks_tuning{2}), xticklabels(axisTL_tuning{2})
 yticks(axisTicks_tuning{1}), yticklabels(axisTL_tuning{1})
-title('Full template-training template')
+title('Full template minus training template')
 
 subplot(2,3,5), hold on
 imagesc(axis_tuning{2}, axis_tuning{1}, template_full_ave), axis square, colorbar, %clim([0, .2])
@@ -126,21 +126,21 @@ set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
 set(findall(gcf, '-property', 'linewidth'), 'linewidth',2)
 
 % Calculate Pearson's corr
-r_all = nan(nBoot, 1);
-p_all = r_all;
-for ii = 1:nBoot
-    kA = template_full_allBoot(ii, :, :);
+r_allBoot = nan(nBoot, 1);
+p_allBoot = r_allBoot;
+for iBoot = 1:nBoot
+    kA = template_full_allBoot(iBoot, :, :);
     kA = kA(:);
     kB = template_true(:);
     [r, p] = corr(kA, kB);
-    r_all(ii) = r;
-    p_all(ii) = p;
+    r_allBoot(iBoot) = r;
+    p_allBoot(iBoot) = p;
 end
-[r_ave, ~, ~, r_SEM] = getCI(r_all, 2, 1);
-[p_ave, ~, ~, p_SEM] = getCI(p_all, 2, 1);
+[r_med, ~, ~, r_SEM] = getCI(r_allBoot, 1, 1);
+[p_med, ~, ~, p_SEM] = getCI(p_allBoot, 1, 1);
 
 sgtitle(sprintf('Figure 2. Recovered template\n%s (L%d, ModelA%d %s, nBoot=%d)\nAveraged Pearson''s corr: r=%.2f (%.2f), p=%.3f (%.2f)', ...
-    subjName, iLocComb, iModelA, namesModelA{iModelA}, nBoot, r_ave, r_SEM, p_ave, p_SEM))
+    subjName, iLocComb, iModelA, namesModelA{iModelA}, nBoot, r_med, r_SEM, p_med, p_SEM))
 
 saveas(gcf, sprintf('%s/2Template_%s_L%d_A%d.jpg', nameFolder_Figures_NOM, subjName, iLocComb, iModelA))
 

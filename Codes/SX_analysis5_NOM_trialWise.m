@@ -748,6 +748,66 @@ for iGroup=1:nGroups
     close all
 end % iGroup
 
+%% Corr between CS and tunC
+nameVarX = 'CS';
+nameVarY = 'tunC';
+
+nameFolder_Fig_NOM_corr = sprintf('%s/Corr/%s_%s', nameFolder_Fig_NOM_Trialwise, nameVarX, nameVarY);
+if isempty(dir(nameFolder_Fig_NOM_corr)); mkdir(nameFolder_Fig_NOM_corr), end
+
+iLocCorr_all = [1,6,5,3];
+flag_zeroMean=1; 
+type_corr='pearson';
+type_tail = 'both';
+
+X_allSubj = CS_allSubj(:, iLocCorr_all);
+x_ticks = linspace(0, 20, 5); % EE
+
+X_med_allSubj = X_allSubj;
+
+for iFeature = 1:nFeatures
+    iFamily = iFamily_perF(iFeature);
+    namesTunCs = namesTunC_unit_perF{iFamily, 2};
+    nTunCs_full = length(namesTunCs);
+    for iTunC = 1:nTunCs_full
+        switch iFeature
+            case 1, Y_allSubj_allBoot = squeeze(margTunC_ORI_allCond(iModelA_plot, iModelB_plot, iLocCorr_all, :, :, iDataset_plot, iTunC));
+            case 2, Y_allSubj_allBoot = squeeze(margTunC_SF_allCond(iModelA_plot, iModelB_plot, iLocCorr_all, :, :, iDataset_plot, iTunC));
+        end
+
+        Y_med_allSubj = getCI(Y_allSubj_allBoot, 1, 3)'; % rotate to match the format needed by basicFxn_drawCorr
+
+        y_ticks_allTunC_lb = -[100, 50, 50, 50]; y_ticks_allTunC_ub = [100, 50, 50, 50];
+
+        y_ticks = linspace(y_ticks_allTunC_lb(iTunC), y_ticks_allTunC_ub(iTunC), 5);
+
+        x_ticklabels = nan;
+        y_ticklabels = nan;
+
+        nameVarY_figTitle = sprintf('%s %s', namesFeature{iFeature}, namesTunC_unit_perF{iFamily_perF(iFeature), 2}{iTunC});
+        nameVarY_fileTitle = sprintf('%s%d', namesFeature{iFeature}, iTunC);
+
+        text_title = sprintf('%s (%s) vs. %s (%s)', nameVarX, nameAsymX, nameVarY_figTitle, nameAsymY);
+
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        text_CI = ''; r_allBoot = nan(nBoot, 1); p_allBoot = r_allBoot;
+        % for iBoot=1:nBoot,[r, p] = corr(X_allSubj, Y_allSubj_allBoot(:, iBoot), 'Type', 'Kendall', 'Tail','right'); p_allBoot(iBoot) = p; r_allBoot(iBoot) = r; end
+        % [p_med, p_lb, p_ub] = getCI(p_allBoot, 1, 1); [r_med, r_lb, r_ub] = getCI(r_allBoot, 1, 1);
+        % text_CI = sprintf('r=%.3f [%.3f, %.3f], p=%.3f [%.3f, %.3f]', r_med, r_lb, r_ub, p_med, p_lb, p_ub);
+        text_title = sprintf('%s\n%s', text_title, text_CI);
+        % flag_sig = basicFxn_drawCorrAsym(asymX_med_allSubj*100, asymY_med_allSubj*100, x_ticks, y_ticks, x_ticklabels, y_ticklabels, text_title, markers_allSubj);
+        flag_sig = basicFxn_drawCorr(X_med_allSubj, Y_med_allSubj, colors_comb(iLocCorr_all, :), [], [], [], [], flag_zeroMean, type_corr, type_tail, text_title, markers_allSubj);
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        % if flag_noOL, saveas(gcf, sprintf('%sn%d%s%s_noOL.jpg', folderNameFig, nsubj, nameVarY_fileTitle, flag_sig))
+        % else,
+        saveas(gcf, sprintf('%s/n%d_L%s_%s_%s.jpg', nameFolder_Fig_NOM_corr, nsubj, strjoin(string(iLocCorr_all), ''), nameVarY_fileTitle, flag_sig))
+        % end
+
+    end % iTunC
+    close all
+end % iFeature
+
+
 %% Corr between extents of EE/HVA/VMA (CS and tunC)
 nameVarX = 'CS';
 nameVarY = 'tunC';
@@ -822,8 +882,8 @@ for iGroup = 1:nGroups
             [p_med, p_lb, p_ub] = getCI(p_allBoot, 1, 1); [r_med, r_lb, r_ub] = getCI(r_allBoot, 1, 1);
             text_CI = sprintf('r=%.3f [%.3f, %.3f], p=%.3f [%.3f, %.3f]', r_med, r_lb, r_ub, p_med, p_lb, p_ub);
             text_title = sprintf('%s\n%s', text_title, text_CI);
-            flag_sig = basicFxn_drawCorrAsym(asymX_med_allSubj*100, asymY_med_allSubj*100, ...
-                x_ticks, y_ticks, x_ticklabels, y_ticklabels, text_title, markers_allSubj);
+            % flag_sig = basicFxn_drawCorrAsym(asymX_med_allSubj*100, asymY_med_allSubj*100, x_ticks, y_ticks, x_ticklabels, y_ticklabels, text_title, markers_allSubj);
+            flag_sig = basicFxn_drawCorrAsym(asymX_med_allSubj*100, asymY_med_allSubj*100, [], [], [], [], text_title, markers_allSubj);
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             % if flag_noOL, saveas(gcf, sprintf('%sn%d%s%s_noOL.jpg', folderNameFig, nsubj, nameVarY_fileTitle, flag_sig))
             % else,

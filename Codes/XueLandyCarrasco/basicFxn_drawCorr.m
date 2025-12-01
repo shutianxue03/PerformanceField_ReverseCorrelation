@@ -18,9 +18,9 @@ function  [str_sig, str_title] = basicFxn_drawCorr(x_med_allSubj, y_med_allSubj,
 %    markers_allSubj
 
 %% figure setting
-wd_border = 2; % default=4
-sz_ticks = 18; % default=30
-sz_marker = 10;% default=30
+wd_border = 3; % default=4
+sz_ticks = 30; % default=30
+sz_marker = 30;% default=30
 nMarkerMax = 11;% default=11
 
 %% extract nsubj and nLoc and make assertion
@@ -45,7 +45,7 @@ end
 % [y_ave, ~, ~, y_sem] = getCI(y_med_0mean_allSubj, 2, 1);
 
 %%
-% figure('Position', [0 200 1e3 1e3]); 
+figure('Position', [0 200 1e3 1e3]); 
 hold on, box on
 
 %% idvd data

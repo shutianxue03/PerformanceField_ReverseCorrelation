@@ -33,14 +33,6 @@ nameFolder_Data_NOM_Trialwise = sprintf('%s/Data_NOM_Trialwise_%d%d', nameFolder
 % Define names of folders to save figures (on the server)
 nameFolder_Figures = sprintf('%s/Figures', nameFolder_server);
 nameFolder_Figures_NOM = sprintf('%s/NOM_Trialwise_%d%d', nameFolder_Figures, nORI, nSF);
-% nameFolder_Figures_local = sprintf('/Users/xueshutian/Desktop/GitHub_local/PF_RC/Figures/Temp');
-
-% if ~exist(nameFolder_Figures_NOM, 'dir'), mkdir(nameFolder_Figures_NOM); end
-
-% Print directory names
-% fprintf('\n\nFolder to save analysis outputs\n  >>>%s\n\n', nameFolder_Data_OOD)
-% fprintf('Folder to save NOM outputs\n  >>>%s\n\n', nameFolder_Data_NOM_Trialwise)
-% fprintf('Folder to save Figures\n  >>>%s\n\n\n', nameFolder_Figures_NOM)
 
 %% Define the function to normalize Gabor SD
 fxn_getSigma_SPdomain = @(SF) 3 * sqrt(2*log(2)) / (2 * pi * SF);
@@ -99,7 +91,6 @@ noise.ratio_base = 0.5;  % Base ratio for noise
 
 params.stim=stim;
 params.noise=noise;
-% save('Data_OOD/params', 'params')
 
 %% Settings for ORI/SF filter
 % ORI filter

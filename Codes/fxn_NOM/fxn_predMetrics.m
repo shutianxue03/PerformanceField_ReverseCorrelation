@@ -57,7 +57,6 @@ switch iModelB
         SDadd = 0;
         rhoDV = 0;
 
-
     case 7 % No Noise [the worst model]
         Nmul = 0;
         SDadd = 0;

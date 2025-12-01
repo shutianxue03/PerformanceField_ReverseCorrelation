@@ -88,11 +88,11 @@ nParams = length(noiseP_true);
 
 fprintf('\nSim settings:\n');
 fprintf(' - noiseCST = %.2f\n', noiseCST);
-fprintf(' - gaborCST = %.2f\n', gaborCST);
-fprintf(' - nTrials = %d\n', nTrials);
-fprintf(' - Nmul_true = %.1f, SDadd_true = %.0f, rho_true = %.1f (nParams=%d)\n', Nmul_true, SDadd_true, rho_true, nParams);
-fprintf(' - iModelB_sim = %d (see updated Model B definitions)\n', iModelB_sim);
-fprintf(' - nBoot (for compIV/fitNOM) = %d\n\n', nBoot);
+fprintf(' gaborCST = %.2f\n', gaborCST);
+fprintf(' nTrials = %d\n', nTrials);
+fprintf(' Nmul_true = %.3f, SDadd_true = %.3f, rho_true = %.3f (nParams=%d)\n', Nmul_true, SDadd_true, rho_true, nParams);
+fprintf(' iModelB_sim = %d (see updated Model B definitions)\n', iModelB_sim);
+fprintf(' nBoot (for compIV/fitNOM) = %d\n\n', nBoot);
 
 % ---------------------- Define IO name & folders ---------------------- %
 
