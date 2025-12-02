@@ -42,15 +42,15 @@ switch iModelB
         SDadd = params_est(1);
         rhoDV = params_est(2);
 
-    case 4 % No induced noise or rho
-        Nmul = 0;
-        SDadd = params_est(1);
-        rhoDV = 0;
-
-    case 5 % No constant noise
+    case 4 % No constant noise
         Nmul = params_est(1);
         SDadd = 0;
         rhoDV = params_est(2);
+
+    case 5 % No induced noise or rho
+        Nmul = 0;
+        SDadd = params_est(1);
+        rhoDV = 0;
 
     case 6 % No constant noise or rho
         Nmul = params_est(1);

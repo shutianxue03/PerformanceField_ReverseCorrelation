@@ -1,7 +1,9 @@
 % NOM illustration figures
-clear; close all; clc;
-
+close all; clc;
+%--------------
 SX_RC1_setting
+%--------------
+
 % Define folder for saving figures
 nameFolder_Fig_NOM_Trialwise = sprintf('%s/NOM_Trialwise_%d%d', nameFolder_Figures, nORI, nSF);
 if isempty(dir(nameFolder_Fig_NOM_Trialwise)), mkdir(nameFolder_Fig_NOM_Trialwise), end
@@ -13,6 +15,8 @@ if isempty(dir(nameFolder_Fig_Schematic)), mkdir(nameFolder_Fig_Schematic), end
 color_shade = [0.8 0.7 0.9]; % light purple
 color_cri = [0.4 0 0.6];
 facealpha = .3;
+sz_hl = 30;
+sz_hw = sz_hl;
 
 for flag_stage = 1:5
 
@@ -83,17 +87,7 @@ for flag_stage = 1:5
             % Vertical line at mean
             plot([mu_i mu_i], [0 max(y_i)], '-', 'color', [.5, .5, .5], 'LineWidth', 1.5);
 
-            % Bandwidth (FWHM) as horizontal arrow (only for stages 3 & 4)
-            if drawBandwidth
-                ymax_i = max(y_i);
-                y_half = ymax_i/2;
-                FWHM = 2*sqrt(2*log(2)) * sigma_i;
-                x1 = mu_i - FWHM/2;
-                x2 = mu_i + FWHM/2;
 
-                h = quiver(x1, y_half, x2 - x1, 0, 0, 'k', 'LineWidth', 1.5);
-                h.MaxHeadSize = 0.03; % slim arrow head
-            end
 
             % Shaded tail to the right of criterion (for stages 4 & 5)
             if drawCriterion
@@ -131,6 +125,38 @@ for flag_stage = 1:5
     y_max_global = .4;
     xlim([x_min - x_margin, x_max + x_margin]);
     ylim([0, y_max_global*1.1]);
+
+    % Bandwidth (FWHM) as horizontal arrow (only for stages 3 & 4)
+    if drawBandwidth
+        ymax_i = max(y_i);
+        y_half = ymax_i / 2;
+
+        FWHM = 2 * sqrt(2*log(2)) * sigma_i;
+        x1 = mu_i - FWHM/2;
+        x2 = mu_i + FWHM/2;
+
+        % ---- Convert data coords → normalized figure coords ----
+        ax = gca;
+        axpos = ax.Position;         % axes position in normalized units
+        xlim_d = ax.XLim;
+        ylim_d = ax.YLim;
+
+        data2norm = @(x, y) [ ...
+            axpos(1) + (x - xlim_d(1)) / diff(xlim_d) * axpos(3), ...
+            axpos(2) + (y - ylim_d(1)) / diff(ylim_d) * axpos(4) ];
+
+        p1 = data2norm(x1, y_half);
+        p2 = data2norm(x2, y_half);
+
+        % ---- Draw a double-headed arrow (using two annotation arrows) ----
+        % Left → Right
+        annotation('arrow', [p1(1) p2(1)], [p1(2) p2(2)], ...
+            'Color','k', 'LineWidth', 1.5, 'HeadWidth', sz_hw, 'HeadLength', sz_hl);
+
+        % Right → Left (overlays shaft and creates symmetric double-head)
+        annotation('arrow', [p2(1) p1(1)], [p2(2) p1(2)], ...
+            'Color','k', 'LineWidth', 1.5, 'HeadWidth', sz_hw, 'HeadLength', sz_hl);
+    end
 
     ax = gca;
     ax.Box = 'off'; % removes top & right box edges
@@ -368,7 +394,7 @@ for iTrial = 1:numel(IV)
 end
 
 % ---------------- Plotting ----------------
-sz_font = 35;
+sz_font = 30;
 figure('Position', [200 200 500 400]);hold on;
 % ---- Panel 1: pYES misfit due to excluding induced/constant noise ----
 % subplot(1,2,1); hold on;
@@ -377,13 +403,12 @@ plot(IV, pYES_true, 'k-', 'LineWidth', 4);
 plot(IV, pYES_noInduced, 'k--', 'LineWidth', 4);
 % plot(IV, pYES_noConst, 'b-', 'LineWidth', 2);
 
-yline(0.5, '--', 'Color', [0.5 0.5 0.5], 'HandleVisibility', 'off', 'LineWidth', 3);
-text(IV(65), 0.42, 'pYES=0.5', 'color', [.5, .5, .5])
+yline(0.5, '-', 'Color', [0.5 0.5 0.5], 'HandleVisibility', 'off', 'LineWidth', 3);
+text(IV(65), 0.42, '$p_{YES}$=0.5', 'color', [.5, .5, .5], 'Interpreter', 'latex');
 
-xlabel('Internal variable (IV)');
-ylabel('Detection rate (p_{YES})');
-% title('Effect of excluding additive / multiplicative noise');
-% legend({'Full model', 'No induced noise', 'No constant noise'}, 'Location', 'southeast');
+xlabel('Internal variable ($V$)', 'Interpreter', 'latex');
+ylabel('Detection rate($p_{YES}$)', 'Interpreter', 'latex');
+legend({'Full model', 'No $\sigma_{constant}$'}, 'Location', 'southeast', 'Interpreter', 'latex');
 
 set(gca, 'FontSize', 12, 'LineWidth', 1.5, 'Box', 'off');
 set(findall(gcf, '-property', 'fontsize'), 'fontsize', sz_font)
@@ -404,13 +429,11 @@ plot(IV, pA_noRho, 'k--', 'LineWidth', 4);
 % plot(IV, pA_noInduced, 'r-', 'LineWidth', 2);
 % plot(IV, pA_noConst, 'b-', 'LineWidth', 2);
 
-yline(0.5, '--', 'Color', [0.5 0.5 0.5], 'HandleVisibility', 'off', 'LineWidth', 3);
-text(IV(65), 0.42, 'pA=0.5', 'color', [.5, .5, .5])
-xlabel('Internal variable (IV)');
-ylabel('Resp. consistency (p_A)');
-% title('Effect of excluding noise correlation');
-
-% legend({'Full model', 'No correlation'}, 'Location', 'southeast');
+yline(0.5, '-', 'Color', [0.5 0.5 0.5], 'HandleVisibility', 'off', 'LineWidth', 3);
+text(IV(65), 0.42, '$p_A$=0.5', 'color', [.5, .5, .5], 'Interpreter', 'latex');
+xlabel('Internal variable ($V$)', 'Interpreter', 'latex');
+ylabel('Resp. consistency ($p_A$)', 'Interpreter', 'latex');
+legend({'Full model', 'No $\rho$'}, 'Location', 'southeast', 'Interpreter', 'latex');
 ax=gca;
 ax.XTick = []; % no x-ticks
 ax.YTick = []; % no x-ticks
@@ -493,9 +516,9 @@ for iFeature = 1:nFeatures
     y = predSFkernel(x, iFamily, params, 0);
 
     % ---- Create figure ----
-    for flag_plotMode=1:2
+    for flag_plotMode=0:2
         switch flag_plotMode
-
+            case 0, str_mode = 'Curve';
             case 1, str_mode = 'PeakAmp';
             case 2, str_mode = 'Bandw';
         end
@@ -539,6 +562,8 @@ for iFeature = 1:nFeatures
         p1 = data2norm(x_peak, y_peak);
         if flag_plotMode==1
             annotation('arrow',[p0(1) p1(1)], [p0(2) p1(2)], 'Color','k','LineWidth',sz_wd, 'HeadWidth', sz_hw, 'HeadLength', sz_hl);
+        elseif flag_plotMode==0
+            plot([x_peak, x_peak], [y_base, y_peak], 'k--','LineWidth',sz_wd/1.25)
         end
         % ============================================================
         % Add horizontal double-arrow (bandwidth)
@@ -578,3 +603,68 @@ for iFeature = 1:nFeatures
     end % flag_plotMode
 end % iFeature
 close all
+
+%% Schematics for EE, HVA and VMA
+sz_marker_all = [70, 100];
+sz_line = 15;
+
+% EE (1 ecc)
+outline_ecc = 1.5;
+ecc = outline_ecc;
+str_locgroup = 'EE-1ecc';
+fprintf('\n%s...\n', str_locgroup)
+x_ref = {};
+y_ref = {};
+x_allLoc = [0,  ecc, -ecc,  0,   0];
+y_allLoc = [0,    0,   0,  ecc, -ecc];
+colors_allLoc = colors_comb([1, 8,8,8,8], :);
+strParts_all = {'full', 'Fov', 'Peri'};
+indParts_all = {1:5, 1, 2:5};
+%------------------------------------%
+fxn_plotPF_diagram(str_locgroup, sz_marker_all,  x_ref, y_ref, x_allLoc, y_allLoc, colors_allLoc, strParts_all, indParts_all, outline_ecc, sz_line, nameFolder_Fig_Schematic);
+%------------------------------------%
+
+% HVA (1 ecc)
+str_locgroup = 'HVA-1ecc';
+fprintf('\n%s...\n', str_locgroup)
+x_ref = {[-ecc, ecc], [0,0]};
+y_ref = {[0,0], [-ecc, ecc]};
+x_allLoc = [ecc, -ecc,  0,   0];
+y_allLoc = [0,   0,  ecc, -ecc];
+colors_allLoc = colors_comb([6,6,7,7], :);
+
+strParts_all = {'full', 'HM', 'VM'};
+indParts_all = {1:4, 1:2, 3:4};
+%------------------------------------%
+fxn_plotPF_diagram(str_locgroup, sz_marker_all,  x_ref, y_ref, x_allLoc, y_allLoc, colors_allLoc, strParts_all, indParts_all, outline_ecc, sz_line, nameFolder_Fig_Schematic);
+%------------------------------------%
+
+% VMA (1 ecc)
+str_locgroup = 'VMA-1ecc';
+fprintf('\n%s...\n', str_locgroup)
+x_ref = {[0,0]};
+y_ref = {[-ecc, ecc]};
+x_allLoc = [0,   0];
+y_allLoc = [-ecc, ecc];
+colors_allLoc = colors_comb([5,3], :);
+
+strParts_all = {'full', 'LVM', 'UVM'};
+indParts_all = {1:2, 1, 2};
+%------------------------------------%
+fxn_plotPF_diagram(str_locgroup, sz_marker_all,  x_ref, y_ref, x_allLoc, y_allLoc, colors_allLoc, strParts_all, indParts_all, outline_ecc, sz_line, nameFolder_Fig_Schematic);
+%------------------------------------%
+
+% VMA (1 ecc)
+str_locgroup = 'FullVF';
+fprintf('\n%s...\n', str_locgroup)
+x_ref = {[-ecc, ecc], [0,0]};
+y_ref = {[0,0], [-ecc, ecc]};
+x_allLoc = [0, ecc, -ecc,  0,   0];
+y_allLoc = [0, 0,   0,  ecc, -ecc];
+colors_allLoc = colors_comb([1, 6, 6, 5, 3], :);
+
+strParts_all = {'full'};
+indParts_all = {1:5};
+%------------------------------------%
+fxn_plotPF_diagram(str_locgroup, sz_marker_all,  x_ref, y_ref, x_allLoc, y_allLoc, colors_allLoc, strParts_all, indParts_all, outline_ecc, sz_line, nameFolder_Fig_Schematic);
+%------------------------------------%

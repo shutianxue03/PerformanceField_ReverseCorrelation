@@ -143,7 +143,7 @@ ncomb8 = 8;
 % Parameter bounds and initial values
 % Internal noise parameters
 Nmul_lb = 1e-5;  Nmul_ub = 1;     % multiplicative noise
-SDadd_lb = 1e-5; SDadd_ub = 30;   % additive noise (20–30 range from simulations)
+SDadd_lb = 1e-5; SDadd_ub = 30;   % Constant noise (20–30 range from simulations)
 % Correlation parameter (rhoDV)
 rho_lb  = 1e-5;  rho_ub = 1 - rho_lb;
 
@@ -161,7 +161,7 @@ options_bads.Verbosity = 0;
 options_fmin = optimoptions('fmincon', 'MaxIterations', 1e4, 'Display', 'off');
 
 %% Tuning function params
-% names of the MODEL
+% names of the tuning models
 namesFamily_all = {
     'Gaussian', ... % M1
     'log parabola', ... % M2
@@ -268,13 +268,13 @@ namesParamsMode = {'estP', 'tunC'};
 %% Noisy observer model names
 namesModelA = {'RC', 'IO', 'RandTemp'};
 
-namesModelB = {'FullModel', 'NoRho', 'NoInduced', 'NoInducedNoRho', 'NoConstant', 'NoConstantNoRho', 'NoNoise'};
+namesModelB = {'FullModel', 'NoRho', 'NoInduced', 'NoConstant', 'NoInducedNoRho', 'NoConstantNoRho', 'NoNoise'};
 namesModelBparams = {...
-    {'Induced noise', 'Additive noise', 'Rho'}, ... 
-    {'Induced noise', 'Additive noise'          }, ...
-    {                          'Additive noise', 'Rho'}, ...
-    {                          'Additive noise',         }, ...
+    {'Induced noise', 'Constant noise', 'Rho'}, ... 
+    {'Induced noise', 'Constant noise'          }, ...
+    {                          'Constant noise', 'Rho'}, ...
     {'Induced noise',                            'Rho'}, ...
+    {                          'Constant noise',         }, ...
     {'Induced noise',                                   }, ...
     {                                                    'Rho'}};
 
@@ -303,6 +303,12 @@ namesTunC_unit_perF{8,1} = {'Gain 1 (a.u.)', 'Gain 2 (a.u.)', 'Sigma 1 (deg)', '
 namesTunC_unit_perF{8,2} = {'Pref ORI (deg)', 'peak amp. (a.u.)', 'trough ori (deg)', 'trough mag. (a.u.)', 'bandwidth (deg)', 'baseline (a.u.)'};
 namesTunC_unit_perF{12,2} = {'peak SF1 (cpd)', 'peak amp. 1 (a.u.)', 'bandwidth 1 (octave)', 'peak SF2 (cpd)', 'peak amp. 2 (a.u.)', 'bandwidth 2 (octave)'};
 namesTunC_unit_perF{13,2} = {'peak amp. (a.u.)', 'trough ori (deg)', 'trough mag, (a.u.)', 'bandwidth (deg)', 'baseline (a.u.)'};
+
+namesTunC_noUnit{1,1} = {'Gain', 'Sigma', 'baseline'};
+namesTunC_noUnit{1,2} = {'peak amp.', 'bandwith', 'baseline'};
+namesTunC_noUnit{2,1} = {'peak SF', 'Gain', 'Sigma', 'baseline'};
+namesTunC_noUnit{2,2} = {'peak SF', 'peak amp.', 'bandwith', 'baseline'};
+
 
 % Colors
 colors_comb = [

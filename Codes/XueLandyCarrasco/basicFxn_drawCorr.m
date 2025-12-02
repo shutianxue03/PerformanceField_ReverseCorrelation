@@ -19,7 +19,7 @@ function  [str_sig, str_title] = basicFxn_drawCorr(x_med_allSubj, y_med_allSubj,
 
 %% figure setting
 wd_border = 3; % default=4
-sz_ticks = 30; % default=30
+sz_ticks = 45; % default=30
 sz_marker = 30;% default=30
 nMarkerMax = 11;% default=11
 
@@ -63,33 +63,52 @@ end % iLoc
 %% get partial corr
 ANOVA_indLoc = repmat(1:nLoc, nsubj, 1);
 ANOVA_indSubj = repmat((1:nsubj)', 1, nLoc);
-switch flag_zeroMean
-    case 0
-        [r_partial, p_partial] = corr(x_med_allSubj(:), y_med_allSubj(:), 'type', type_corr, 'tail', type_tail);
-    case 1
-        [r_partial, p_partial] = partialcorr(x_med_allSubj(:), y_med_allSubj(:), ANOVA_indLoc(:), ...
-            'type', type_corr, 'tail', type_tail);
-    case 2
-        [r_partial, p_partial] = partialcorr(x_med_allSubj(:), y_med_allSubj(:), ANOVA_indSubj(:), ...
-            'type', type_corr, 'tail', type_tail);
-end
-str_sig='ns'; if p_partial<.05, str_sig='_sig'; elseif p_partial<.1, str_sig = '_mg'; end
+% switch flag_zeroMean
+%     case 0
+%         % [r_partial, p_partial] = corr(x_med_allSubj(:), y_med_allSubj(:), 'type', type_corr, 'tail', type_tail);
+%         [r_partial, p_partial] = partialcorr(x_med_allSubj(:), y_med_allSubj(:), ANOVA_indLoc(:), ...
+%             'type', type_corr, 'tail', type_tail);
+%     case 1
+%         [r_partial, p_partial] = partialcorr(x_med_allSubj(:), y_med_allSubj(:), ANOVA_indLoc(:), ...
+%             'type', type_corr, 'tail', type_tail);
+%     case 2
+%         [r_partial, p_partial] = partialcorr(x_med_allSubj(:), y_med_allSubj(:), ANOVA_indSubj(:), ...
+%             'type', type_corr, 'tail', type_tail);
+% end
 
-%% corr for each loc
+% Always reveal observer effect and control for loc effect
+[r_partial, p_partial] = partialcorr(x_med_allSubj(:), y_med_allSubj(:), ANOVA_indLoc(:), ...
+            'type', type_corr, 'tail', type_tail);
+str_sig='_ns'; if p_partial<.05, str_sig='_sig'; elseif p_partial<.1, str_sig = '_mg'; end
+
+%% Corr for each loc
 text_corr_perL = [];
 for iLoc = 1:nLoc
     [r, p] = corr(x_med_allSubj(:, iLoc), y_med_allSubj(:, iLoc));
-    text_corr_perL = [text_corr_perL, sprintf('L%d: r=%.2f, p=%.3f\n', iLoc, r, p)];
+    text_corr_perL = [text_corr_perL, sprintf('L%d: r=%.2f, p=%.3f |', iLoc, r, p)];
+
+    if p<.05, lineStyle = '-'; else, lineStyle = '--'; end
+     lineStyle = '-'
+    % Plot linear regression for each loc/condition
+    lm = polyfit(x_med_allSubj(:, iLoc), y_med_allSubj(:, iLoc), 1);
+    x_lm2 = linspace(min(x_med_allSubj(:, iLoc)), max(x_med_allSubj(:, iLoc)), 2);
+    yfit = polyval(lm, x_lm2);
+    eta2 = var(polyval(lm, x_med_allSubj(:, iLoc)))/var(y_med_allSubj(:, iLoc));
+    % if p_partial<.1
+        plot(x_lm2, yfit, lineStyle, 'color', colors(iLoc, :), 'handlevisibility', 'off', 'linewidth', wd_border * 1);
+    % end
+
 end
+text_corr_perL = sprintf('%s\n', text_corr_perL)
 
 %% linear regression
-lm = polyfit(x_med_0mean_allSubj(:), y_med_0mean_allSubj(:), 1);
-x_lm2 = linspace(min(x_med_0mean_allSubj(:)), max(x_med_0mean_allSubj(:)), 2);
-yfit = polyval(lm, x_lm2);
-eta2 = var(polyval(lm, x_med_0mean_allSubj(:)))/var(y_med_0mean_allSubj(:));
-if p_partial<.1
-    plot(x_lm2, yfit,'-', 'color', ones(1,3)*.4, 'handlevisibility', 'off', 'linewidth', wd_border * 1.5);
-end
+% lm = polyfit(x_med_0mean_allSubj(:), y_med_0mean_allSubj(:), 1);
+% x_lm2 = linspace(min(x_med_0mean_allSubj(:)), max(x_med_0mean_allSubj(:)), 2);
+% yfit = polyval(lm, x_lm2);
+% eta2 = var(polyval(lm, x_med_0mean_allSubj(:)))/var(y_med_0mean_allSubj(:));
+% if p_partial<.1
+%     plot(x_lm2, yfit,'-', 'color', ones(1,3)*.4, 'handlevisibility', 'off', 'linewidth', wd_border * 1.5);
+% end
 
 %% ticks and limits
 if ~isnan(x_ticks), xticks(x_ticks), xlim(x_ticks([1, end])), end

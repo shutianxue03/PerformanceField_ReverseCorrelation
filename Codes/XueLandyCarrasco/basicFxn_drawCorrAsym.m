@@ -37,39 +37,26 @@ for isubj = 1:nsubj
 end
 
 %% get corr of different types
-[rB, p_rB] = corr(asymX_med_allSubj, asymY_med_allSubj); % left: assume slope <0
+[r2, p_r2] = corr(asymX_med_allSubj, asymY_med_allSubj); % left: assume slope <0
 [rL, p_rL] = corr(asymX_med_allSubj, asymY_med_allSubj, 'Tail','left'); % left: assume slope <0
 [rR, p_rR] = corr(asymX_med_allSubj, asymY_med_allSubj, 'Tail','right'); % left: assume slope <0
 
-[rhoB, p_rhoB] = corr(asymX_med_allSubj, asymY_med_allSubj, 'Type', 'spearman'); % left: assume slope <0
+[rho2, p_rho2] = corr(asymX_med_allSubj, asymY_med_allSubj, 'Type', 'spearman'); % left: assume slope <0
 [rhoL, p_rhoL] = corr(asymX_med_allSubj, asymY_med_allSubj, 'Type', 'spearman', 'Tail','left'); % left: assume slope <0
 [rhoR, p_rhoR] = corr(asymX_med_allSubj, asymY_med_allSubj, 'Type', 'spearman', 'Tail','right'); % right: assume slope>0
 
-[tauB, p_tauB] = corr(asymX_med_allSubj, asymY_med_allSubj, 'Type', 'Kendall'); % left: assume slope <0
+[tau2, p_tau2] = corr(asymX_med_allSubj, asymY_med_allSubj, 'Type', 'Kendall'); % left: assume slope <0
 [tauL, p_tauL] = corr(asymX_med_allSubj, asymY_med_allSubj, 'Type', 'Kendall', 'Tail','left'); % left: assume slope <0
 [tauR, p_tauR] = corr(asymX_med_allSubj, asymY_med_allSubj,'Type', 'Kendall', 'Tail','right'); % right: assume slope>0
 
-% tail=["2-tail"; "R-tail"; "L-tail"];
-% Pearson=round([rB;rL;rR],2);
-% p1=round([p_p2;p_pL;p_pR],3);
-% Spearman=round([rho2;rhoL;rhoR],2);
-% p2=round([p_rB;p_rL;p_rR],3);
-% Kendall=round([tau2;tauL;tauR],2);
-% p3=round([p_t2;p_tL;p_tR],3);
-% 
-% table(tail, Pearson, p1, Spearman, p2, Kendall, p3)
-
-% report all
-text_corr_all = sprintf('Two-tailed // Left // Right\nr=%.2f (%.3f) // %.2f (%.3f) // %.2f (%.3f)\nrho=%.2f (%.3f) // %.2f (%.3f) // %.2f (%.3f)\ntau=%.2f (%.3f) // %.2f (%.3f) // %.2f (%.3f)\n', ...
-    rB, p_rB, rL, p_rL, rR, p_rR, ...
-    rhoB, p_rhoB, rhoL, p_rhoL, rhoR, p_rhoR, ...
-    tauB, p_tauB, tauL, p_tauL, tauR, p_tauR);
+text_corr_all = sprintf('r=%.2f (%.3f) | rho=%.2f (%.3f)  | tau=%.2f (%.3f)\n', ...
+    r2, p_r2,    rho2, p_rho2,    tau2, p_tau2);
 
 flag_sig=''; 
 % if p_tR<.05, flag_sig='_sig'; elseif p_tR<.1, flag_sig = '_mg'; end
 
 %% linear regression
-if any([p_rB, p_rL, p_rR, p_rhoB, p_rhoL, p_rhoR, p_tauB, p_tauL, p_tauR]<=.1)
+if any([p_r2/2, p_rho2/2, p_tau2/2]<=.1)
 % if p_tR<.1
     lm = polyfit(asymX_med_allSubj, asymY_med_allSubj, 1);
     x_lm2 = linspace(min(asymX_med_allSubj), max(asymX_med_allSubj), 2);

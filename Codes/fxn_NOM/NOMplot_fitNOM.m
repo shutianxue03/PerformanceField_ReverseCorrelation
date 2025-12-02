@@ -115,13 +115,13 @@ saveas(gcf, sprintf('%s/3Metrics_%s_L%d_A%dB%d.jpg', nameFolder_Figures_NOM, sub
 figure('Position', [100,100,nParams*400,400]);
 for iParam = 1:nParams
 
-    subplot(1, nParams, iParam);
+    subplot(1, nParams, iParam); hold on
     plot(params_est_allBoot(:, iParam), '-o');
-    yline(mean(params_est_allBoot(:, iParam)), 'k-')
+    yline(nanmean(params_est_allBoot(:, iParam)), 'k-')
 
     % Load and plot the true param
-    load(sprintf('%s/truth.mat', nameFolder_OOD_load), 'noiseP_true')
-    yline(noiseP_true, 'r-'); % should match noiseP defined in OOD_sim
+    % load(sprintf('%s/truth.mat', nameFolder_OOD_load), 'noiseP_true')
+    % yline(noiseP_true, 'r-'); % should match noiseP defined in OOD_sim
 
     ylim([params_lb(iParam), params_ub(iParam)])
     xlabel('Bootstrap');

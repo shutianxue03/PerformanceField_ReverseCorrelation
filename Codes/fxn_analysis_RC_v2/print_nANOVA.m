@@ -10,14 +10,19 @@ function [anova_text, tbl] = print_nANOVA(varNames, data, IVs, nsubj, lengMode)
 %    0=the simple version (for plotting in the figure)
 
 %%
-if nargin < 5, lengMode=1; end % long version
-nVars=length(varNames);
-[~, tbl] = anovan(data, IVs,'model','interaction','varnames', varNames, 'display', 'off');
+if nargin < 5, lengMode = 1; end % long version
+nVars = length(varNames);
 
-if nVars>1
-    nrows=nchoosek(nVars,2) + nVars;
+if isscalar(varNames)
+    [~, tbl] = anovan(data, IVs, 'varnames', varNames, 'display', 'off');
 else
-    nrows=1;
+    [~, tbl] = anovan(data, IVs,'model','interaction','varnames', varNames, 'display', 'off');
+end
+
+if nVars > 1
+    nrows = nchoosek(nVars,2) + nVars;
+else
+    nrows = 1;
 end
 
 % sumsqr_error = tbl{nrows+2, 2};   % Sum of squares for error
