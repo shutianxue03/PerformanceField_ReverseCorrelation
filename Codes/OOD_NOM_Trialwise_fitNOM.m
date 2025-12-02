@@ -122,44 +122,84 @@ fprintf('\n Loaded xx_compIV.mat for "data_allBoot" and "c_zscore"\n')
 
 %% Parameter vectors per Model B
 switch iModelB
-    case 1 % Full model: Nmul + SDadd + rho [the best model]
-        params0 = [Nmul0, SDadd0, rho0];
-        params_lb = [Nmul_lb, SDadd_lb, rho_lb];
-        params_ub = [Nmul_ub, SDadd_ub, rho_ub];
+    case 1  % FullModel: Induced + constant independent + constant shared
+        params0   = [NOMp1_0,   NOMp2_0,   NOMp3_0];
+        params_lb = [NOMp1_lb, NOMp2_lb, NOMp3_lb];
+        params_ub = [NOMp1_ub, NOMp2_ub, NOMp3_ub];
 
-    case 2 % Nmul + SDadd (no rho)
-        params0 = [Nmul0, SDadd0];
-        params_lb = [Nmul_lb, SDadd_lb];
-        params_ub = [Nmul_ub, SDadd_ub];
+    case 2  % NoSharedN: Induced + constant independent (no shared noise)
+        params0   = [NOMp1_0,   NOMp2_0];
+        params_lb = [NOMp1_lb, NOMp2_lb];
+        params_ub = [NOMp1_ub, NOMp2_ub];
 
-    case 3 % SDadd + rho (no Nmul)
-        params0 = [SDadd0, rho0];
-        params_lb = [SDadd_lb, rho_lb];
-        params_ub = [SDadd_ub, rho_ub];
+    case 3  % NoInducedN: constant independent + constant shared (no induced noise)
+        params0   = [NOMp2_0,   NOMp3_0];
+        params_lb = [NOMp2_lb, NOMp3_lb];
+        params_ub = [NOMp2_ub, NOMp3_ub];
 
-    case 4 % Nmul + rho (no SDadd)
-        params0 = [Nmul0, rho0];
-        params_lb = [Nmul_lb, rho_lb];
-        params_ub = [Nmul_ub, rho_ub];
+    case 4  % NoIdpdtN: Induced + constant shared (no independent constant noise)
+        params0   = [NOMp1_0,   NOMp3_0];
+        params_lb = [NOMp1_lb, NOMp3_lb];
+        params_ub = [NOMp1_ub, NOMp3_ub];
 
-    case 5 % SDadd only
-        params0 = [SDadd0];
-        params_lb = [SDadd_lb];
-        params_ub = [SDadd_ub];
+    case 5  % JustIdpdtN: constant independent only
+        params0   = [NOMp2_0];
+        params_lb = [NOMp2_lb];
+        params_ub = [NOMp2_ub];
 
-    case 6 % Nmul only
-        params0 = [Nmul0];
-        params_lb = [Nmul_lb];
-        params_ub = [Nmul_ub];
+    case 6  % JustInducedN: induced only
+        params0   = [NOMp1_0];
+        params_lb = [NOMp1_lb];
+        params_ub = [NOMp1_ub];
 
-    case 7 % rho only (no internal noise) [the worst model]
-        params0 = [rho0];
-        params_lb = [rho_lb];
-        params_ub = [rho_ub];
+    case 7  % JustSharedM: constant shared only
+        params0   = [NOMp3_0];
+        params_lb = [NOMp3_lb];
+        params_ub = [NOMp3_ub];
 
     otherwise
         error('OOD_NOM_Trialwise_fitNOM: Unknown iModelB = %d', iModelB);
 end
+
+% switch iModelB
+%     case 1 % Full model: (1) Nmul + (2) SDadd + (3) rho [the best model]
+%         params0 = [NOMp1_0, NOMp2_0, NOMp3_0];
+%         params_lb = [NOMp1_lb, NOMp2_lb, NOMp3_lb];
+%         params_ub = [NOMp1_ub, NOMp2_ub, NOMp3_ub];
+% 
+%     case 2 % Nmul + SDadd (no rho)
+%         params0 = [NOMp1_0, NOMp2_0];
+%         params_lb = [NOMp1_lb, NOMp2_lb];
+%         params_ub = [NOMp1_ub, NOMp2_ub];
+% 
+%     case 3 % SDadd + rho (no Nmul)
+%         params0 = [NOMp2_0, NOMp3_0];
+%         params_lb = [NOMp2_lb, NOMp3_lb];
+%         params_ub = [NOMp2_ub, NOMp3_ub];
+% 
+%     case 4 % Nmul + rho (no SDadd)
+%         params0 = [NOMp1_0, NOMp3_0];
+%         params_lb = [NOMp1_lb, NOMp3_lb];
+%         params_ub = [NOMp1_ub, NOMp3_ub];
+% 
+%     case 5 % SDadd only
+%         params0 = [NOMp2_0];
+%         params_lb = [NOMp2_lb];
+%         params_ub = [NOMp2_ub];
+% 
+%     case 6 % Nmul only
+%         params0 = [NOMp1_0];
+%         params_lb = [NOMp1_lb];
+%         params_ub = [NOMp1_ub];
+% 
+%     case 7 % rho only (no internal noise) [the worst model]
+%         params0 = [NOMp3_0];
+%         params_lb = [NOMp3_lb];
+%         params_ub = [NOMp3_ub];
+% 
+%     otherwise
+%         error('OOD_NOM_Trialwise_fitNOM: Unknown iModelB = %d', iModelB);
+% end
 
 %% Preallocate outputs
 nParams = length(namesModelBparams{iModelB});
@@ -178,42 +218,44 @@ for iBoot = 1:nBoot
     % Extract data
     data = data_allBoot{iBoot};
 
-    if any(iModelB == [1,3,4,7]) % for ModelBs with rho
-        % Objective function for optimizer: nLL from trial-wise pYES + pairwise pA
-        iStep = 1;
-        fxn_estParams = @(paramsNOM) fxn_getError_v7(iModelB, paramsNOM, data, c_zscore, iStep);
-        switch iModelB
-            case 1, params0_step1 = params0(1:2); params_lb_step1 = params_lb(1:2); params_ub_step1 = params_ub(1:2);
-            case 3, params0_step1 = params0(1); params_lb_step1 = params_lb(1); params_ub_step1 = params_ub(1);
-            case 4, params0_step1 = params0(1); params_lb_step1 = params_lb(1); params_ub_step1 = params_ub(1);
-            case 7, error('ALERT: we are no longer fitting iModelB=7 (no noise)')
-        end
-        % Estimate parameters
-        if flag_fminconORbads == 1 % Faster, local search
-            [params_est_step1, nLL_step1] = fmincon(fxn_estParams, params0_step1, [], [], [], [], params_lb_step1, params_ub_step1, [], options_fmin);
-        else % BADS: more robust global + local search
-            [params_est_step1, nLL_step1] = bads(fxn_estParams, params0_step1, params_lb_step1, params_ub_step1, [], [], [], options_bads);
-        end
+    % if any(iModelB == [1,3,4,7]) % Fit all params separately: for ModelBs with rho
+    %     % Objective function for optimizer: nLL from trial-wise pYES + pairwise pA
+    %     iStep = 1;
+    %     fxn_estParams = @(paramsNOM) fxn_getError_v7(iModelB, paramsNOM, data, c_zscore, iStep);
+    %     switch iModelB
+    %         case 1, params0_step1 = params0(1:2); params_lb_step1 = params_lb(1:2); params_ub_step1 = params_ub(1:2);
+    %         case 3, params0_step1 = params0(1); params_lb_step1 = params_lb(1); params_ub_step1 = params_ub(1);
+    %         case 4, params0_step1 = params0(1); params_lb_step1 = params_lb(1); params_ub_step1 = params_ub(1);
+    %         case 7, error('ALERT: we are no longer fitting iModelB=7 (no noise)')
+    %     end
+    %     % Estimate parameters
+    %     if flag_fminconORbads == 1 % Faster, local search
+    %         [params_est_step1, nLL_step1] = fmincon(fxn_estParams, params0_step1, [], [], [], [], params_lb_step1, params_ub_step1, [], options_fmin);
+    %     else % BADS: more robust global + local search
+    %         [params_est_step1, nLL_step1] = bads(fxn_estParams, params0_step1, params_lb_step1, params_ub_step1, [], [], [], options_bads);
+    %     end
+    % 
+    %     iStep = 2;
+    %     fxn_estParams = @(paramsNOM) fxn_getError_v7(iModelB, paramsNOM, data, c_zscore, iStep, params_est_step1);
+    %     switch iModelB
+    %         case 1, params0_step2 = params0(3); params_lb_step2 = params_lb(3); params_ub_step2 = params_ub(3);
+    %         case 3, params0_step2 = params0(2); params_lb_step2 = params_lb(2); params_ub_step2 = params_ub(2);
+    %         case 4, params0_step2 = params0(2); params_lb_step2 = params_lb(2); params_ub_step2 = params_ub(2);
+    %         case 7, error('ALERT: we are no longer fitting iModelB=7 (no noise)')
+    %     end
+    %     % Estimate parameters
+    %     if flag_fminconORbads == 1 % Faster, local search
+    %         [params_est_step2, nLL_step2] = fmincon(fxn_estParams, params0_step2, [], [], [], [], params_lb_step2, params_ub_step2, [], options_fmin);
+    %     else % BADS: more robust global + local search
+    %         [params_est_step2, nLL_step2] = bads(fxn_estParams, params0_step2, params_lb_step2, params_ub_step2, [], [], [], options_bads);
+    %     end
+    %     params_est = [params_est_step1, params_est_step2];
+    %     nLL = nLL_step1+nLL_step2;
 
-        iStep = 2;
-        fxn_estParams = @(paramsNOM) fxn_getError_v7(iModelB, paramsNOM, data, c_zscore, iStep, params_est_step1);
-        switch iModelB
-            case 1, params0_step2 = params0(3); params_lb_step2 = params_lb(3); params_ub_step2 = params_ub(3);
-            case 3, params0_step2 = params0(2); params_lb_step2 = params_lb(2); params_ub_step2 = params_ub(2);
-            case 4, params0_step2 = params0(2); params_lb_step2 = params_lb(2); params_ub_step2 = params_ub(2);
-            case 7, error('ALERT: we are no longer fitting iModelB=7 (no noise)')
-        end
-        % Estimate parameters
-        if flag_fminconORbads == 1 % Faster, local search
-            [params_est_step2, nLL_step2] = fmincon(fxn_estParams, params0_step2, [], [], [], [], params_lb_step2, params_ub_step2, [], options_fmin);
-        else % BADS: more robust global + local search
-            [params_est_step2, nLL_step2] = bads(fxn_estParams, params0_step2, params_lb_step2, params_ub_step2, [], [], [], options_bads);
-        end
-        params_est = [params_est_step1, params_est_step2];
-        nLL = nLL_step1+nLL_step2;
-    else % for ModelBs without rho
+    % else % Fit all params together
         iStep = 0;
-        fxn_estParams = @(paramsNOM) fxn_getError_v7(iModelB, paramsNOM, data, c_zscore, iStep);
+        % fxn_estParams = @(paramsNOM) fxn_getError_v7(iModelB, paramsNOM, data, c_zscore, iStep); % the full model has induced, constant noise and rho (two passes are correlated)
+        fxn_estParams = @(paramsNOM) fxn_getError_v8(iModelB, paramsNOM, data, c_zscore, iStep); % the full model has induced, constant noise (shared and independent across passes)
 
         % Estimate parameters
         if flag_fminconORbads == 1 % Faster, local search
@@ -221,14 +263,15 @@ for iBoot = 1:nBoot
         else % BADS: more robust global + local search
             [params_est, nLL] = bads(fxn_estParams, params0, params_lb, params_ub, [], [], [], options_bads);
         end
-    end
+    % end
 
     % Compile
     params_est_allBoot(iBoot, :) = params_est(:).';
     nLL_allBoot(iBoot) = nLL;
 
     % Predict binned metrics from estimated parameters
-    pred = PR_pred_v7(iModelB, params_est, data, c_zscore, nBins, flag_plot_perIter);
+    % pred = PR_pred_v7(iModelB, params_est, data, c_zscore, nBins, flag_plot_perIter);
+    pred = PR_pred_v8(iModelB, params_est, data, c_zscore, nBins, flag_plot_perIter);
     pred_metrics_allBoot{iBoot} = pred;
 
 end % end of iBoot

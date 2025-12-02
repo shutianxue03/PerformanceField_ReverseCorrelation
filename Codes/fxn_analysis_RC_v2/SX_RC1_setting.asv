@@ -143,20 +143,15 @@ ncomb8 = 8;
 % Parameter bounds and initial values
 % Internal noise parameters
 
-% Old model: full model has induced and constant noise and rho (correlation between passes)
-% NOMp1_lb = 1e-5;  NOMp1_ub = 1;     % multiplicative noise
-% NOMp2_lb = 1e-5; NOMp2_ub = 30;   % Constant noise (20–30 range from simulations)
-% NOMp3_lb  = 1e-5;  NOMp3_ub = 1 - NOMp3_lb; % Correlation parameter (rhoDV)
-
-% New model: induced noise (indpt), idpdt constant noise, and shared constant noise
-NOMp1_lb = 1e-5;  NOMp1_ub = 1;     % induced noise 
-NOMp2_lb = 1e-5; NOMp2_ub = 50;   % idpdt constant noise
-NOMp3_lb  = 1e-5;  NOMp3_ub = 50; %  shared constant noise
+NOMp1_lb = 1e-5;  NOMp1_ub = 1;     % multiplicative noise
+NOMp2_lb = 1e-5; NOMp2_ub = 30;   % Constant noise (20–30 range from simulations)
+% Correlation parameter (rhoDV)
+NOMp3_lb  = 1e-5;  NOMp3_ub = 1 - NOMp3_lb;
 
 % Midpoint initial guesses
-NOMp1_0 = mean([NOMp1_lb,  NOMp1_ub]);
-NOMp2_0 = mean([NOMp2_lb, NOMp2_ub]);
-NOMp3_0   = mean([NOMp3_lb,   NOMp3_ub]);
+NOM0 = mean([NOMp1_lb,  NOMp1_ub]);
+SDadd0 = mean([NOMp2_lb, NOMp2_ub]);
+rho0   = mean([NOMp3_lb,   NOMp3_ub]);
 
 % BADS options
 options_bads = bads('defaults');
