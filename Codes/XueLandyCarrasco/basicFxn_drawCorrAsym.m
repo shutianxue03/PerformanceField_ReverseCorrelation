@@ -13,7 +13,7 @@ function flag_sig = basicFxn_drawCorrAsym(asymX_med_allSubj, asymY_med_allSubj, 
 %% figure setting
 wd_ref = 3; % line width of the reference line
 wd_border = 4; % default =4
-fsz_ticks = 45; % RC: 45
+fsz_ticks = 45; % TunC: 45; pA; NOM
 sz_marker = 40;
 nMarkerMax = 11;
 % markers_allSubj = {'o', 's', 'd', '^','v',  '<', '+','p', 'h', 'x', '>',     'o', 's', 'd', '^'}; % for each subjclc
@@ -30,7 +30,7 @@ for isubj = 1:nsubj
 %     if isubj<=nMarkerMax, 
         faceColor = 'w'; edgeColor = 'k';
 %     else, 
-%         faceColor = 'k'; edgeColor = 'w';
+        faceColor = 'k'; edgeColor = 'w';
 %     end
     plot(asymX_med_allSubj(isubj), asymY_med_allSubj(isubj),  markers_allSubj{isubj}, ...
         'markerfacecolor', faceColor, 'markeredgecolor',edgeColor, 'markersize', sz_marker, 'linewidth', wd_border)
@@ -56,14 +56,14 @@ flag_sig='';
 % if p_tR<.05, flag_sig='_sig'; elseif p_tR<.1, flag_sig = '_mg'; end
 
 %% linear regression
-if any([p_r2/2, p_rho2/2, p_tau2/2]<=.1)
-% if p_tR<.1
-    lm = polyfit(asymX_med_allSubj, asymY_med_allSubj, 1);
-    x_lm2 = linspace(min(asymX_med_allSubj), max(asymX_med_allSubj), 2);
-    yfit = polyval(lm, x_lm2);
-    plot(x_lm2, yfit,'-', 'color', ones(1,3)*.4, 'handlevisibility', 'off', 'linewidth', wd_border * 1.5);
-    % eta2 = var(polyval(lm, HVA_med_allSubj))/var(VMA_med_allSubj);
-end
+% if any([p_r2/2, p_rho2/2, p_tau2/2]<=.1)
+% % if p_tR<.1
+%     lm = polyfit(asymX_med_allSubj, asymY_med_allSubj, 1);
+%     x_lm2 = linspace(min(asymX_med_allSubj), max(asymX_med_allSubj), 2);
+%     yfit = polyval(lm, x_lm2);
+%     plot(x_lm2, yfit,'-', 'color', ones(1,3)*.4, 'handlevisibility', 'off', 'linewidth', wd_border * 1.5);
+%     % eta2 = var(polyval(lm, HVA_med_allSubj))/var(VMA_med_allSubj);
+% end
 
 %% ref (i.e., at 0)
 xline(0, 'color', ones(1,3)/2, 'linewidth', wd_ref);
@@ -74,6 +74,8 @@ if ~isnan(x_ticks), xticks(x_ticks), xlim(x_ticks([1, end])), end
 if ~isnan(y_ticks), yticks(y_ticks), ylim(y_ticks([1, end])), end
 if ~isnan(x_ticklabels), xticklabels(x_ticklabels),  end
 if ~isnan(y_ticklabels), yticklabels(y_ticklabels),  end
+
+%% Print correlation coefficient
 
 %% figure format
 axis square

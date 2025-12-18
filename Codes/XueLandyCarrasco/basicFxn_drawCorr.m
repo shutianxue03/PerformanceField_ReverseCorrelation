@@ -52,13 +52,14 @@ hold on, box on
 for iLoc = 1:nLoc
     for isubj = 1:nsubj
         %         if isubj<=nMarkerMax,
-        faceColor = 'w';
-        %else, faceColor = colors(iLoc, :); end
+        faceColor = 'w'; edgeColor = colors(iLoc, :);
+        % else, 
+            faceColor = colors(iLoc, :); edgeColor = 'w';
+    % end
         plot(x_med_0mean_allSubj(isubj, iLoc), y_med_0mean_allSubj(isubj, iLoc),  markers_allSubj{isubj}, 'markerfacecolor',faceColor, ...
-            'markeredgecolor', colors(iLoc, :), 'markersize', sz_marker, 'linewidth', wd_border)
+            'markeredgecolor', edgeColor, 'markersize', sz_marker, 'linewidth', wd_border)
     end % isubj
 end % iLoc
-
 
 %% get partial corr
 ANOVA_indLoc = repmat(1:nLoc, nsubj, 1);
@@ -77,8 +78,7 @@ ANOVA_indSubj = repmat((1:nsubj)', 1, nLoc);
 % end
 
 % Always reveal observer effect and control for loc effect
-[r_partial, p_partial] = partialcorr(x_med_allSubj(:), y_med_allSubj(:), ANOVA_indLoc(:), ...
-            'type', type_corr, 'tail', type_tail);
+[r_partial, p_partial] = partialcorr(x_med_allSubj(:), y_med_allSubj(:), ANOVA_indLoc(:), 'type', type_corr, 'tail', type_tail);
 str_sig='_ns'; if p_partial<.05, str_sig='_sig'; elseif p_partial<.1, str_sig = '_mg'; end
 
 %% Corr for each loc
@@ -88,27 +88,27 @@ for iLoc = 1:nLoc
     text_corr_perL = [text_corr_perL, sprintf('L%d: r=%.2f, p=%.3f |', iLoc, r, p)];
 
     if p<.05, lineStyle = '-'; else, lineStyle = '--'; end
-     lineStyle = '-'
+     % lineStyle = '-'
     % Plot linear regression for each loc/condition
     lm = polyfit(x_med_allSubj(:, iLoc), y_med_allSubj(:, iLoc), 1);
     x_lm2 = linspace(min(x_med_allSubj(:, iLoc)), max(x_med_allSubj(:, iLoc)), 2);
     yfit = polyval(lm, x_lm2);
     eta2 = var(polyval(lm, x_med_allSubj(:, iLoc)))/var(y_med_allSubj(:, iLoc));
     % if p_partial<.1
-        plot(x_lm2, yfit, lineStyle, 'color', colors(iLoc, :), 'handlevisibility', 'off', 'linewidth', wd_border * 1);
+        % plot(x_lm2, yfit, lineStyle, 'color', colors(iLoc, :), 'handlevisibility', 'off', 'linewidth', wd_border * 1);
     % end
 
 end
-text_corr_perL = sprintf('%s\n', text_corr_perL)
+text_corr_perL = sprintf('%s\n', text_corr_perL);
 
 %% linear regression
-% lm = polyfit(x_med_0mean_allSubj(:), y_med_0mean_allSubj(:), 1);
-% x_lm2 = linspace(min(x_med_0mean_allSubj(:)), max(x_med_0mean_allSubj(:)), 2);
-% yfit = polyval(lm, x_lm2);
-% eta2 = var(polyval(lm, x_med_0mean_allSubj(:)))/var(y_med_0mean_allSubj(:));
-% if p_partial<.1
-%     plot(x_lm2, yfit,'-', 'color', ones(1,3)*.4, 'handlevisibility', 'off', 'linewidth', wd_border * 1.5);
-% end
+lm = polyfit(x_med_0mean_allSubj(:), y_med_0mean_allSubj(:), 1);
+x_lm2 = linspace(min(x_med_0mean_allSubj(:)), max(x_med_0mean_allSubj(:)), 2);
+yfit = polyval(lm, x_lm2);
+eta2 = var(polyval(lm, x_med_0mean_allSubj(:)))/var(y_med_0mean_allSubj(:));
+if p_partial<.1
+    plot(x_lm2, yfit,'-', 'color', ones(1,3)*.4, 'handlevisibility', 'off', 'linewidth', wd_border * 1.5);
+end
 
 %% ticks and limits
 if ~isnan(x_ticks), xticks(x_ticks), xlim(x_ticks([1, end])), end

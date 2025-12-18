@@ -88,7 +88,6 @@ for flag_stage = 1:5
             plot([mu_i mu_i], [0 max(y_i)], '-', 'color', [.5, .5, .5], 'LineWidth', 1.5);
 
 
-
             % Shaded tail to the right of criterion (for stages 4 & 5)
             if drawCriterion
                 idx_tail = x_i >= criterion;
@@ -176,8 +175,9 @@ close all
 V = 0.2; % mean of decision variable for both passes
 sigma = 1; % SD for both passes
 
-rhoDV1 = 0.1; % correlation for first layer
-rhoDV2 = 0.6; % correlation for second layer (change as you like)
+rhoDV1 = 0.6; % correlation for second layer (change as you like)
+rhoDV2 = 0; % correlation for first layer
+
 
 criterion = V + 0.3;
 nContours = 3;
@@ -215,9 +215,9 @@ Z2 = reshape(Z2, size(x1_grid));
 figure('Position',[200 200 700 600]); hold on;
 
 % 1) Contour lines of the first joint density
-[~, hC1] = contour(x1_grid, x2_grid, Z1, nContours, 'k', 'LineWidth', 1.5);
+[~, hC1] = contour(x1_grid, x2_grid, Z1, nContours, 'k-', 'LineWidth', 1.5);
 % 2) Contour lines of the second joint density (different style)
-[~, hC2] = contour(x1_grid, x2_grid, Z2, nContours, '--', 'LineWidth', 1.5, 'Color', [0.3 0.3 0.3]);
+[~, hC2] = contour(x1_grid, x2_grid, Z2, nContours, 'k--', 'LineWidth', 1.5, 'Color', [0.3 0.3 0.3]);
 
 % 3) Shade agreement regions (D1 > crit & D2 > crit) and (D1 < crit & D2 < crit)
 % Top-right (YES–YES)
@@ -268,20 +268,21 @@ set(gca, 'FontSize', 14);
 % title('Joint 2D Gaussian with criterion and agreement regions');
 
 legend([hC1, hC2], ...
-    {sprintf('$\\rho = %.2f, p_A=%.1f$', rhoDV1, pA1), sprintf('$\\rho = %.2f, p_A=%.1f$', rhoDV2, pA2)}, ...
+    {sprintf('$\\sigma_{shared}^2/\\sigma_{i}^2 = %.2f,\\; p_A = %.1f$', rhoDV1, pA1), ...
+    sprintf('$\\sigma_{shared}^2/\\sigma_{i}^2 = %.2f,\\; p_A = %.1f$', rhoDV2, pA2)}, ...
     'Location', 'northwest', 'Interpreter', 'latex');
 
 set(findall(gcf, '-property', 'fontsize'), 'fontsize', 25)
 saveas(gcf, sprintf('%s/NOM_stage6_2D.jpg', nameFolder_Fig_Schematic));
 close all
 
-%% Illustration of misprediction when excluding noise parameters
+%% Prediction of reduced models
 close all; clc;
 
 % ---------------- Ground-truth parameters ----------------
 Nmul_true = .6; % induced (multiplicative) noise
-SDadd_true = 15; % baseline (additive) noise
-rho_true = 0.5; % correlation between passes
+SDadd_ind_true = 15; % baseline (additive) noise
+SDadd_sha_true = 15; % correlation between passes
 
 % IV range (internal variable mean)
 IV = linspace(0, 150, 100); % row vector
@@ -291,7 +292,7 @@ medianIV = median(IV);
 c_zscore = -.3;
 
 % ---------------- Helper: full model sigma(IV) ----------------
-sigma_true = sqrt((Nmul_true .* IV).^2 + SDadd_true.^2);
+sigma_true = sqrt((Nmul_true .* IV).^2 + SDadd_ind_true.^2);
 sigma_true = max(sigma_true, 1e-6); % avoid zero
 criterion_true = c_zscore .* sigma_true + medianIV; % trial-wise criterion in IV units
 
@@ -301,7 +302,7 @@ pYES_true = 1 - normcdf(criterion_true, IV, sigma_true);
 
 % Model without induced noise (Nmul = 0)
 Nmul_noInduced = 0;
-sigma_noInduced = sqrt((Nmul_noInduced .* IV).^2 + SDadd_true.^2);
+sigma_noInduced = sqrt((Nmul_noInduced .* IV).^2 + SDadd_ind_true.^2);
 sigma_noInduced = max(sigma_noInduced, 1e-6);
 criterion_noInduced = c_zscore .* sigma_noInduced + medianIV;
 pYES_noInduced = 1 - normcdf(criterion_noInduced, IV, sigma_noInduced);
@@ -331,20 +332,20 @@ for iTrial = 1:numel(IV)
     % Full model sigma and criterion at this IV
     s_true = sigma_true(iTrial);
     criterion_true_i = criterion_true(iTrial);
-    Sigma_true = [s_true^2, rho_true*s_true^2; ...
-        rho_true*s_true^2, s_true^2 ];
+    Sigma_true = [s_true^2, SDadd_sha_true*s_true^2; ...
+        SDadd_sha_true*s_true^2, s_true^2 ];
 
     % Sigma & criterion without induced noise (Nmul = 0)
     s_noInduced = sigma_noInduced(iTrial);
     criterion_noInd_i = criterion_noInduced(iTrial);
-    Sigma_noInduced = [s_noInduced^2, rho_true*s_noInduced^2; ...
-        rho_true*s_noInduced^2, s_noInduced^2 ];
+    Sigma_noInduced = [s_noInduced^2, SDadd_sha_true*s_noInduced^2; ...
+        SDadd_sha_true*s_noInduced^2, s_noInduced^2 ];
 
     % Sigma & criterion without constant noise (SDadd = 0)
     s_noConst = sigma_noConst(iTrial);
     criterion_noConst_i = criterion_noConst(iTrial);
-    Sigma_noConst = [s_noConst^2, rho_true*s_noConst^2; ...
-        rho_true*s_noConst^2, s_noConst^2 ];
+    Sigma_noConst = [s_noConst^2, SDadd_sha_true*s_noConst^2; ...
+        SDadd_sha_true*s_noConst^2, s_noConst^2 ];
 
     % Sigma without correlation (rho = 0), same criterion as full model
     Sigma_noRho = [s_true^2, 0; ...
@@ -447,7 +448,6 @@ saveas(gcf, sprintf('%s/NOM_excludeParams_pA.jpg', nameFolder_Fig_Schematic));
 close all
 
 %% Sketches for neural variability
-
 close all; clc
 
 % Time axis
@@ -654,17 +654,110 @@ indParts_all = {1:2, 1, 2};
 fxn_plotPF_diagram(str_locgroup, sz_marker_all,  x_ref, y_ref, x_allLoc, y_allLoc, colors_allLoc, strParts_all, indParts_all, outline_ecc, sz_line, nameFolder_Fig_Schematic);
 %------------------------------------%
 
-% VMA (1 ecc)
+% 5 single locations
 str_locgroup = 'FullVF';
 fprintf('\n%s...\n', str_locgroup)
 x_ref = {[-ecc, ecc], [0,0]};
 y_ref = {[0,0], [-ecc, ecc]};
 x_allLoc = [0, ecc, -ecc,  0,   0];
 y_allLoc = [0, 0,   0,  ecc, -ecc];
-colors_allLoc = colors_comb([1, 6, 6, 5, 3], :);
+colors_allLoc = colors_comb([1, 6, 6, 3, 5], :);
 
 strParts_all = {'full'};
 indParts_all = {1:5};
 %------------------------------------%
 fxn_plotPF_diagram(str_locgroup, sz_marker_all,  x_ref, y_ref, x_allLoc, y_allLoc, colors_allLoc, strParts_all, indParts_all, outline_ecc, sz_line, nameFolder_Fig_Schematic);
 %------------------------------------%
+
+%% Increasing vs decreasing monotonic functions and (Δx, Δy)
+
+% Define a set of monotonic functions on x >= 0
+% Column 1: function handle
+% Column 2: label
+% Column 3: +1 for increasing, -1 for decreasing (just for your reference)
+fxn_all = {
+    @(x) x,              'Increasing: y = x',                 +1
+    @(x) x.^2,           'Increasing: y = x^2',               +1
+    @(x) sqrt(x),        'Increasing: y = sqrt(x)',           +1
+    @(x) log(1 + x),     'Increasing: y = log(1 + x)',        +1
+    @(x) exp(-0.5*x),    'Decreasing: y = exp(-0.5x)',        -1
+    @(x) 1 ./ (1 + x),   'Decreasing: y = 1 / (1 + x)',       -1
+    @(x) 5 - x,          'Decreasing: y = 5 - x',             -1
+    };
+
+nFxn = size(fxn_all, 1);
+
+% Common x-axis
+nPoints = 200;
+x = linspace(0, 5, nPoints);
+
+% Parameters for random pairs
+nPairs = 10;
+close all
+
+figure('Position', [0 0 2e3 500]);
+
+for iFxn = 1:nFxn
+
+    f       = fxn_all{iFxn, 1};
+    f_label = fxn_all{iFxn, 2};
+    monoDir = fxn_all{iFxn, 3};  %#ok<NASGU> % +1 or -1, if you need it later
+
+    % Compute y for this function
+    y = f(x);
+
+    % Randomly select multiple pairs of indices (i1 <= i2)
+    idxPairs = sort(randi(nPoints, nPairs, 2), 2);
+    i1 = idxPairs(:, 1);
+    i2 = idxPairs(:, 2);
+
+    % Compute Δx and Δy for each pair
+    delta_x = x(i2) - x(i1);      % always >= 0 by construction
+    delta_y = y(i2) - y(i1);      % sign depends on increasing vs decreasing
+
+    % ---- Plot for this function ----
+    % Top plot: function + pairs
+    subplot(2, nFxn, iFxn);
+    plot(x, y, 'k-', 'LineWidth', 2); hold on;
+    % grid on; box on;
+    axis square
+
+    co = get(gca, 'ColorOrder');
+    nColors = size(co, 1);
+
+    for iPair = 1:nPairs
+        c = co(mod(iPair-1, nColors) + 1, :);
+        xx_pair = x([i1(iPair), i2(iPair)]);
+        yy_pair = y([i1(iPair), i2(iPair)]);
+
+        % Vertical lines
+        plot([xx_pair(1), xx_pair(1)], [0, yy_pair(1)], '--', 'color', c)
+        plot([xx_pair(2), xx_pair(2)], [0, yy_pair(2)], '--', 'color', c)
+        plot([0, xx_pair(1)], [yy_pair(1), yy_pair(1)], '--', 'color', c)
+        plot([0, xx_pair(2)], [yy_pair(2), yy_pair(2)], '--', 'color', c)
+
+        % The two endpoints
+        plot(xx_pair, yy_pair, 'o', 'Color', c, 'MarkerFaceColor', c, 'MarkerSize', 10);
+    end
+
+    xlabel('x');
+    ylabel('y = f(x)');
+    title(sprintf('%s', f_label), 'Interpreter', 'none');
+
+    % Bottom plot: Δy vs Δx
+    subplot(2, nFxn, iFxn+nFxn); hold on
+
+    for iPair = 1:nPairs
+        c = co(mod(iPair-1, nColors) + 1, :);
+        plot(delta_x(iPair), delta_y(iPair), 'o', 'color', c, 'LineWidth', 1.5, 'MarkerSize', 10);
+    end
+    % grid on; box on;
+    axis square
+    xlabel('\Delta x');
+    ylabel('\Delta y');
+    title('\Delta y as a function of \Delta x across pairs');
+
+    set(findall(gcf, '-property', 'fontsize'), 'fontsize', 12)
+    set(findall(gcf, '-property', 'linewidth'), 'linewidth',2)
+end % iFxn
+saveas(gcf, sprintf('%s/CorrAsym.jpg', nameFolder_Fig_Schematic))

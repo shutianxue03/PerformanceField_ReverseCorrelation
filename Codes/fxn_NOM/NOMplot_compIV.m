@@ -31,39 +31,50 @@
 % It loads the saved output and generates plots for IV distribution, bin counts, and performance metrics.
 
 %% Figure 1: Performance Metrics across Iterations
-iDataset = 2; %1=full, 2=test
 figure('Position', [100, 100, 2e3, 2e3])
-for iMetric = 1:nmetrics
-    subplot(3,3,iMetric)
-    plot(data_metrics_allBoot(:, iDataset, iMetric),'-o');
-    yline(getCI(data_metrics_allBoot(:,iDataset, iMetric), 1, 1),'k-');
-    xlabel('Iteration');
-    ylabel(namesMetrics{iMetric})
-    title(sprintf('Metric %s across iterations', namesMetrics{iMetric}));
+for iMetric = 1:nMetrics
+    subplot(3, 4, iMetric), hold on
+
+    [metric_med, ~, ~, metric_sem_neg, metric_sem_pos] = getCI(data_metrics_allBoot(:, :, iMetric), 1, 1);
+
+    for iDataset = 1:nDatasets % iDataset: 1=full, 2=tmpl, 3=train, 4=test
+        if iDataset==1, color_face = 'k'; else, color_face = 1-ratio_split(iDataset-1)*ones(1,3); end
+        bar(iDataset, metric_med(iDataset), 'EdgeColor', 'k', 'FaceColor', color_face)
+        errorbar(iDataset, metric_med(iDataset), metric_sem_neg, metric_sem_pos, 'k', 'capsize', 0)
+    end
+
+    xticks(1:nDatasets)
+    xticklabels(namesDataset_full)
+    % ylabel(namesMetrics{iMetric})
+    title(namesMetrics{iMetric})
+    
     % Set y-axis limits based on metric type
     switch iMetric
         % metrics: [dprime, criterion, [pC, pHit, pFA], nanmean(respC), pYES, mean(1./contrast), median(RT)];
-        case 1, ylimits = [0,2]; % dprime
+        case 1, ylimits = [0,2]; yline(dprime_theo, 'k--'); % dprime
         case 2, ylimits = [-1,1]; yline(0, 'k--'); % criterion
         case 3, ylimits = [0,1]; yline(.7, 'k--'); % pC; pC_titrate = 0.7 (defined in OOD_sim)
-        case 4, ylimits = [0,1]; % pHit
-        case 5, ylimits = [0,1]; % pFA
-        case 6, ylimits = [.5,1]; % pA
-        case 7, ylimits = [.5,1]; % pA1
-        case 8, ylimits = [.5,1]; % pA0
-        case 9, ylimits = [0,1]; % pYES
+        case 4, ylimits = [.5, 1]; % pHit
+        case 5, ylimits = [0, .5]; % pFA
+        case 6, ylimits = [.5, 1]; % pA
+        case 7, ylimits = [.5, 1]; % pA1
+        case 8, ylimits = [.5, 1]; % pA0
+        case 9, ylimits = [0, 1]; yline(.5, 'k--'); % pYES
+        case 10, ylimits = [2, 3]; % CS
+        case 11, ylimits = [0, .5]; % RT
     end
     ylim(ylimits)
 end
+
 set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
-set(findall(gcf, '-property', 'linewidth'), 'linewidth',2)
-% saveas(gcf, sprintf('%s/1PerfPerIteraction.jpg', nameFolder_Figures_local))
-sgtitle(sprintf('Figure 1. Measured metrics as a fxn of iteration\n%s (L%d ModelA%d %s, nBoot=%d)', ...
-    subjName, iLocComb, iModelA, namesModelA{iModelA}, nBoot))
+set(findall(gcf, '-property', 'linewidth'), 'linewidth', 2)
+
+sgtitle(sprintf('Figure 1. Measured metrics (Ave across %d boots +- 68%% CI)\n%s (Loc%d ModelA%d %s)', ...
+    nBoot, subjName, iLocComb, iModelA, namesModelA{iModelA}))
 saveas(gcf, sprintf('%s/1MetricMeasured_%s_L%d_A%d.jpg', nameFolder_Figures_NOM, subjName, iLocComb, iModelA))
 
 %% Figure 2: 2D Kernel
-template_train_ave = squeeze(mean(template_train_allBoot, 1));
+template_tmpl_ave = squeeze(mean(template_tmpl_allBoot, 1));
 template_full_ave = squeeze(mean(template_full_allBoot, 1));
 
 figure('Position', [100, 100, 2e3, 2e3])
@@ -78,7 +89,7 @@ yticks(axisTicks_tuning{1}), yticklabels(axisTL_tuning{1})
 title('True template')
 
 subplot(2,3,2), hold on
-imagesc(axis_tuning{2}, axis_tuning{1}, template_train_ave), axis square, colorbar, %clim([0, .2])
+imagesc(axis_tuning{2}, axis_tuning{1}, template_tmpl_ave), axis square, colorbar, %clim([0, .2])
 xline(1, 'r-'); % log gabor SF
 yline(0, 'r-'); % Gabor ori
 xlabel('Spatial Frequency'), ylabel('Orientation')
@@ -87,7 +98,7 @@ yticks(axisTicks_tuning{1}), yticklabels(axisTL_tuning{1})
 title('Template derived from TRAINING trials')
 
 subplot(2,3,3), hold on
-imagesc(axis_tuning{2}, axis_tuning{1}, template_train_ave-template_true), axis square, colorbar
+imagesc(axis_tuning{2}, axis_tuning{1}, template_tmpl_ave-template_true), axis square, colorbar
 xline(1, 'r-'); % log gabor SF
 yline(0, 'r-'); % Gabor ori
 xlabel('Spatial Frequency'), ylabel('Orientation')
@@ -96,7 +107,7 @@ yticks(axisTicks_tuning{1}), yticklabels(axisTL_tuning{1})
 title('Difference with the true template')
 
 subplot(2,3,4), hold on
-imagesc(axis_tuning{2}, axis_tuning{1}, template_train_ave-template_full_ave), axis square, colorbar
+imagesc(axis_tuning{2}, axis_tuning{1}, template_tmpl_ave-template_full_ave), axis square, colorbar
 xline(1, 'r-'); % log gabor SF
 yline(0, 'r-'); % Gabor ori
 xlabel('Spatial Frequency'), ylabel('Orientation')

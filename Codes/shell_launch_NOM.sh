@@ -16,7 +16,7 @@ flag_stage=1    # 1 = run xx_compIV (MUST be done before running xx_fitNOM); 2 =
 nBoot=100  # number of bootstraps
 
 for isubj in {1..15}; do        # subject indices
-  for iLocComb in {1..8}; do    # location combinations
+  for iLocComb in {1..5}; do    # location combinations
     for iModelA in {1..2}; do      # see SX_RC1_setting (A1: core, A2: IO template)
 
       if [ "$flag_stage" -eq 1 ]; then
@@ -27,7 +27,7 @@ for isubj in {1..15}; do        # subject indices
           shell_NOM_compIV.sh "${isubj}" "${iLocComb}" "${iModelA}" "${nBoot}"
 
       elif [ "$flag_stage" -eq 2 ]; then
-        for iModelB in {1..7}; do   # see SX_RC1_setting (B1–B7)
+        for iModelB in {1..4}; do   # see SX_RC1_setting "namesModelB"
           echo "Submitting fitNOM: subj=${isubj}, loc=${iLocComb}, A=${iModelA}, B=${iModelB}, nIter=${nBoot}"
 
           sbatch \

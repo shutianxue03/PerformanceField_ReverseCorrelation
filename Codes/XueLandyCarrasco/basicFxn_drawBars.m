@@ -17,7 +17,7 @@ function flag_sig = basicFxn_drawBars(med_allSubj, ref, colors, x_ticks, y_ticks
 %% define sizes
 sz_marker_idvd = 10;
 sz_marker_ave = 30;
-fsz_ticks = 20; % tunC: 30, MC: 20; BEHAV: 15; NOM: 20
+fsz_ticks = 15; % tunC: 20; BEHAV: xx; NOM: 15
 fsz_title = 10; % font size of titlte
 wd = 2; % line width of axis
 wd_bar = .5; % the width of the bar (not the bar edge!!)
@@ -52,7 +52,7 @@ for iBar = 1:nBars
     bar(iBar, ave(iBar), 'FaceColor', colors(iBar, :),  'EdgeColor', colors(iBar, :), 'barwidth', wd_bar, 'HandleVisibility', 'off')
     %     end
     errorbar(iBar, ave(iBar), sem(iBar), '.', 'color', colors(iBar, :), 'CapSize', 0, 'linewidth', wd, 'HandleVisibility', 'off')
-    
+
     %     if ~flag_plotIdvd
     if ave(iBar)>0
         errorbar(iBar, ave(iBar), sem(iBar), 0, '.w', 'CapSize', 0, 'linewidth', wd, 'HandleVisibility', 'off')
@@ -60,7 +60,7 @@ for iBar = 1:nBars
         errorbar(iBar, ave(iBar), 0, sem(iBar), '.w', 'CapSize', 0, 'linewidth', wd, 'HandleVisibility', 'off')
     end
     %     end
-    
+
     % if plot HVA vs. VMA
     %     bar(iBar, ave(iBar), 'FaceColor', 'w',  'EdgeColor', 'k', 'barwidth', wd_bar, 'linewidth', wd)
     %     errorbar(iBar, ave(iBar), sem(iBar), '.', 'color', 'k', 'CapSize', 0, 'linewidth', wd)
@@ -69,17 +69,17 @@ end % end of iiLoc
 %% idvd data
 buffer = .2;
 if flag_plotIDVD
-    
+
     if nBars == 2 % for nBars=2, plot idvd data between two bars
         x = [1+buffer, 2-buffer];
     else % for nBars>2, plot idvd data at the center of each bar
         x = 1:nBars;
     end
-    
+
     for isubj = 1:nsubj
         if isubj<=nsubj_max, c = 'w'; else, c= ones(1,3)/2; end
         if nBars==2
-            
+
             %             plot(x, med_allSubj(isubj, :), [markers_allSubj{isubj}, '-'],  ...
             plot(x, med_allSubj(isubj, :), '-',  ...
                 'color',ones(1,3)*.7, 'markerfacecolor', 'w', 'markeredgecolor', ones(1,3)*.7, ...
@@ -89,8 +89,8 @@ if flag_plotIDVD
             %             'color',ones(1,3)*.7, 'markerfacecolor', 'w', 'markeredgecolor', ones(1,3)*.7, ...
             %             'markersize', sz_marker_idvd, 'linewidth', wd_bar, 'linewidth', 2)
             %
-%             plot([1,3], med_allSubj(isubj, [1,3]), [markers_allSubj{isubj}, '-'],  ...
-                plot(1:nBars+buffer, med_allSubj(isubj, :), '-',  ...
+            %             plot([1,3], med_allSubj(isubj, [1,3]), [markers_allSubj{isubj}, '-'],  ...
+            plot(1:nBars+buffer, med_allSubj(isubj, :), '-',  ...
                 'color',ones(1,3)*.7, 'markerfacecolor', 'w', 'markeredgecolor', ones(1,3)*.7, ...
                 'markersize', sz_marker_idvd, 'linewidth', wd)
         end
@@ -117,7 +117,7 @@ end
 text_testPairs = '';
 if nBars>2 && flag_pairwiseComp
     indPairs = nchoosek(1:nBars, 2); % all possible pairs across columns
-%     npairs = size(indPairs , 1);
+    %     npairs = size(indPairs , 1);
     for iPair = 1:nPairs
         x1 = med_allSubj(:, indPairs(iPair, 1));
         x2 = med_allSubj(:, indPairs(iPair, 2));
@@ -138,7 +138,7 @@ if nBars==2
     flag_sig=''; if p<.05, flag_sig='_sig'; elseif p<.1, flag_sig='_mg'; end
     text_testPairs = sprintf('%s vs. %s: t(%d)=%.2f, p=%.3f, d=%.2f (%d/%d)\n', ...
         x_ticks{1}, x_ticks{2},stats.df, stats.tstat, p, cohenD, sum(med_allSubj(:, 1)> med_allSubj(:, 2)), nsubj);
-    
+
     if flag_plotDiff
         yDiffSEM = y_ticks(end) - (y_ticks(end) - y_ticks(1))/interval_diffBar;
         diff_sem = std(x1 - x2)/sqrt(nsubj);

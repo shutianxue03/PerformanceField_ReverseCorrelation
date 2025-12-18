@@ -39,7 +39,7 @@ fxn_getSigma_SPdomain = @(SF) 3 * sqrt(2*log(2)) / (2 * pi * SF);
 % fxn_getSigma_SPdomain = @(SF) SF;
 
 %%  Global parameters
-nBins = 10; % to bin IVs in OOD_xx_beforeEst
+nBins = 6; % to bin IVs in OOD_xx_beforeEst
 binStrategy_all = {'equal', 'algorithm', 'manual'};
 eyeD_all = [1,1,0,1,1,1,1,1,0,0,1,0]; % 1=right eye dominant; 0=left eye dominant
 flag_block200 = 0; % 1; all observers are forced to have 200 blocks; 0=no
@@ -169,15 +169,15 @@ options_fmin = optimoptions('fmincon', 'MaxIterations', 1e4, 'Display', 'off');
 % Noisy observer model names
 namesModelA = {'RC', 'IO', 'RandTemp'};
 
-namesModelB = {'FullModel', 'NoSharedN', 'NoInducedN', 'NoIdpdtN', 'JustIdpdtN', 'JustInducedN', 'JustSharedM'};
+namesModelB = {'FullModel', 'NoSharedN', 'NoMultiN', 'NoPrivN', 'JustPrivN', 'JustMultiN', 'JustSharedN'};
 namesModelBparams = {...
-    {'Induced noise', 'Constant idpdt noise', 'Constant shared noise'}, ... %1
-    {'Induced noise', 'Constant idpdt noise'                                       }, ... %2
-    {                          'Constant idpdt noise', 'Constant shared noise'}, ... %3
-    {'Induced noise',                                      'Constant shared noise'}, ... %4
-    {                          'Constant idpdt noise',                                      }, ... %5
-    {'Induced noise',                                                                           }, ... %6
-    {                                                              'Constant shared noise'}};    %7
+    {'Multiplicative variability', 'Private variability', 'Shared variability'}, ... %1
+    {'Multiplicative variability', 'Private variability'                                       }, ... %2
+    {                                         'Private variability', 'Shared variability'}, ... %3
+    {'Multiplicative variability',                                'Shared variability'}, ... %4
+    {                                         'Private variability',                                      }, ... %5
+    {'Multiplicative variability',                                                                           }, ... %6
+    {                                                                        'Shared variability'}};    %7
 
 % namesModelB = {'FullModel', 'NoRho', 'NoInduced', 'NoConstant', 'NoInducedNoRho', 'NoConstantNoRho', 'NoNoise'};
 % namesModelBparams = {...
@@ -191,7 +191,6 @@ namesModelBparams = {...
 
 namesConvolveType = {'dot product', 'convolution'}; nConvolveType = length(namesConvolveType);
 namesIVType = {'sum all channels', 'channel with max IV'}; nIVType = length(namesIVType);
-
 
 %% Tuning function params
 % names of the tuning models
@@ -214,13 +213,13 @@ namesFamily_all = {
 namesParams_all = {
     {'gain', 'width', 'baseline'}, ...                                                    % M1 gaussian, to fit ori
     {'peak SF', 'gain', 'tuning', 'baseline'}, ...                             % M2 log parabola, AF
-    {'peak SF', 'gain', 'bandwidth', 'baseline', 'truncation'}, ...              % M3 truncated log parabola, AF
-    {'peak SF', 'gain', 'bandwidth', 'baseline', 'power'}, ...                 % M4 raised gaussian, LiBarbotCarrasco_2006
-    {'peak SF', 'gain', 'bandwidth'}, ...                                             % M5 double exponential, JigoCarrasco2020
-    {'peak SF', 'gain', 'bandwidth'}, ...                                             % M6 skewed gaussian, as suggested by AF
-    {'peak SF', 'gain', 'bandwidth', 'baseline', 'power', 'truncate'}, ... % M7 truncated raised gaussian
+    {'peak SF', 'gain', 'width', 'baseline', 'truncation'}, ...              % M3 truncated log parabola, AF
+    {'peak SF', 'gain', 'width', 'baseline', 'power'}, ...                 % M4 raised gaussian, LiBarbotCarrasco_2006
+    {'peak SF', 'gain', 'width'}, ...                                             % M5 double exponential, JigoCarrasco2020
+    {'peak SF', 'gain', 'width'}, ...                                             % M6 skewed gaussian, as suggested by AF
+    {'peak SF', 'gain', 'width', 'baseline', 'power', 'truncate'}, ... % M7 truncated raised gaussian
     {'gain1', 'gain2', 'sigma1', 'sigma_r', 'baseline'}, ...                          % M8 difference of gaussians, to fit ori
-    {'peak SF', 'gain', 'bandwidth', 'baseline'}, ... % M9: gaussian for SF
+    {'peak SF', 'gain', 'width', 'baseline'}, ... % M9: gaussian for SF
     {'gain', 'kappa', 'baseline'}, ... % M10:
     {'peak ORI', 'gain', 'kappa', 'baseline'}, ... % M11: Gaussian with the mean free to vary
     {'peakSF1', 'gain1', 'width1','base2', 'peakSF2', 'gain2', 'width2', 'base2'}, ... % M12: double peak
@@ -230,7 +229,7 @@ if ~exist('flag_standEnergy', 'var'), flag_standEnergy = 1; end
 
 % lb and ub that are consistent across models
 ORI_gain_lb = 1e-3; ORI_gain_ub = .5;
-ORI_width_lb = 1e-3; ORI_width_ub = 40;
+ORI_width_lb = 1e-3; ORI_width_ub = 90;
 ORI_base_lb = -.2; ORI_base_ub = ORI_gain_ub;
 
 SF_peak_lb = 1e-3; SF_peak_ub = 4;
@@ -272,7 +271,9 @@ fitMode = 2; % 1 = SSE, 2 = MLE;
 
 %% Names
 % General names
+% metrics = [dprime, criterion, [pC, pHit, pFA], nanmean(respC), pYES, mean(1./contrast), median(RT)];
 namesMetrics = {'dprime', 'criterion', 'pC', 'pHit', 'pFA', 'pA', 'pA1', 'pA0', 'CS'}; nmetrics = length(namesMetrics);
+namesMetrics = {'dprime', 'criterion', 'pC', 'pHit', 'pFA', 'pA', 'pA1', 'pA0', 'pYES', 'CS', 'RT'}; nMetrics = length(namesMetrics);
 namesFeature = {'ORI', 'SF'}; nFeatures = length(namesFeature);
 namesType = {'PRS', 'ABS', 'BOTH'}; nTypes = length(namesType);
 namesLoc2D = {'Fovea', 'Left', 'Upper', 'Right', 'Lower'};
@@ -287,7 +288,10 @@ namesTitles3 = {'', 'Meridian', 'Vertical Meridian', 'HM'}; % in black
 % namesCI = {'mean', 'mean norm', 'var', 'var norm'};
 namesIC = {'AIC', 'AICc', 'BIC'}; nICs = length(namesIC);
 publishOptions = struct('format','pdf','outputDir','publishedPDFs/', 'showCode', 0);
-namesDataset = {'TrainingSet', 'FullSet'};
+% namesDataset = {'TrainingSet', 'FullSet'};
+% namesDataset = {'TempSet', 'FullSet'}; % template set, full set (all data)
+namesDataset_full = {'FullSet', 'TmplSet', 'TrainSet', 'TestSet'}; nDatasets_full = length(namesDataset_full); 
+namesDataset = {'TmplSet', 'FullSet'}; nDatasets = length(namesDataset); % needs to matchOOD_xx_compIV ("for iDataset = 1:2")
 
 % Model comparison names
 namesMCmode = {'10-CV', 'LOOCV',   'InfoCriterion'}; nMCmode = length(namesMCmode);
@@ -305,21 +309,21 @@ namesFeature_axis_Tuning = {'Marginalized ORI kernel (a.u.)', 'Marginalized SF k
 % names of the estParams/tuningC
 clear namesTunC_unit_perF
 namesTunC_unit_perF{1,1} = {'Gain (a.u.)', 'Sigma (deg)', 'baseline (a.u.)'};
-% namesTunC_unit_perF{1,2} = {'Pref ORI (deg)', 'peak amp. (a.u.)', 'bandwith (deg)', 'baseline (a.u.)'};
-namesTunC_unit_perF{1,2} = {'peak amp. (a.u.)', 'bandwith (º)', 'baseline (a.u.)'};
+% namesTunC_unit_perF{1,2} = {'Pref ORI (deg)', 'amplitude (a.u.)', 'width (deg)', 'baseline (a.u.)'};
+namesTunC_unit_perF{1,2} = {'amplitude (a.u.)', 'width (º)', 'baseline (a.u.)'};
 namesTunC_unit_perF{2,1} = {'peak SF (cpd)', 'Gain (a.u.)', 'Sigma (cpd)', 'baseline (a.u.)'};
-namesTunC_unit_perF{2,2} = {'peak SF (cpd)', 'peak amp. (a.u.)', 'bandwith (octave)', 'baseline (a.u.)'};
+namesTunC_unit_perF{2,2} = {'peak SF (cpd)', 'amplitude (a.u.)', 'width (octave)', 'baseline (a.u.)'};
 namesTunC_unit_perF{3,1} = {'peak SF (cpd)', 'Gain (a.u.)', 'Sigma (cpd)', 'baseline (a.u.)', 'Truncation (a.u.)'};
-namesTunC_unit_perF{3,2} = {'peak SF (cpd)', 'peak amp. (a.u.)', 'bandwith (octave)', 'baseline (a.u.)', 'Truncation (a.u.)'};
+namesTunC_unit_perF{3,2} = {'peak SF (cpd)', 'amplitude (a.u.)', 'width (octave)', 'baseline (a.u.)', 'Truncation (a.u.)'};
 namesTunC_unit_perF{8,1} = {'Gain 1 (a.u.)', 'Gain 2 (a.u.)', 'Sigma 1 (deg)', 'ratio (a.u.)', 'baseline (a.u.)'};
-namesTunC_unit_perF{8,2} = {'Pref ORI (deg)', 'peak amp. (a.u.)', 'trough ori (deg)', 'trough mag. (a.u.)', 'bandwidth (deg)', 'baseline (a.u.)'};
-namesTunC_unit_perF{12,2} = {'peak SF1 (cpd)', 'peak amp. 1 (a.u.)', 'bandwidth 1 (octave)', 'peak SF2 (cpd)', 'peak amp. 2 (a.u.)', 'bandwidth 2 (octave)'};
-namesTunC_unit_perF{13,2} = {'peak amp. (a.u.)', 'trough ori (deg)', 'trough mag, (a.u.)', 'bandwidth (deg)', 'baseline (a.u.)'};
+namesTunC_unit_perF{8,2} = {'Pref ORI (deg)', 'amplitude (a.u.)', 'trough ori (deg)', 'trough mag. (a.u.)', 'width (deg)', 'baseline (a.u.)'};
+namesTunC_unit_perF{12,2} = {'peak SF1 (cpd)', 'amplitude 1 (a.u.)', 'width 1 (octave)', 'peak SF2 (cpd)', 'amplitude 2 (a.u.)', 'width 2 (octave)'};
+namesTunC_unit_perF{13,2} = {'amplitude (a.u.)', 'trough ori (deg)', 'trough mag, (a.u.)', 'width (deg)', 'baseline (a.u.)'};
 
 namesTunC_noUnit{1,1} = {'Gain', 'Sigma', 'baseline'};
-namesTunC_noUnit{1,2} = {'peak amp.', 'bandwith', 'baseline'};
+namesTunC_noUnit{1,2} = {'amplitude', 'width', 'baseline'};
 namesTunC_noUnit{2,1} = {'peak SF', 'Gain', 'Sigma', 'baseline'};
-namesTunC_noUnit{2,2} = {'peak SF', 'peak amp.', 'bandwith', 'baseline'};
+namesTunC_noUnit{2,2} = {'peak SF', 'amplitude', 'width', 'baseline'};
 
 
 % Colors

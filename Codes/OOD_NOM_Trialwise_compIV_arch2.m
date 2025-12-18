@@ -1,4 +1,4 @@
-function OOD_NOM_Trialwise_compIV(isubj, iLocComb, iModelA, nBoot)
+function OOD_NOM_Trialwise_compIV_temp(isubj, iLocComb, iModelA, nBoot)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % OOD_NOM_Trialwise_compIV.m
 %

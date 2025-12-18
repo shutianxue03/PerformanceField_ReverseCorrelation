@@ -1,4 +1,4 @@
-function OOD_NOM_Trialwise_fitNOM(isubj, iLocComb, iModelA, iModelB, nBoot)
+function OOD_NOM_Trialwise_fitNOM_arch1(isubj, iLocComb, iModelA, iModelB, nBoot)
 %==========================================================================%
 % OOD_NOM_Trialwise_fitNOM.m
 %--------------------------------------------------------------------------
@@ -19,20 +19,21 @@ function OOD_NOM_Trialwise_fitNOM(isubj, iLocComb, iModelA, iModelB, nBoot)
 % - PR_pred_v7(): predicts metrics from IVs and fitted parameters
 %
 % INPUTS
-%       isubj : subject index (for human data), or cell array {name, c_true} for IO simulations.
-%       iLocComb : location combination index
-%       iModelA : template / IV model index (defined in SX_RC1_setting)
-%       iModelB : internal noise / correlation model index (see fxn_getError_v7)
-%       nBoot : number of resampling bootstraps (same as in *_compIV)
+% isubj : subject index (for human data), or cell array {name, c_true}
+% for IO simulations.
+% iLocComb : location combination index
+% iModelA : template / IV model index (defined in SX_RC1_setting)
+% iModelB : internal noise / correlation model index (see fxn_getError_v7)
+% nBoot : number of resampling bootstraps (same as in *_compIV)
 %
 % OUTPUTS
-%       Results are saved to:
-%       nameFile_fitNOM = '<Data_NOM_Trialwise>/<subj>/L<iLocComb>/n<nBoot>_A<iModelA>B<iModelB>.mat'
+% Results are saved to:
+% nameFile_fitNOM = '<Data_NOM_Trialwise>/<subj>/L<iLocComb>/n<nBoot>_A<iModelA>B<iModelB>.mat'
 %
 % Saved variables (appended to *_compIV.mat):
-%       params_est_allBoot : [nBoot x nParams] fitted parameters
-%       nLL_allBoot : [nBoot x 1] negative log-likelihood
-%       pred_metrics_allBoot : {nBoot x 1} predictions from PR_pred_v7
+% params_est_allB : [nBoot x nParams] fitted parameters
+% nLL_allB : [nBoot x 1] negative log-likelihood
+% pred_metrics_allB : {nBoot x 1} predictions from PR_pred_v7
 %
 %==========================================================================%
 
@@ -100,7 +101,7 @@ fprintf(['\nSubject/IO name: %s ' ...
     nBoot);
 
 %% Load trial-wise data and criterion from xx_compIV.mat file
-load(nameFile_compIV, 'data_*allBoot', 'c_zscore*');
+load(nameFile_compIV, 'data_allBoot', 'c_zscore');
 fprintf('\n Loaded xx_compIV.mat for "data_allBoot" and "c_zscore"\n')
 
 %% Parameter vectors per Model B
@@ -144,11 +145,50 @@ switch iModelB
         error('OOD_NOM_Trialwise_fitNOM: Unknown iModelB = %d', iModelB);
 end
 
+% switch iModelB
+%     case 1 % Full model: (1) Nmul + (2) SDadd + (3) rho [the best model]
+%         params0 = [NOMp1_0, NOMp2_0, NOMp3_0];
+%         params_lb = [NOMp1_lb, NOMp2_lb, NOMp3_lb];
+%         params_ub = [NOMp1_ub, NOMp2_ub, NOMp3_ub];
+% 
+%     case 2 % Nmul + SDadd (no rho)
+%         params0 = [NOMp1_0, NOMp2_0];
+%         params_lb = [NOMp1_lb, NOMp2_lb];
+%         params_ub = [NOMp1_ub, NOMp2_ub];
+% 
+%     case 3 % SDadd + rho (no Nmul)
+%         params0 = [NOMp2_0, NOMp3_0];
+%         params_lb = [NOMp2_lb, NOMp3_lb];
+%         params_ub = [NOMp2_ub, NOMp3_ub];
+% 
+%     case 4 % Nmul + rho (no SDadd)
+%         params0 = [NOMp1_0, NOMp3_0];
+%         params_lb = [NOMp1_lb, NOMp3_lb];
+%         params_ub = [NOMp1_ub, NOMp3_ub];
+% 
+%     case 5 % SDadd only
+%         params0 = [NOMp2_0];
+%         params_lb = [NOMp2_lb];
+%         params_ub = [NOMp2_ub];
+% 
+%     case 6 % Nmul only
+%         params0 = [NOMp1_0];
+%         params_lb = [NOMp1_lb];
+%         params_ub = [NOMp1_ub];
+% 
+%     case 7 % rho only (no internal noise) [the worst model]
+%         params0 = [NOMp3_0];
+%         params_lb = [NOMp3_lb];
+%         params_ub = [NOMp3_ub];
+% 
+%     otherwise
+%         error('OOD_NOM_Trialwise_fitNOM: Unknown iModelB = %d', iModelB);
+% end
+
 %% Preallocate outputs
 nParams = length(namesModelBparams{iModelB});
 params_est_allBoot = nan(nBoot, nParams);
-nLL_train_allBoot = nan(nBoot, 1);
-nLL_test_allBoot = nLL_train_allBoot;
+nLL_allBoot = nan(nBoot, 1);
 pred_metrics_allBoot = cell(nBoot, 1);
 
 %% Main estimation loop across bootstraps
@@ -159,14 +199,13 @@ for iBoot = 1:nBoot
 
     fprintf('%d... ', iBoot);
 
-    % Extract the training and test set 
-    data_train = data_train_allBoot{iBoot}; % (for estimating params)
-    data_test = data_test_allBoot{iBoot}; % for predicting metrics and calculating nLL
-    
+    % Extract data
+    data = data_allBoot{iBoot};
+
     % if any(iModelB == [1,3,4,7]) % Fit all params separately: for ModelBs with rho
     %     % Objective function for optimizer: nLL from trial-wise pYES + pairwise pA
     %     iStep = 1;
-    %     fxn_estParams = @(paramsNOM) fxn_getError_v7(iModelB, paramsNOM, data_train, c_zscore_train, iStep);
+    %     fxn_estParams = @(paramsNOM) fxn_getError_v7(iModelB, paramsNOM, data, c_zscore, iStep);
     %     switch iModelB
     %         case 1, params0_step1 = params0(1:2); params_lb_step1 = params_lb(1:2); params_ub_step1 = params_ub(1:2);
     %         case 3, params0_step1 = params0(1); params_lb_step1 = params_lb(1); params_ub_step1 = params_ub(1);
@@ -181,7 +220,7 @@ for iBoot = 1:nBoot
     %     end
     % 
     %     iStep = 2;
-    %     fxn_estParams = @(paramsNOM) fxn_getError_v7(iModelB, paramsNOM, data_train, c_zscore_train, iStep, params_est_step1);
+    %     fxn_estParams = @(paramsNOM) fxn_getError_v7(iModelB, paramsNOM, data, c_zscore, iStep, params_est_step1);
     %     switch iModelB
     %         case 1, params0_step2 = params0(3); params_lb_step2 = params_lb(3); params_ub_step2 = params_ub(3);
     %         case 3, params0_step2 = params0(2); params_lb_step2 = params_lb(2); params_ub_step2 = params_ub(2);
@@ -200,29 +239,25 @@ for iBoot = 1:nBoot
     % else % Fit all params together
         iStep = 0;
         % fxn_estParams = @(paramsNOM) fxn_getError_v7(iModelB, paramsNOM, data, c_zscore, iStep); % the full model has induced, constant noise and rho (two passes are correlated)
-        fxn_estParams = @(paramsNOM) fxn_getError_v8(iModelB, paramsNOM, data_train, c_zscore_train, iStep); % the full model has induced, constant noise (shared and independent across passes)
+        fxn_estParams = @(paramsNOM) fxn_getError_v8(iModelB, paramsNOM, data, c_zscore, iStep); % the full model has induced, constant noise (shared and independent across passes)
 
         % Estimate parameters
         if flag_fminconORbads == 1 % Faster, local search
-            [params_est, nLL_train] = fmincon(fxn_estParams, params0, [], [], [], [], params_lb, params_ub, [], options_fmin);
+            [params_est, nLL] = fmincon(fxn_estParams, params0, [], [], [], [], params_lb, params_ub, [], options_fmin);
         else % BADS: more robust global + local search
-            [params_est, nLL_train] = bads(fxn_estParams, params0, params_lb, params_ub, [], [], [], options_bads);
+            [params_est, nLL] = bads(fxn_estParams, params0, params_lb, params_ub, [], [], [], options_bads);
         end
     % end
 
     % Compile
     params_est_allBoot(iBoot, :) = params_est(:).';
-    nLL_train_allBoot(iBoot) = nLL_train;
-    pred_train = PR_pred_v8(iModelB, params_est, data_train, c_zscore_train, nBins, flag_plot_perIter);
+    nLL_allBoot(iBoot) = nLL;
 
-    % Calculate nLL for the test set
-    nLL_test = fxn_getError_v8(iModelB, params_est, data_test, c_zscore_test, iStep);
-    nLL_test_allBoot(iBoot) = nLL_test;
-    
     % Predict binned metrics from estimated parameters
-    pred_test = PR_pred_v8(iModelB, params_est, data_test, c_zscore_test, nBins, flag_plot_perIter);
-    pred_metrics_allBoot{iBoot} = pred_test;
-    
+    % pred = PR_pred_v7(iModelB, params_est, data, c_zscore, nBins, flag_plot_perIter);
+    pred = PR_pred_v8(iModelB, params_est, data, c_zscore, nBins, flag_plot_perIter);
+    pred_metrics_allBoot{iBoot} = pred;
+
 end % end of iBoot
 
 % fprintf('\n\nAll bootstraps DONE\n');
@@ -234,7 +269,7 @@ fprintf('\n========== Fitting saved ==========\n\n\n\n\n');
 
 %%
 if flag_plot_allIter
-    NOMplot_fitNOM;
+    % NOMplot_fitNOM;
 end
 close all;
 

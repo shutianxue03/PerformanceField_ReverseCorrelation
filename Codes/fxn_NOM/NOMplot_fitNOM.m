@@ -2,6 +2,8 @@
 % This script generates plots for the estimated parameters and prediction metrics of the Noisy Observer Model (NOM).
 
 %% Compile data and pred for all iterations and bins
+pred = pred_test;
+
 pYES_data_allBins = nan(nBoot, nBins);
 pYES_pred_allBins = pYES_data_allBins;
 pC_data_allBins = pYES_data_allBins;
@@ -27,10 +29,12 @@ for iBoot = 1:nBoot
     pA_data_allBins(iBoot, :) = pred_metrics_allBoot{iBoot}.metrics.pA_data_allBins;
     pA_pred_allBins(iBoot, :) = pred_metrics_allBoot{iBoot}.metrics.pA_pred_allBins;
 
-    nData_allBins(iBoot, :) = data_allBoot{iBoot}.nTrials_allBins;
+    nData_allBins(iBoot, :) = data_test_allBoot{iBoot}.nTrials_allBins;
 end
 
-%% pYES/pC/pA as a fxn of binned IV
+fprintf('\n *** Compiling DONE, READY to plot ***\n ')
+
+%% 1. pYES/pC/pA as a fxn of binned IV
 [IV_allBins_med] = getCI(IV_allBins_all, 1, 1);
 [nData_allB_med] = getCI(nData_allBins, 1, 1);
 % Obtain median and CI of data across iteractions (dot+errorbars)
@@ -105,32 +109,70 @@ r_pA = corr(pA_pred_med', pA_data_med');
 R2_pA = 1 - sum((pA_data_med - pA_pred_med).^2) / sum((pA_data_med - mean(pA_data_med)).^2);
 title(sprintf('pA (r=%.2f, R²=%.2f)', r_pA, R2_pA));
 
-sgtitle(sprintf('Figure 1. Metrics as a fxn of binned IV\n%s (ModelA%dB%d %s, niterations=%d)', ...
-    subjName, iModelA, iModelB, namesModelB{iModelB}, nBoot))
+sgtitle(sprintf('Figure 1. Metrics vs. binned IV\n%s (ModelA%dB%d %s, L%d, nBoot=%d)', ...
+    subjName, iModelA, iModelB, namesModelB{iModelB}, iLocComb, nBoot))
 
 saveas(gcf, sprintf('%s/3Metrics_%s_L%d_A%dB%d.jpg', nameFolder_Figures_NOM, subjName, iLocComb, iModelA, iModelB))
 
-%% Plot estimated parameters across iterations
+%% 2. Plot estimated parameters across iterations
 
 figure('Position', [100,100,nParams*400,400]);
-for iParam = 1:nParams
+for iParamFreeze = 1:nParams
 
-    subplot(1, nParams, iParam); hold on
-    plot(params_est_allBoot(:, iParam), '-o');
-    yline(nanmean(params_est_allBoot(:, iParam)), 'k-')
+    subplot(1, nParams, iParamFreeze); hold on
+    plot(params_est_allBoot(:, iParamFreeze), '-o');
+    yline(nanmean(params_est_allBoot(:, iParamFreeze)), 'k-')
 
     % Load and plot the true param
     % load(sprintf('%s/truth.mat', nameFolder_OOD_load), 'noiseP_true')
     % yline(noiseP_true, 'r-'); % should match noiseP defined in OOD_sim
 
-    ylim([params_lb(iParam), params_ub(iParam)])
+    ylim([params_lb(iParamFreeze), params_ub(iParamFreeze)])
     xlabel('Bootstrap');
-    ylabel(namesModelBparams{iModelB}{iParam});
-    title(['Parameter: ', namesModelBparams{iModelB}{iParam}]);
+    ylabel(namesModelBparams{iModelB}{iParamFreeze});
+    title(['Parameter: ', namesModelBparams{iModelB}{iParamFreeze}]);
 
 end
 
-sgtitle(sprintf('Figure 2. Estimated Parameters Across Bootstraps\n%s (ModelA%dB%d %s, niterations=%d)', ...
-    subjName, iModelA, iModelB, namesModelB{iModelB}, nBoot))
+sgtitle(sprintf('Figure 2. Estimated Parameters Across Bootstraps\n%s (ModelA%dB%d %s, L%d, nBoot=%d)', ...
+    subjName, iModelA, iModelB, namesModelB{iModelB}, iLocComb, nBoot))
 
 saveas(gcf, sprintf('%s/4Params_%s_L%d_A%dB%d.jpg', nameFolder_Figures_NOM, subjName, iLocComb, iModelA, iModelB))
+
+%% 3. Freeze other params and vary one param to see its corr with pA
+figure('Position', [0 0 1e3 300])
+
+for iParamFreeze = 1:nParams
+    NOM_grid = linspace(params_lb(iParamFreeze), params_ub(iParamFreeze), 20);
+    pA_mean = nan(size(NOM_grid));
+    for i = 1:numel(NOM_grid)
+        NOM_test = NOM_grid(i);
+
+        switch nParams
+            case 3
+                switch iParamFreeze
+                    case 1, params_test  = [NOM_test, params_est(2), params_est(3)]; % iModelB = 1
+                    case 2, params_test  = [params_est(1), NOM_test, params_est(3)]; % iModelB = 1
+                    case 3, params_test  = [params_est(1), params_est(2), NOM_test]; % iModelB = 1
+                end
+            case 2
+                switch iParamFreeze
+                    case 1, params_test  = [NOM_test, params_est(2)]; % iModelB = 2
+                    case 2, params_test  = [params_est(1), NOM_test]; % iModelB = 2
+                end
+        end
+        [~, pA_pred_allPairs, ~] = fxn_predMetrics_v2(iModelB, params_test, data_test, c_zscore_test);
+        pA_mean(i) = mean(pA_pred_allPairs);
+
+        subplot(1,nParams, iParamFreeze)
+        plot(NOM_grid, pA_mean, '-o');
+        ylim([.5, 1])
+        xlabel(sprintf('Only Vary %s', namesModelBparams{iModelB}{iParamFreeze})); 
+        ylabel('Mean pA_{pred}');
+    end
+end
+
+sgtitle(sprintf('Figure 3. Vary one param (and freeze others) to see its corr with pA\n%s (ModelA%dB%d %s, L%d, nBoot=%d)', ...
+    subjName, iModelA, iModelB, namesModelB{iModelB}, iLocComb, nBoot))
+
+saveas(gcf, sprintf('%s/3FreezeCorr_%s_L%d_A%dB%d.jpg', nameFolder_Figures_NOM, subjName, iLocComb, iModelA, iModelB))

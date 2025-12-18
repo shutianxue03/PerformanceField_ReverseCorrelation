@@ -16,9 +16,9 @@ function [pYES_pred_allT, pA_pred_allPairs, consistency_allPairs] = fxn_predMetr
 % c_zscore : criterion in z units (scaled by sigma_pred and added to median(IV))
 %
 % New parameterization:
-% Nmul : multiplicative (induced) noise coefficient
-% SDidpdt : constant independent noise (across passes)
-% SDshared : constant shared noise (across passes)
+% Nmul : multiplicative (Multi) noise coefficient
+% SDidpdt : Private noise (across passes)
+% SDshared : Shared noise (across passes)
 %
 % DV correlation across passes is implied by SDshared, not fit as rho.
 
@@ -26,42 +26,42 @@ function [pYES_pred_allT, pA_pred_allPairs, consistency_allPairs] = fxn_predMetr
 lambda = 0; % Set lapse rate at 0
 
 % Default values (in case a component is absent in a reduced model)
-Nmul = 1e-10;
-sigma_idpdt = 1e-10;
-sigma_shared = 1e-10;
+Nmul = 0;
+sigma_priv = 0;
+sigma_shared = 0;
 
 switch iModelB
-    case 1 % FullModel: Induced + constant independent + constant shared
+    case 1 % FullModel: Multi + Private + Shared
         Nmul = params_est(1);
-        sigma_idpdt = params_est(2);
+        sigma_priv = params_est(2);
         sigma_shared = params_est(3);
 
-    case 2 % NoSharedN: Induced + constant independent (no shared noise)
+    case 2 % NoSharedN: Multi + Private (no shared var)
         Nmul = params_est(1);
-        sigma_idpdt = params_est(2);
+        sigma_priv = params_est(2);
         % sigma_shared = 0;
 
-    case 3 % NoInducedN: constant independent + constant shared (no induced noise)
+    case 3 % NoMultiN: Private + Shared (no Multi var)
         % Nmul = 0;
-        sigma_idpdt = params_est(1);
+        sigma_priv = params_est(1);
         sigma_shared = params_est(2);
 
-    case 4 % NoIdpdtN: Induced + constant shared (no independent constant noise)
+    case 4 % NoPrivN: Multi + Shared (no private var)
         Nmul = params_est(1);
         % sigma_idpdt = 0;
         sigma_shared = params_est(2);
 
-    case 5 % JustIdpdtN: constant independent only
+    case 5 % JustPrivN: Private only
         Nmul = 0;
-        sigma_idpdt = params_est(1);
+        sigma_priv = params_est(1);
         % sigma_shared = 0;
 
-    case 6 % JustInducedN: induced only
+    case 6 % JustMultiN: Multi only
         Nmul = params_est(1);
         % sigma_idpdt = 0;
         % sigma_shared = 0;
 
-    case 7 % JustSharedM: constant shared only
+    case 7 % JustSharedM: Shared only
         % Nmul = 0;
         % sigma_idpdt = 0;
         sigma_shared = params_est(1);
@@ -83,10 +83,10 @@ end
 %% -------- 3. Predict sigma and criterion (per trial) --------
 
 % Constant variance (shared + independent)
-sigma_const = sigma_shared^2 + sigma_idpdt^2;
+var_const = sigma_shared^2 + sigma_priv^2;
 
-% Trial-wise total noise SD (constant + induced)
-sigma_pred_allT = sqrt( sigma_const + (Nmul .* IV_allT).^2 ); % nTrials x 1
+% Trial-wise total noise SD (constant + Multi)
+sigma_pred_allT = sqrt( var_const + (Nmul .* IV_allT).^2 ); % nTrials x 1
 
 % Avoid exactly zero variance (mvncdf & normcdf can be unhappy)
 sigma_pred_allT = max(sigma_pred_allT, 1e-6);
@@ -97,8 +97,7 @@ criterion_allT = median(IV_allT) + c_zscore .* sigma_pred_allT;
 
 %% -------- 4. Predicted pYES per trial --------
 
-pYES_pred_allT = lambda/2 + (1 - lambda) .* ...
-    (1 - normcdf(criterion_allT, IV_allT, sigma_pred_allT));
+pYES_pred_allT = lambda/2 + (1 - lambda) .* (1 - normcdf(criterion_allT, IV_allT, sigma_pred_allT));
 
 % Safety: clamp probabilities away from 0 and 1
 pYES_pred_allT = min(max(pYES_pred_allT, eps), 1 - eps);
@@ -117,13 +116,13 @@ for iUnik = 1:nPairs
         error('fxn_predMetrics_v2: Each iPair should have exactly 2 trials (found %d).', numel(idx));
     end
 
-    PassA = idx(1);
-    PassB = idx(2);
+    indPassA = idx(1);
+    indPassB = idx(2);
 
-    pairIdx(iUnik,:) = [PassA, PassB];
+    pairIdx(iUnik,:) = [indPassA, indPassB];
 
-    respA = resp_allT(PassA);
-    respB = resp_allT(PassB);
+    respA = resp_allT(indPassA);
+    respB = resp_allT(indPassB);
     consistency_allPairs(iUnik) = (respA == respB);
 end
 
@@ -137,39 +136,31 @@ YY_lb = [0, 0]; YY_ub = [Inf, Inf]; % both YES
 NN_lb = [-Inf, -Inf]; NN_ub = [0, 0]; % both NO
 
 for iUnik = 1:nPairs
-    PassA = pairIdx(iUnik,1);
-    PassB = pairIdx(iUnik,2);
+    indPassA = pairIdx(iUnik,1);
+    indPassB = pairIdx(iUnik,2);
 
     % Center DVs relative to criterion:
-    mu_passA = IV_allT(PassA) - criterion_allT(PassA);
-    mu_passB = IV_allT(PassB) - criterion_allT(PassB);
+    mu_passA = IV_allT(indPassA) - criterion_allT(indPassA);
+    mu_passB = IV_allT(indPassB) - criterion_allT(indPassB);
 
-    % Total variance per pass: constant (shared + independent) + induced
-    IV_passA = IV_allT(PassA);
-    IV_passB = IV_allT(PassB);
-
-    sigma_passA2 = sigma_const + (Nmul * IV_passA)^2;
-    sigma_passB2 = sigma_const + (Nmul * IV_passB)^2;
+    % Total variance per pass (constant (shared + private) + multiplicative)
+    var_total_passA = var_const + (Nmul * IV_allT(indPassA))^2;
+    var_total_passB = var_const + (Nmul * IV_allT(indPassB))^2;
 
     % Enforce strictly positive variances
-    sigma_passA2 = max(sigma_passA2, 1e-10);
-    sigma_passB2 = max(sigma_passB2, 1e-10);
+    var_total_passA = max(var_total_passA, 1e-10);
+    var_total_passB = max(var_total_passB, 1e-10);
 
     % Covariance comes only from the shared constant noise
-    % (independent constant + induced noise are independent across passes)
     CovAB = sigma_shared^2;
-
+    
     % --- CAP: enforce positive definiteness ---
-    % The shared variance (CovAB^2 ) has to be smaller than the total
-    % variance (sigmaA2^2 * sigmaB2^2)
-    CovAB_max = 0.999 * sqrt(sigma_passA2 * sigma_passB2); % 0.999 to stay strictly inside
-    if abs(CovAB) > CovAB_max
-        CovAB = sign(CovAB) * CovAB_max;
-    end
+    % Need CovAB^2 < varA * varB; sufficient to enforce CovAB < min(varA,varB).”
+    CovAB = min(CovAB, 0.999 * min(var_total_passA, var_total_passB));
 
     % Create the covariance matrix
-    CovMtx = [ sigma_passA2, CovAB; ...
-        CovAB, sigma_passB2 ];
+    CovMtx = [ var_total_passA, CovAB; ...
+        CovAB, var_total_passB ];
 
     % P(both YES)
     P_YY = mvncdf(YY_lb, YY_ub, [mu_passA, mu_passB], CovMtx);
