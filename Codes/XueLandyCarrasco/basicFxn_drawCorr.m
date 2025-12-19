@@ -45,19 +45,22 @@ end
 % [y_ave, ~, ~, y_sem] = getCI(y_med_0mean_allSubj, 2, 1);
 
 %%
-figure('Position', [0 200 1e3 1e3]); 
+figure('Position', [0 200 1e3 1e3]);
 hold on, box on
 
 %% idvd data
 for iLoc = 1:nLoc
     for isubj = 1:nsubj
-        %         if isubj<=nMarkerMax,
-        faceColor = 'w'; edgeColor = colors(iLoc, :);
-        % else, 
-            faceColor = colors(iLoc, :); edgeColor = 'w';
-    % end
-        plot(x_med_0mean_allSubj(isubj, iLoc), y_med_0mean_allSubj(isubj, iLoc),  markers_allSubj{isubj}, 'markerfacecolor',faceColor, ...
-            'markeredgecolor', edgeColor, 'markersize', sz_marker, 'linewidth', wd_border)
+        if ismember(markers_allSubj{isubj}, {'+','x','*','.'})   % markers with no face
+            color_face = 'w';             % (or 'w' if you prefer)
+            color_edge = colors(iLoc, :);
+        else
+            color_face = colors(iLoc, :);
+            color_edge = 'w';
+        end
+        plot(x_med_0mean_allSubj(isubj, iLoc), y_med_0mean_allSubj(isubj, iLoc),  ...
+            markers_allSubj{isubj}, 'markerfacecolor', color_face, 'markeredgecolor', color_edge, ...
+            'markersize', sz_marker, 'linewidth', wd_border)
     end % isubj
 end % iLoc
 
@@ -85,17 +88,17 @@ str_sig='_ns'; if p_partial<.05, str_sig='_sig'; elseif p_partial<.1, str_sig = 
 text_corr_perL = [];
 for iLoc = 1:nLoc
     [r, p] = corr(x_med_allSubj(:, iLoc), y_med_allSubj(:, iLoc));
-    text_corr_perL = [text_corr_perL, sprintf('L%d: r=%.2f, p=%.3f |', iLoc, r, p)];
+    text_corr_perL = [text_corr_perL, sprintf('L%d: r=%.2f, p=%.3f | ', iLoc, r, p)];
 
     if p<.05, lineStyle = '-'; else, lineStyle = '--'; end
-     % lineStyle = '-'
+    % lineStyle = '-'
     % Plot linear regression for each loc/condition
     lm = polyfit(x_med_allSubj(:, iLoc), y_med_allSubj(:, iLoc), 1);
     x_lm2 = linspace(min(x_med_allSubj(:, iLoc)), max(x_med_allSubj(:, iLoc)), 2);
     yfit = polyval(lm, x_lm2);
     eta2 = var(polyval(lm, x_med_allSubj(:, iLoc)))/var(y_med_allSubj(:, iLoc));
     % if p_partial<.1
-        % plot(x_lm2, yfit, lineStyle, 'color', colors(iLoc, :), 'handlevisibility', 'off', 'linewidth', wd_border * 1);
+    % plot(x_lm2, yfit, lineStyle, 'color', colors(iLoc, :), 'handlevisibility', 'off', 'linewidth', wd_border * 1);
     % end
 
 end
@@ -127,7 +130,3 @@ ax.LineWidth = wd_border;
 str_title = sprintf('%s\nPartial r = %.2f (p = %.3f) eta^2=%.2f\n%s', ...
     text_title, r_partial, p_partial, eta2, text_corr_perL);
 title(str_title)
-
-
-
-

@@ -32,8 +32,8 @@ SX_RC1_setting
 %-------------%
 subjList = {'YK', 'SP', 'SX', 'LS', 'RE', 'MD', 'AS', 'HL', 'FH', 'HA',  'DT', 'CS', 'DU', 'SR', 'RC'};
 nblocks_allSubj = [200, 240, 210, 240, 220, 220, 215, 220, 205, 210, 205, 205, 205, 195, 205];
-subjList = {'SX',  'CS'};
-nblocks_allSubj = [ 210, 205];
+subjList = {'HL'};
+nblocks_allSubj = [220];
 nsubj = length(subjList);
 
 ib_start = 1; % do NOT change!
