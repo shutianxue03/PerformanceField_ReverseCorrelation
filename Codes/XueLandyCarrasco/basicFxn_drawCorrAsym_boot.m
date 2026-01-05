@@ -64,7 +64,7 @@ assert(nSubj2 == nSubj, 'ALERT: Cannot reconcile nSubj from markers with X/Y siz
 % X_med = X_med(:); X_lb = X_lb(:); X_ub = X_ub(:);
 % Y_med = Y_med(:); Y_lb = Y_lb(:); Y_ub = Y_ub(:);
 
-%% ---- Plot ----
+%% Plot individual data
 figure('Position', [0 200 1e3 1e3]); hold on; box on
 
 for iSubj = 1:nSubj
@@ -95,6 +95,12 @@ for iSubj = 1:nSubj
         'MarkerFaceColor', faceColor, 'MarkerEdgeColor', edgeColor, ...
         'MarkerSize', sz_marker, 'LineWidth', wd_border);
 end % iSubj
+
+%% Plot group averages
+[X_ave, ~, ~, X_sem] = getCI(X_med(:), 2, 1);
+[Y_ave, ~, ~, Y_sem] = getCI(Y_med(:), 2, 1);
+errorbar(X_ave, Y_ave, X_sem, 'horizontal', 'k.', 'LineWidth', wd_border*2);
+errorbar(X_ave, Y_ave, Y_sem, 'vertical', 'k.', 'LineWidth', wd_border*2);
 
 %% Linear regression on median points (reference line)
 lm_med = polyfit(X_med, Y_med, 1);

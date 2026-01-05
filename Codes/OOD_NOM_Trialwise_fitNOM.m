@@ -163,41 +163,47 @@ for iBoot = 1:nBoot
     data_train = data_train_allBoot{iBoot}; % (for estimating params)
     data_test = data_test_allBoot{iBoot}; % for predicting metrics and calculating nLL
     
-    % if any(iModelB == [1,3,4,7]) % Fit all params separately: for ModelBs with rho
-    %     % Objective function for optimizer: nLL from trial-wise pYES + pairwise pA
-    %     iStep = 1;
-    %     fxn_estParams = @(paramsNOM) fxn_getError_v7(iModelB, paramsNOM, data_train, c_zscore_train, iStep);
-    %     switch iModelB
-    %         case 1, params0_step1 = params0(1:2); params_lb_step1 = params_lb(1:2); params_ub_step1 = params_ub(1:2);
-    %         case 3, params0_step1 = params0(1); params_lb_step1 = params_lb(1); params_ub_step1 = params_ub(1);
-    %         case 4, params0_step1 = params0(1); params_lb_step1 = params_lb(1); params_ub_step1 = params_ub(1);
-    %         case 7, error('ALERT: we are no longer fitting iModelB=7 (no noise)')
-    %     end
-    %     % Estimate parameters
-    %     if flag_fminconORbads == 1 % Faster, local search
-    %         [params_est_step1, nLL_step1] = fmincon(fxn_estParams, params0_step1, [], [], [], [], params_lb_step1, params_ub_step1, [], options_fmin);
-    %     else % BADS: more robust global + local search
-    %         [params_est_step1, nLL_step1] = bads(fxn_estParams, params0_step1, params_lb_step1, params_ub_step1, [], [], [], options_bads);
-    %     end
-    % 
-    %     iStep = 2;
-    %     fxn_estParams = @(paramsNOM) fxn_getError_v7(iModelB, paramsNOM, data_train, c_zscore_train, iStep, params_est_step1);
-    %     switch iModelB
-    %         case 1, params0_step2 = params0(3); params_lb_step2 = params_lb(3); params_ub_step2 = params_ub(3);
-    %         case 3, params0_step2 = params0(2); params_lb_step2 = params_lb(2); params_ub_step2 = params_ub(2);
-    %         case 4, params0_step2 = params0(2); params_lb_step2 = params_lb(2); params_ub_step2 = params_ub(2);
-    %         case 7, error('ALERT: we are no longer fitting iModelB=7 (no noise)')
-    %     end
-    %     % Estimate parameters
-    %     if flag_fminconORbads == 1 % Faster, local search
-    %         [params_est_step2, nLL_step2] = fmincon(fxn_estParams, params0_step2, [], [], [], [], params_lb_step2, params_ub_step2, [], options_fmin);
-    %     else % BADS: more robust global + local search
-    %         [params_est_step2, nLL_step2] = bads(fxn_estParams, params0_step2, params_lb_step2, params_ub_step2, [], [], [], options_bads);
-    %     end
-    %     params_est = [params_est_step1, params_est_step2];
-    %     nLL = nLL_step1+nLL_step2;
+    % Objective function for optimizer: nLL from trial-wise pYES + pairwise pA
+    if any(iModelB == [1,3,4,7]) % Two-stage fitting: stabilize models that include a shared component across two passes
+        
+        % ==== Step 1: fit the “base” noise terms (excluding the shared term) ====
+        iStep = 1;
+            fxn_estParams = @(paramsNOM) fxn_getError_v8(iModelB, paramsNOM, data_train, c_zscore_train, iStep); % the full model has induced, constant noise (shared and independent across passes)
+        switch iModelB
+            case 1, indStep1=1:2;
+            case 3, indStep1=1;
+            case 4, indStep1=1;
+            case 7, error('ALERT: we are no longer fitting iModelB=7 (no noise)')
+        end
+        params0_step1 = params0(indStep1); params_lb_step1 = params_lb(indStep1); params_ub_step1 = params_ub(indStep1);
+        % Estimate parameters
+        if flag_fminconORbads == 1 % Faster, local search
+            [params_est_fromStep1, nLL_step1] = fmincon(fxn_estParams, params0_step1, [], [], [], [], params_lb_step1, params_ub_step1, [], options_fmin);
+        else % BADS: more robust global + local search
+            [params_est_fromStep1, nLL_step1] = bads(fxn_estParams, params0_step1, params_lb_step1, params_ub_step1, [], [], [], options_bads);
+        end
 
-    % else % Fit all params together
+        % ==== Step 2. Fix the Step-1 estimates and fit the shared term ====
+        iStep = 2;
+        fxn_estParams = @(paramsNOM) fxn_getError_v8(iModelB, paramsNOM, data_train, c_zscore_train, iStep, params_est_fromStep1); % the full model has induced, constant noise (shared and independent across passes)
+        switch iModelB
+            case 1, indStep2=3;
+            case 3, indStep2=2;
+            case 4, indStep2=2;
+            case 7, error('ALERT: we are no longer fitting iModelB=7 (no noise)')
+        end
+        params0_step2 = params0(indStep2); params_lb_step2 = params_lb(indStep2); params_ub_step2 = params_ub(indStep2);
+
+        % Estimate parameters
+        if flag_fminconORbads == 1 % Faster, local search
+            [params_est_step2, nLL_step2] = fmincon(fxn_estParams, params0_step2, [], [], [], [], params_lb_step2, params_ub_step2, [], options_fmin);
+        else % BADS: more robust global + local search
+            [params_est_step2, nLL_step2] = bads(fxn_estParams, params0_step2, params_lb_step2, params_ub_step2, [], [], [], options_bads);
+        end
+        params_est = [params_est_fromStep1, params_est_step2];
+        nLL_train = nLL_step1+nLL_step2;
+
+    else % Fit all params together
         iStep = 0;
         % fxn_estParams = @(paramsNOM) fxn_getError_v7(iModelB, paramsNOM, data, c_zscore, iStep); % the full model has induced, constant noise and rho (two passes are correlated)
         fxn_estParams = @(paramsNOM) fxn_getError_v8(iModelB, paramsNOM, data_train, c_zscore_train, iStep); % the full model has induced, constant noise (shared and independent across passes)
@@ -208,7 +214,7 @@ for iBoot = 1:nBoot
         else % BADS: more robust global + local search
             [params_est, nLL_train] = bads(fxn_estParams, params0, params_lb, params_ub, [], [], [], options_bads);
         end
-    % end
+    end
 
     % Compile
     params_est_allBoot(iBoot, :) = params_est(:).';

@@ -24,14 +24,14 @@ switch iStep
         % Step 1: Predict pYES and estimate only the internal noise parameter
         % append rho=0
         if find(iModelB==[1,3,4,7]), params_est = [params_est, 0]; end
-        [pYES_pred_allT] = fxn_predMetrics(iModelB, params_est, data, c_zscore);
+        [pYES_pred_allT] = fxn_predMetrics_v2(iModelB, params_est, data, c_zscore);
         % Calculate nLL based on pYES
         nLL = -sum( resp_allT .* log(pYES_pred_allT) + (1 - resp_allT) .* log(1 - pYES_pred_allT) );
         
     case 2
         % Step 2: Predict pA and estimate only rho
         params_est = [params_fromStep1, params_est];
-        [~, pA_pred_allPairs, consistency_allPairs] = fxn_predMetrics(iModelB, params_est, data, c_zscore);
+        [~, pA_pred_allPairs, consistency_allPairs] = fxn_predMetrics_v2(iModelB, params_est, data, c_zscore);
 
         % Calculate nLL based on pA
         nLL = -sum( consistency_allPairs .* log(pA_pred_allPairs) + (1 - consistency_allPairs) .* log(1 - pA_pred_allPairs) );
