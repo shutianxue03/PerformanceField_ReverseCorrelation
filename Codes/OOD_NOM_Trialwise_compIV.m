@@ -292,8 +292,7 @@ for iBoot = 1:nBoot
 
     fprintf('%d... ', iBoot);
 
-    %% 1. Resample trials into FULL or TRAIN / TEST
-    % For combined locations, trials are resampled within each location, and DOWNsampled (to equate number of pairs per loc, like for fovea (1 single loc) vs. perifovea (4 single loc)).
+    %% 1. Resample trials into FULL or TEMPLATE/TRAIN / TEST
     %----------------%
     fxn_resampleTrials;
     %----------------%

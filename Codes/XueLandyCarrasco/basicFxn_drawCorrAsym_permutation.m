@@ -1,15 +1,14 @@
-function basicFxn_drawCorrAsym_boot(X_allBoot_allSubj, Y_allBoot_allSubj, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj)
+function basicFxn_drawCorrAsym_permutation(X_allIter_allSubj, Y_allIter_allSubj, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj)
 
 % =========================================================================
-% basicFxn_drawCorrAsym_boot.m
+% basicFxn_drawCorrAsym_permutation.m
 %
 % Purpose
-%   Plot and compare *asymmetry* metrics between two measurements (X vs Y)
-%   across observers, while propagating bootstrap uncertainty.
+%   Plot and compare *asymmetry* metrics between two measurements (X vs Y) across observers
 %
 % Inputs (canonical / recommended)
-%   asymX_allBoot_allSubj : [nBoot x nSubj] bootstrap samples for X asymmetry
-%   asymY_allBoot_allSubj : [nBoot x nSubj] bootstrap samples for Y asymmetry
+%   asymX_allIter_allSubj : [nIter x nSubj] 
+%   asymY_allIter_allSubj : [nIter x nSubj] 
 %
 %   x_ticks, y_ticks       : vectors (e.g., 5 values) for tick locations
 %   x_ticklabels, y_ticklabels : tick labels (numeric or cellstr)
@@ -22,13 +21,10 @@ function basicFxn_drawCorrAsym_boot(X_allBoot_allSubj, Y_allBoot_allSubj, x_tick
 %   markers_allSubj      : {nSubj x 1} marker strings (e.g., {'o','s',...})
 %
 % Outputs
-%   str_sig   : '_sig' / '_mg' / '_ns' based on median p-value across boots
+%   str_sig   : '_sig' / '_mg' / '_ns' based on median p-value across iterations
 %   str_title : full title string including r/p medians and CIs
-%   stats     : struct with medians, CIs, and bootstrap distributions
+%   stats     : struct with medians, CIs, and distributions
 %
-% Notes
-%   - Uses getCI.m to summarize bootstrap distributions (median + CI).
-%   - If you pass [nSubj x nBoot], the function will auto-permute.
 % =========================================================================
 
 %% ---- Figure settings ----
@@ -38,28 +34,28 @@ fsz_ticks = 45;
 sz_marker = 40;
 CI_level = .90; % CI range for stats only! Default for plotting is .68; use 90% because of oone-tailed correlation
 
-%% ---- Validate / canonicalize shapes to [nBoot x nSubj] ----
-assert(ndims(X_allBoot_allSubj) <= 2 && ndims(Y_allBoot_allSubj) <= 2, ...
-    'ALERT: X/Y asym inputs must be 2D: [nBoot x nSubj] (or [nSubj x nBoot]).');
+%% ---- Validate / canonicalize shapes to [nIter x nSubj] ----
+assert(ndims(X_allIter_allSubj) <= 2 && ndims(Y_allIter_allSubj) <= 2, ...
+    'ALERT: X/Y asym inputs must be 2D: [nIter x nSubj] (or [nSubj x nIter]).');
 
 % Determine nSubj from markers
 nSubj = numel(markers_allSubj);
 
-% Reshape to ensure both X and Y are [nBoot x nSubj]
-if size(X_allBoot_allSubj, 2) ~= nSubj
-    X_allBoot_allSubj = X_allBoot_allSubj';
+% Reshape to ensure both X and Y are [nIter x nSubj]
+if size(X_allIter_allSubj, 2) ~= nSubj
+    X_allIter_allSubj = X_allIter_allSubj';
 end
-if size(Y_allBoot_allSubj, 2) ~= nSubj
-    Y_allBoot_allSubj = Y_allBoot_allSubj';
+if size(Y_allIter_allSubj, 2) ~= nSubj
+    Y_allIter_allSubj = Y_allIter_allSubj';
 end
 
-[nBoot, nSubj2] = size(X_allBoot_allSubj);
+[nIter, nSubj2] = size(X_allIter_allSubj);
 assert(nSubj2 == nSubj, 'ALERT: Cannot reconcile nSubj from markers with X/Y size.');
 
 %% ---- Bootstrap summary for plotting: per-subject median and CI ----
 % Outputs are 1 x nSubj by default; squeeze/transpose to nSubj x 1
-[X_med, X_lb, X_ub] = getCI(X_allBoot_allSubj, 1, 1);
-[Y_med, Y_lb, Y_ub] = getCI(Y_allBoot_allSubj, 1, 1);
+[X_med, X_lb, X_ub] = getCI(X_allIter_allSubj, 1, 1);
+[Y_med, Y_lb, Y_ub] = getCI(Y_allIter_allSubj, 1, 1);
 
 % X_med = X_med(:); X_lb = X_lb(:); X_ub = X_ub(:);
 % Y_med = Y_med(:); Y_lb = Y_lb(:); Y_ub = Y_ub(:);
@@ -108,45 +104,45 @@ x_lm = linspace(min(X_med), max(X_med), 200);
 yfit_OnMed = polyval(lm_med, x_lm);
 
 %% Linear regression & correlation analysis PER BOOT
-yfit_allBoot = nan(nBoot, numel(x_lm));
-eta2_allBoot = nan(nBoot, 1);
+yfit_allIter = nan(nIter, numel(x_lm));
+eta2_allIter = nan(nIter, 1);
 
-r_allBoot = nan(nBoot, 1);
-p_r_allBoot = r_allBoot;
-rho_allBoot = r_allBoot;
-p_rho_allBoot = r_allBoot;
-tau_allBoot = r_allBoot;
-p_tau_allBoot = r_allBoot;
+r_allIter = nan(nIter, 1);
+p_r_allIter = r_allIter;
+rho_allIter = r_allIter;
+p_rho_allIter = r_allIter;
+tau_allIter = r_allIter;
+p_tau_allIter = r_allIter;
 
-for iBoot = 1:nBoot
-    x_perBoot = X_allBoot_allSubj(iBoot, :).';
-    y_perBoot = Y_allBoot_allSubj(iBoot, :).';
+for iIter = 1:nIter
+    x_perBoot = X_allIter_allSubj(iIter, :).';
+    y_perBoot = Y_allIter_allSubj(iIter, :).';
 
     % Obtain linear regression fits
     if numel(unique(x_perBoot)) >= 2
         polyfit_perBoot = polyfit(x_perBoot, y_perBoot, 1);
-        yfit_allBoot(iBoot, :) = polyval(polyfit_perBoot, x_lm);
-        eta2_allBoot(iBoot) = var(polyval(polyfit_perBoot, x_perBoot)) / var(y_perBoot);
+        yfit_allIter(iIter, :) = polyval(polyfit_perBoot, x_lm);
+        eta2_allIter(iIter) = var(polyval(polyfit_perBoot, x_perBoot)) / var(y_perBoot);
     end
 
     % Conduct correlation analysis of different types
-    [r_allBoot(iBoot), p_r_allBoot(iBoot)] = corr(x_perBoot, y_perBoot, 'Type', 'Pearson', 'tail', 'both'); % left: assume slope <0
-    [rho_allBoot(iBoot), p_rho_allBoot(iBoot)] = corr(x_perBoot, y_perBoot, 'Type', 'spearman', 'tail', 'both'); % left: assume slope <0
-    [tau_allBoot(iBoot), p_tau_allBoot(iBoot)] = corr(x_perBoot, y_perBoot, 'Type', 'Kendall', 'tail', 'both'); % left: assume slope <0
+    [r_allIter(iIter), p_r_allIter(iIter)] = corr(x_perBoot, y_perBoot, 'Type', 'Pearson', 'tail', 'both'); % left: assume slope <0
+    [rho_allIter(iIter), p_rho_allIter(iIter)] = corr(x_perBoot, y_perBoot, 'Type', 'spearman', 'tail', 'both'); % left: assume slope <0
+    [tau_allIter(iIter), p_tau_allIter(iIter)] = corr(x_perBoot, y_perBoot, 'Type', 'Kendall', 'tail', 'both'); % left: assume slope <0
 end % iBoot
 
 %% Obtain medians and CI of stats
 % Linear regression
-[~, yfit_lb, yfit_ub] = getCI(yfit_allBoot, 1, 1);
-[eta2_med, eta2_lb, eta2_ub] = getCI(eta2_allBoot, 1, 1, CI_level);
+[~, yfit_lb, yfit_ub] = getCI(yfit_allIter, 1, 1);
+[eta2_med, eta2_lb, eta2_ub] = getCI(eta2_allIter, 1, 1, CI_level);
 
 % Correlation analysis
-[r_med, r_lb, r_ub] = getCI(r_allBoot, 1, 1, CI_level);
-% [p_r_med, p_r_lb, p_r_ub] = getCI(p_r_allBoot, 1, 1);
-[rho_med, rho_lb, rho_ub] = getCI(rho_allBoot, 1, 1, CI_level);
-% [p_rho_med, p_rho_lb, p_rho_ub] = getCI(p_rho_allBoot, 1, 1);
-[tau_med, tau_lb, tau_ub] = getCI(tau_allBoot, 1, 1, CI_level);
-% [p_tau_med, p_tau_lb, p_tau_ub] = getCI(p_tau_allBoot, 1, 1);
+[r_med, r_lb, r_ub] = getCI(r_allIter, 1, 1, CI_level);
+% [p_r_med, p_r_lb, p_r_ub] = getCI(p_r_allIter, 1, 1);
+[rho_med, rho_lb, rho_ub] = getCI(rho_allIter, 1, 1, CI_level);
+% [p_rho_med, p_rho_lb, p_rho_ub] = getCI(p_rho_allIter, 1, 1);
+[tau_med, tau_lb, tau_ub] = getCI(tau_allIter, 1, 1, CI_level);
+% [p_tau_med, p_tau_lb, p_tau_ub] = getCI(p_tau_allIter, 1, 1);
 
 % Significance annotation based on CI excluding zero
 str_sig_pearson = '';

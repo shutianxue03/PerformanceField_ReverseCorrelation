@@ -1,36 +1,18 @@
-function basicFxn_drawCorr_boot( ...
-    X_allBoot_allSubj, Y_allBoot_allSubj, colors, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, type_corr, type_tail, str_title, markers_allSubj, nBoot)
+function basicFxn_drawCorr_permutation( ...
+    X_allIter_allSubj, Y_allIter_allSubj, colors, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, type_corr, type_tail, str_title, markers_allSubj, nIter)
 % =========================================================================
-% basicFxn_drawCorr_boot
-% (updated annotations: 2025-12-18)
-%
-% Purpose
-%   Plot the relationship between two metrics (X and Y) across observers and
-%   conditions using BOOTSTRAPPED estimates. The plot uses the bootstrap
-%   MEDIAN for each observer×condition point, and can optionally show
-%   per-point bootstrap CI errorbars. In addition, the function computes:
-%     - Partial correlation across all points controlling for condition
-%     - Correlation within each condition (across observers)
-%     - Linear regression (global + per-condition) with bootstrap CI bands
-%
+% basicFxn_drawCorr_permutation
 % Inputs
-%   X_allBoot_allSubj : 3D array containing bootstrapped X
-%   Y_allBoot_allSubj : 3D array containing bootstrapped Y
-%       * May be in any dimension order, but must contain (nBoot, nSubj, nCond)
-%       * Internally reshaped to canonical: [nBoot x nSubj x nCond]
+%   X_allIter_allSubj : 3D array 
+%   Y_allIter_allSubj : 3D array 
+%       * May be in any dimension order, but must contain (nIter, nSubj, nCond)
+%       * Internally reshaped to canonical: [nIter x nSubj x nCond]
 %   colors            : [nCond x 3] RGB color per condition
 %   x_ticks, y_ticks  : tick locations (or NaN to skip setting)
 %   x_ticklabels, y_ticklabels : tick labels (or NaN to skip setting)
 %   flag_zeroMean     : 0 = no centering
 %                       1 = subtract mean across observers within each condition
 %                       2 = subtract mean across conditions within each observer
-%       NOTE: centering is applied to the plotted medians and their CI bounds,
-%             and is ALSO applied to the regression fits (so regression is
-%             shown in the same coordinate system as the scatter).
-%             By default, correlations (partial / per-condition) are computed
-%             on the raw bootstrap samples (not centered). If you want the
-%             correlations to be computed in the centered space, switch
-%             x_perBoot->x_reg and y_perBoot->y_reg in that block.
 %   flag_plotIdvdCI   : 1 = draw per-point CI bars (X horizontal, Y vertical)
 %   flag_plotUnikSymbol : 1 = each observer uses a unique marker from markers_allSubj
 %                         0 = all observers use 'o'
@@ -38,19 +20,11 @@ function basicFxn_drawCorr_boot( ...
 %   type_tail         : tail for significance tests ('both','right','left')
 %   str_title         : base title string (will be appended with results)
 %   markers_allSubj   : cell array (nSubj x 1) of marker symbols per observer (e.g., 'o','s','+','x')
-%   nBoot             : number of bootstrap samples
+%   nIter             : number of iterations 
 %
 % Output
 %   str_sig           : string label based on median partial-corr p-value:
 %                       '_sig' (<=.05), '_mg' (<=.1), '_ns' otherwise
-%
-% Dependencies
-%   getCI.m : [med, lb, ub] = getCI(X, dim_boot, alphaIdx, CI_level) where dim_boot=1 here
-%
-% Notes for reuse
-%   - Replace "condition" with any grouping factor (e.g., ROI, task, session).
-%   - Keep your upstream code consistent: X/Y should represent the same set
-%     of observers and conditions, and be bootstrapped in the same way.
 % =========================================================================
 
 %% 0) Plot style defaults (edit once, reuse forever)
@@ -60,28 +34,28 @@ sz_marker = 20;    % marker size
 
 CI_level = .95; % CI range for stats only! Default for plotting is .68
 
-%% 1) Validate / canonicalize shapes: enforce [nBoot x nSubj x nCond]
-assert(ndims(X_allBoot_allSubj) == 3 && ndims(Y_allBoot_allSubj) == 3, ...
-    'ALERT: X_allBoot_allSubj and Y_allBoot_allSubj must be 3D arrays.');
+%% 1) Validate / canonicalize shapes: enforce [nIter x nSubj x nCond]
+assert(ndims(X_allIter_allSubj) == 3 && ndims(Y_allIter_allSubj) == 3, ...
+    'ALERT: X_allIter_allSubj and Y_allIter_allSubj must be 3D arrays.');
 
 nCond = size(colors, 1);
 nSubj = length(markers_allSubj);
 
-X_allBoot_allSubj = fxn_reshape(X_allBoot_allSubj, nSubj, nCond, 'X_allBoot_allSubj');
-Y_allBoot_allSubj = fxn_reshape(Y_allBoot_allSubj, nSubj, nCond, 'Y_allBoot_allSubj');
+X_allIter_allSubj = fxn_reshape(X_allIter_allSubj, nSubj, nCond, 'X_allIter_allSubj');
+Y_allIter_allSubj = fxn_reshape(Y_allIter_allSubj, nSubj, nCond, 'Y_allIter_allSubj');
 
-[nBoot2, nSubj2, nCond2] = size(X_allBoot_allSubj);
-assert(all(size(Y_allBoot_allSubj) == [nBoot2, nSubj2, nCond2]), ...
+[nIter2, nSubj2, nCond2] = size(X_allIter_allSubj);
+assert(all(size(Y_allIter_allSubj) == [nIter2, nSubj2, nCond2]), ...
     'ALERT: X and Y must match after reshape/permute.');
 assert(nSubj2 == nSubj && nCond2 == nCond, ...
     'ALERT: Reshaped X has wrong nSubj/nCond.');
-assert(nBoot2 == nBoot, ...
-    'ALERT: Input nBoot=%d but inferred nBoot=%d from X.', nBoot, nBoot2);
+assert(nIter2 == nIter, ...
+    'ALERT: Input nIter=%d but inferred nIter=%d from X.', nIter, nIter2);
 
 %% 2) Bootstrap summary for plotting: median + CI per (observer × condition)
 % Output arrays are [nSubj x nCond]
-[X_med_allSubj, X_lb_allSubj, X_ub_allSubj] = getCI(X_allBoot_allSubj, 1, 1);
-[Y_med_allSubj, Y_lb_allSubj, Y_ub_allSubj] = getCI(Y_allBoot_allSubj, 1, 1);
+[X_med_allSubj, X_lb_allSubj, X_ub_allSubj] = getCI(X_allIter_allSubj, 1, 1);
+[Y_med_allSubj, Y_lb_allSubj, Y_ub_allSubj] = getCI(Y_allIter_allSubj, 1, 1);
 
 %% 3) Optional centering (flag_zeroMean): define plotting-space variables
 % We apply the same shift to medians and CI bounds so errorbars match points.
@@ -118,7 +92,7 @@ switch flag_zeroMean
         Y_lb_plot = Y_lb_allSubj;  Y_ub_plot = Y_ub_allSubj;
 end
 
-%% 4) Scatter plot of bootstrap medians (optionally with per-point CI bars)
+%% 4) Scatter plot of medians (optionally with per-point CI bars)
 figure('Position', [0 200 1e3 1e3]);
 hold on; box on
 
@@ -189,19 +163,19 @@ for iCond = 1:nCond
 end
 
 %% 7) Regression PER BOOT
-yfit_global_allBoot   = nan(nBoot, nSamples);          % global regression line per boot
-yfit_perCond_allBoot  = nan(nBoot, nSamples, nCond);   % per-condition regression line per boot
-eta2_global_allBoot   = nan(nBoot, 1);                 % eta^2 per boot (global)
+yfit_global_allIter   = nan(nIter, nSamples);          % global regression line per iteration
+yfit_perCond_allIter  = nan(nIter, nSamples, nCond);   % per-condition regression line per iteration
+eta2_global_allIter   = nan(nIter, 1);                 % eta^2 per iteration (global)
 
-r_partial_allBoot = nan(nBoot, 1); % partial corr (global association controlling for condition)
-p_partial_allBoot = nan(nBoot, 1);
+r_partial_allIter = nan(nIter, 1); % partial corr (global association controlling for condition)
+p_partial_allIter = nan(nIter, 1);
 
-r_perCond_allBoot = nan(nBoot, nCond);
-p_perCond_allBoot = nan(nBoot, nCond);
+r_perCond_allIter = nan(nIter, nCond);
+p_perCond_allIter = nan(nIter, nCond);
 
-for iBoot = 1:nBoot
-    x_perBoot = squeeze(X_allBoot_allSubj(iBoot, :, :));   % nSubj x nCond
-    y_perBoot = squeeze(Y_allBoot_allSubj(iBoot, :, :));   % nSubj x nCond
+for iIter = 1:nIter
+    x_perBoot = squeeze(X_allIter_allSubj(iIter, :, :));   % nSubj x nCond
+    y_perBoot = squeeze(Y_allIter_allSubj(iIter, :, :));   % nSubj x nCond
 
     % Regression uses the same coordinate system as the scatter (centering applied).
     switch flag_zeroMean
@@ -218,12 +192,12 @@ for iBoot = 1:nBoot
 
     % --- Correlations ---
     % Partial correlation controlling for condition.
-    [r_partial_allBoot(iBoot), p_partial_allBoot(iBoot)] = partialcorr( ...
+    [r_partial_allIter(iIter), p_partial_allIter(iIter)] = partialcorr( ...
         x_perBoot(:), y_perBoot(:), ANOVA_indCond(:), 'type', type_corr, 'tail', type_tail);
 
     % Correlation within each condition (across observers)
     for iCond = 1:nCond
-        [r_perCond_allBoot(iBoot, iCond), p_perCond_allBoot(iBoot, iCond)] = corr( ...
+        [r_perCond_allIter(iIter, iCond), p_perCond_allIter(iIter, iCond)] = corr( ...
             x_perBoot(:, iCond), y_perBoot(:, iCond), 'type', type_corr, 'tail', type_tail);
     end
 
@@ -231,29 +205,29 @@ for iBoot = 1:nBoot
     % Global
     if numel(unique(x_reg(:))) >= 2
         polyfit_global_perBoot = polyfit(x_reg(:), y_reg(:), 1);
-        yfit_global_allBoot(iBoot, :) = polyval(polyfit_global_perBoot, x_global);
-        eta2_global_allBoot(iBoot) = var(polyval(polyfit_global_perBoot, x_reg(:))) / var(y_reg(:));
+        yfit_global_allIter(iIter, :) = polyval(polyfit_global_perBoot, x_global);
+        eta2_global_allIter(iIter) = var(polyval(polyfit_global_perBoot, x_reg(:))) / var(y_reg(:));
     end
 
     % Per condition
     for iCond = 1:nCond
         polyfit_perCond_perBoot = polyfit(x_reg(:, iCond), y_reg(:, iCond), 1);
-        yfit_perCond_allBoot(iBoot, :, iCond) = polyval(polyfit_perCond_perBoot, x_allCond(iCond, :));
+        yfit_perCond_allIter(iIter, :, iCond) = polyval(polyfit_perCond_perBoot, x_allCond(iCond, :));
     end
 end
 
-%% 8) Summarize bootstrap distributions (median + CI)
-[r_med_partial, r_lb_partial, r_ub_partial] = getCI(r_partial_allBoot, 1, 1, CI_level);
-[p_med_partial, p_lb_partial, p_ub_partial] = getCI(p_partial_allBoot, 1, 1, CI_level);
-[eta2_med, eta2_lb, eta2_ub] = getCI(eta2_global_allBoot, 1, 1, CI_level);
+%% 8) Summarize distributions (median + CI)
+[r_med_partial, r_lb_partial, r_ub_partial] = getCI(r_partial_allIter, 1, 1, CI_level);
+[p_med_partial, p_lb_partial, p_ub_partial] = getCI(p_partial_allIter, 1, 1, CI_level);
+[eta2_med, eta2_lb, eta2_ub] = getCI(eta2_global_allIter, 1, 1, CI_level);
 
-[r_med_perCond, r_lb_perCond, r_ub_perCond] = getCI(r_perCond_allBoot, 1, 1, CI_level);
-[p_med_perCond, p_lb_perCond, p_ub_perCond] = getCI(p_perCond_allBoot, 1, 1, CI_level);
+[r_med_perCond, r_lb_perCond, r_ub_perCond] = getCI(r_perCond_allIter, 1, 1, CI_level);
+[p_med_perCond, p_lb_perCond, p_ub_perCond] = getCI(p_perCond_allIter, 1, 1, CI_level);
 
-%% 9) Plot regression lines (from medians) + CI bands (from per boot)
+%% 9) Plot regression lines (from medians) + CI bands (from per iteration)
 % Global
 % if p_med_partial < .1
-    [~, yfit_global_lb, yfit_global_ub] = getCI(yfit_global_allBoot, 1, 1);
+    [~, yfit_global_lb, yfit_global_ub] = getCI(yfit_global_allIter, 1, 1);
     patch([x_global fliplr(x_global)], [yfit_global_lb fliplr(yfit_global_ub)], ...
         ones(1,3)*.6, 'EdgeColor','none', 'FaceAlpha', 0.20, 'HandleVisibility','off');
     plot(x_global, yfit_global_OnMed, '-', 'color', ones(1,3)*.4, ...
@@ -267,7 +241,7 @@ for iCond = 1:nCond
     else
         lineStyle = '--';
     end
-    [~, yfit_perCond_lb, yfit_perCond_ub] = getCI(yfit_perCond_allBoot(:, :, iCond), 1, 1);
+    [~, yfit_perCond_lb, yfit_perCond_ub] = getCI(yfit_perCond_allIter(:, :, iCond), 1, 1);
     patch([x_allCond(iCond, :) fliplr(x_allCond(iCond, :))], [yfit_perCond_lb fliplr(yfit_perCond_ub)], ...
         colors(iCond,:), 'EdgeColor','none', 'FaceAlpha', 0.12, 'HandleVisibility','off');
     plot(x_allCond(iCond, :), yfit_allCond_OnMed(iCond, :), lineStyle, 'Color', colors(iCond,:), ...

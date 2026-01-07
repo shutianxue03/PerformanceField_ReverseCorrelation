@@ -66,9 +66,7 @@ nPairs_total = numel(iPair_unik_nonrand);
 assert(nPairs_total > 0, 'No pairs found for this location/session selection.')
 
 %% Randomize PAIRS, then 3-way split on pairs
-% NOTE: your old code used randperm(ntrials_perSingleLoc/2,...)
-% Here we use the ACTUAL available number of unique pairs.
-indUnikPair_rand = randperm(nPairs_total, nPairs_total); % indices into iPair_unik_nonrand
+indUnikPair_rand = randperm(nPairs_total, nPairs_total); % NO replacement
 
 nPairs_tmpl = floor(ratio_split(1) * nPairs_total);
 nPairs_train = floor(ratio_split(2) * nPairs_total);
