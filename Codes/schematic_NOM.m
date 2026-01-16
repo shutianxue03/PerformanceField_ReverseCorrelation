@@ -5,18 +5,24 @@ SX_RC1_setting
 %--------------
 
 % Define folder for saving figures
-nameFolder_Fig_NOM_Trialwise = sprintf('%s/NOM_Trialwise_%d%d', nameFolder_Figures, nORI, nSF);
-if isempty(dir(nameFolder_Fig_NOM_Trialwise)), mkdir(nameFolder_Fig_NOM_Trialwise), end
-
-nameFolder_Fig_Schematic = sprintf('%s/Schematic', nameFolder_Fig_NOM_Trialwise);
+nameFolder_Fig_Schematic = sprintf('%s/Schematic', nameFolder_Figures);
 if isempty(dir(nameFolder_Fig_Schematic)), mkdir(nameFolder_Fig_Schematic), end
 
 %% 1D probability distribution for pYES
+FS_AX   = 20;   % axis tick/labels (when shown)
+FS_LAB  = 30;   % xlabel/ylabel
+LW_MAIN = 3.0;  % main curves/contours/criterion
+LW_AUX  = 2.0;  % auxiliary lines (means, IV lines)
+LW_MRK  = 3.0;  % markers/IV dots
+LW_ANN  = 3.0;  % annotation arrows (bandwidth)
+
+
 color_shade = [0.8 0.7 0.9]; % light purple
 color_cri = [0.4 0 0.6];
 facealpha = .3;
 sz_hl = 30;
 sz_hw = sz_hl;
+
 
 for flag_stage = 1:5
 
@@ -77,7 +83,8 @@ for flag_stage = 1:5
             y_i = 1/(sigma_i*sqrt(2*pi)) * exp(-(x_i - mu_i).^2 / (2*sigma_i^2));
 
             % Plot Gaussian
-            plot(x_i, y_i, 'Color', baseColor, 'LineWidth', 2);
+            plot(x_i, y_i, 'Color', baseColor, 'LineWidth', LW_MAIN);
+
 
             % Update global ranges
             x_min = min(x_min, min(x_i));
@@ -85,8 +92,7 @@ for flag_stage = 1:5
             y_max_global = max(y_max_global, max(y_i));
 
             % Vertical line at mean
-            plot([mu_i mu_i], [0 max(y_i)], '-', 'color', [.5, .5, .5], 'LineWidth', 1.5);
-
+            plot([mu_i mu_i], [0 max(y_i)], '-', 'color', [.5, .5, .5], 'LineWidth', LW_AUX);
 
             % Shaded tail to the right of criterion (for stages 4 & 5)
             if drawCriterion
@@ -105,11 +111,13 @@ for flag_stage = 1:5
     if drawCriterion
         % use global y max (or a default if no PDFs were drawn for some reason)
         if y_max_global == 0, y_max_global = 1; end
-        plot([criterion criterion], [0 .5], '--', 'Color',color_cri, 'LineWidth', 2);
+        plot([criterion criterion], [0 .5], '--', 'Color', color_cri, 'LineWidth', LW_MAIN);
+
     end
 
     % ----------------- Draw IV dots at y=0 -----------------
-    plot(IV, zeros(size(IV)), 'ok', 'MarkerSize', 16, 'MarkerFaceColor', 'w', 'LineWidth', 2);
+    plot(IV, zeros(size(IV)), 'ok', 'MarkerSize', 16, 'MarkerFaceColor', 'w', 'LineWidth', LW_MRK);
+
 
     % ----------------- Axes formatting -----------------------------------
     % If no distributions were drawn, set a reasonable y-range
@@ -149,35 +157,35 @@ for flag_stage = 1:5
 
         % ---- Draw a double-headed arrow (using two annotation arrows) ----
         % Left → Right
-        annotation('arrow', [p1(1) p2(1)], [p1(2) p2(2)], ...
-            'Color','k', 'LineWidth', 1.5, 'HeadWidth', sz_hw, 'HeadLength', sz_hl);
+        annotation('arrow', [p1(1) p2(1)], [p1(2) p2(2)], 'Color','k', 'LineWidth', LW_ANN, 'HeadWidth', sz_hw, 'HeadLength', sz_hl);
 
         % Right → Left (overlays shaft and creates symmetric double-head)
-        annotation('arrow', [p2(1) p1(1)], [p2(2) p1(2)], ...
-            'Color','k', 'LineWidth', 1.5, 'HeadWidth', sz_hw, 'HeadLength', sz_hl);
+        annotation('arrow', [p2(1) p1(1)], [p2(2) p1(2)], 'Color','k', 'LineWidth', LW_ANN, 'HeadWidth', sz_hw, 'HeadLength', sz_hl);
     end
 
     ax = gca;
     ax.Box = 'off'; % removes top & right box edges
     ax.YColor = 'none'; % hide y-axis line & ticks
     ax.XTick = []; % no x-ticks
-    ax.LineWidth = 2;
-    set(gca, 'FontSize', 14);
-    set(findall(gcf, '-property', 'linewidth'), 'linewidth',3.5)
+    ax.LineWidth = LW_AUX;
+    set(ax, 'FontSize', FS_AX);
 
     % ----------------- Save figure ---------------------------------------
-    saveas(gcf, sprintf('%s/NOM_stage%d_%s.jpg', nameFolder_Fig_Schematic, flag_stage, str_stage));
+    saveas(gcf, sprintf('%s/NOM_stage%d_%s.png', nameFolder_Fig_Schematic, flag_stage, str_stage));
 
 end % flag_stage
 close all
 
 %% 2D probability distribution for pA (not assuming independence)
+color_shade = [0.8 0.7 0.9]; % light purple
+color_cri = [0.4 0 0.6];
+facealpha = .3;
+
 V = 0.2; % mean of decision variable for both passes
 sigma = 1; % SD for both passes
 
 rhoDV1 = 0.6; % correlation for second layer (change as you like)
 rhoDV2 = 0; % correlation for first layer
-
 
 criterion = V + 0.3;
 nContours = 3;
@@ -215,9 +223,10 @@ Z2 = reshape(Z2, size(x1_grid));
 figure('Position',[200 200 700 600]); hold on;
 
 % 1) Contour lines of the first joint density
-[~, hC1] = contour(x1_grid, x2_grid, Z1, nContours, 'k-', 'LineWidth', 1.5);
+[~, hC1] = contour(x1_grid, x2_grid, Z1, nContours, 'k-', 'LineWidth', LW_MAIN);
+
 % 2) Contour lines of the second joint density (different style)
-[~, hC2] = contour(x1_grid, x2_grid, Z2, nContours, 'k--', 'LineWidth', 1.5, 'Color', [0.3 0.3 0.3]);
+% [~, hC2] = contour(x1_grid, x2_grid, Z2, nContours, 'k-', 'LineWidth', LW_MAIN);
 
 % 3) Shade agreement regions (D1 > crit & D2 > crit) and (D1 < crit & D2 < crit)
 % Top-right (YES–YES)
@@ -231,14 +240,14 @@ patch([x1_min criterion criterion x1_min], ...
     color_shade, 'FaceAlpha', facealpha, 'EdgeColor', 'none');
 
 % 4) Criterion lines
-plot([criterion criterion], [x2_min x2_max], '--', 'Color', color_cri, 'LineWidth', 3);
-plot([x1_min x1_max], [criterion criterion], '--', 'Color', color_cri, 'LineWidth', 3);
+plot([criterion criterion], [x2_min x2_max], '--', 'Color', color_cri, 'LineWidth', LW_MAIN);
+plot([x1_min x1_max], [criterion criterion], '--', 'Color', color_cri, 'LineWidth', LW_MAIN);
 
 % 5) IVs
-plot([V, V], [x1_min, x1_max], '-', 'color', [.5,.5, .5], 'linewidth', 2);
-plot([x2_min, x2_max], [V, V], '-', 'color', [.5,.5, .5], 'linewidth', 2);
-plot(V, x1_min, 'o', 'MarkerEdgeColor', [.5,.5, .5], 'MarkerFaceColor', 'w', 'MarkerSize', 15, 'linewidth', 2)
-plot(x2_min, V, 'o', 'MarkerEdgeColor', [.5,.5, .5], 'MarkerFaceColor', 'w', 'MarkerSize', 15, 'linewidth', 2)
+plot([V, V], [x1_min, x1_max], '-', 'color', [.5,.5,.5], 'LineWidth', LW_MAIN);
+plot([x2_min, x2_max], [V, V], '-', 'color', [.5,.5,.5], 'LineWidth', LW_MAIN);
+plot(V, x1_min, 'o', 'MarkerEdgeColor', [.5,.5,.5], 'MarkerFaceColor', 'w', 'MarkerSize', 15, 'LineWidth', LW_MRK);
+plot(x2_min, V, 'o', 'MarkerEdgeColor', [.5,.5,.5], 'MarkerFaceColor', 'w', 'MarkerSize', 15, 'LineWidth', LW_MRK);
 
 % ----- Compute pA for each rho using mvncdf ---------------
 lb_YY = [criterion, criterion];
@@ -250,202 +259,199 @@ pA1 = mvncdf(lb_YY, ub_YY, mu, Sigma1) + mvncdf(lb_NN, ub_NN, mu, Sigma1);
 pA2 = mvncdf(lb_YY, ub_YY, mu, Sigma2) + mvncdf(lb_NN, ub_NN, mu, Sigma2);
 
 % ----- Formatting --------------------------------------------------------
-xlabel('Internal variable of pass 1 ($V_{i,1}$)', 'Interpreter', 'latex');
-ylabel('Internal variable of pass 2 ($V_{i,2}$)', 'Interpreter', 'latex');
+xlabel('$V_{i,1}$', 'Interpreter', 'latex', 'FontSize', FS_LAB);
+ylabel('$V_{i,2}$', 'Interpreter', 'latex', 'FontSize', FS_LAB);
+
+ax = gca;
+ax.FontSize = FS_AX;
+ax.LineWidth = LW_AUX;
 axis equal;
 xlim([x1_min x1_max]);
 ylim([x2_min x2_max]);
 
 ax = gca;
-% ax.Box = 'off'; % removes top & right box edges
-% ax.YColor = 'none'; % hide y-axis line & ticks
 ax.XTick = []; % no x-ticks
 ax.YTick = []; % no x-ticks
-ax.LineWidth = 2;
-set(gca, 'FontSize', 14);
-% set(findall(gcf, '-property', 'linewidth'), 'linewidth', 3)
 
-% title('Joint 2D Gaussian with criterion and agreement regions');
-
-legend([hC1, hC2], ...
-    {sprintf('$\\sigma_{shared}^2/\\sigma_{i}^2 = %.2f,\\; p_A = %.1f$', rhoDV1, pA1), ...
-    sprintf('$\\sigma_{shared}^2/\\sigma_{i}^2 = %.2f,\\; p_A = %.1f$', rhoDV2, pA2)}, ...
-    'Location', 'northwest', 'Interpreter', 'latex');
+% legend([hC1, hC2], ...
+%     {sprintf('$\\sigma_{shared}^2/\\sigma_{i}^2 = %.2f,\\; p_A = %.1f$', rhoDV1, pA1), ...
+%     sprintf('$\\sigma_{shared}^2/\\sigma_{i}^2 = %.2f,\\; p_A = %.1f$', rhoDV2, pA2)}, ...
+%     'Location', 'northwest', 'Interpreter', 'latex');
 
 set(findall(gcf, '-property', 'fontsize'), 'fontsize', 25)
-saveas(gcf, sprintf('%s/NOM_stage6_2D.jpg', nameFolder_Fig_Schematic));
+saveas(gcf, sprintf('%s/NOM_stage6_2D.png', nameFolder_Fig_Schematic));
 close all
 
 %% Prediction of reduced models
-close all; clc;
-
-% ---------------- Ground-truth parameters ----------------
-Nmul_true = .6; % induced (multiplicative) noise
-SDadd_ind_true = 15; % baseline (additive) noise
-SDadd_sha_true = 15; % correlation between passes
-
-% IV range (internal variable mean)
-IV = linspace(0, 150, 100); % row vector
-medianIV = median(IV);
-
-% Criterion in z-units
-c_zscore = -.3;
-
-% ---------------- Helper: full model sigma(IV) ----------------
-sigma_true = sqrt((Nmul_true .* IV).^2 + SDadd_ind_true.^2);
-sigma_true = max(sigma_true, 1e-6); % avoid zero
-criterion_true = c_zscore .* sigma_true + medianIV; % trial-wise criterion in IV units
-
-% ---------------- 1D: pYES for full and reduced models ----------------
-% Full model: V ~ N(IV, sigma_true^2), YES if V > criterion_true
-pYES_true = 1 - normcdf(criterion_true, IV, sigma_true);
-
-% Model without induced noise (Nmul = 0)
-Nmul_noInduced = 0;
-sigma_noInduced = sqrt((Nmul_noInduced .* IV).^2 + SDadd_ind_true.^2);
-sigma_noInduced = max(sigma_noInduced, 1e-6);
-criterion_noInduced = c_zscore .* sigma_noInduced + medianIV;
-pYES_noInduced = 1 - normcdf(criterion_noInduced, IV, sigma_noInduced);
-
-% Model without constant noise (SDadd = 0)
-SDadd_noConst = 0;
-sigma_noConst = sqrt((Nmul_true .* IV).^2 + SDadd_noConst.^2);
-sigma_noConst = max(sigma_noConst, 1e-6);
-criterion_noConst = c_zscore .* sigma_noConst + medianIV;
-pYES_noConst = 1 - normcdf(criterion_noConst, IV, sigma_noConst);
-
-% "Model without correlation" for pYES:
-% Note: correlation does NOT affect the marginal, so this is identical to pYES_true
-pYES_noRho = pYES_true;
-
-% ---------------- 2D: pA (probability of agreement) ----------------
-% Agreement: both YES or both NO for two passes
-
-pA_true = zeros(size(IV));
-pA_noRho = zeros(size(IV));
-pA_noInduced = zeros(size(IV));
-pA_noConst = zeros(size(IV));
-
-for iTrial = 1:numel(IV)
-    mu_i = [IV(iTrial), IV(iTrial)];
-
-    % Full model sigma and criterion at this IV
-    s_true = sigma_true(iTrial);
-    criterion_true_i = criterion_true(iTrial);
-    Sigma_true = [s_true^2, SDadd_sha_true*s_true^2; ...
-        SDadd_sha_true*s_true^2, s_true^2 ];
-
-    % Sigma & criterion without induced noise (Nmul = 0)
-    s_noInduced = sigma_noInduced(iTrial);
-    criterion_noInd_i = criterion_noInduced(iTrial);
-    Sigma_noInduced = [s_noInduced^2, SDadd_sha_true*s_noInduced^2; ...
-        SDadd_sha_true*s_noInduced^2, s_noInduced^2 ];
-
-    % Sigma & criterion without constant noise (SDadd = 0)
-    s_noConst = sigma_noConst(iTrial);
-    criterion_noConst_i = criterion_noConst(iTrial);
-    Sigma_noConst = [s_noConst^2, SDadd_sha_true*s_noConst^2; ...
-        SDadd_sha_true*s_noConst^2, s_noConst^2 ];
-
-    % Sigma without correlation (rho = 0), same criterion as full model
-    Sigma_noRho = [s_true^2, 0; ...
-        0, s_true^2];
-    criterion_noRho_i = criterion_true_i;
-
-    % ----- Agreement regions for each model -----
-    % Full model
-    lb_YY_true = [criterion_true_i, criterion_true_i];
-    ub_YY_true = [ inf, inf];
-    lb_NN_true = [-inf, -inf];
-    ub_NN_true = [criterion_true_i, criterion_true_i];
-
-    P_YY = mvncdf(lb_YY_true, ub_YY_true, mu_i, Sigma_true);
-    P_NN = mvncdf(lb_NN_true, ub_NN_true, mu_i, Sigma_true);
-    pA_true(iTrial) = P_YY + P_NN;
-
-    % No rho
-    lb_YY_0 = [criterion_noRho_i, criterion_noRho_i];
-    ub_YY_0 = [ inf, inf];
-    lb_NN_0 = [-inf, -inf];
-    ub_NN_0 = [criterion_noRho_i, criterion_noRho_i];
-
-    P_YY_0 = mvncdf(lb_YY_0, ub_YY_0, mu_i, Sigma_noRho);
-    P_NN_0 = mvncdf(lb_NN_0, ub_NN_0, mu_i, Sigma_noRho);
-    pA_noRho(iTrial) = P_YY_0 + P_NN_0;
-
-    % No induced noise
-    lb_YY_noInd = [criterion_noInd_i, criterion_noInd_i];
-    ub_YY_noInd = [ inf, inf];
-    lb_NN_noInd = [-inf, -inf];
-    ub_NN_noInd = [criterion_noInd_i, criterion_noInd_i];
-
-    P_YY_noInd = mvncdf(lb_YY_noInd, ub_YY_noInd, mu_i, Sigma_noInduced);
-    P_NN_noInd = mvncdf(lb_NN_noInd, ub_NN_noInd, mu_i, Sigma_noInduced);
-    pA_noInduced(iTrial) = P_YY_noInd + P_NN_noInd;
-
-    % No constant noise
-    lb_YY_noConst = [criterion_noConst_i, criterion_noConst_i];
-    ub_YY_noConst = [ inf, inf];
-    lb_NN_noConst = [-inf, -inf];
-    ub_NN_noConst = [criterion_noConst_i, criterion_noConst_i];
-
-    P_YY_noConst = mvncdf(lb_YY_noConst, ub_YY_noConst, mu_i, Sigma_noConst);
-    P_NN_noConst = mvncdf(lb_NN_noConst, ub_NN_noConst, mu_i, Sigma_noConst);
-    pA_noConst(iTrial) = P_YY_noConst + P_NN_noConst;
-end
-
-% ---------------- Plotting ----------------
-sz_font = 30;
-figure('Position', [200 200 500 400]);hold on;
-% ---- Panel 1: pYES misfit due to excluding induced/constant noise ----
-% subplot(1,2,1); hold on;
-
-plot(IV, pYES_true, 'k-', 'LineWidth', 4);
-plot(IV, pYES_noInduced, 'k--', 'LineWidth', 4);
-% plot(IV, pYES_noConst, 'b-', 'LineWidth', 2);
-
-yline(0.5, '-', 'Color', [0.5 0.5 0.5], 'HandleVisibility', 'off', 'LineWidth', 3);
-text(IV(65), 0.42, '$p_{YES}$=0.5', 'color', [.5, .5, .5], 'Interpreter', 'latex');
-
-xlabel('Internal variable ($V$)', 'Interpreter', 'latex');
-ylabel('Detection rate($p_{YES}$)', 'Interpreter', 'latex');
-legend({'Full model', 'No $\sigma_{constant}$'}, 'Location', 'southeast', 'Interpreter', 'latex');
-
-set(gca, 'FontSize', 12, 'LineWidth', 1.5, 'Box', 'off');
-set(findall(gcf, '-property', 'fontsize'), 'fontsize', sz_font)
-ylim([0 1]);
-ax=gca;
-ax.XTick = []; % no x-ticks
-ax.YTick = []; % no x-ticks
-% sgtitle('Mispredictions when excluding noise parameters');
-saveas(gcf, sprintf('%s/NOM_excludeParams_pYES.jpg', nameFolder_Fig_Schematic));
-
-% ---- Panel 2: pA misfit (here only showing full vs no correlation) ----
-figure('Position', [200 200 500 400]);hold on;
-% subplot(1,2,2); hold on;
-
-plot(IV, pA_true, 'k-', 'LineWidth', 4);
-plot(IV, pA_noRho, 'k--', 'LineWidth', 4);
-% If you want to show these too, uncomment:
-% plot(IV, pA_noInduced, 'r-', 'LineWidth', 2);
-% plot(IV, pA_noConst, 'b-', 'LineWidth', 2);
-
-yline(0.5, '-', 'Color', [0.5 0.5 0.5], 'HandleVisibility', 'off', 'LineWidth', 3);
-text(IV(65), 0.42, '$p_A$=0.5', 'color', [.5, .5, .5], 'Interpreter', 'latex');
-xlabel('Internal variable ($V$)', 'Interpreter', 'latex');
-ylabel('Resp. consistency ($p_A$)', 'Interpreter', 'latex');
-legend({'Full model', 'No $\rho$'}, 'Location', 'southeast', 'Interpreter', 'latex');
-ax=gca;
-ax.XTick = []; % no x-ticks
-ax.YTick = []; % no x-ticks
-set(gca, 'FontSize', 12, 'LineWidth', 1.5, 'Box', 'off');
-set(findall(gcf, '-property', 'fontsize'), 'fontsize', sz_font)
-ylim([0 1]);
-
-% sgtitle('Mispredictions when excluding noise parameters');
-saveas(gcf, sprintf('%s/NOM_excludeParams_pA.jpg', nameFolder_Fig_Schematic));
-
-close all
+% close all; clc;
+% 
+% % ---------------- Ground-truth parameters ----------------
+% Nmul_true = .6; % induced (multiplicative) noise
+% SDadd_ind_true = 15; % baseline (additive) noise
+% SDadd_sha_true = 15; % correlation between passes
+% 
+% % IV range (internal variable mean)
+% IV = linspace(0, 150, 100); % row vector
+% medianIV = median(IV);
+% 
+% % Criterion in z-units
+% c_zscore = -.3;
+% 
+% % ---------------- Helper: full model sigma(IV) ----------------
+% sigma_true = sqrt((Nmul_true .* IV).^2 + SDadd_ind_true.^2);
+% sigma_true = max(sigma_true, 1e-6); % avoid zero
+% criterion_true = c_zscore .* sigma_true + medianIV; % trial-wise criterion in IV units
+% 
+% % ---------------- 1D: pYES for full and reduced models ----------------
+% % Full model: V ~ N(IV, sigma_true^2), YES if V > criterion_true
+% pYES_true = 1 - normcdf(criterion_true, IV, sigma_true);
+% 
+% % Model without induced noise (Nmul = 0)
+% Nmul_noInduced = 0;
+% sigma_noInduced = sqrt((Nmul_noInduced .* IV).^2 + SDadd_ind_true.^2);
+% sigma_noInduced = max(sigma_noInduced, 1e-6);
+% criterion_noInduced = c_zscore .* sigma_noInduced + medianIV;
+% pYES_noInduced = 1 - normcdf(criterion_noInduced, IV, sigma_noInduced);
+% 
+% % Model without constant noise (SDadd = 0)
+% SDadd_noConst = 0;
+% sigma_noConst = sqrt((Nmul_true .* IV).^2 + SDadd_noConst.^2);
+% sigma_noConst = max(sigma_noConst, 1e-6);
+% criterion_noConst = c_zscore .* sigma_noConst + medianIV;
+% pYES_noConst = 1 - normcdf(criterion_noConst, IV, sigma_noConst);
+% 
+% % "Model without correlation" for pYES:
+% % Note: correlation does NOT affect the marginal, so this is identical to pYES_true
+% pYES_noRho = pYES_true;
+% 
+% % ---------------- 2D: pA (probability of agreement) ----------------
+% % Agreement: both YES or both NO for two passes
+% 
+% pA_true = zeros(size(IV));
+% pA_noRho = zeros(size(IV));
+% pA_noInduced = zeros(size(IV));
+% pA_noConst = zeros(size(IV));
+% 
+% for iTrial = 1:numel(IV)
+%     mu_i = [IV(iTrial), IV(iTrial)];
+% 
+%     % Full model sigma and criterion at this IV
+%     s_true = sigma_true(iTrial);
+%     criterion_true_i = criterion_true(iTrial);
+%     Sigma_true = [s_true^2, SDadd_sha_true*s_true^2; ...
+%         SDadd_sha_true*s_true^2, s_true^2 ];
+% 
+%     % Sigma & criterion without induced noise (Nmul = 0)
+%     s_noInduced = sigma_noInduced(iTrial);
+%     criterion_noInd_i = criterion_noInduced(iTrial);
+%     Sigma_noInduced = [s_noInduced^2, SDadd_sha_true*s_noInduced^2; ...
+%         SDadd_sha_true*s_noInduced^2, s_noInduced^2 ];
+% 
+%     % Sigma & criterion without constant noise (SDadd = 0)
+%     s_noConst = sigma_noConst(iTrial);
+%     criterion_noConst_i = criterion_noConst(iTrial);
+%     Sigma_noConst = [s_noConst^2, SDadd_sha_true*s_noConst^2; ...
+%         SDadd_sha_true*s_noConst^2, s_noConst^2 ];
+% 
+%     % Sigma without correlation (rho = 0), same criterion as full model
+%     Sigma_noRho = [s_true^2, 0; ...
+%         0, s_true^2];
+%     criterion_noRho_i = criterion_true_i;
+% 
+%     % ----- Agreement regions for each model -----
+%     % Full model
+%     lb_YY_true = [criterion_true_i, criterion_true_i];
+%     ub_YY_true = [ inf, inf];
+%     lb_NN_true = [-inf, -inf];
+%     ub_NN_true = [criterion_true_i, criterion_true_i];
+% 
+%     P_YY = mvncdf(lb_YY_true, ub_YY_true, mu_i, Sigma_true);
+%     P_NN = mvncdf(lb_NN_true, ub_NN_true, mu_i, Sigma_true);
+%     pA_true(iTrial) = P_YY + P_NN;
+% 
+%     % No rho
+%     lb_YY_0 = [criterion_noRho_i, criterion_noRho_i];
+%     ub_YY_0 = [ inf, inf];
+%     lb_NN_0 = [-inf, -inf];
+%     ub_NN_0 = [criterion_noRho_i, criterion_noRho_i];
+% 
+%     P_YY_0 = mvncdf(lb_YY_0, ub_YY_0, mu_i, Sigma_noRho);
+%     P_NN_0 = mvncdf(lb_NN_0, ub_NN_0, mu_i, Sigma_noRho);
+%     pA_noRho(iTrial) = P_YY_0 + P_NN_0;
+% 
+%     % No induced noise
+%     lb_YY_noInd = [criterion_noInd_i, criterion_noInd_i];
+%     ub_YY_noInd = [ inf, inf];
+%     lb_NN_noInd = [-inf, -inf];
+%     ub_NN_noInd = [criterion_noInd_i, criterion_noInd_i];
+% 
+%     P_YY_noInd = mvncdf(lb_YY_noInd, ub_YY_noInd, mu_i, Sigma_noInduced);
+%     P_NN_noInd = mvncdf(lb_NN_noInd, ub_NN_noInd, mu_i, Sigma_noInduced);
+%     pA_noInduced(iTrial) = P_YY_noInd + P_NN_noInd;
+% 
+%     % No constant noise
+%     lb_YY_noConst = [criterion_noConst_i, criterion_noConst_i];
+%     ub_YY_noConst = [ inf, inf];
+%     lb_NN_noConst = [-inf, -inf];
+%     ub_NN_noConst = [criterion_noConst_i, criterion_noConst_i];
+% 
+%     P_YY_noConst = mvncdf(lb_YY_noConst, ub_YY_noConst, mu_i, Sigma_noConst);
+%     P_NN_noConst = mvncdf(lb_NN_noConst, ub_NN_noConst, mu_i, Sigma_noConst);
+%     pA_noConst(iTrial) = P_YY_noConst + P_NN_noConst;
+% end
+% 
+% % ---------------- Plotting ----------------
+% sz_font = 30;
+% figure('Position', [200 200 500 400]);hold on;
+% % ---- Panel 1: pYES misfit due to excluding induced/constant noise ----
+% % subplot(1,2,1); hold on;
+% 
+% plot(IV, pYES_true, 'k-', 'LineWidth', 4);
+% plot(IV, pYES_noInduced, 'k--', 'LineWidth', 4);
+% % plot(IV, pYES_noConst, 'b-', 'LineWidth', 2);
+% 
+% yline(0.5, '-', 'Color', [0.5 0.5 0.5], 'HandleVisibility', 'off', 'LineWidth', 3);
+% text(IV(65), 0.42, '$p_{YES}$=0.5', 'color', [.5, .5, .5], 'Interpreter', 'latex');
+% 
+% xlabel('Internal variable ($V$)', 'Interpreter', 'latex');
+% ylabel('Detection rate($p_{YES}$)', 'Interpreter', 'latex');
+% legend({'Full model', 'No $\sigma_{constant}$'}, 'Location', 'southeast', 'Interpreter', 'latex');
+% 
+% set(gca, 'FontSize', 12, 'LineWidth', 1.5, 'Box', 'off');
+% set(findall(gcf, '-property', 'fontsize'), 'fontsize', sz_font)
+% ylim([0 1]);
+% ax=gca;
+% ax.XTick = []; % no x-ticks
+% ax.YTick = []; % no x-ticks
+% % sgtitle('Mispredictions when excluding noise parameters');
+% saveas(gcf, sprintf('%s/NOM_excludeParams_pYES.png', nameFolder_Fig_Schematic));
+% 
+% % ---- Panel 2: pA misfit (here only showing full vs no correlation) ----
+% figure('Position', [200 200 500 400]);hold on;
+% % subplot(1,2,2); hold on;
+% 
+% plot(IV, pA_true, 'k-', 'LineWidth', 4);
+% plot(IV, pA_noRho, 'k--', 'LineWidth', 4);
+% % If you want to show these too, uncomment:
+% % plot(IV, pA_noInduced, 'r-', 'LineWidth', 2);
+% % plot(IV, pA_noConst, 'b-', 'LineWidth', 2);
+% 
+% yline(0.5, '-', 'Color', [0.5 0.5 0.5], 'HandleVisibility', 'off', 'LineWidth', 3);
+% text(IV(65), 0.42, '$p_A$=0.5', 'color', [.5, .5, .5], 'Interpreter', 'latex');
+% xlabel('Internal variable ($V$)', 'Interpreter', 'latex');
+% ylabel('Resp. consistency ($p_A$)', 'Interpreter', 'latex');
+% legend({'Full model', 'No $\rho$'}, 'Location', 'southeast', 'Interpreter', 'latex');
+% ax=gca;
+% ax.XTick = []; % no x-ticks
+% ax.YTick = []; % no x-ticks
+% set(gca, 'FontSize', 12, 'LineWidth', 1.5, 'Box', 'off');
+% set(findall(gcf, '-property', 'fontsize'), 'fontsize', sz_font)
+% ylim([0 1]);
+% 
+% % sgtitle('Mispredictions when excluding noise parameters');
+% saveas(gcf, sprintf('%s/NOM_excludeParams_pA.png', nameFolder_Fig_Schematic));
+% 
+% close all
 
 %% Sketches for neural variability
 close all; clc
@@ -469,7 +475,7 @@ ylim([-3, 3])
 box off
 set(gca, 'YTick', [], 'XTick', [])   % keep it schematic
 axis off
-saveas(gcf, sprintf('%s/NeuralVar.jpg', nameFolder_Fig_Schematic))
+saveas(gcf, sprintf('%s/NeuralVar.png', nameFolder_Fig_Schematic))
 close all
 
 %% Sketch for neural correlation
@@ -490,7 +496,7 @@ box off
 set(gca, 'YTick', [], 'XTick', [])
 axis off
 
-saveas(gcf, sprintf('%s/NeuralCorr.jpg', nameFolder_Fig_Schematic))
+saveas(gcf, sprintf('%s/NeuralCorr.png', nameFolder_Fig_Schematic))
 close all
 
 %% Sketch for orientation and SF tuning function
@@ -599,7 +605,7 @@ for iFeature = 1:nFeatures
         % ============================================================
         % Save figure
         % ============================================================
-        saveas(gcf, sprintf('%s/TuningFxn_%s_%s.jpg', nameFolder_Fig_Schematic, namesFeature{iFeature}, str_mode))
+        saveas(gcf, sprintf('%s/TuningFxn_%s_%s.png', nameFolder_Fig_Schematic, namesFeature{iFeature}, str_mode))
     end % flag_plotMode
 end % iFeature
 close all
@@ -760,4 +766,4 @@ for iFxn = 1:nFxn
     set(findall(gcf, '-property', 'fontsize'), 'fontsize', 12)
     set(findall(gcf, '-property', 'linewidth'), 'linewidth',2)
 end % iFxn
-saveas(gcf, sprintf('%s/CorrAsym.jpg', nameFolder_Fig_Schematic))
+saveas(gcf, sprintf('%s/CorrAsym.png', nameFolder_Fig_Schematic))

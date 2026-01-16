@@ -64,7 +64,7 @@ for sz_marker = sz_marker_all
         nameFolder = sprintf('%s/Size_%s', nameFolder_Figures_diagrams, str_size);
         if isempty(dir(nameFolder)), mkdir(nameFolder), end
         % Save the figure
-        saveas(gcf, sprintf('%s/%s_%s.jpg', nameFolder, str_locgroup, strParts))
+        saveas(gcf, sprintf('%s/%s_%s.png', nameFolder, str_locgroup, strParts))
 
     end % iPart
     close all

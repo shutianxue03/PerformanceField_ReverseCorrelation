@@ -52,13 +52,50 @@ end
 [nIter, nSubj2] = size(X_allIter_allSubj);
 assert(nSubj2 == nSubj, 'ALERT: Cannot reconcile nSubj from markers with X/Y size.');
 
-%% ---- Bootstrap summary for plotting: per-subject median and CI ----
+%% Obtain median and CI
 % Outputs are 1 x nSubj by default; squeeze/transpose to nSubj x 1
 [X_med, X_lb, X_ub] = getCI(X_allIter_allSubj, 1, 1);
 [Y_med, Y_lb, Y_ub] = getCI(Y_allIter_allSubj, 1, 1);
 
-% X_med = X_med(:); X_lb = X_lb(:); X_ub = X_ub(:);
-% Y_med = Y_med(:); Y_lb = Y_lb(:); Y_ub = Y_ub(:);
+%% Permutation test on MEDIAN asymmetry points (p-values)
+nPerm = 1e4;
+
+x_obs = X_med(:);
+y_obs = Y_med(:);
+
+% observed correlations
+r_obs_pearson  = corr(x_obs, y_obs, 'Type', 'Pearson',  'Rows', 'complete');
+r_obs_spearman = corr(x_obs, y_obs, 'Type', 'Spearman', 'Rows', 'complete');
+r_obs_kendall  = corr(x_obs, y_obs, 'Type', 'Kendall',  'Rows', 'complete');
+
+% null distributions (permute observer labels of y; keeps x fixed)
+r_perm_pearson  = nan(nPerm,1);
+r_perm_spearman = nan(nPerm,1);
+r_perm_kendall  = nan(nPerm,1);
+
+for iPerm = 1:nPerm
+    idx = randperm(nSubj);
+    yp  = y_obs(idx);
+
+    r_perm_pearson(iPerm)  = corr(x_obs, yp, 'Type', 'Pearson',  'Rows', 'complete');
+    r_perm_spearman(iPerm) = corr(x_obs, yp, 'Type', 'Spearman', 'Rows', 'complete');
+    r_perm_kendall(iPerm)  = corr(x_obs, yp, 'Type', 'Kendall',  'Rows', 'complete');
+end
+
+% ---- permutation p-values for ALL tails ----
+tail_all = {'left','both','right'};     % L / two-sided / R
+tail_lab = {'L','2','R'};
+
+p_perm_pearson_all  = nan(1,3);
+p_perm_spearman_all = nan(1,3);
+p_perm_kendall_all  = nan(1,3);
+
+for iTail = 1:3
+    p_perm_pearson_all(iTail)  = fxn_perm_pval(r_perm_pearson,  r_obs_pearson,  tail_all{iTail});
+    p_perm_spearman_all(iTail) = fxn_perm_pval(r_perm_spearman, r_obs_spearman, tail_all{iTail});
+    p_perm_kendall_all(iTail)  = fxn_perm_pval(r_perm_kendall,  r_obs_kendall,  tail_all{iTail});
+end
+
 
 %% Plot individual data
 figure('Position', [0 200 1e3 1e3]); hold on; box on
@@ -103,9 +140,8 @@ lm_med = polyfit(X_med, Y_med, 1);
 x_lm = linspace(min(X_med), max(X_med), 200);
 yfit_OnMed = polyval(lm_med, x_lm);
 
-%% Linear regression & correlation analysis PER BOOT
+%% Linear regression & correlation analysis PER Iteration
 yfit_allIter = nan(nIter, numel(x_lm));
-eta2_allIter = nan(nIter, 1);
 
 r_allIter = nan(nIter, 1);
 p_r_allIter = r_allIter;
@@ -115,26 +151,24 @@ tau_allIter = r_allIter;
 p_tau_allIter = r_allIter;
 
 for iIter = 1:nIter
-    x_perBoot = X_allIter_allSubj(iIter, :).';
-    y_perBoot = Y_allIter_allSubj(iIter, :).';
+    x_perIter = X_allIter_allSubj(iIter, :).';
+    y_perIter = Y_allIter_allSubj(iIter, :).';
 
     % Obtain linear regression fits
-    if numel(unique(x_perBoot)) >= 2
-        polyfit_perBoot = polyfit(x_perBoot, y_perBoot, 1);
-        yfit_allIter(iIter, :) = polyval(polyfit_perBoot, x_lm);
-        eta2_allIter(iIter) = var(polyval(polyfit_perBoot, x_perBoot)) / var(y_perBoot);
+    if numel(unique(x_perIter)) >= 2
+        polyfit_perIter = polyfit(x_perIter, y_perIter, 1);
+        yfit_allIter(iIter, :) = polyval(polyfit_perIter, x_lm);
     end
 
     % Conduct correlation analysis of different types
-    [r_allIter(iIter), p_r_allIter(iIter)] = corr(x_perBoot, y_perBoot, 'Type', 'Pearson', 'tail', 'both'); % left: assume slope <0
-    [rho_allIter(iIter), p_rho_allIter(iIter)] = corr(x_perBoot, y_perBoot, 'Type', 'spearman', 'tail', 'both'); % left: assume slope <0
-    [tau_allIter(iIter), p_tau_allIter(iIter)] = corr(x_perBoot, y_perBoot, 'Type', 'Kendall', 'tail', 'both'); % left: assume slope <0
-end % iBoot
+    [r_allIter(iIter), p_r_allIter(iIter)] = corr(x_perIter, y_perIter, 'Type', 'Pearson', 'tail', 'both'); % left: assume slope <0
+    [rho_allIter(iIter), p_rho_allIter(iIter)] = corr(x_perIter, y_perIter, 'Type', 'spearman', 'tail', 'both'); % left: assume slope <0
+    [tau_allIter(iIter), p_tau_allIter(iIter)] = corr(x_perIter, y_perIter, 'Type', 'Kendall', 'tail', 'both'); % left: assume slope <0
+end % iIter
 
 %% Obtain medians and CI of stats
 % Linear regression
 [~, yfit_lb, yfit_ub] = getCI(yfit_allIter, 1, 1);
-[eta2_med, eta2_lb, eta2_ub] = getCI(eta2_allIter, 1, 1, CI_level);
 
 % Correlation analysis
 [r_med, r_lb, r_ub] = getCI(r_allIter, 1, 1, CI_level);
@@ -184,14 +218,38 @@ ax.YAxis.FontSize = fsz_ticks;
 ax.LineWidth = wd_border;
 
 %% ---- Title / annotation ----
-str_corr = sprintf(' Pearson%s: r=%.2f [%.2f, %.2f]\n Spearman%s: rho=%.2f [%.2f, %.2f]\n Kendall%s: tau=%.2f [%.2f, %.2f]', ...
-    str_sig_pearson, r_med, r_lb, r_ub, ...
-    str_sig_spearman, rho_med, rho_lb, rho_ub, ...
-    str_sig_kendall, tau_med, tau_lb, tau_ub);
+% optional: make the p-value triplet compact in the title
+pstr_pearson  = sprintf('p(%s/%s/%s)=[%.3f, %.3f , %.3f]', tail_lab{:}, p_perm_pearson_all);
+pstr_spearman = sprintf('p(%s/%s/%s)=[%.3f, %.3f , %.3f]', tail_lab{:}, p_perm_spearman_all);
+pstr_kendall  = sprintf('p(%s/%s/%s)=[%.3f, %.3f , %.3f]', tail_lab{:}, p_perm_kendall_all);
 
-str_eta2 = sprintf('eta2=%.2f [%.2f, %.2f]', eta2_med, eta2_lb, eta2_ub);
+str_corr = sprintf([' Pearson%s: r=%.2f [%.2f, %.2f], %s\n' ...
+    ' Spearman%s: rho=%.2f [%.2f, %.2f], %s\n' ...
+    ' Kendall%s: tau=%.2f [%.2f, %.2f], %s'], ...
+    str_sig_pearson,  r_med,   r_lb,   r_ub,   pstr_pearson, ...
+    str_sig_spearman, rho_med, rho_lb, rho_ub, pstr_spearman, ...
+    str_sig_kendall,  tau_med, tau_lb, tau_ub, pstr_kendall);
 
-str_title = sprintf('%s | %s\n%s', str_title, str_eta2, str_corr);
+str_title = sprintf('%s\n%s\n', str_title, str_corr);
 title(str_title);
 
+end
+
+function p = fxn_perm_pval(nullStats, obsStat, type_tail)
+% Permutation p-value with +1 correction.
+% type_tail: 'both' (two-sided), 'left', or 'right'
+
+nullStats = nullStats(~isnan(nullStats));
+n = numel(nullStats);
+
+switch lower(type_tail)
+    case {'both','two','two-sided','twosided'}
+        p = (1 + sum(abs(nullStats) >= abs(obsStat))) / (n + 1);
+    case {'right','greater'}
+        p = (1 + sum(nullStats >= obsStat)) / (n + 1);
+    case {'left','less'}
+        p = (1 + sum(nullStats <= obsStat)) / (n + 1);
+    otherwise
+        error('Unknown type_tail: %s', type_tail);
+end
 end

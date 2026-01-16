@@ -1,5 +1,5 @@
 
-function basicFxn_drawBars_permutation(data_allIter_allSubj, data_obs_allSubj, ref, colors, x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIter, markers_allSubj)
+function basicFxn_drawBars_permutation(data_allIter_allSubj, ref, colors, x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIter, markers_allSubj)
 
 % Inputs:
 %    med_allSubj: nsubj x nBars, median of boostrapping
@@ -16,23 +16,18 @@ function basicFxn_drawBars_permutation(data_allIter_allSubj, data_obs_allSubj, r
 
 %% define sizes
 sz_marker_idvd = 10;
-sz_marker_ave = 30;
 fsz_ticks = 15; % tunC: 20; BEHAV: xx; NOM: 15
 fsz_title = 10; % font size of titlte
 wd = 2; % line width of axis
 wd_bar = .5; % the width of the bar (not the bar edge!!)
 wd_ref = wd; % line width of the reference line
-% markers_allSubj = {'o', 's', 'd', '^','v',  '<', '+','p', 'h', 'x', '>',      'o', 's', 'd', '^'}; % for each subj
 interval_diffBar = 8; % higher, closer the comparison bar is to the top of the figure
-% markers_allSubj = {'o', 'o', 'o', 'o','o',  'o', 'o','o', 'o', 'o', 'o',      'o', 'o', 'o'};
-nsubj_max = 11;
 fprintf('\n\n *** %s ***\n', str_title)
 
 CI_level = .95; % CI range for stats only! Default for plotting is .68
 
-%% 1) Validate / canonicalize shapes: enforce [nIter x nSubj x nCond]
+%% Enforce shape of matrix to [nIter x nSubj x nCond]
 assert(ndims(data_allIter_allSubj) == 3, 'ALERT: data_allIter_allSubj must be 3D arrays.');
-assert(ndims(data_obs_allSubj) == 2, 'ALERT: data_obs_allSubj must be 2D arrays.');
 
 nCond = size(colors, 1);
 nSubj = length(markers_allSubj);
@@ -45,31 +40,27 @@ assert(nSubj2 == nSubj && nCond2 == nCond, ...
 assert(nIter2 == nIter, ...
     'ALERT: Input nIter=%d but inferred nIter=%d from X.', nIter, nIter2);
 
-if size(data_obs_allSubj, 1) ~= nSubj, data_obs_allSubj = data_obs_allSubj'; end
-[nSubj2, nCond2] = size(data_obs_allSubj);
-assert(nSubj2 == nSubj && nCond2 == nCond, ...
-    'ALERT: Reshaped matrix has wrong nSubj/nCond.');
-
 %% Conduct ANOVA and paired t-test per iteration
-% Placeholders for test statistics and effect size
+% To obttain test statistics and effect size
+
 % ANOVA
-F_allIter = nan(nIter, 1);
+Fvalue_allIter = nan(nIter, 1);
 eta2p_allIter = nan(nIter, 1);
 % Paired t-test
-t_allIter = nan(nIter, 1);
+tscore_allIter = nan(nIter, 1);
 CohenD_allIter = nan(nIter, 1);
 
 for iIter = 1:nIter
     data_perIter = squeeze(data_allIter_allSubj(iIter, :, :));
 
     % ANOVA
-    [F_allIter(iIter), eta2p_allIter(iIter)] = rm_oneway(data_perIter);
+    [Fvalue_allIter(iIter), eta2p_allIter(iIter)] = rm_oneway(data_perIter);
 
     % Paired t-test
     if nCond == 2
         [~, ~, ~, stats] = ttest(data_perIter(:, 1), data_perIter(:, 2));
         CohenD = fxn_getES(data_perIter(:, 1), data_perIter(:, 2));
-        t_allIter(iIter) = stats.tstat;
+        tscore_allIter(iIter) = stats.tstat;
         CohenD_allIter(iIter) = CohenD;
     else % >2 levels: ONLY specified pairs, no exhaustive pairwise
         % think of this later
@@ -77,88 +68,85 @@ for iIter = 1:nIter
 
 end % iIter
 
-%% Get group means of all iterations (for comparing to ref)
-[data_allIter_ave] = getCI(data_allIter_allSubj, 2, 2);
-[~, data_ave_lb, data_ave_ub] = getCI(data_allIter_ave, 1, 1, CI_level);
+%% Permutation to obtain p-value
+% Obtain median and CI for stats
+[data_med_allSubj] = getCI(data_allIter_allSubj, 1, 1);
 
-%% Obtain baseline F and eta2 by shuffling labels
-% ANOVA
-F_obs = rm_oneway(data_obs_allSubj);
+nPerm = 1e4; % number of permutation runs
+Fvalue_allPerm = nan(nPerm,1);
+tscore_allPerm = Fvalue_allPerm;
 
-% t-test
-diff  = data_obs_allSubj(:, 1)-data_obs_allSubj(:, 2);
+% ANOVA: observed F-value
+Fvalue_obs = rm_oneway(data_med_allSubj);
 
-% observed t
-% t_obs = mean(diff, 'omitnan') / (std(diff, 'omitnan') / sqrt(nSubj));
-nEff = sum(~isnan(diff));
-t_obs = mean(diff,'omitnan') / (std(diff,0,'omitnan') / sqrt(nEff));
-
-nPerm = 1e4;
-F_allPerm = nan(nPerm,1);
-t_allPerm = F_allPerm;
+% t-test: observed t-score
+if nCond==2
+    diff_med_allSubj  = data_med_allSubj(:, 1)-data_med_allSubj(:, 2);
+    tscore_obs = mean(diff_med_allSubj,'omitnan') / (std(diff_med_allSubj,0,'omitnan') / sqrt( sum(~isnan(diff_med_allSubj))));
+end
 
 for iPerm = 1:nPerm
-    data_shuffled = data_obs_allSubj;
+    data_shuffled = data_med_allSubj;
+
     % shuffle condition labels within each subject (keeps each subject's distribution)
     for iSubj = 1:nSubj
         data_shuffled(iSubj, :) = data_shuffled(iSubj, randperm(nCond));
     end
 
     % ANOVA
-    F_allPerm(iPerm) = rm_oneway(data_shuffled);
+    Fvalue_allPerm(iPerm) = rm_oneway(data_shuffled);
 
-    if nCond==2
     % t-test
-    sgn = (rand(nSubj,1) > 0.5)*2 - 1;     % random +/-1
-    dp  = diff .* sgn;
-    t_allPerm(iPerm) = mean(dp,'omitnan') / (std(dp,'omitnan') / sqrt(nSubj));
+    if nCond==2
+        sgn = (rand(nSubj,1) > 0.5)*2 - 1;     % random +/-1
+        dp  = diff_med_allSubj .* sgn;
+        tscore_allPerm(iPerm) = mean(dp,'omitnan') / (std(dp,0,'omitnan')/sqrt(sum(~isnan(dp))));
     end
 end % iPerm
 
-p_ANOVA_perm = (1 + sum(F_allPerm >= F_obs)) / (numel(F_allPerm) + 1);
+p_ANOVA_perm = (1 + sum(Fvalue_allPerm >= Fvalue_obs)) / (numel(Fvalue_allPerm) + 1);
 if nCond==2
-p_ttest_perm = (1 + sum(abs(t_allPerm) >= abs(t_obs))) / (nPerm + 1);
+    p_ttest_perm = (1 + sum(abs(tscore_allPerm) >= abs(tscore_obs))) / (nPerm + 1);
 end
 
-%% Obtain median and CI
-[data_med, data_lb, data_ub] = getCI(data_allIter_allSubj, 1, 1);
-
-% [ttest_p_med, ttest_p_lb, ttest_p_ub] = getCI(p_ttest_allIter, 1, 1, CI_level);
-[ttest_t_med, ttest_t_lb, ttest_t_ub] = getCI(t_allIter, 1, 1, CI_level);
-[ttest_d_med, ttest_d_lb, ttest_d_ub] = getCI(CohenD_allIter, 1, 1, CI_level);
-
-% [p_ANOVA_med, p_ANOVA_lb, p_ANOVA_ub] = getCI(p_ANOVA_allIter, 1, 1, CI_level);
-[F_med, F_lb, F_ub] = getCI(F_allIter, 1, 1, CI_level);
+%% Obtain median and CI for stats
+% F value and partial eta2
+[Fvalue_med, Fvalue_lb, Fvalue_ub] = getCI(Fvalue_allIter, 1, 1, CI_level);
 [eta2p_med, eta2p_lb, eta2p_ub] = getCI(eta2p_allIter, 1, 1, CI_level);
 
-str_ANOVA = sprintf('ANOVA: F=%.2f [%.2f, %.2f], p=%.3f, eta2=%.2f [%.2f, %.2f]', ...
-    F_med, F_lb, F_ub, ...
+% t-score and cohen's D
+[tscore_med, tscore_lb, tscore_ub] = getCI(tscore_allIter, 1, 1, CI_level);
+[cohenD_med, cohenD_lb, cohenD_ub] = getCI(CohenD_allIter, 1, 1, CI_level);
+
+%% Put up strings
+str_ANOVA = sprintf('ANOVA: F=%.2f [%.2f, %.2f], p=%.3f, eta2p=%.2f [%.2f, %.2f]', ...
+    Fvalue_med, Fvalue_lb, Fvalue_ub, ...
     p_ANOVA_perm, ...
     eta2p_med, eta2p_lb, eta2p_ub);
 if nCond==2
     str_ttest = sprintf('T-test: t=%.2f [%.2f, %.2f], p=%.3f, CohenD=%.2f [%.2f, %.2f]', ...
-        ttest_t_med, ttest_t_lb, ttest_t_ub, ...
+        tscore_med, tscore_lb, tscore_ub, ...
         p_ttest_perm, ...
-        ttest_d_med, ttest_d_lb, ttest_d_ub);
+        cohenD_med, cohenD_lb, cohenD_ub);
 else
     str_ttest = '';
 end
 
-%% Difference
-diff_allIter_allSubj = squeeze(data_allIter_allSubj(:, :, 1) - data_allIter_allSubj(:, :, 2));
-[diff_ave_allIter] = getCI(diff_allIter_allSubj, 2, 2);
-[diff_ave_med, diff_ave_lb, diff_ave_ub] = getCI(diff_ave_allIter, 1, 1, CI_level);
-str_sig = ''; if diff_ave_lb*diff_ave_ub>0, str_sig = '*'; end
+% Difference
 if nCond==2
+    diff_allIter_allSubj = squeeze(data_allIter_allSubj(:, :, 1) - data_allIter_allSubj(:, :, 2));
+    [diff_ave_allIter] = getCI(diff_allIter_allSubj, 2, 2);
+    [diff_ave_med, diff_ave_lb, diff_ave_ub] = getCI(diff_ave_allIter, 1, 1, CI_level);
+    str_sig = ''; if diff_ave_lb*diff_ave_ub>0, str_sig = '*'; end
     str_diff = sprintf('Diff%s=%.2f [%.2f, %.2f]', str_sig, diff_ave_med, diff_ave_lb, diff_ave_ub);
 else
     str_diff = '';
 end
 
 %% Obtain group ave and sem for plotting
-[data_ave, ~, ~, data_sem] = getCI(data_med, 2, 1);
+[data_ave, ~, ~, data_sem] = getCI(data_med_allSubj, 2, 1);
 
-%%
+%% PLOT
 figure('Position', [0, 200, sz_fig])
 hold on
 
@@ -179,7 +167,7 @@ for iCond = 1:nCond
     %     errorbar(iCond, ave(iCond), sem(iCond), '.', 'color', 'k', 'CapSize', 0, 'linewidth', wd)
 end % iCond
 
-%% Plot idvd data
+%% Plot idvd data (grey lines)
 buffer = .2;
 if flag_plotIDVD
 
@@ -190,13 +178,17 @@ if flag_plotIDVD
     end
 
     for iSubj = 1:nSubj
-        plot(x, data_med(iSubj, :), '-',  ...
+        plot(x, data_med_allSubj(iSubj, :), '-',  ...
             'color',ones(1,3)*.7, 'markerfacecolor', 'w', 'markeredgecolor', ones(1,3)*.7, ...
             'markersize', sz_marker_idvd, 'linewidth', wd)
     end
 end
 
-%% Draw ref and compare bars with ref (print in command window)
+%% Draw ref and compare bars with ref
+% Get group means of all iterations
+[data_allIter_ave] = getCI(data_allIter_allSubj, 2, 2);
+[~, data_ave_lb, data_ave_ub] = getCI(data_allIter_ave, 1, 1, CI_level);
+
 str_Comp2Ref = '';
 if ~isnan(ref)
     if length(ref)>1; error('ALERT: there are more than one REF!!!'), end
@@ -211,11 +203,10 @@ if ~isnan(ref)
     end
 end
 
-%% Compare two loc (ttest, draw sem of diff)
+%% Plot SEM of difference (one errorbar)
 if nCond==2 && flag_plotDiff
-    [~, ~, ~, diff_sem] = getCI(getCI(diff_allIter_allSubj, 1, 1), 2, 2);
-
     yDiffSEM = y_ticks(end) - (y_ticks(end) - y_ticks(1))/interval_diffBar;
+    [~, ~, ~, diff_sem] = getCI(getCI(diff_allIter_allSubj, 1, 1), 2, 2);
     errorbar(1.5, yDiffSEM, diff_sem, 'k', 'CapSize', 0, 'linewidth', wd, 'HandleVisibility', 'off')
     plot([1,2], [yDiffSEM, yDiffSEM], 'k-', 'linewidth', wd, 'HandleVisibility', 'off')
     %     string_s = getString_starts(p);
@@ -241,21 +232,21 @@ title(sprintf('%s\n%s\n%s\n%s\n%s', str_title, str_ANOVA, str_ttest, str_diff, s
 
 end
 
-function [F, eta2_partial] = rm_oneway(Y)
+function [Fvalue, eta2_partial] = rm_oneway(data)
 % Repeated-measures one-way ANOVA F for Condition (within-subject)
 % Standard partition: SS_cond, SS_error (subject x condition interaction)
 
-[nSubj, nCond] = size(Y);
+[nSubj, nCond] = size(data);
 
-grand = mean(Y(:), 'omitnan');
-subj_mean = mean(Y, 2, 'omitnan');     % nSubj x 1
-cond_mean = mean(Y, 1, 'omitnan');     % 1 x nCond
+grand = mean(data(:), 'omitnan');
+subj_mean = mean(data, 2, 'omitnan');     % nSubj x 1
+cond_mean = mean(data, 1, 'omitnan');     % 1 x nCond
 
 SS_cond = nSubj * sum((cond_mean - grand).^2, 'omitnan');
 SS_subj = nCond * sum((subj_mean - grand).^2, 'omitnan');
 
 % Total SS
-SS_tot  = sum((Y - grand).^2, 'all', 'omitnan');
+SS_tot  = sum((data - grand).^2, 'all', 'omitnan');
 
 % Error term in RM one-way: subject x condition interaction
 SS_err = SS_tot - SS_cond - SS_subj;
@@ -266,7 +257,7 @@ df_err  = (nSubj - 1) * (nCond - 1);
 MS_cond = SS_cond / df_cond;
 MS_err  = SS_err  / df_err;
 
-F = MS_cond / MS_err;
+Fvalue = MS_cond / MS_err;
 
 % Compute the effect size: partial eta-squared
 eta2_partial = SS_cond/(SS_cond+SS_err);

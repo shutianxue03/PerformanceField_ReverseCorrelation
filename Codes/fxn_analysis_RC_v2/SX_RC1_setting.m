@@ -234,7 +234,7 @@ ORI_base_lb = -.2; ORI_base_ub = ORI_gain_ub;
 
 SF_peak_lb = 1e-3; SF_peak_ub = 4;
 SF_gain_lb = 1e-3; SF_gain_ub = .5;
-SF_width_lb = 1e-3; SF_width_ub = .4; % .2 is arbitrary
+SF_width_lb = 1e-3; SF_width_ub = 1; % 1 is arbitrary; but 0.4 is too low
 SF_base_lb = -.1; SF_base_ub = SF_gain_ub;
 
 ub_full_all = {

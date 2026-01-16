@@ -1,4 +1,4 @@
-function OOD_NOM_Trialwise_compIV(isubj, iLocComb, iModelA, nBoot)
+function OOD_NOM_Trialwise_compIV(isubj, iLocComb, iModelA, nIter, iJob, nJob)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % OOD_NOM_Trialwise_compIV.m
 %
@@ -10,10 +10,10 @@ function OOD_NOM_Trialwise_compIV(isubj, iLocComb, iModelA, nBoot)
 % 3. Computes behavioral metrics in the test set (these are the metrics the model will later try to match).
 % 4. Computes, normalizes, and bins empirical internal variables (IVs) for the test set.
 
-% The output is a .mat file containing, for each  bootstrap:
+% The output is a .mat file containing, for each  iteration:
 % - data_allB{ii}: struct with IVs, binning info, responses, etc.
-% - data_metrics_allB(ii,:): behavioral metrics per  bootstrap
-% - kernel2D_allB(ii,:,:): 2D templates (ORI x SF) per  bootstrap
+% - data_metrics_allB(ii,:): behavioral metrics per  iteration
+% - kernel2D_allB(ii,:,:): 2D templates (ORI x SF) per  iteration
 %
 % INPUTS
 % isubj : index of subject or IO info
@@ -39,15 +39,15 @@ function OOD_NOM_Trialwise_compIV(isubj, iLocComb, iModelA, nBoot)
 % 1 = PRS (signal-present) trials only
 % 2 = ABS (signal-absent) trials only
 % 3 = both PRS and ABS (not implemented here, falls through)
-% nBoot : number of resampling bootstraps
+% nIter : number of resampling iterations
 %
 % OUTPUTS (saved to disk)
 % nameFile_compIV = '.../n%d_A%d_compIV.mat', containing:
-% - c_zscore : SDT criterion (z units) per  bootstrap
-% - data_allBoot : cell array of "data" structs per  bootstrap
-% - data_metrics_allBoot : behavioral metrics per  bootstrap
-% - Template_train_allBoot : 2D kernels per  bootstrap (using trials in the training set)
-% - Template_full_allBoot : 2D kernels per  bootstrap (using all trials)
+% - c_zscore : SDT criterion (z units) per  iteration
+% - data_allIter : cell array of "data" structs per  iteration
+% - data_metrics_allIter : behavioral metrics per  iteration
+% - Template_train_allIter : 2D kernels per  iteration (using trials in the training set)
+% - Template_full_allIter : 2D kernels per  iteration (using all trials)
 % - names*, flag*, ratio_train, ORI_bound, *Type, etc.
 %
 % Notes:
@@ -62,7 +62,6 @@ clc; close all;
 warning off; % (You may want to remove this once things are stable.)
 format compact;
 time_start = datetime('now')
-rng(123); % define see for reproducibility
 
 addpath(genpath('fxn_exp'));
 addpath(genpath('fxn_NOM'));
@@ -70,11 +69,21 @@ addpath(genpath('fxn_RCplot'));
 addpath(genpath('fxn_analysis_RC_v2'));
 addpath(genpath('SX_toolbox/bads-master'));
 
-%% -------------------- General parameters -------------------- %%
-% Global settings for RC / NOM analyses
+%% Global settings 
+% Define directories
 % --------------%
 SX_RC1_setting; % defines nameFolder_*, nORI, nSF, namesLocComb, namesModelA, etc.
 % --------------%
+
+%% -------------------- Deterministic RNG (grand seed + per-iteration substreams) -------------------- %%
+S_seed = GetGrandSeed(nIter, iJob, nJob, nameFolder_Data);
+
+% One RNG stream for the whole job; each iteration uses its own Substream
+stream = RandStream('Threefry', 'Seed', S_seed.grandSeed);
+RandStream.setGlobalStream(stream);
+
+%% -------------------- General parameters -------------------- %%
+
 IVType = 1; % 1=sum of the dot product/convolution; 2=max; 3=normalized
 templateType = 3; % (1) raw (2) reconstructed kernel (3) mirrored template
 itype_template = 2; % 1=estimate template from PRS trials, ABS trials, or BOTH trials
@@ -149,14 +158,14 @@ end
 % fprintf('\nBehav and energy LOADED\n\n');
 
 % Output file name (before estimation)
-nameFile_compIV = sprintf('%s/n%d_A%d_compIV', nameFolder_NOM_save, nBoot, iModelA);
+nameFile_compIV = sprintf('%s/n%d_J%d_A%d_compIV', nameFolder_NOM_save, nIter, iJob, iModelA);
 
 %% Print run info
 fprintf('\n==================================\nStep 1: Compute IVs and derive templates\n================================== \n\n')
 fprintf(['\nSubject/IO name: %s ' ...
     '\n - L%d [%s]', ...
     '\n - A%d [%s]', ...
-    '\n - Number of bootstraps = %d', ...
+    '\n - Number of iterations = %d', ...
     '\n - Number of blocks = %d', ...
     '\n - nORI=%d | nSF=%d', ...
     '\n - Template derived from %s trials', ...
@@ -166,7 +175,7 @@ fprintf(['\nSubject/IO name: %s ' ...
     subjName, ...
     iLocComb, namesLocComb{iLocComb}, ...
     iModelA, namesModelA{iModelA}, ...
-    nBoot, ...
+    nIter, ...
     nblocks, nORI, nSF, ...
     namesType{itype_template}, flag_PatchMode, ...
     namesConvolveType{convolveType}, namesIVType{IVType});
@@ -188,9 +197,9 @@ end
 %% -------------------- Sanity check: iPRS consistent within pairs -------------------- %%
 % Col#1 = itrial_allT; Col#6 = iPRS; Col#8 = iPair;
 for ipair = 1:max(dataMatrix(:, 8))
-    iBoot = find(dataMatrix(:, 8) == ipair);
-    iPRS_A = dataMatrix(dataMatrix(:, 1) == iBoot(1), 6);
-    iPRS_B = dataMatrix(dataMatrix(:, 1) == iBoot(2), 6);
+    iIter = find(dataMatrix(:, 8) == ipair);
+    iPRS_A = dataMatrix(dataMatrix(:, 1) == iIter(1), 6);
+    iPRS_B = dataMatrix(dataMatrix(:, 1) == iIter(2), 6);
     if iPRS_A ~= iPRS_B
         fprintf('WARNING: when ipair=%d, iPRS_A=%d, iPRS_B=%d\n', ipair, iPRS_A, iPRS_B);
     end
@@ -260,8 +269,7 @@ templateType_true = 1; % doesn't matter much for the IO Gabor template
 stim.gaborCST = gaborCST;
 
 % Create a pool of Gabor filters
-[filter_sin, filter_cos] = SX_sim02_setFilters(stim, noise.filtersSF_all, ...
-    filtersOri_all, fxn_getSigma_SPdomain, 0);
+[filter_sin, filter_cos] = SX_sim02_setFilters(stim, noise.filtersSF_all, filtersOri_all, fxn_getSigma_SPdomain, 0);
 
 % Define the TRUE template (ORI x SF)
 template_gabor_true = exp_CreateGabor(stim, stim.gaborCST);
@@ -269,28 +277,30 @@ template_true = SX_RC4_Energy_parfor(stim.mask, {template_gabor_true}, filter_si
 template_true = squeeze(template_true); % remove singleton dim
 template_true = fxn_getTemplate(template_true, templateType_true, 0);
 
-%% -------------------- MAIN LOOP over  bootstraps -------------------- %%
-data_metrics_allBoot = nan(nBoot, nDatasets_full, nMetrics); % see fxn_getMetrics for all 11 metrics
-data_train_allBoot = cell(nBoot, 1);
-data_test_allBoot = data_train_allBoot;
-template_tmpl_allBoot = nan(nBoot, nORI, nSF);
-template_full_allBoot = template_tmpl_allBoot;
+%% -------------------- MAIN LOOP over  iterations -------------------- %%
+data_metrics_allIter = nan(nIter, nDatasets_full, nMetrics); % see fxn_getMetrics for all 11 metrics
+data_train_allIter = cell(nIter, 1);
+data_test_allIter = data_train_allIter;
+template_tmpl_allIter = nan(nIter, nORI, nSF);
+template_full_allIter = template_tmpl_allIter;
 
-sep_allBoot = nan(nBoot, 2); % 1=template set, 2=full set
-margORI_allBoot = nan(nBoot, 2, nORI);
-margPred_ORI_allBoot = nan(nBoot, 2, nORI);
-margParams_ORI_allBoot = nan(nBoot, 2, length(namesParams_all{iFamily_ORI}));
-margR2_ORI_allBoot = nan(nBoot, 2);
-margSF_allBoot = nan(nBoot, 2, nSF);
-margPred_SF_allBoot = nan(nBoot, 2, nSF);
-margParams_SF_allBoot = nan(nBoot, 2, length(namesParams_all{iFamily_SF}));
-margR2_SF_allBoot = nan(nBoot, 2);
+sep_allIter = nan(nIter, 2); % 1=template set, 2=full set
+margORI_allIter = nan(nIter, 2, nORI);
+margPred_ORI_allIter = nan(nIter, 2, nORI);
+margParams_ORI_allIter = nan(nIter, 2, length(namesParams_all{iFamily_ORI}));
+margR2_ORI_allIter = nan(nIter, 2);
+margSF_allIter = nan(nIter, 2, nSF);
+margPred_SF_allIter = nan(nIter, 2, nSF);
+margParams_SF_allIter = nan(nIter, 2, length(namesParams_all{iFamily_SF}));
+margR2_SF_allIter = nan(nIter, 2);
 
-fprintf('\n\nRunning nBoot = %d: ', nBoot);
+fprintf('\n\nRunning nIter = %d: ', nIter);
 
-for iBoot = 1:nBoot
+for iIter = 1:nIter
+    fprintf('%d... ', iIter);
 
-    fprintf('%d... ', iBoot);
+    % Deterministic randomness for THIS iteration (global index across jobs)
+    stream.Substream = S_seed.iterIdxList(iIter);
 
     %% 1. Resample trials into FULL or TEMPLATE/TRAIN / TEST
     %----------------%
@@ -382,17 +392,17 @@ for iBoot = 1:nBoot
         margR2_SF = 1-sumsqr(margSF-margPred_SF)/sumsqr(margSF-mean(margSF));
 
         % Store
-        sep_allBoot(iBoot, iDataset) = sep;
+        sep_allIter(iIter, iDataset) = sep;
 
-        margORI_allBoot(iBoot, iDataset, :) = margORI;
-        margPred_ORI_allBoot(iBoot, iDataset, :) = margPred_ORI;
-        margParams_ORI_allBoot(iBoot, iDataset, :) = margParams_ORI;
-        margR2_ORI_allBoot(iBoot, iDataset) = margR2_ORI;
+        margORI_allIter(iIter, iDataset, :) = margORI;
+        margPred_ORI_allIter(iIter, iDataset, :) = margPred_ORI;
+        margParams_ORI_allIter(iIter, iDataset, :) = margParams_ORI;
+        margR2_ORI_allIter(iIter, iDataset) = margR2_ORI;
 
-        margSF_allBoot(iBoot, iDataset, :) = margSF;
-        margPred_SF_allBoot(iBoot, iDataset, :) = margPred_SF;
-        margParams_SF_allBoot(iBoot, iDataset, :) = margParams_SF;
-        margR2_SF_allBoot(iBoot, iDataset) = margR2_SF;
+        margSF_allIter(iIter, iDataset, :) = margSF;
+        margPred_SF_allIter(iIter, iDataset, :) = margPred_SF;
+        margParams_SF_allIter(iIter, iDataset, :) = margParams_SF;
+        margR2_SF_allIter(iIter, iDataset) = margR2_SF;
     end % iDataset
 
     %% 5. Compute behavioral metrics for all data sets
@@ -409,7 +419,7 @@ for iBoot = 1:nBoot
     c_zscore_test = metrics_test(2);
     % CONFIRM if c_zscore should be from TRAIN set or TEST set!!
 
-    clear data; % size of IV differs across subjects and  bootstraps
+    clear data; % size of IV differs across subjects and  iterations
 
     %% 6. Compute internal variable (IV) from template and energy (TEST set)
     % 5.1 Derive template
@@ -441,7 +451,7 @@ for iBoot = 1:nBoot
     [nTrials_allBins_train, ~, iTrial4Bin_train] = histcounts(IV_train, nBins);
     [nTrials_allBins_test, ~, iTrial4Bin_test] = histcounts(IV_test, nBins);
 
-    %% 8. Compile data struct for this  bootstrap
+    %% 8. Compile data struct for this  iteration
     % Store data_train
     data_train = struct();
     data_train.c_zscore = c_zscore_train;
@@ -461,7 +471,7 @@ for iBoot = 1:nBoot
     data_train.respC = respC_train_rand;
     data_train.RT = RT_train_rand;
     data_train.metrics_sim = metrics_train; % keep field name 'metrics_sim'
-    data_train_allBoot{iBoot} = data_train;
+    data_train_allIter{iIter} = data_train;
 
     % Store data_test
     data_test = struct();
@@ -483,21 +493,21 @@ for iBoot = 1:nBoot
     data_test.RT = RT_test_rand;
     data_test.metrics_sim = metrics_test; % keep field name 'metrics_sim'
     % Store
-    data_test_allBoot{iBoot} = data_test;
+    data_test_allIter{iIter} = data_test;
 
     % Store metrics of three datasets together (for fast plotting in NOMplot_compIV)
-    data_metrics_allBoot(iBoot, :, :) = metrics;
+    data_metrics_allIter(iIter, :, :) = metrics;
 
     % Store templates
-    template_tmpl_allBoot(iBoot, :, :) = template_tmpl;
-    template_full_allBoot(iBoot, :, :) = template_full;
+    template_tmpl_allIter(iIter, :, :) = template_tmpl;
+    template_full_allIter(iIter, :, :) = template_full;
 
-end % end for iBoot
+end % end for iIter
 
-% fprintf('\n\n[L%d ModelA%d] ALL  bootstraps DONE\n', iLocComb, iModelA);
+% fprintf('\n\n[L%d ModelA%d] ALL  iterations DONE\n', iLocComb, iModelA);
 
 %% -------------------- SAVE -------------------- %%
-save(nameFile_compIV, 'template_true', 'c_zscore*', '*_allBoot', 'names*', 'flag*', 'ratio_split', 'ORI_bound', '*Type');
+save(nameFile_compIV, 'template_true', 'c_zscore*', '*_allIter', 'names*', 'flag*', 'ratio_split', 'ORI_bound', '*Type');
 fprintf('\n========== Binned IV saved ==========\n\n\n\n\n');
 
 %% -------------------- Plot (optional) -------------------- %%

@@ -3,8 +3,8 @@ function basicFxn_drawCorr_permutation( ...
 % =========================================================================
 % basicFxn_drawCorr_permutation
 % Inputs
-%   X_allIter_allSubj : 3D array 
-%   Y_allIter_allSubj : 3D array 
+%   X_allIter_allSubj : 3D array
+%   Y_allIter_allSubj : 3D array
 %       * May be in any dimension order, but must contain (nIter, nSubj, nCond)
 %       * Internally reshaped to canonical: [nIter x nSubj x nCond]
 %   colors            : [nCond x 3] RGB color per condition
@@ -20,7 +20,7 @@ function basicFxn_drawCorr_permutation( ...
 %   type_tail         : tail for significance tests ('both','right','left')
 %   str_title         : base title string (will be appended with results)
 %   markers_allSubj   : cell array (nSubj x 1) of marker symbols per observer (e.g., 'o','s','+','x')
-%   nIter             : number of iterations 
+%   nIter             : number of iterations
 %
 % Output
 %   str_sig           : string label based on median partial-corr p-value:
@@ -92,6 +92,53 @@ switch flag_zeroMean
         Y_lb_plot = Y_lb_allSubj;  Y_ub_plot = Y_ub_allSubj;
 end
 
+%% Permutation test on MEDIANS (p-values)
+% Preserves within-observer structure across conditions by permuting rows of Y.
+nPerm = 1e4;
+
+X_obs = X_med_plot;   % nSubj x nCond
+Y_obs = Y_med_plot;   % nSubj x nCond
+
+% --- observed statistics ---
+% Partial correlation controlling for condition:
+% Implemented as correlation after removing condition means from X and Y.
+X_res = X_obs - mean(X_obs, 1, 'omitnan');
+Y_res = Y_obs - mean(Y_obs, 1, 'omitnan');
+r_partial_obs = corr(X_res(:), Y_res(:), 'type', type_corr, 'rows', 'complete');
+
+% Per-condition correlations (across observers)
+r_perCond_obs = nan(1, nCond);
+for iCond = 1:nCond
+    r_perCond_obs(iCond) = corr(X_obs(:,iCond), Y_obs(:,iCond), ...
+        'type', type_corr, 'rows', 'complete');
+end
+
+% --- permuted null distributions ---
+r_partial_perm = nan(nPerm,1);
+r_perCond_perm = nan(nPerm,nCond);
+
+for iPerm = 1:nPerm
+    idx = randperm(nSubj);
+    Yp = Y_obs(idx, :);   % block permutation across observers
+
+    % partial (demean within condition)
+    Yp_res = Yp - mean(Yp, 1, 'omitnan');
+    r_partial_perm(iPerm) = corr(X_res(:), Yp_res(:), 'type', type_corr, 'rows', 'complete');
+
+    for iCond = 1:nCond
+        r_perCond_perm(iPerm,iCond) = corr(X_obs(:,iCond), Yp(:,iCond), ...
+            'type', type_corr, 'rows', 'complete');
+    end
+end
+
+% Convert to p-values (tail-aware, +1 correction)
+p_partial_perm = fxn_perm_pval(r_partial_perm, r_partial_obs, type_tail);
+p_perCond_perm = nan(1,nCond);
+for iCond = 1:nCond
+    p_perCond_perm(iCond) = fxn_perm_pval(r_perCond_perm(:,iCond), r_perCond_obs(iCond), type_tail);
+end
+
+
 %% 4) Scatter plot of medians (optionally with per-point CI bars)
 figure('Position', [0 200 1e3 1e3]);
 hold on; box on
@@ -162,10 +209,9 @@ for iCond = 1:nCond
     yfit_allCond_OnMed(iCond, :) = polyval(polyfit_perCond_OnMed, x_allCond(iCond, :));
 end
 
-%% 7) Regression PER BOOT
+%% 7) Regression PER iteration
 yfit_global_allIter   = nan(nIter, nSamples);          % global regression line per iteration
 yfit_perCond_allIter  = nan(nIter, nSamples, nCond);   % per-condition regression line per iteration
-eta2_global_allIter   = nan(nIter, 1);                 % eta^2 per iteration (global)
 
 r_partial_allIter = nan(nIter, 1); % partial corr (global association controlling for condition)
 p_partial_allIter = nan(nIter, 1);
@@ -193,20 +239,19 @@ for iIter = 1:nIter
     % --- Correlations ---
     % Partial correlation controlling for condition.
     [r_partial_allIter(iIter), p_partial_allIter(iIter)] = partialcorr( ...
-        x_perBoot(:), y_perBoot(:), ANOVA_indCond(:), 'type', type_corr, 'tail', type_tail);
+        x_reg(:), y_reg(:), ANOVA_indCond(:), 'type', type_corr, 'tail', type_tail);
 
-    % Correlation within each condition (across observers)
     for iCond = 1:nCond
         [r_perCond_allIter(iIter, iCond), p_perCond_allIter(iIter, iCond)] = corr( ...
-            x_perBoot(:, iCond), y_perBoot(:, iCond), 'type', type_corr, 'tail', type_tail);
+            x_reg(:, iCond), y_reg(:, iCond), 'type', type_corr, 'tail', type_tail);
     end
+
 
     % --- Regressions ---
     % Global
     if numel(unique(x_reg(:))) >= 2
         polyfit_global_perBoot = polyfit(x_reg(:), y_reg(:), 1);
         yfit_global_allIter(iIter, :) = polyval(polyfit_global_perBoot, x_global);
-        eta2_global_allIter(iIter) = var(polyval(polyfit_global_perBoot, x_reg(:))) / var(y_reg(:));
     end
 
     % Per condition
@@ -218,29 +263,26 @@ end
 
 %% 8) Summarize distributions (median + CI)
 [r_med_partial, r_lb_partial, r_ub_partial] = getCI(r_partial_allIter, 1, 1, CI_level);
-[p_med_partial, p_lb_partial, p_ub_partial] = getCI(p_partial_allIter, 1, 1, CI_level);
-[eta2_med, eta2_lb, eta2_ub] = getCI(eta2_global_allIter, 1, 1, CI_level);
-
 [r_med_perCond, r_lb_perCond, r_ub_perCond] = getCI(r_perCond_allIter, 1, 1, CI_level);
-[p_med_perCond, p_lb_perCond, p_ub_perCond] = getCI(p_perCond_allIter, 1, 1, CI_level);
 
 %% 9) Plot regression lines (from medians) + CI bands (from per iteration)
 % Global
 % if p_med_partial < .1
-    [~, yfit_global_lb, yfit_global_ub] = getCI(yfit_global_allIter, 1, 1);
-    patch([x_global fliplr(x_global)], [yfit_global_lb fliplr(yfit_global_ub)], ...
-        ones(1,3)*.6, 'EdgeColor','none', 'FaceAlpha', 0.20, 'HandleVisibility','off');
-    plot(x_global, yfit_global_OnMed, '-', 'color', ones(1,3)*.4, ...
-        'HandleVisibility','off', 'LineWidth', wd_border*1.5);
+[~, yfit_global_lb, yfit_global_ub] = getCI(yfit_global_allIter, 1, 1);
+patch([x_global fliplr(x_global)], [yfit_global_lb fliplr(yfit_global_ub)], ...
+    ones(1,3)*.6, 'EdgeColor','none', 'FaceAlpha', 0.20, 'HandleVisibility','off');
+plot(x_global, yfit_global_OnMed, '-', 'color', ones(1,3)*.4, ...
+    'HandleVisibility','off', 'LineWidth', wd_border*1.5);
 % end
 
 % Per condition
 for iCond = 1:nCond
-    if p_med_perCond(iCond) < .1
+    if p_perCond_perm(iCond) < .1
         lineStyle = '-';
     else
         lineStyle = '--';
     end
+
     [~, yfit_perCond_lb, yfit_perCond_ub] = getCI(yfit_perCond_allIter(:, :, iCond), 1, 1);
     patch([x_allCond(iCond, :) fliplr(x_allCond(iCond, :))], [yfit_perCond_lb fliplr(yfit_perCond_ub)], ...
         colors(iCond,:), 'EdgeColor','none', 'FaceAlpha', 0.12, 'HandleVisibility','off');
@@ -268,18 +310,37 @@ ax.LineWidth = wd_border;
 %     str_sig = '_mg';
 % end
 
-str_partial = sprintf('Partial r=%.2f [%.2f, %.2f], eta2=%.2f [%.2f, %.2f]', ...
-    r_med_partial, r_lb_partial, r_ub_partial, eta2_med, eta2_lb, eta2_ub);
+% Partial correlation across locations
+str_partial = sprintf('Partial r=%.2f [%.2f, %.2f], p=%.3f', r_med_partial, r_lb_partial, r_ub_partial, p_partial_perm);
 
+% Correlation per location
 str_perCond = "";
 for iCond = 1:nCond
     if mod(iCond-1, 3) == 0 && iCond > 1
         str_perCond = str_perCond + sprintf('\n');
     end
-    str_perCond = str_perCond + sprintf('Cond#%d: r=%.2f [%.2f, %.2f] | ', ...
-        iCond, r_med_perCond(iCond), r_lb_perCond(iCond), r_ub_perCond(iCond));
+    str_perCond = str_perCond + sprintf('Cond#%d: r=%.2f [%.2f, %.2f], p=%.3f | ', ...
+        iCond, r_med_perCond(iCond), r_lb_perCond(iCond), r_ub_perCond(iCond), p_perCond_perm(iCond));
 end
 
-title(sprintf('%s\n%s\n%s', str_title, str_partial, str_perCond));
+title(sprintf('%s\n%s\n%s\n', str_title, str_partial, str_perCond));
+
+%%
+    function p = fxn_perm_pval(nullStats, obsStat, type_tail)
+        % Permutation p-value with +1 correction
+        nullStats = nullStats(~isnan(nullStats));
+        n = numel(nullStats);
+
+        switch lower(type_tail)
+            case {'both','two','two-sided','twosided'}
+                p = (1 + sum(abs(nullStats) >= abs(obsStat))) / (n + 1);
+            case {'right','greater'}
+                p = (1 + sum(nullStats >= obsStat)) / (n + 1);
+            case {'left','less'}
+                p = (1 + sum(nullStats <= obsStat)) / (n + 1);
+            otherwise
+                error('Unknown type_tail: %s', type_tail);
+        end
+    end
 
 end
