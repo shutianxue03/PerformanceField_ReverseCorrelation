@@ -156,7 +156,7 @@ for iUnik = 1:nPairs
     
     % --- CAP: enforce positive definiteness ---
     % Need CovAB^2 < varA * varB; sufficient to enforce CovAB < min(varA,varB).”
-    CovAB = min(CovAB, 0.999 * sqrt(var_total_passA, var_total_passB));
+    CovAB = min(CovAB, 0.999 * sqrt(var_total_passA* var_total_passB));
 
     % Create the covariance matrix
     CovMtx = [ var_total_passA, CovAB; ...

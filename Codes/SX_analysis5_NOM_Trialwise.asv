@@ -1438,15 +1438,15 @@ load(nameFolder_Data_SaveCompile, 'margTunC_*_allCond')
 nameVarX = 'CS';
 nameVarY = 'tunC';
 
-nameFolder_Fig_NOM_CompAsym = sprintf('%s/CompAsym/%s_%s', nameFolder_Fig_NOM_Trialwise, nameVarX, nameVarY);
+nameFolder_Fig_NOM_CompAsym = sprintf('%s/CorrAsym/%s_%s', nameFolder_Fig_NOM_Trialwise, nameVarX, nameVarY);
 if isempty(dir(nameFolder_Fig_NOM_CompAsym)); mkdir(nameFolder_Fig_NOM_CompAsym), end
 
-sz_label = 15;
+sz_label = 25;
 sz_labelOffset = 0.01;
 sz_axOffset = 0.05; % extra breathing room
 nBinsCompAsym = 2;
-sz_wd_perBar = 200;
-sz_fig = [1e3, 500];
+sz_wd_perBar = 100;
+sz_fig = [nBinsCompAsym*sz_wd_perBar, 250];
 
 for iGroup = 1:nGroups
     iLocPair_all = iLocGroups_all{iGroup};
@@ -1513,32 +1513,32 @@ for iGroup = 1:nGroups
 
             % remove later!!s
             asymX_allIter_allSubj_ = repmat(asymX_allIter_allSubj, 5, 1);
-            asymX_allIter_allSubj_ = asymX_allIter_allSubj_+randn(size(asymX_allIter_allSubj_))*mean(asymX_allIter_allSubj_(:))/20;
+            asymX_allIter_allSubj_
             asymY_allIter_allSubj_ = repmat(asymY_allIter_allSubj, 5, 1);
-            asymY_allIter_allSubj_ = asymY_allIter_allSubj_+randn(size(asymY_allIter_allSubj_))*mean(asymY_allIter_allSubj_(:))/20;
+            % asymY_allIter_allSubj = [asymY_allIter_allSubj; asymY_allIter_allSubj+randn(size(asymY_allIter_allSubj));asymY_allIter_allSubj+randn(size(asymY_allIter_allSubj));asymY_allIter_allSubj+randn(size(asymY_allIter_allSubj))];
 
-            str_ylabel = sprintf('\\Delta %s %s (%%)', namesFeature{iFeature}, namesTunC_noUnit{iFamily_perF(iFeature), 2}{iTunC});
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            basicFxn_compAsym_permutation(asymX_allIter_allSubj_*100, asymY_allIter_allSubj_*100, nBinsCompAsym, y_ticks, sz_fig, str_title, str_ylabel)
+            % basicFxn_drawCorrAsym_permutation(asymX_allIter_allSubj*100, asymY_allIter_allSubj*100, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj)
+            basicFxn_compAsym_permutation(asymX_allIter_allSubj*100, asymY_allIter_allSubj*100, nBinsCompAsym, y_ticks, sz_fig, str_title)
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
             % xlabel(sprintf('\\Delta contrast sensitivity (%%)'), 'FontSize', sz_label);
-            % ylabel(str_ylabel, 'fontsize', sz_label)
+            ylabel(sprintf('\\Delta %s %s (%%)', namesFeature{iFeature}, namesTunC_noUnit{iFamily_perF(iFeature), 2}{iTunC}), 'fontsize', sz_label)
 
             % Adjust distance between components
-            % ax = gca;
-            % ti = ax.TightInset;   % [left bottom right top] padding needed for labels/ticks
-            % 
-            % ax.XLabel.Units = 'normalized';
-            % ax.YLabel.Units = 'normalized';
-            % 
-            % ax.XLabel.Position(2) = ax.XLabel.Position(2) - sz_labelOffset;   % move label down
-            % ax.YLabel.Position(1) = ax.YLabel.Position(1) - sz_labelOffset;   % move label left
-            % ax.Position = [ ...
-            %     ti(1) + sz_axOffset, ...
-            %     ti(2) + sz_axOffset, ...
-            %     1 - ti(1) - ti(3) - 2*sz_axOffset, ...
-            %     1 - ti(2) - ti(4) - 2*sz_axOffset];
+            ax = gca;
+            ti = ax.TightInset;   % [left bottom right top] padding needed for labels/ticks
+
+            ax.XLabel.Units = 'normalized';
+            ax.YLabel.Units = 'normalized';
+
+            ax.XLabel.Position(2) = ax.XLabel.Position(2) - sz_labelOffset;   % move label down
+            ax.YLabel.Position(1) = ax.YLabel.Position(1) - sz_labelOffset;   % move label left
+            ax.Position = [ ...
+                ti(1) + sz_axOffset, ...
+                ti(2) + sz_axOffset, ...
+                1 - ti(1) - ti(3) - 2*sz_axOffset, ...
+                1 - ti(2) - ti(4) - 2*sz_axOffset];
 
             drawnow, pause(1), saveas(gcf, sprintf('%s/n%d_L%d%d_%s.png', nameFolder_Fig_NOM_CompAsym, nsubj, iLocPair_all, nameVarY_fileTitle))
             close(gcf)
@@ -1548,93 +1548,6 @@ for iGroup = 1:nGroups
 end % iGroup
 clear margTunC_*_allCond
 fprintf('\n\n Plotting DONE\n\n')
-
-%% CompAsym2: CorrAsym (CS and NOMparams): corr between extents of EE/HVA/VMA
-clc, fprintf('\n\n Plotting STARTED......\n\n')
-
-% Load data
-load(nameFolder_Data_SaveCompile, 'params_allCond')
-
-nameVarX = 'CS';
-nameVarY = 'NOMparams';
-
-nameFolder_Fig_NOM_CompAsym = sprintf('%s/CompAsym/%s_%s', nameFolder_Fig_NOM_Trialwise, nameVarX, nameVarY);
-if isempty(dir(nameFolder_Fig_NOM_CompAsym)); mkdir(nameFolder_Fig_NOM_CompAsym), end
-
-sz_label = 15;
-sz_labelOffset = 0.05;
-sz_axOffset = 0.05; % extra breathing room
-
-for iGroup = 1:nGroups
-    iLocPair_all = iLocGroups_all{iGroup};
-
-    switch iLocPair_all(1)
-        case 1, nameAsymX = 'Ecc. effect'; nameAsymY = 'Ecc. effect';
-        case 6, nameAsymX = 'HVA'; nameAsymY = 'HVA';
-        case 5, nameAsymX = 'VMA'; nameAsymY = 'VMA';
-    end
-
-    asymX_allSubj = (CS_allSubj(:, iLocPair_all(1))-CS_allSubj(:, iLocPair_all(2)))./(CS_allSubj(:, iLocPair_all(1))+CS_allSubj(:, iLocPair_all(2)));
-    switch iLocPair_all(1)
-        case 1, x_ticks = linspace(0, 20, 5); % EE
-        case 6, x_ticks = linspace(-5, 15, 5); % HVA
-        case 5, x_ticks = linspace(0, 12, 5); % VMA (extent is smaller)
-    end
-    asymX_allIter_allSubj = repmat(asymX_allSubj, 1, nIterxJob)';
-
-    for iNOMparam = 1:nNOMparams
-        NOMp_allIter_allSubj = squeeze(params_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iNOMparam));
-
-        asymY_allIter_allSubj = squeeze((NOMp_allIter_allSubj(1, :, :)-NOMp_allIter_allSubj(2, :, :))./(NOMp_allIter_allSubj(1, :, :)+NOMp_allIter_allSubj(2, :, :)));
-
-        y_ticks_lb = -[30, 20, 20]; y_ticks_ub = [50 40 60];
-        y_ticks = linspace(y_ticks_lb(iNOMparam), y_ticks_ub(iNOMparam), 5);
-
-        x_ticklabels = nan;
-        y_ticklabels = nan;
-
-        nameVarY_figTitle = namesModelBparams{iModelB_plot}{iNOMparam};
-        nameVarY_fileTitle = nameVarY_figTitle;
-
-        str_title = sprintf('n=%d, %s (%s) vs. %s (%s)', nsubj, nameVarX, nameAsymX, nameVarY_figTitle, nameAsymY);
-
-            % remove later!!s
-            asymX_allIter_allSubj_ = repmat(asymX_allIter_allSubj', 5, 1);
-            asymX_allIter_allSubj_ = asymX_allIter_allSubj_+randn(size(asymX_allIter_allSubj_))*mean(asymX_allIter_allSubj_(:))/20;
-            asymY_allIter_allSubj_ = repmat(asymY_allIter_allSubj, 5, 1);
-            asymY_allIter_allSubj_ = asymY_allIter_allSubj_+randn(size(asymY_allIter_allSubj_))*mean(asymY_allIter_allSubj_(:))/20;
-
-            str_ylabel = sprintf('\\Delta %s (%%)', nameVarY_figTitle);
-            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            basicFxn_compAsym_permutation(asymX_allIter_allSubj_*100, asymY_allIter_allSubj_*100, nBinsCompAsym, y_ticks, sz_fig, str_title, str_ylabel)
-            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-        % xlabel(sprintf('\\Delta contrast sensitivity (%%)'), 'FontSize', sz_label);
-        % ylabel(, 'fontsize', sz_label)
-
-        % Adjust distance between components
-        % ax = gca;
-        % ti = ax.TightInset;   % [left bottom right top] padding needed for labels/ticks
-        % 
-        % ax.XLabel.Units = 'normalized';
-        % ax.YLabel.Units = 'normalized';
-        % 
-        % ax.XLabel.Position(2) = ax.XLabel.Position(2) - sz_labelOffset;   % move label down
-        % ax.YLabel.Position(1) = ax.YLabel.Position(1) - sz_labelOffset;   % move label left
-        % ax.Position = [ ...
-        %     ti(1) + sz_axOffset, ...
-        %     ti(2) + sz_axOffset, ...
-        %     1 - ti(1) - ti(3) - 2*sz_axOffset, ...
-        %     1 - ti(2) - ti(4) - 2*sz_axOffset];
-
-        drawnow, pause(1), saveas(gcf, sprintf('%s/n%d_L%d%d_NOM%d.png', nameFolder_Fig_NOM_CompAsym, nsubj, iLocPair_all, iNOMparam))
-        close(gcf)
-
-    end % iNOMparam
-end % iGroup
-clear params_allCond
-fprintf('\n\n Plotting DONE\n\n')
-
 
 %% CorrAsym1: (CS and tunC): corr between extents of EE/HVA/VMA
 flag_plotIdvdCI = 1;

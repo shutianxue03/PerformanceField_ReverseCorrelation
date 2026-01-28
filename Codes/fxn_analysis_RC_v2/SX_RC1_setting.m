@@ -17,11 +17,11 @@ nORI = 29;
 nSF = nORI;
 
 %% Define names of folders to load/save data (on the server)
-% if run on HPC
+% if run on HPC OOD
 nameFolder_server = '/scratch/sx712/PF_RC'; str_envir = 'HPC'; 
 
-% if run on server
-nameFolder_server = '/Volumes/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC'; str_envir = 'Server'; 
+% if run on server (mute if run on OOD)
+nameFolder_server = '/Volumes/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC'; str_envir = 'Server';
 
 % if run on local for model simulation
 % nameFolder_server = '/Users/xueshutian/Desktop/GitHub_local/PF_RC'; str_envir = 'Local'; 

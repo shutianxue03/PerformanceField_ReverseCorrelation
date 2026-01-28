@@ -10,12 +10,12 @@
 %
 % Usage:
 %  Run this script after executing OOD_NOM_Trialwise_compIV.m and loading its output.
-%  The script expects variables such as data_allB, data_metrics_allBoot, kernel2D, axis_tuning,
+%  The script expects variables such as data_allB, data_metrics_allIter, kernel2D, axis_tuning,
 %  axisTicks_tuning, axisTL_tuning, and namesMetrics to be available in the workspace.
 %
 % Inputs:
 %  - data_allB: cell array containing IV, bin counts, and trial data for each iteration
-%  - data_metrics_allBoot: matrix of performance metrics for each iteration
+%  - data_metrics_allIter: matrix of performance metrics for each iteration
 %  - kernel2D: 2D kernel matrix
 %  - axis_tuning, axisTicks_tuning, axisTL_tuning: axis info for kernel plot
 %  - namesMetrics: cell array of metric names
@@ -35,7 +35,7 @@ figure('Position', [100, 100, 2e3, 2e3])
 for iMetric = 1:nMetrics
     subplot(3, 4, iMetric), hold on
 
-    [metric_med, ~, ~, metric_sem_neg, metric_sem_pos] = getCI(data_metrics_allBoot(:, :, iMetric), 1, 1);
+    [metric_med, ~, ~, metric_sem_neg, metric_sem_pos] = getCI(data_metrics_allIter(:, :, iMetric), 1, 1);
 
     for iDataset = 1:nDatasets % iDataset: 1=full, 2=tmpl, 3=train, 4=test
         if iDataset==1, color_face = 'k'; else, color_face = 1-ratio_split(iDataset-1)*ones(1,3); end
@@ -69,13 +69,13 @@ end
 set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
 set(findall(gcf, '-property', 'linewidth'), 'linewidth', 2)
 
-sgtitle(sprintf('Figure 1. Measured metrics (Ave across %d boots +- 68%% CI)\n%s (Loc%d ModelA%d %s)', ...
-    nBoot, subjName, iLocComb, iModelA, namesModelA{iModelA}))
+sgtitle(sprintf('Figure 1. Measured metrics (Ave across %d iterations +- 68%% CI)\n%s (Loc%d ModelA%d %s)', ...
+    nIter, subjName, iLocComb, iModelA, namesModelA{iModelA}))
 saveas(gcf, sprintf('%s/1MetricMeasured_%s_L%d_A%d.jpg', nameFolder_Figures_NOM, subjName, iLocComb, iModelA))
 
 %% Figure 2: 2D Kernel
-template_tmpl_ave = squeeze(mean(template_tmpl_allBoot, 1));
-template_full_ave = squeeze(mean(template_full_allBoot, 1));
+template_tmpl_ave = squeeze(mean(template_tmpl_allIter, 1));
+template_full_ave = squeeze(mean(template_full_allIter, 1));
 
 figure('Position', [100, 100, 2e3, 2e3])
 
@@ -137,36 +137,36 @@ set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
 set(findall(gcf, '-property', 'linewidth'), 'linewidth',2)
 
 % Calculate Pearson's corr
-r_allBoot = nan(nBoot, 1);
-p_allBoot = r_allBoot;
-for iBoot = 1:nBoot
-    kA = template_full_allBoot(iBoot, :, :);
+r_allIter = nan(nIter, 1);
+p_allIter = r_allIter;
+for iIter = 1:nIter
+    kA = template_full_allIter(iIter, :, :);
     kA = kA(:);
     kB = template_true(:);
     [r, p] = corr(kA, kB);
-    r_allBoot(iBoot) = r;
-    p_allBoot(iBoot) = p;
+    r_allIter(iIter) = r;
+    p_allIter(iIter) = p;
 end
-[r_med, ~, ~, r_SEM] = getCI(r_allBoot, 1, 1);
-[p_med, ~, ~, p_SEM] = getCI(p_allBoot, 1, 1);
+[r_med, ~, ~, r_SEM] = getCI(r_allIter, 1, 1);
+[p_med, ~, ~, p_SEM] = getCI(p_allIter, 1, 1);
 
-sgtitle(sprintf('Figure 2. Recovered template\n%s (L%d, ModelA%d %s, nBoot=%d)\nAveraged Pearson''s corr: r=%.2f (%.2f), p=%.3f (%.2f)', ...
-    subjName, iLocComb, iModelA, namesModelA{iModelA}, nBoot, r_med, r_SEM, p_med, p_SEM))
+sgtitle(sprintf('Figure 2. Recovered template\n%s (L%d, ModelA%d %s, nIter=%d)\nAveraged Pearson''s corr: r=%.2f (%.2f), p=%.3f (%.2f)', ...
+    subjName, iLocComb, iModelA, namesModelA{iModelA}, nIter, r_med, r_SEM, p_med, p_SEM))
 
 saveas(gcf, sprintf('%s/2Template_%s_L%d_A%d.jpg', nameFolder_Figures_NOM, subjName, iLocComb, iModelA))
 
 %% Figure 3. Plot marg and margPred, print R2 and params in the title
-[margORI_med, ~, ~, margORI_sem] = getCI(margORI_allBoot, 1, 1);
-[margSF_med, ~, ~, margSF_sem] = getCI(margSF_allBoot, 1, 1);
+[margORI_med, ~, ~, margORI_sem] = getCI(margORI_allIter, 1, 1);
+[margSF_med, ~, ~, margSF_sem] = getCI(margSF_allIter, 1, 1);
 
-[margPred_ORI_med, ~, ~, margPred_ORI_sem] = getCI(margPred_ORI_allBoot, 1, 1);
-[margPred_SF_med, ~, ~, margPred_SF_sem] = getCI(margPred_SF_allBoot, 1, 1);
+[margPred_ORI_med, ~, ~, margPred_ORI_sem] = getCI(margPred_ORI_allIter, 1, 1);
+[margPred_SF_med, ~, ~, margPred_SF_sem] = getCI(margPred_SF_allIter, 1, 1);
 
-[margParam_ORI_med, ~, ~, margParam_ORI_sem] = getCI(margParams_ORI_allBoot, 1, 1);
-[margParam_SF_med, ~, ~, margParam_SF_sem] = getCI(margParams_SF_allBoot, 1, 1);
+[margParam_ORI_med, ~, ~, margParam_ORI_sem] = getCI(margParams_ORI_allIter, 1, 1);
+[margParam_SF_med, ~, ~, margParam_SF_sem] = getCI(margParams_SF_allIter, 1, 1);
 
-[margR2_ORI_med, ~, ~, margR2_ORI_sem] = getCI(margR2_ORI_allBoot, 1, 1);
-[margR2_SF_med, ~, ~, margR2_SF_sem] = getCI(margR2_SF_allBoot, 1, 1);
+[margR2_ORI_med, ~, ~, margR2_ORI_sem] = getCI(margR2_ORI_allIter, 1, 1);
+[margR2_SF_med, ~, ~, margR2_SF_sem] = getCI(margR2_SF_allIter, 1, 1);
 
 figure('Position', [0 0 1e3 1e3])
 % ORI tuning (training set)
@@ -205,8 +205,8 @@ yline(0, 'k--', 'LineWidth', 1); % Marginalized kernel=0
 title(sprintf('SF tuning function (full set)\nR2=%.2f (+-%.2f)| Params=[%s]', margR2_SF_med(2), margR2_SF_sem(2), num2str(margParam_SF_med(2, :), ' %.2f')));
 xlabel('Log Spatial frequency (cpd)'); ylabel('Amplitude');
 
-sgtitle(sprintf('Figure 3. Tuning functions\n%s (L%d, ModelA%d %s, nBoot=%d)', ...
-    subjName, iLocComb, iModelA, namesModelA{iModelA}, nBoot))
+sgtitle(sprintf('Figure 3. Tuning functions\n%s (L%d, ModelA%d %s, nIter=%d)', ...
+    subjName, iLocComb, iModelA, namesModelA{iModelA}, nIter))
 
 set(findall(gcf, '-property', 'fontsize'), 'fontsize', 20)
 % set(findall(gcf, '-property', 'linewidth'), 'linewidth', 2)

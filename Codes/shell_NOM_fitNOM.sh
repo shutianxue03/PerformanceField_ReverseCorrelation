@@ -11,10 +11,14 @@
 # ============================================================
 
 #SBATCH --nodes=1
+#SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=32G
-#SBATCH --time=1:00:00
-#SBATCH --output=zzz_NOM2_fitNOM_%j.out
+#SBATCH --time=00:30:00
+#SBATCH --output=zzz_NOM1_compIV_%j.out
+#SBATCH --account=torch_pr_503_general
+#SBATCH --mail-user=vivanxuest@gmail.com
+#SBATCH --mail-type=END
 
 set -euo pipefail
 
@@ -22,16 +26,19 @@ set -euo pipefail
 # MATLAB setup
 #############################
 module purge
-module load matlab/2024b
+module load matlab/2025b
 
 # Use a temporary MATLAB preference directory to avoid conflicts
 export MATLAB_PREFDIR
+export SLURM_ACCOUNT="torch_pr_503_general"
+export SBATCH_ACCOUNT=${SLURM_ACCOUNT}
+export SALLOC_ACCOUNT=${SLURM_ACCOUNT}
 MATLAB_PREFDIR=$(mktemp -d -t matlab-XXXX)
 
 echo
 echo "SLURM job ID : $SLURM_JOB_ID"
 echo "SLURM job name: $SLURM_JOB_NAME"
-echo "Subj=$1 Loc=$2 ModelA=$3 ModelB=$4 nIter=$5 iJob=$6"
+echo "Subj=$1 Loc=$2 ModelA=$3 ModelB=$4 nIter=$5 iJob=$7/$6"
 echo
 
 #############################
@@ -48,9 +55,10 @@ iLocComb = $2;
 iModelA = $3;
 iModelB=$4;
 nIter = $5;
-iJob = $6;
+nJob = $6;
+iJob = $7;
 
-OOD_NOM_Trialwise_fitNOM(isubj, iLocComb, iModelA, iModelB, nIter, iJob);
+OOD_NOM_Trialwise_fitNOM(isubj, iLocComb, iModelA, iModelB, nIter, nJob, iJob);
 
 disp('====================================');
 disp(' OOD_NOM_Trialwise_fitNOM finished.');

@@ -1,4 +1,4 @@
-function OOD_NOM_Trialwise_fitNOM(isubj, iLocComb, iModelA, iModelB, nIter, iJob)
+function OOD_NOM_Trialwise_fitNOM(isubj, iLocComb, iModelA, iModelB, nIter, nJob, iJob)
 %==========================================================================%
 % OOD_NOM_Trialwise_fitNOM.m
 %--------------------------------------------------------------------------
@@ -52,10 +52,18 @@ addpath(genpath('SX_toolbox/bads-master'));
 %--------------%
 SX_RC1_setting; % defines nORI, nSF, namesLocComb, namesModelA, namesModelB, nBins, etc.
 %--------------%
+flag_fittingStep = 1; % one vs. two step fitting (one step is more standard)
 flag_fminconORbads = 1; % 1 = use fmincon (faster, local); 2 = use BADS (slower, more robust)
 flag_plot_allIter = 0; % 1 = make summary plots across iterations
 flag_plot_perIter = 0; % 1 = plot per-iteration fits (can be slow)
 if ~strcmp('HPC', str_envir), flag_plot_allIter = 1; end % don't plot when running on HPC
+
+%% -------------------- Deterministic RNG (grand seed + per-iteration substreams) -------------------- %%
+S_seed = GetGrandSeed(nIter, iJob, nJob, nameFolder_Data);
+
+% One RNG stream for the whole job; each iteration uses its own Substream
+stream = RandStream('Threefry', 'Seed', S_seed.grandSeed);
+RandStream.setGlobalStream(stream);
 
 %% Set up file paths and names
 if isnumeric(isubj)
@@ -92,11 +100,13 @@ fprintf(['\nSubject/IO name: %s ' ...
     '\n - L%d [%s]', ...
     '\n - A%d [%s]', ...
     '\n - B%d [%s]', ...
+    '\n - Job #%d/%d', ...
     '\n - Number of iterations = %d\n\n'], ...
     subjName, ...
     iLocComb, namesLocComb{iLocComb}, ...
     iModelA, namesModelA{iModelA}, ...
     iModelB, namesModelB{iModelB}, ...
+    iJob, nJob, ...
     nIter);
 
 %% Load trial-wise data and criterion from xx_compIV.mat file
@@ -159,63 +169,81 @@ for iIter = 1:nIter
 
     fprintf('%d... ', iIter);
 
-    % Extract the training and test set 
+    % Deterministic randomness for THIS iteration (global index across jobs)
+    stream.Substream = S_seed.iterIdxList(iIter);
+
+    % Extract the training and test set
     data_train = data_train_allIter{iIter}; % (for estimating params)
     data_test = data_test_allIter{iIter}; % for predicting metrics and calculating nLL
-    
+
     % Objective function for optimizer: nLL from trial-wise pYES + pairwise pA
-    if any(iModelB == [1,3,4,7]) % Two-stage fitting: stabilize models that include a shared component across two passes
-        
-        % ==== Step 1: fit the “base” noise terms (excluding the shared term) ====
-        iStep = 1;
+    switch flag_fittingStep
+
+        case 1 % one-step fitting (more standard)
+            iStep = 0;
             fxn_estParams = @(paramsNOM) fxn_getError_v8(iModelB, paramsNOM, data_train, c_zscore_train, iStep); % the full model has induced, constant noise (shared and independent across passes)
-        switch iModelB
-            case 1, indStep1=1:2;
-            case 3, indStep1=1;
-            case 4, indStep1=1;
-            case 7, error('ALERT: we are no longer fitting iModelB=7 (no noise)')
-        end
-        params0_step1 = params0(indStep1); params_lb_step1 = params_lb(indStep1); params_ub_step1 = params_ub(indStep1);
-        % Estimate parameters
-        if flag_fminconORbads == 1 % Faster, local search
-            [params_est_fromStep1, nLL_step1] = fmincon(fxn_estParams, params0_step1, [], [], [], [], params_lb_step1, params_ub_step1, [], options_fmin);
-        else % BADS: more robust global + local search
-            [params_est_fromStep1, nLL_step1] = bads(fxn_estParams, params0_step1, params_lb_step1, params_ub_step1, [], [], [], options_bads);
-        end
 
-        % ==== Step 2. Fix the Step-1 estimates and fit the shared term ====
-        iStep = 2;
-        fxn_estParams = @(paramsNOM) fxn_getError_v8(iModelB, paramsNOM, data_train, c_zscore_train, iStep, params_est_fromStep1); % the full model has induced, constant noise (shared and independent across passes)
-        switch iModelB
-            case 1, indStep2=3;
-            case 3, indStep2=2;
-            case 4, indStep2=2;
-            case 7, error('ALERT: we are no longer fitting iModelB=7 (no noise)')
-        end
-        params0_step2 = params0(indStep2); params_lb_step2 = params_lb(indStep2); params_ub_step2 = params_ub(indStep2);
+            % Estimate parameters
+            if flag_fminconORbads == 1 % Faster, local search
+                [params_est, nLL_train] = fmincon(fxn_estParams, params0, [], [], [], [], params_lb, params_ub, [], options_fmin);
+            else % BADS: more robust global + local search
+                [params_est, nLL_train] = bads(fxn_estParams, params0, params_lb, params_ub, [], [], [], options_bads);
+            end
 
-        % Estimate parameters
-        if flag_fminconORbads == 1 % Faster, local search
-            [params_est_step2, nLL_step2] = fmincon(fxn_estParams, params0_step2, [], [], [], [], params_lb_step2, params_ub_step2, [], options_fmin);
-        else % BADS: more robust global + local search
-            [params_est_step2, nLL_step2] = bads(fxn_estParams, params0_step2, params_lb_step2, params_ub_step2, [], [], [], options_bads);
-        end
-        params_est = [params_est_fromStep1, params_est_step2];
-        nLL_train = nLL_step1+nLL_step2;
+        case 2 % Two-stage fitting: stabilize models that include a shared component across two passes
+            if any(iModelB == [1,3,4,7]) 
 
-    else % Fit all params together
-        iStep = 0;
-        % fxn_estParams = @(paramsNOM) fxn_getError_v7(iModelB, paramsNOM, data, c_zscore, iStep); % the full model has induced, constant noise and rho (two passes are correlated)
-        fxn_estParams = @(paramsNOM) fxn_getError_v8(iModelB, paramsNOM, data_train, c_zscore_train, iStep); % the full model has induced, constant noise (shared and independent across passes)
+                % ==== Step 1: fit the “base” noise terms (excluding the shared term) ====
+                iStep = 1;
+                fxn_estParams = @(paramsNOM) fxn_getError_v8(iModelB, paramsNOM, data_train, c_zscore_train, iStep); % the full model has induced, constant noise (shared and independent across passes)
+                switch iModelB
+                    case 1, indStep1=1:2;
+                    case 3, indStep1=1;
+                    case 4, indStep1=1;
+                    case 7, error('ALERT: we are no longer fitting iModelB=7 (no noise)')
+                end
+                params0_step1 = params0(indStep1); params_lb_step1 = params_lb(indStep1); params_ub_step1 = params_ub(indStep1);
+                % Estimate parameters
+                if flag_fminconORbads == 1 % Faster, local search
+                    [params_est_fromStep1, nLL_step1] = fmincon(fxn_estParams, params0_step1, [], [], [], [], params_lb_step1, params_ub_step1, [], options_fmin);
+                else % BADS: more robust global + local search
+                    [params_est_fromStep1, nLL_step1] = bads(fxn_estParams, params0_step1, params_lb_step1, params_ub_step1, [], [], [], options_bads);
+                end
 
-        % Estimate parameters
-        if flag_fminconORbads == 1 % Faster, local search
-            [params_est, nLL_train] = fmincon(fxn_estParams, params0, [], [], [], [], params_lb, params_ub, [], options_fmin);
-        else % BADS: more robust global + local search
-            [params_est, nLL_train] = bads(fxn_estParams, params0, params_lb, params_ub, [], [], [], options_bads);
-        end
+                % ==== Step 2. Fix the Step-1 estimates and fit the shared term ====
+                iStep = 2;
+                fxn_estParams = @(paramsNOM) fxn_getError_v8(iModelB, paramsNOM, data_train, c_zscore_train, iStep, params_est_fromStep1); % the full model has induced, constant noise (shared and independent across passes)
+                switch iModelB
+                    case 1, indStep2=3;
+                    case 3, indStep2=2;
+                    case 4, indStep2=2;
+                    case 7, error('ALERT: we are no longer fitting iModelB=7 (no noise)')
+                end
+                params0_step2 = params0(indStep2); params_lb_step2 = params_lb(indStep2); params_ub_step2 = params_ub(indStep2);
+
+                % Estimate parameters
+                if flag_fminconORbads == 1 % Faster, local search
+                    [params_est_step2, nLL_step2] = fmincon(fxn_estParams, params0_step2, [], [], [], [], params_lb_step2, params_ub_step2, [], options_fmin);
+                else % BADS: more robust global + local search
+                    [params_est_step2, nLL_step2] = bads(fxn_estParams, params0_step2, params_lb_step2, params_ub_step2, [], [], [], options_bads);
+                end
+                params_est = [params_est_fromStep1, params_est_step2];
+                nLL_train = nLL_step1+nLL_step2;
+
+            else % Fit all params together (the same as one-step fitting)
+                iStep = 0;
+                % fxn_estParams = @(paramsNOM) fxn_getError_v7(iModelB, paramsNOM, data, c_zscore, iStep); % the full model has induced, constant noise and rho (two passes are correlated)
+                fxn_estParams = @(paramsNOM) fxn_getError_v8(iModelB, paramsNOM, data_train, c_zscore_train, iStep); % the full model has induced, constant noise (shared and independent across passes)
+
+                % Estimate parameters
+                if flag_fminconORbads == 1 % Faster, local search
+                    [params_est, nLL_train] = fmincon(fxn_estParams, params0, [], [], [], [], params_lb, params_ub, [], options_fmin);
+                else % BADS: more robust global + local search
+                    [params_est, nLL_train] = bads(fxn_estParams, params0, params_lb, params_ub, [], [], [], options_bads);
+                end
+            end
     end
-
+    
     % Compile
     params_est_allIter(iIter, :) = params_est(:).';
     nLL_train_allIter(iIter) = nLL_train;
@@ -224,11 +252,11 @@ for iIter = 1:nIter
     % Calculate nLL for the test set
     nLL_test = fxn_getError_v8(iModelB, params_est, data_test, c_zscore_test, iStep);
     nLL_test_allIter(iIter) = nLL_test;
-    
+
     % Predict binned metrics from estimated parameters
     pred_test = PR_pred_v8(iModelB, params_est, data_test, c_zscore_test, nBins, flag_plot_perIter);
     pred_metrics_allIter{iIter} = pred_test;
-    
+
 end % end of iIter
 
 % fprintf('\n\nAll iterations DONE\n');
@@ -247,6 +275,6 @@ close all;
 %% Timing info
 time_end = datetime('now')
 elapsed = time_end - time_start;
-fprintf('\n\nDONE (time used: %s)\n', char(elapsed));
+fprintf('\n\nDONE (time used: %s)\n\n\n\n', char(elapsed));
 
 end
