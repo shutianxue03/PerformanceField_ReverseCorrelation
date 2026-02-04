@@ -100,13 +100,11 @@ fprintf(['\nSubject/IO name: %s ' ...
     '\n - L%d [%s]', ...
     '\n - A%d [%s]', ...
     '\n - B%d [%s]', ...
-    '\n - Job #%d/%d', ...
     '\n - Number of iterations = %d\n\n'], ...
     subjName, ...
     iLocComb, namesLocComb{iLocComb}, ...
     iModelA, namesModelA{iModelA}, ...
     iModelB, namesModelB{iModelB}, ...
-    iJob, nJob, ...
     nIter);
 
 %% Load trial-wise data and criterion from xx_compIV.mat file
@@ -164,6 +162,8 @@ pred_metrics_allIter = cell(nIter, 1);
 %% Main estimation loop across iterations
 
 fprintf('\nRunning nIter = %d: ', nIter);
+
+nameFile_progress = [nameFile_fitNOM, '.mat'];
 
 for iIter = 1:nIter
 
@@ -257,14 +257,27 @@ for iIter = 1:nIter
     pred_test = PR_pred_v8(iModelB, params_est, data_test, c_zscore_test, nBins, flag_plot_perIter);
     pred_metrics_allIter{iIter} = pred_test;
 
+    %% Save a progress report in the folder to indicate the finished iteration and time spent
+    time_progress = datetime('now');
+    time_progress = ceil(minutes(time_progress-time_start)); % round up to minutes
+    save(nameFile_progress, 'iIter')
+    % rename (to avoid saving one file for each iteration)
+    nameFile_progress_new = sprintf('%s_%d_%dmin.mat', nameFile_fitNOM, iIter, time_progress);
+    movefile(nameFile_progress, nameFile_progress_new);
+    nameFile_progress = nameFile_progress_new;
+
 end % end of iIter
 
 % fprintf('\n\nAll iterations DONE\n');
 
 %% Save results (append onto *_compIV.mat)
-% copyfile([nameFile_compIV, '.mat'], [nameFile_fitNOM, '.mat']); % backup structure from compIV
-save(nameFile_fitNOM, '*_allIter');
+save(nameFile_fitNOM, '*_allIter', 'time_progress');
 fprintf('\n========== Fitting saved ==========\n\n\n\n\n');
+
+% Delete the progress report
+if exist(nameFile_progress_new, 'file')
+    delete(nameFile_progress_new);
+end
 
 %%
 if flag_plot_allIter
@@ -275,6 +288,6 @@ close all;
 %% Timing info
 time_end = datetime('now')
 elapsed = time_end - time_start;
-fprintf('\n\nDONE (time used: %s)\n\n\n\n', char(elapsed));
+fprintf('\n\nDONE (time used: %s)\n\n\n', char(elapsed));
 
 end

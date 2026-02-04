@@ -12,13 +12,11 @@
 
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16
-#SBATCH --mem=32G
-#SBATCH --time=00:30:00
-#SBATCH --output=zzz_NOM1_compIV_%j.out
+#SBATCH --cpus-per-task=2
+#SBATCH --mem=16G
+#SBATCH --time=00:59:59
+#SBATCH --output=zzz_NOM2_%j.out
 #SBATCH --account=torch_pr_503_general
-#SBATCH --mail-user=vivanxuest@gmail.com
-#SBATCH --mail-type=END
 
 set -euo pipefail
 

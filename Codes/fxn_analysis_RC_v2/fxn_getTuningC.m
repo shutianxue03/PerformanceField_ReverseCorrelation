@@ -22,15 +22,15 @@ function tuningC = fxn_getTuningC(x, iFeature, iFamily, pred, params)
 %   9/8. half height
 %   10/9. full width (in cpd): on linear scale
 
-nfilters = length(x);
+nFilters = length(x);
 
 if iFeature == 1
     switch iFamily
         case 1 % scaled Gaussian
             % ORI-peak and bottom
-            peakAmp_ORI = pred(ceil(nfilters/2));
-            bottom_ORI = pred(1);
-            width_ORI = params(2)*sqrt(2*log(2));
+            peakAmp_ORI = pred(ceil(nFilters/2)); % the same as max(pred) after mirroring
+            bottom_ORI = pred(1); % the same as min(pred), assuming Gaussian and mirroring
+            width_ORI = params(2)*sqrt(2*log(2)); % half width at half height; has a math expression because the model is Gaussian
             % compile
             tuningC = [peakAmp_ORI, width_ORI, bottom_ORI];
 
@@ -40,7 +40,7 @@ if iFeature == 1
             % SX_normPDF = @(x,mu,sigma) exp(-((x-mu)/sigma).^2);
             % fxn = @(x, params) params(1)*(exp(-(x/params(3)).^2) - params(2)*exp(-(x/params(4)).^2)) + params(5);
             % peak amp
-            peakAmp_ORI = pred(ceil(nfilters/2));
+            peakAmp_ORI = pred(ceil(nFilters/2));
             % trough depth
             trough_depth = min(pred);
             %% trough ori
@@ -49,7 +49,7 @@ if iFeature == 1
             pred_max = max(pred); pred_min = min(pred);
             pred_half_max_min = (pred_max - pred_min)/2 + pred_min; % the y coordinate of the width
             %             pred_half_max_base = (pred_max - baseline)/2 + baseline; % the y coordinate of the width
-            width_ORI_min = 2*inverseFxn(pred_half_max_min, iFamily, params, linspace(0, 90, 1e4));
+            width_ORI_min = 2*inverseFxn(pred_half_max_min, iFamily, params, linspace(-90, 90, 1e4));
             %             width_ORI_base = 2*inverseFxn(pred_half_max_base, ifamily, params, linspace(0, 90, 1e4));
             % compile
             tuningC = [peakAmp_ORI, trough_ORI, trough_depth, width_ORI_min, baseline];
@@ -127,13 +127,14 @@ else % iF=2, SF
             errorbar(peakSF2_ln, peakAmp2, bw_ln2/2, 'b', 'horizontal')
 
         case 2
+            % Math:         y = gain * 10.^(-(log10(x / peakSF) / width).^2) + base;
             peakSF = params(1);
             peakAmp = max(pred);
             baseline = params(4);
             %===============%
-            [width_full_log] = getSFbandwidth(params);
+            [width_full_oct] = getSFbandwidth(params, 'aboveBase'); % aboveBase or absPeak
             %===============%
-            tuningC = [peakSF, peakAmp, width_full_log, baseline];
+            tuningC = [peakSF, peakAmp, width_full_oct, baseline];
             %%
         case 3
             peakAmp = max(pred);
@@ -143,10 +144,10 @@ else % iF=2, SF
             % peakSF and peak (from the true fxn without the trunc)
             % pred_true = predSFkernel(x_ln, 2, params(1:4), 0); % as in some subj, the trunc is even higher that the peak of the true kernel
             %===============%
-            [width_full_log] = getSFbandwidth(params);
+            [width_full_oct] = getSFbandwidth(params);
             %===============%
             trunc_SF = pred(1);
-            tuningC = [peakSF, peakAmp, width_full_log, baseline, trunc_SF];%, ...
+            tuningC = [peakSF, peakAmp, width_full_oct, baseline, trunc_SF];%, ...
             %                 width_L_SF, width_R_SF, bottom_SF, pred_half, width_full_ln];
     end
 end % if ifeature==1
@@ -167,47 +168,105 @@ x = x_all(ix);
 end
 
 
-function [width_full_oct, width_full_cpd, fL, fR] = getSFbandwidth(params)
-% getSFbandwidth  Bandwidth (FWHH) for SF tuning in OCTAVES and CPD
+function [width_full_oct, width_full_cpd, fL, fR, y_half] = getSFbandwidth(params, halfDef)
+% getSFbandwidth  Bandwidth for SF tuning in OCTAVES and CPD
 %
-% Model in code:
-%   Ksf(f) = base + gain * 10.^(-(log10(f/peakSF)/width).^2)
+% Model:
+%   Ksf(f) = base + gain * 10.^(-(log10(f/peakSF)/w).^2)
 %
-% params = [peakSF, gain, width, base]
+% params = [peakSF, gain, w, base]
+%
+% halfDef:
+%   'aboveBase'  (default): y_half = base + 0.5*gain   (standard FWHH)
+%   'absPeak'              y_half = 0.5*(base + gain)
 %
 % Outputs:
 %   width_full_oct : full width at half height in octaves
-%   width_full_cpd : full width at half height in cycles/deg (linear scale)
-%   fL, fR         : half-height frequencies (left/right), in cpd
+%   width_full_cpd : full width at half height in cycles/deg
+%   fL, fR         : half-height frequencies (left/right), cpd
+%   y_half         : the y-value used as half height
+
+if nargin < 2 || isempty(halfDef), halfDef = 'aboveBase'; end
 
 peakSF = params(1);
+gain   = params(2);
 w      = params(3);
+base   = params(4);
 
-% Half-height constant for base-10 log-parabola:
-% 10^(-(log10(f/f0)/w)^2) = 1/2  ->  (log10(f/f0)/w)^2 = log10(2)
+switch halfDef
+    case 'aboveBase'
+        % Standard: half of the amplitude above baseline
+        r = 0.5;                 % (y_half - base)/gain
+        y_half = base + 0.5*gain;
+
+    case 'absPeak'
+        % Half of the absolute peak value
+        y_half = 0.5*(base + gain);
+        r = (y_half - base) / gain;   % = 0.5 - base/(2*gain)
+
+    otherwise
+        error('halfDef must be ''aboveBase'' or ''absPeak''.');
+end
+
+% Validity check
+if ~(isfinite(r) && r > 0 && r < 1)
+    width_full_oct = NaN;
+    width_full_cpd = NaN;
+    fL = NaN; fR = NaN;
+    return
+end
+
 c = sqrt(log10(2));
 
 fL = peakSF * 10^(-w * c);
 fR = peakSF * 10^(+w * c);
 
-width_full_oct = log2(fR / fL);   % octaves
-width_full_cpd = fR - fL;         % linear bandwidth (cpd)
+width_full_oct = log2(fR / fL);
+width_full_cpd = fR - fL;
 
 end
 
 
-% function [width_full_log, width_full_ln] = getSFbandwidth(params, pred_true, x_)
-% [pred_max, imax] = max(pred_true);
-% % SF-width
-% pred_min = min(pred_true);
-% pred_half = (pred_max - pred_min)/2 + pred_min; % the y coordinate of the width
-% x_half_L_SF = params(1) * 10^(-(params(3)*sqrt(-log10((pred_half-params(4))/params(2))))); % linear scale
-% x_half_R_SF = params(1) * 10^(params(3)*sqrt(-log10((pred_half-params(4))/params(2)))); % linear scale
-% % get bandiwdth in octave unit (on log scale)
-% width_full_log = log2(x_half_R_SF/x_half_L_SF);
-% % get bandiwdth in cpd unit (on linear scale)
-% width_L_SF = x_(imax)-x_half_L_SF; % left, linear scale
-% width_R_SF = x_half_R_SF-x_(imax); % right, linear scale
-% width_full_ln = width_L_SF + width_R_SF; % linear scale
+% function [width_full_oct, width_full_cpd, fL, fR] = getSFbandwidth(params)
+% % getSFbandwidth  Bandwidth (FWHH) for SF tuning in OCTAVES and CPD
+% %
+% % Model in code:
+% %   Ksf(f) = base + gain * 10.^(-(log10(f/peakSF)/width).^2)
+% %
+% % params = [peakSF, gain, width, base]
+% %
+% % Outputs:
+% %   width_full_oct : full width at half height in octaves
+% %   width_full_cpd : full width at half height in cycles/deg (linear scale)
+% %   fL, fR         : half-height frequencies (left/right), in cpd
+%
+% peakSF = params(1);
+% w      = params(3);
+%
+% % Half-height constant for base-10 log-parabola:
+% % 10^(-(log10(f/f0)/w)^2) = 1/2  ->  (log10(f/f0)/w)^2 = log10(2)
+% c = sqrt(log10(2));
+%
+% fL = peakSF * 10^(-w * c);
+% fR = peakSF * 10^(+w * c);
+%
+% width_full_oct = log2(fR / fL);   % octaves
+% width_full_cpd = fR - fL;         % linear bandwidth (cpd)
+%
 % end
-
+%
+%
+% % function [width_full_log, width_full_ln] = getSFbandwidth(params, pred_true, x_)
+% % [pred_max, imax] = max(pred_true);
+% % % SF-width
+% % pred_min = min(pred_true);
+% % pred_half = (pred_max - pred_min)/2 + pred_min; % the y coordinate of the width
+% % x_half_L_SF = params(1) * 10^(-(params(3)*sqrt(-log10((pred_half-params(4))/params(2))))); % linear scale
+% % x_half_R_SF = params(1) * 10^(params(3)*sqrt(-log10((pred_half-params(4))/params(2)))); % linear scale
+% % % get bandiwdth in octave unit (on log scale)
+% % width_full_log = log2(x_half_R_SF/x_half_L_SF);
+% % % get bandiwdth in cpd unit (on linear scale)
+% % width_L_SF = x_(imax)-x_half_L_SF; % left, linear scale
+% % width_R_SF = x_half_R_SF-x_(imax); % right, linear scale
+% % width_full_ln = width_L_SF + width_R_SF; % linear scale
+% % end

@@ -20,8 +20,6 @@ function basicFxn_compAsym_permutation(asymX_allIter_allSubj, asymY_allIter_allS
 [~, nIter] = size(asymX_allIter_allSubj);
 
 colors = repmat(linspace(0, .5, nBins)', 1, 3);
-
-fsz_ticks = 15;
 fsz_title = 10;
 wd = 2;
 wd_bar = .5;
@@ -39,10 +37,6 @@ X_meanBin_allIter = nan(nBins, nIter);   %#ok<NASGU> % optional
 N_bin_allIter     = zeros(nBins, nIter); %#ok<NASGU> % optional
 
 % Statistical analysis
-Fvalue_allIter = nan(nIter, 1);
-eta2_allIter   = nan(nIter, 1);
-pA_allIter     = nan(nIter, 1);
-
 tscore_allIter = nan(nIter, 1);
 CohenD_allIter = nan(nIter, 1);
 pT_allIter     = nan(nIter, 1);
@@ -57,27 +51,27 @@ pT_allIter     = nan(nIter, 1);
 %   tscore_allIter, CohenD_allIter, pT_allIter  (only meaningful if nBins==2)
 
 for iIter = 1:nIter
-    x = asymX_allIter_allSubj(:, iIter);
-    y = asymY_allIter_allSubj(:, iIter);
+    asymX_med_allSubj = asymX_allIter_allSubj(:, iIter);
+    asymY_med_allSubj = asymY_allIter_allSubj(:, iIter);
 
-    [~, ~, binIdx] = histcounts(x, nBins);
+    [~, ~, binIdx] = histcounts(asymX_med_allSubj, nBins);
 
     % validXY = ~isnan(x) & ~isnan(y);
-    validXY = (binIdx > 0) & ~isnan(y);
+    validXY = (binIdx > 0) & ~isnan(asymY_med_allSubj);
     if sum(validXY) < nBins
         continue
     end
 
     % Quantile edges -> roughly equal N per bin
-    edges = quantile(x(validXY), linspace(0, 1, nBins+1));
+    edges = quantile(asymX_med_allSubj(validXY), linspace(0, 1, nBins+1));
     edges(1)   = edges(1) - eps;      % include min
     edges(end) = edges(end) + eps;    % include max
 
     % If ties make repeated edges, discretize can fail; fall back to histcounts
     if numel(unique(edges)) < numel(edges)
-        [~, ~, binIdx] = histcounts(x, nBins);
+        [~, ~, binIdx] = histcounts(asymX_med_allSubj, nBins);
     else
-        binIdx = discretize(x, edges);
+        binIdx = discretize(asymX_med_allSubj, edges);
     end
 
     for iBin = 1:nBins
@@ -85,8 +79,8 @@ for iIter = 1:nIter
         N_bin_allIter(iBin, iIter) = sum(idx);
 
         if any(idx)
-            Y_meanBin_allIter(iBin, iIter) = mean(y(idx), 'omitnan');
-            X_meanBin_allIter(iBin, iIter) = mean(x(idx), 'omitnan');
+            Y_meanBin_allIter(iBin, iIter) = mean(asymY_med_allSubj(idx), 'omitnan');
+            X_meanBin_allIter(iBin, iIter) = mean(asymX_med_allSubj(idx), 'omitnan');
         end
     end
 
@@ -95,7 +89,7 @@ for iIter = 1:nIter
     %     [pA, tbl] = anova1(y(validXY), binIdx(validXY), 'off');
     %     pA_allIter(iIter)     = pA;
     %     Fvalue_allIter(iIter) = tbl{2,5};
-    % 
+    %
     %     % eta^2 for independent-groups ANOVA: SS_between / SS_total
     %     SSb = tbl{2,2};
     %     SSt = tbl{4,2};
@@ -104,8 +98,8 @@ for iIter = 1:nIter
 
     % --- if 2 bins: 2-sample t-test (independent) + Cohen's d ---
     if nBins == 2
-        y1 = y((binIdx == 1) & ~isnan(y));
-        y2 = y((binIdx == 2) & ~isnan(y));
+        y1 = asymY_med_allSubj((binIdx == 1) & ~isnan(asymY_med_allSubj));
+        y2 = asymY_med_allSubj((binIdx == 2) & ~isnan(asymY_med_allSubj));
 
         % Conduct two-sample t-test
         if ~isempty(y1) && ~isempty(y2)
@@ -121,84 +115,97 @@ end % iIter
 
 %% Calculate bin difference
 if nBins==2
-yDiff_allIter = Y_meanBin_allIter(1, :) - Y_meanBin_allIter(2, :);
+    yDiff_allIter = Y_meanBin_allIter(1, :) - Y_meanBin_allIter(2, :);
 
-% Obtain 95% CI for bin difference across iterations
-[yDiff_med, yDiff_lb, yDiff_ub] = getCI(yDiff_allIter(:), 1, 1, CI_level_stats);
-str_diff = sprintf('Bin1 - Bin2 = %.2f [%.2f, %.2f]\n', yDiff_med, yDiff_lb, yDiff_ub);
+    % Obtain 95% CI for bin difference across iterations
+    [yDiff_med, yDiff_lb95, yDiff_ub95] = getCI(yDiff_allIter(:), 1, 1, CI_level_stats);
+    [yDiff_med, yDiff_lb68, yDiff_ub68] = getCI(yDiff_allIter(:), 1, 1, .68);
+    str_diff = sprintf('Bin1 - Bin2 = %.2f [%.2f, %.2f]\n', yDiff_med, yDiff_lb95, yDiff_ub95);
 end
 
-%% (2) Permutation p-values (across-iteration summary statistic)
-% We permute bin labels within each iteration and compute the median F (and median |t| if 2 bins)
-% across iterations. p-value = fraction of permuted medians >= observed median.
+%% (2) Permutation p-values on MEDIAN x/y across iterations (no per-iter permutation)
 
-nPerm = 1e4;
+% Median across iterations per subject (nSubj x 1)
+x_med = getCI(asymX_allIter_allSubj, 1, 2);  % median over dim-2
+y_med = getCI(asymY_allIter_allSubj, 1, 2);
 
-% Observed summary statistics
-% F_obs = median(Fvalue_allIter, 'omitnan');
+x_med = x_med(:);
+y_med = y_med(:);
 
+% --- bin subjects by x_med (quantile bins, like your per-iter code) ---
+validXY = ~isnan(x_med) & ~isnan(y_med);
+if sum(validXY) < nBins
+    error('Not enough valid subjects to form %d bins.', nBins);
+end
+
+edges = quantile(x_med(validXY), linspace(0, 1, nBins+1));
+edges(1)   = edges(1) - eps;
+edges(end) = edges(end) + eps;
+
+if numel(unique(edges)) < numel(edges)
+    [~, ~, binIdx] = histcounts(x_med, nBins);
+else
+    binIdx = discretize(x_med, edges);
+end
+
+valid = validXY & (binIdx > 0);
+if numel(unique(binIdx(valid))) < 2
+    error('Binning failed: fewer than 2 non-empty bins.');
+end
+
+% --- observed statistic on median y ---
 if nBins == 2
-    t_obs = median(abs(tscore_allIter), 'omitnan');
+    y1 = y_med(valid & binIdx == 1);
+    y2 = y_med(valid & binIdx == 2);
+
+    if isempty(y1) || isempty(y2)
+        error('Empty bin after binning (nBins=2).');
+    end
+
+    [~, ~, ~, stats] = ttest2(y1, y2);
+    t_obs = abs(stats.tstat);
 end
 
-% F_med_allPerm = nan(nPerm, 1);
+% --- permutation: shuffle y across subjects (bins stay fixed) ---
 if nBins == 2
-    t_med_allPerm = nan(nPerm, 1);
+    t_perm = nan(nPerm, 1);
 end
+
+idxValid = find(valid);          % indices of valid subjects
+nValid   = numel(idxValid);
 
 parfor iPerm = 1:nPerm
-    % F_perm_iter = nan(nIter, 1);
+    y_perm = y_med;
+
+    % permute y among valid subjects only (correct indexing)
+    perm = idxValid(randperm(nValid));
+    y_perm(idxValid) = y_med(perm);
 
     if nBins == 2
-        t_perm_iter = nan(nIter, 1);
-    end
+        yp1 = y_perm(valid & binIdx == 1);
+        yp2 = y_perm(valid & binIdx == 2);
 
-    for iIter = 1%:nIter
-        x = asymX_allIter_allSubj(:, iIter);
-        y = asymY_allIter_allSubj(:, iIter);
+        % guard against tiny bins / NaNs
+        yp1 = yp1(~isnan(yp1));
+        yp2 = yp2(~isnan(yp2));
 
-        [~, ~, binIdx] = histcounts(x, nBins);
-
-        validXY = (binIdx > 0) & ~isnan(y);
-        if numel(unique(binIdx(validXY))) < 2
-            continue
-        end
-
-        % shuffle bin labels among valid subjects
-        bin_shuf = binIdx(validXY);
-        bin_shuf = bin_shuf(randperm(numel(bin_shuf)));
-
-        % ANOVA on permuted labels
-        % [~, tbl] = anova1(y(validXY), bin_shuf, 'off');
-        % F_perm_iter(iIter) = tbl{2,5};
-
-        % if 2 bins: permuted t-test on permuted labels
-        if nBins == 2
-            yv = y(validXY);
-            y1 = yv(bin_shuf == 1);
-            y2 = yv(bin_shuf == 2);
-
-            if ~isempty(y1) && ~isempty(y2)
-                [~, ~, ~, stats] = ttest2(y1, y2);
-                t_perm_iter(iIter) = stats.tstat;
-            end
+        if numel(yp1) >= 2 && numel(yp2) >= 2
+            [~, ~, ~, stp] = ttest2(yp1, yp2);
+            t_perm(iPerm) = abs(stp.tstat);
         end
     end
-
-    % store across-iteration summary for this permutation
-    % F_med_allPerm(iPerm) = median(F_perm_iter, 'omitnan');
-
-    if nBins == 2
-        t_med_allPerm(iPerm) = median(abs(t_perm_iter), 'omitnan');
-    end
-end % iPerm
-
-% permutation p-values
-% p_ANOVA_perm = (1 + sum(F_med_allPerm >= F_obs)) / (nPerm + 1);
-
-if nBins == 2
-    p_ttest_perm = (1 + sum(t_med_allPerm >= t_obs)) / (nPerm + 1);
 end
+
+% compute p using only finite permutation stats
+if nBins == 2
+    t_perm = t_perm(isfinite(t_perm));
+    if isempty(t_perm) || ~isfinite(t_obs)
+        p_ttest_perm = NaN;  % something degenerate happened
+    else
+        p_ttest_perm = (1 + sum(t_perm >= t_obs)) / (numel(t_perm) + 1);
+    end
+end
+
 
 %% 3) Median + CI for stats across iterations
 % [F_med, F_lb, F_ub]       = getCI(Fvalue_allIter, 1, 1, CI_level_stats);
@@ -260,8 +267,10 @@ ylabel(str_ylabel)
 subplot(1,2,2), hold on
 histogram(yDiff_allIter, 'Normalization', 'probability', 'FaceColor', ones(1,3)*0.7, 'EdgeColor', 'k');
 xline(yDiff_med, 'r-', 'LineWidth', wd, 'Label', 'Median', 'LabelHorizontalAlignment', 'left', 'LabelVerticalAlignment', 'middle', 'HandleVisibility', 'off');
-xline(yDiff_lb, 'r--', 'LineWidth', wd, 'Label', '95% CI', 'LabelHorizontalAlignment', 'left', 'LabelVerticalAlignment', 'middle', 'HandleVisibility', 'off');
-xline(yDiff_ub, 'r--', 'LineWidth', wd, 'HandleVisibility', 'off');
+xline(yDiff_lb95, 'r--', 'LineWidth', wd, 'Label', '95% CI', 'LabelHorizontalAlignment', 'left', 'LabelVerticalAlignment', 'middle', 'HandleVisibility', 'off');
+xline(yDiff_ub95, 'r--', 'LineWidth', wd, 'HandleVisibility', 'off');
+xline(yDiff_lb68, 'b--', 'LineWidth', wd, 'Label', '95% CI', 'LabelHorizontalAlignment', 'left', 'LabelVerticalAlignment', 'middle', 'HandleVisibility', 'off');
+xline(yDiff_ub68, 'b--', 'LineWidth', wd, 'HandleVisibility', 'off');
 xline(0, 'k--', 'LineWidth', wd*2, 'HandleVisibility', 'off');
 xlabel('Bin1 - Bin2');
 ylabel('Proportion of iterations');

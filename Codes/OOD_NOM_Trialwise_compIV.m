@@ -165,7 +165,6 @@ fprintf('\n==================================\nStep 1: Compute IVs and derive te
 fprintf(['\nSubject/IO name: %s ' ...
     '\n - L%d [%s]', ...
     '\n - A%d [%s]', ...
-    '\n - Job #%d/%d', ...
     '\n - Number of iterations = %d', ...
     '\n - Number of blocks = %d', ...
     '\n - nORI=%d | nSF=%d', ...
@@ -176,7 +175,6 @@ fprintf(['\nSubject/IO name: %s ' ...
     subjName, ...
     iLocComb, namesLocComb{iLocComb}, ...
     iModelA, namesModelA{iModelA}, ...
-    iJob, nJob, ...
     nIter, ...
     nblocks, nORI, nSF, ...
     namesType{itype_template}, flag_PatchMode, ...
@@ -298,6 +296,8 @@ margR2_SF_allIter = nan(nIter, 2);
 
 fprintf('\n\nRunning nIter = %d: ', nIter);
 
+
+nameFile_progress = [nameFile_compIV, '.mat'];
 
 for iIter = 1:nIter
     fprintf('%d... ', iIter);
@@ -505,13 +505,27 @@ for iIter = 1:nIter
     template_tmpl_allIter(iIter, :, :) = template_tmpl;
     template_full_allIter(iIter, :, :) = template_full;
 
+    %% Save a progress report in the folder to indicate the finished iteration and time spent
+    time_progress = datetime('now');
+    time_progress = ceil(minutes(time_progress-time_start)); % round up to minutes
+    save(nameFile_progress, 'iIter')
+    % rename (to avoid saving one file for each iteration)
+    nameFile_progress_new = sprintf('%s_%d_%dmin.mat', nameFile_compIV, iIter, time_progress);
+    movefile(nameFile_progress, nameFile_progress_new);
+    nameFile_progress = nameFile_progress_new;
+
 end % end for iIter
 
 % fprintf('\n\n[L%d ModelA%d] ALL  iterations DONE\n', iLocComb, iModelA);
 
 %% -------------------- SAVE -------------------- %%
-save(nameFile_compIV, 'template_true', 'c_zscore*', '*_allIter', 'names*', 'flag*', 'ratio_split', 'ORI_bound', '*Type');
+save(nameFile_compIV, 'time_progress', 'template_true', 'c_zscore*', '*_allIter', 'names*', 'flag*', 'ratio_split', 'ORI_bound', '*Type');
 fprintf('\n========== Binned IV saved ==========\n\n\n\n\n');
+
+% Delete the progress report
+if exist(nameFile_progress_new, 'file')
+    delete(nameFile_progress_new);
+end
 
 %% -------------------- Plot (optional) -------------------- %%
 if flag_plot_compIV

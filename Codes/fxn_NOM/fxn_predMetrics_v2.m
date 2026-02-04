@@ -17,7 +17,7 @@ function [pYES_pred_allT, pA_pred_allPairs, consistency_allPairs] = fxn_predMetr
 %
 % New parameterization:
 % Nmul : multiplicative (Multi) noise coefficient
-% SDidpdt : Private noise (across passes)
+% SDidpdt : Additive noise (across passes)
 % SDshared : Shared noise (across passes)
 %
 % DV correlation across passes is implied by SDshared, not fit as rho.
@@ -27,44 +27,44 @@ lambda = 0; % Set lapse rate at 0
 
 % Default values (in case a component is absent in a reduced model)
 Nmul = 0;
-sigma_priv = 0;
-sigma_shared = 0;
+sigmaAdd = 0;
+sigmaShared = 0;
 
 switch iModelB
-    case 1 % FullModel: Multi + Private + Shared
+    case 1 % FullModel: Multi + Additive + Shared
         Nmul = params_est(1);
-        sigma_priv = params_est(2);
-        sigma_shared = params_est(3);
+        sigmaAdd = params_est(2);
+        sigmaShared = params_est(3);
 
-    case 2 % NoSharedN: Multi + Private (no shared var)
+    case 2 % NoSharedN: Multi + Additive (no shared var)
         Nmul = params_est(1);
-        sigma_priv = params_est(2);
-        % sigma_shared = 0;
+        sigmaAdd = params_est(2);
+        % sigmaShared = 0;
 
-    case 3 % NoMultiN: Private + Shared (no Multi var)
+    case 3 % NoMultiN: Additive + Shared (no Multi var)
         % Nmul = 0;
-        sigma_priv = params_est(1);
-        sigma_shared = params_est(2);
+        sigmaAdd = params_est(1);
+        sigmaShared = params_est(2);
 
     case 4 % NoPrivN: Multi + Shared (no private var)
         Nmul = params_est(1);
-        % sigma_idpdt = 0;
-        sigma_shared = params_est(2);
+        % sigmaAdd = 0;
+        sigmaShared = params_est(2);
 
-    case 5 % JustPrivN: Private only
+    case 5 % JustPrivN: Additive only
         Nmul = 0;
-        sigma_priv = params_est(1);
-        % sigma_shared = 0;
+        sigmaAdd = params_est(1);
+        % sigmaShared = 0;
 
     case 6 % JustMultiN: Multi only
         Nmul = params_est(1);
-        % sigma_idpdt = 0;
-        % sigma_shared = 0;
+        % sigmaAdd = 0;
+        % sigmaShared = 0;
 
     case 7 % JustSharedM: Shared only
         % Nmul = 0;
-        % sigma_idpdt = 0;
-        sigma_shared = params_est(1);
+        % sigmaAdd = 0;
+        sigmaShared = params_est(1);
 
     otherwise
         error('fxn_predMetrics_v2: Unknown iModelB = %d', iModelB);
@@ -83,10 +83,10 @@ end
 %% -------- 3. Predict sigma and criterion (per trial) --------
 
 % Constant variance (shared + independent)
-var_const = sigma_shared^2 + sigma_priv^2;
+varConst = sigmaShared^2 + sigmaAdd^2;
 
 % Trial-wise total noise SD (constant + Multi)
-sigma_pred_allT = sqrt( var_const + (Nmul .* IV_allT).^2 ); % nTrials x 1
+sigma_pred_allT = sqrt(varConst + (Nmul .* IV_allT).^2 ); % nTrials x 1
 
 % Avoid exactly zero variance (mvncdf & normcdf can be unhappy)
 sigma_pred_allT = max(sigma_pred_allT, 1e-6);
@@ -144,15 +144,15 @@ for iUnik = 1:nPairs
     mu_passB = IV_allT(indPassB) - criterion_allT(indPassB);
 
     % Total variance per pass (constant (shared + private) + multiplicative)
-    var_total_passA = var_const + (Nmul * IV_allT(indPassA))^2;
-    var_total_passB = var_const + (Nmul * IV_allT(indPassB))^2;
+    var_total_passA = varConst + (Nmul * IV_allT(indPassA))^2;
+    var_total_passB = varConst + (Nmul * IV_allT(indPassB))^2;
 
     % Enforce strictly positive variances
     var_total_passA = max(var_total_passA, 1e-10);
     var_total_passB = max(var_total_passB, 1e-10);
 
     % Covariance comes only from the shared constant noise
-    CovAB = sigma_shared^2;
+    CovAB = sigmaShared^2;
     
     % --- CAP: enforce positive definiteness ---
     % Need CovAB^2 < varA * varB; sufficient to enforce CovAB < min(varA,varB).”

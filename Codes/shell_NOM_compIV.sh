@@ -12,13 +12,11 @@
 
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16
-#SBATCH --mem=32G
-#SBATCH --time=00:30:00
-#SBATCH --output=zzz_NOM1_compIV_%j.out
+#SBATCH --cpus-per-task=12
+#SBATCH --mem=16G
+#SBATCH --time=01:30:00
+#SBATCH --output=zzz_NOM1_%j.out
 #SBATCH --account=torch_pr_503_general
-#SBATCH --mail-user=vivanxuest@gmail.com
-#SBATCH --mail-type=END
 
 set -euo pipefail
 
@@ -37,8 +35,8 @@ export SALLOC_ACCOUNT=${SLURM_ACCOUNT}
 MATLAB_PREFDIR=$(mktemp -d -t matlab-XXXX)
 
 echo
-echo "SLURM job ID : $SLURM_JOB_ID"
-echo "SLURM job name: $SLURM_JOB_NAME"
+echo "SLURM job ID : ${SLURM_JOB_ID:-LOCAL}"
+echo "SLURM job name: ${SLURM_JOB_NAME:-shell_NOM_compIV}"
 echo "Subj=$1 Loc=$2 ModelA=$3 nIter=$4 iJob=$6/$5"
 echo
 

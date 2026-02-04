@@ -1,266 +1,264 @@
-function basicFxn_compAsym_permutation(asymX_allIter_allSubj, asymY_allIter_allSubj, nBins, y_ticks, sz_fig, str_title)
-% basicFxn_compAsym_permutation
-%
-% asymX_allIter_allSubj: delta contrast [nSubj x nIter]
-% asymY_allIter_allSubj: delta parameter [nSubj x nIter]
-% nBins: number of bins (based on X) used to group subjects on each iteration
-%
-% What it does:
-% 1) For each iteration:
-%    - bin subjects by X
-%    - compute mean(Y) within each bin (for plotting)
-%    - run independent-groups one-way ANOVA on RAW Y with group=bin label
-%    - if nBins==2, run 2-sample t-test and compute Cohen's d via fxn_getES()
-% 2) Summarize stats across iterations (median + CI_level_stats CI)
-% 3) Permutation test for p-values: shuffle bin labels within each iteration, recompute stats,
-%    compare to observed (median across iterations)
-% 4) Plot: bar chart of median binned mean(Y) across iterations + CI_level_plot CI
 
-%% Settings
-[nSubj, nIter] = size(asymX_allIter_allSubj);
+function basicFxn_drawBars_permutation(data_allIter_allSubj, ref, colors, x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIter, markers_allSubj)
 
-colors = repmat(linspace(0, .5, nBins)', 1, 3);
+% Inputs:
+%    med_allSubj: nsubj x nBars, median of boostrapping
+%    ref: one reference line, ylines
+%    colors: nBars x 3, each rows indicates a bar
+%    x_ticks: cell, containing strings indicating location names
+%    y_ticks: vector, containing 3 values
+%    y_ticklabels: vector, containing 3 value
+%    flag_plotIdvd: 1=plot idvd data; 0=NOT
+%    flag_plotDiff: ~isnan=plot SEM of difference
+%    text_title: string
+%    flag_pairwiseComp: 1=print pairwise comparison in the title
+%    sz_fig
 
-fsz_ticks = 15;
-fsz_title = 10;
-wd = 2;
-wd_bar = .5;
-wd_ref = wd;
-ref = 0;
+%% define sizes
+sz_marker_idvd = 10;
+fsz_ticks = 15; % tunC: 20; BEHAV: xx; NOM: 15
+fsz_title = 10; % font size of titlte
+wd = 2; % line width of axis
+wd_bar = .5; % the width of the bar (not the bar edge!!)
+wd_ref = wd; % line width of the reference line
+interval_diffBar = 8; % higher, closer the comparison bar is to the top of the figure
+fprintf('\n\n *** %s ***\n', str_title)
 
-CI_level_stats = 0.95;   % for stats strings
-CI_level_plot  = 0.68;   % for plotting
+CI_level = .95; % CI range for stats only! Default for plotting is .68
 
-nPerm = 1e4;
+%% Enforce shape of matrix to [nIter x nSubj x nCond]
+assert(ndims(data_allIter_allSubj) == 3, 'ALERT: data_allIter_allSubj must be 3D arrays.');
 
-%% Preallocate binned means (for plotting)
-Y_meanBin_allIter = nan(nBins, nIter);
-X_meanBin_allIter = nan(nBins, nIter);   %#ok<NASGU> % optional
-N_bin_allIter     = zeros(nBins, nIter); %#ok<NASGU> % optional
+nCond = size(colors, 1);
+nSubj = length(markers_allSubj);
 
-%% Preallocate per-iteration stats on RAW Y grouped by bin label
+data_allIter_allSubj = fxn_reshape(data_allIter_allSubj, nSubj, nCond, 'data_allIter_allSubj');
+
+[nIter2, nSubj2, nCond2] = size(data_allIter_allSubj);
+assert(nSubj2 == nSubj && nCond2 == nCond, ...
+    'ALERT: Reshaped matrix has wrong nSubj/nCond.');
+assert(nIter2 == nIter, ...
+    'ALERT: Input nIter=%d but inferred nIter=%d from X.', nIter, nIter2);
+
+%% Conduct ANOVA and paired t-test per iteration
+% To obttain test statistics and effect size
+
+% ANOVA
 Fvalue_allIter = nan(nIter, 1);
-eta2_allIter   = nan(nIter, 1);
-
+eta2p_allIter = nan(nIter, 1);
+% Paired t-test
 tscore_allIter = nan(nIter, 1);
 CohenD_allIter = nan(nIter, 1);
 
-%% 1) Per-iteration binning + stats
 for iIter = 1:nIter
-    x = asymX_allIter_allSubj(:, iIter);
-    y = asymY_allIter_allSubj(:, iIter);
+    data_perIter = squeeze(data_allIter_allSubj(iIter, :, :));
 
-    % Bin subjects by X
-    [~, ~, binIdx] = histcounts(x, nBins);
+    % ANOVA
+    [Fvalue_allIter(iIter), eta2p_allIter(iIter)] = rm_oneway(data_perIter);
 
-    % --- binned means for plotting ---
-    for iBin = 1:nBins
-        idx = (binIdx == iBin);
-        N_bin_allIter(iBin, iIter) = sum(idx);
-
-        if any(idx)
-            Y_meanBin_allIter(iBin, iIter) = mean(y(idx), 'omitnan');
-            X_meanBin_allIter(iBin, iIter) = mean(x(idx), 'omitnan');
-        end
+    % Paired t-test
+    if nCond == 2
+        [~, ~, ~, stats] = ttest(data_perIter(:, 1), data_perIter(:, 2));
+        CohenD = fxn_getES(data_perIter(:, 1), data_perIter(:, 2));
+        tscore_allIter(iIter) = stats.tstat;
+        CohenD_allIter(iIter) = CohenD;
+    else % >2 levels: ONLY specified pairs, no exhaustive pairwise
+        % think of this later
     end
 
-    % --- stats on RAW y by bin groups (independent groups!) ---
-    valid = (binIdx > 0) & ~isnan(y);
-    if numel(unique(binIdx(valid))) >= 2
-        [Fvalue_allIter(iIter), eta2_allIter(iIter)] = oneway_anova_indep(y(valid), binIdx(valid));
-    end
+end % iIter
 
-    % --- if 2 bins: 2-sample t-test + Cohen's d (via fxn_getES) ---
-    if nBins == 2
-        idx1 = (binIdx == 1) & ~isnan(y);
-        idx2 = (binIdx == 2) & ~isnan(y);
-        if any(idx1) && any(idx2)
-            [~, ~, ~, stats] = ttest2(y(idx1), y(idx2)); % independent samples
-            tscore_allIter(iIter) = stats.tstat;
+%% Permutation to obtain p-value
+% Obtain median and CI for stats
+[data_med_allSubj] = getCI(data_allIter_allSubj, 1, 1);
 
-            % Use your existing effect size helper
-            CohenD_allIter(iIter) = fxn_getES(y(idx1), y(idx2));
-        end
-    end
-end
+nPerm = 1e4; % number of permutation runs
+Fvalue_allPerm = nan(nPerm,1);
+tscore_allPerm = Fvalue_allPerm;
 
-%% 2) Permutation p-value (shuffle bin labels within each iteration)
-F_obs = median(Fvalue_allIter, 'omitnan');
-F_med_allPerm = nan(nPerm, 1);
+% ANOVA: observed F-value
+Fvalue_obs = rm_oneway(data_med_allSubj);
 
-if nBins == 2
-    t_obs = median(tscore_allIter, 'omitnan');
-    t_med_allPerm = nan(nPerm, 1);
+% t-test: observed t-score
+if nCond==2
+    diff_med_allSubj  = data_med_allSubj(:, 1)-data_med_allSubj(:, 2);
+    tscore_obs = mean(diff_med_allSubj,'omitnan') / (std(diff_med_allSubj,0,'omitnan') / sqrt( sum(~isnan(diff_med_allSubj))));
 end
 
 for iPerm = 1:nPerm
-    F_perm_iter = nan(nIter, 1);
+    data_shuffled = data_med_allSubj;
 
-    if nBins == 2
-        t_perm_iter = nan(nIter, 1);
+    % shuffle condition labels within each subject (keeps each subject's distribution)
+    for iSubj = 1:nSubj
+        data_shuffled(iSubj, :) = data_shuffled(iSubj, randperm(nCond));
     end
 
-    for iIter = 1:nIter
-        x = asymX_allIter_allSubj(:, iIter);
-        y = asymY_allIter_allSubj(:, iIter);
+    % ANOVA
+    Fvalue_allPerm(iPerm) = rm_oneway(data_shuffled);
 
-        [~, ~, binIdx] = histcounts(x, nBins);
-
-        valid = (binIdx > 0) & ~isnan(y);
-        if numel(unique(binIdx(valid))) < 2
-            continue
-        end
-
-        % Shuffle bin labels among valid subjects (break X->bin association)
-        bin_shuf = binIdx(valid);
-        bin_shuf = bin_shuf(randperm(numel(bin_shuf)));
-
-        % ANOVA
-        [F_perm_iter(iIter), ~] = oneway_anova_indep(y(valid), bin_shuf);
-
-        % 2-sample t-test if 2 bins
-        if nBins == 2
-            yv = y(valid);
-            idx1 = (bin_shuf == 1);
-            idx2 = (bin_shuf == 2);
-            if any(idx1) && any(idx2)
-                [~, ~, ~, stats] = ttest2(yv(idx1), yv(idx2));
-                t_perm_iter(iIter) = stats.tstat;
-            end
-        end
+    % t-test
+    if nCond==2
+        sgn = (rand(nSubj,1) > 0.5)*2 - 1;     % random +/-1
+        dp  = diff_med_allSubj .* sgn;
+        tscore_allPerm(iPerm) = mean(dp,'omitnan') / (std(dp,0,'omitnan')/sqrt(sum(~isnan(dp))));
     end
+end % iPerm
 
-    F_med_allPerm(iPerm) = median(F_perm_iter, 'omitnan');
-
-    if nBins == 2
-        t_med_allPerm(iPerm) = median(t_perm_iter, 'omitnan');
-    end
+p_ANOVA_perm = (1 + sum(Fvalue_allPerm >= Fvalue_obs)) / (numel(Fvalue_allPerm) + 1);
+if nCond==2
+    p_ttest_perm = (1 + sum(abs(tscore_allPerm) >= abs(tscore_obs))) / (nPerm + 1);
 end
 
-p_ANOVA_perm = (1 + sum(F_med_allPerm >= F_obs)) / (numel(F_med_allPerm) + 1);
+%% Obtain median and CI for stats
+% F value and partial eta2
+[Fvalue_med, Fvalue_lb, Fvalue_ub] = getCI(Fvalue_allIter, 1, 1, CI_level);
+[eta2p_med, eta2p_lb, eta2p_ub] = getCI(eta2p_allIter, 1, 1, CI_level);
 
-if nBins == 2
-    p_ttest_perm = (1 + sum(abs(t_med_allPerm) >= abs(t_obs))) / (numel(t_med_allPerm) + 1);
-end
+% t-score and cohen's D
+[tscore_med, tscore_lb, tscore_ub] = getCI(tscore_allIter, 1, 1, CI_level);
+[cohenD_med, cohenD_lb, cohenD_ub] = getCI(CohenD_allIter, 1, 1, CI_level);
 
-%% 3) Median + CI for stats across iterations
-[F_med, F_lb, F_ub]       = getCI(Fvalue_allIter, 1, 1, CI_level_stats);
-[eta_med, eta_lb, eta_ub] = getCI(eta2_allIter,   1, 1, CI_level_stats);
-
-str_ANOVA = sprintf('ANOVA (across bins): F=%.2f [%.2f, %.2f], p=%.3f, eta2=%.2f [%.2f, %.2f]', ...
-    F_med, F_lb, F_ub, p_ANOVA_perm, eta_med, eta_lb, eta_ub);
-
-if nBins == 2
-    [t_med, t_lb, t_ub] = getCI(tscore_allIter, 1, 1, CI_level_stats);
-    [d_med, d_lb, d_ub] = getCI(CohenD_allIter, 1, 1, CI_level_stats);
-
-    str_ttest = sprintf('2-sample t: t=%.2f [%.2f, %.2f], p=%.3f, CohenD=%.2f [%.2f, %.2f]', ...
-        t_med, t_lb, t_ub, p_ttest_perm, d_med, d_lb, d_ub);
+%% Put up strings
+str_ANOVA = sprintf('ANOVA: F=%.2f [%.2f, %.2f], p=%.3f, eta2p=%.2f [%.2f, %.2f]', ...
+    Fvalue_med, Fvalue_lb, Fvalue_ub, ...
+    p_ANOVA_perm, ...
+    eta2p_med, eta2p_lb, eta2p_ub);
+if nCond==2
+    str_ttest = sprintf('T-test: t=%.2f [%.2f, %.2f], p=%.3f, CohenD=%.2f [%.2f, %.2f]', ...
+        tscore_med, tscore_lb, tscore_ub, ...
+        p_ttest_perm, ...
+        cohenD_med, cohenD_lb, cohenD_ub);
 else
     str_ttest = '';
 end
 
-%% 4) Plot: bars show median binned mean(Y) across iterations + CI for plotting
-[Y_med_plot, Y_lb_plot, Y_ub_plot] = getCI(Y_meanBin_allIter', 1, 1, CI_level_plot);
+% Difference
+if nCond==2
+    diff_allIter_allSubj = squeeze(data_allIter_allSubj(:, :, 1) - data_allIter_allSubj(:, :, 2));
+    [diff_ave_allIter] = getCI(diff_allIter_allSubj, 2, 2);
+    [diff_ave_med, diff_ave_lb, diff_ave_ub] = getCI(diff_ave_allIter, 1, 1, CI_level);
+    str_sig = ''; if diff_ave_lb*diff_ave_ub>0, str_sig = '*'; end
+    str_diff = sprintf('Diff%s=%.2f [%.2f, %.2f]', str_sig, diff_ave_med, diff_ave_lb, diff_ave_ub);
+else
+    str_diff = '';
+end
 
+%% Obtain group ave and sem for plotting
+[data_ave, ~, ~, data_sem] = getCI(data_med_allSubj, 2, 1);
+
+%% PLOT
 figure('Position', [0, 200, sz_fig])
 hold on
 
-for iBin = 1:nBins
-    bar(iBin, Y_med_plot(iBin), ...
-        'FaceColor', colors(iBin,:), 'EdgeColor', colors(iBin,:), ...
-        'BarWidth', wd_bar, 'HandleVisibility', 'off');
+%% Plot group means (bars) and SEM (errorbars)
+for iCond = 1:nCond
 
-    errorbar(iBin, Y_med_plot(iBin), ...
-        Y_med_plot(iBin)-Y_lb_plot(iBin), Y_ub_plot(iBin)-Y_med_plot(iBin), ...
-        '.', 'color', colors(iBin,:), 'CapSize', 0, 'linewidth', wd, 'HandleVisibility', 'off');
-
-    % Fancy white overlay
-    if Y_med_plot(iBin) > 0
-        errorbar(iBin, Y_med_plot(iBin), Y_med_plot(iBin)-Y_lb_plot(iBin), 0, ...
-            '.w', 'CapSize', 0, 'linewidth', wd, 'HandleVisibility', 'off');
+    bar(iCond, data_ave(iCond), 'FaceColor', colors(iCond, :),  'EdgeColor', colors(iCond, :), 'barwidth', wd_bar, 'HandleVisibility', 'off')
+    errorbar(iCond, data_ave(iCond), data_sem(iCond), '.', 'color', colors(iCond, :), 'CapSize', 0, 'linewidth', wd, 'HandleVisibility', 'off')
+    % Fancy errorbars
+    if data_ave(iCond)>0
+        errorbar(iCond, data_ave(iCond), data_sem(iCond), 0, '.w', 'CapSize', 0, 'linewidth', wd, 'HandleVisibility', 'off')
     else
-        errorbar(iBin, Y_med_plot(iBin), 0, Y_ub_plot(iBin)-Y_med_plot(iBin), ...
-            '.w', 'CapSize', 0, 'linewidth', wd, 'HandleVisibility', 'off');
+        errorbar(iCond, data_ave(iCond), 0, data_sem(iCond), '.w', 'CapSize', 0, 'linewidth', wd, 'HandleVisibility', 'off')
+    end
+
+    % if plot HVA vs. VMA
+    %     bar(iCond, ave(iCond), 'FaceColor', 'w',  'EdgeColor', 'k', 'barwidth', wd_bar, 'linewidth', wd)
+    %     errorbar(iCond, ave(iCond), sem(iCond), '.', 'color', 'k', 'CapSize', 0, 'linewidth', wd)
+end % iCond
+
+%% Plot idvd data (grey lines)
+buffer = .2;
+if flag_plotIDVD
+
+    if nCond == 2 % for nBars=2, need space to plot idvd data between two bars
+        x = [1+buffer, 2-buffer];
+    else % for nBars>2, plot idvd data at the center of each bar
+        x = 1:nCond;
+    end
+
+    for iSubj = 1:nSubj
+        plot(x, data_med_allSubj(iSubj, :), '-',  ...
+            'color',ones(1,3)*.7, 'markerfacecolor', 'w', 'markeredgecolor', ones(1,3)*.7, ...
+            'markersize', sz_marker_idvd, 'linewidth', wd)
     end
 end
 
-% reference line
+%% Draw ref and compare bars with ref
+% Get group means of all iterations
+[data_allIter_ave] = getCI(data_allIter_allSubj, 2, 2);
+[~, data_ave_lb, data_ave_ub] = getCI(data_allIter_ave, 1, 1, CI_level);
+
+str_Comp2Ref = '';
 if ~isnan(ref)
+    if length(ref)>1; error('ALERT: there are more than one REF!!!'), end
     yline(ref, 'color', ones(1,3)/2, 'linewidth', wd_ref, 'HandleVisibility', 'off');
+
+    str_Comp2Ref = sprintf('Ref.=%.1f: ', ref);
+
+    for iCond = 1:nCond
+        str_sig = ''; if (data_ave_lb(iCond)-ref) * (data_ave_ub(iCond)-ref)>0, str_sig = '*'; end
+        if iCond==4, str_Comp2Ref = sprintf('%s\n', str_Comp2Ref); end
+        str_Comp2Ref = [str_Comp2Ref, sprintf('%s%s: [%.2f, %.2f] | ', x_ticks{iCond}, str_sig, data_ave_lb(iCond), data_ave_ub(iCond))];
+    end
 end
 
-% ticks / limits
-if ~isnan(y_ticks)
-    yticks(y_ticks)
-    ylim(y_ticks([1 end]))
+%% Plot SEM of difference (one errorbar)
+if nCond==2 && flag_plotDiff
+    yDiffSEM = y_ticks(end) - (y_ticks(end) - y_ticks(1))/interval_diffBar;
+    [~, ~, ~, diff_sem] = getCI(getCI(diff_allIter_allSubj, 1, 1), 2, 2);
+    errorbar(1.5, yDiffSEM, diff_sem, 'k', 'CapSize', 0, 'linewidth', wd, 'HandleVisibility', 'off')
+    plot([1,2], [yDiffSEM, yDiffSEM], 'k-', 'linewidth', wd, 'HandleVisibility', 'off')
+    %     string_s = getString_starts(p);
 end
 
-xticks(1:nBins)
+%% ticks, limits and labels
+if ~isnan(y_ticks), yticks(y_ticks), ylim(y_ticks([1, end])), end
+if ~isnan(y_ticklabels), yticklabels(y_ticklabels), end
+xticks(1:nCond), xticklabels([]) % manually add tick labels /symbols on the slide
 
-buffer = 0.6;
-xlim([1-buffer, nBins+buffer])
+% if plot idvd data, leave more space for the middle
+if flag_plotIDVD, buffer = .6; else, buffer = .5; end
+xlim([1-buffer, nCond+buffer])
 
+%% size
 ax = gca;
 ax.XAxis.FontSize = fsz_ticks;
 ax.YAxis.FontSize = fsz_ticks;
 ax.LineWidth = wd;
 
-% title
-if nBins == 2
-    title(sprintf('%s\n%s\n%s', str_title, str_ANOVA, str_ttest), 'fontsize', fsz_title)
-else
-    title(sprintf('%s\n%s', str_title, str_ANOVA), 'fontsize', fsz_title)
-end
+%% title
+title(sprintf('%s\n%s\n%s\n%s\n%s', str_title, str_ANOVA, str_ttest, str_diff, str_Comp2Ref), 'fontsize', fsz_title)
 
 end
 
-%% ===== helper: one-way ANOVA for independent groups (bin label) =====
-function [Fvalue, eta2] = oneway_anova_indep(y, g)
-% Independent-groups one-way ANOVA
-% y: Nx1 values, g: Nx1 integer group labels
+function [Fvalue, eta2_partial] = rm_oneway(data)
+% Repeated-measures one-way ANOVA F for Condition (within-subject)
+% Standard partition: SS_cond, SS_error (subject x condition interaction)
 
-y = y(:);
-g = g(:);
+[nSubj, nCond] = size(data);
 
-valid = ~isnan(y) & ~isnan(g);
-y = y(valid);
-g = g(valid);
+grand = mean(data(:), 'omitnan');
+subj_mean = mean(data, 2, 'omitnan');     % nSubj x 1
+cond_mean = mean(data, 1, 'omitnan');     % 1 x nCond
 
-groups = unique(g);
-k = numel(groups);
-N = numel(y);
+SS_cond = nSubj * sum((cond_mean - grand).^2, 'omitnan');
+SS_subj = nCond * sum((subj_mean - grand).^2, 'omitnan');
 
-if k < 2 || N <= k
-    Fvalue = NaN;
-    eta2 = NaN;
-    return
-end
+% Total SS
+SS_tot  = sum((data - grand).^2, 'all', 'omitnan');
 
-grand = mean(y, 'omitnan');
+% Error term in RM one-way: subject x condition interaction
+SS_err = SS_tot - SS_cond - SS_subj;
 
-SS_between = 0;
-SS_within  = 0;
+df_cond = nCond - 1;
+df_err  = (nSubj - 1) * (nCond - 1);
 
-for i = 1:k
-    idx = (g == groups(i));
-    yi  = y(idx);
-    ni  = numel(yi);
-    if ni == 0, continue; end
+MS_cond = SS_cond / df_cond;
+MS_err  = SS_err  / df_err;
 
-    mi = mean(yi, 'omitnan');
-    SS_between = SS_between + ni * (mi - grand).^2;
-    SS_within  = SS_within  + sum((yi - mi).^2, 'omitnan');
-end
+Fvalue = MS_cond / MS_err;
 
-df_between = k - 1;
-df_within  = N - k;
-
-MS_between = SS_between / df_between;
-MS_within  = SS_within  / df_within;
-
-Fvalue = MS_between / MS_within;
-
-SS_total = SS_between + SS_within;
-eta2 = SS_between / SS_total;  % eta-squared
+% Compute the effect size: partial eta-squared
+eta2_partial = SS_cond/(SS_cond+SS_err);
 end
