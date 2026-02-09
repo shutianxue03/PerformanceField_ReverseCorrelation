@@ -266,16 +266,14 @@ end
 [r_med_perCond, r_lb_perCond, r_ub_perCond] = getCI(r_perCond_allIter, 1, 1, CI_level);
 
 %% 9) Plot regression lines (from medians) + CI bands (from per iteration)
-% Global
+% ==== Global ====
 % if p_med_partial < .1
 [~, yfit_global_lb, yfit_global_ub] = getCI(yfit_global_allIter, 1, 1);
-patch([x_global fliplr(x_global)], [yfit_global_lb fliplr(yfit_global_ub)], ...
-    ones(1,3)*.6, 'EdgeColor','none', 'FaceAlpha', 0.20, 'HandleVisibility','off');
-plot(x_global, yfit_global_OnMed, '-', 'color', ones(1,3)*.4, ...
-    'HandleVisibility','off', 'LineWidth', wd_border*1.5);
+patch([x_global fliplr(x_global)], [yfit_global_lb fliplr(yfit_global_ub)], ones(1,3)*.6, 'EdgeColor','none', 'FaceAlpha', 0.20, 'HandleVisibility','off');
+plot(x_global, yfit_global_OnMed, '-k', 'HandleVisibility','off', 'LineWidth', wd_border*2);
 % end
 
-% Per condition
+% ==== Per condition ====
 for iCond = 1:nCond
     if p_perCond_perm(iCond) < .1
         lineStyle = '-';
@@ -284,10 +282,8 @@ for iCond = 1:nCond
     end
 
     [~, yfit_perCond_lb, yfit_perCond_ub] = getCI(yfit_perCond_allIter(:, :, iCond), 1, 1);
-    patch([x_allCond(iCond, :) fliplr(x_allCond(iCond, :))], [yfit_perCond_lb fliplr(yfit_perCond_ub)], ...
-        colors(iCond,:), 'EdgeColor','none', 'FaceAlpha', 0.12, 'HandleVisibility','off');
-    plot(x_allCond(iCond, :), yfit_allCond_OnMed(iCond, :), lineStyle, 'Color', colors(iCond,:), ...
-        'LineWidth', wd_border, 'HandleVisibility','off');
+    patch([x_allCond(iCond, :) fliplr(x_allCond(iCond, :))], [yfit_perCond_lb fliplr(yfit_perCond_ub)], colors(iCond,:), 'EdgeColor','none', 'FaceAlpha', 0.12, 'HandleVisibility','off');
+    plot(x_allCond(iCond, :), yfit_allCond_OnMed(iCond, :), lineStyle, 'Color', colors(iCond,:), 'LineWidth', wd_border, 'HandleVisibility','off');
 end % iCond
 
 %% 10) Axes formatting

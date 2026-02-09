@@ -611,13 +611,14 @@ end % iFeature
 close all
 
 %% Schematics for EE, HVA and VMA
-sz_marker_all = [70, 100];
+clc, close all
+sz_marker_all = [100];
 sz_line = 15;
 
 % EE (1 ecc)
 outline_ecc = 1.5;
 ecc = outline_ecc;
-str_locgroup = 'EE-1ecc';
+str_locgroup = 'L18-1ecc';
 fprintf('\n%s...\n', str_locgroup)
 x_ref = {};
 y_ref = {};
@@ -631,7 +632,7 @@ fxn_plotPF_diagram(str_locgroup, sz_marker_all,  x_ref, y_ref, x_allLoc, y_allLo
 %------------------------------------%
 
 % HVA (1 ecc)
-str_locgroup = 'HVA-1ecc';
+str_locgroup = 'L67-1ecc';
 fprintf('\n%s...\n', str_locgroup)
 x_ref = {[-ecc, ecc], [0,0]};
 y_ref = {[0,0], [-ecc, ecc]};
@@ -646,7 +647,7 @@ fxn_plotPF_diagram(str_locgroup, sz_marker_all,  x_ref, y_ref, x_allLoc, y_allLo
 %------------------------------------%
 
 % VMA (1 ecc)
-str_locgroup = 'VMA-1ecc';
+str_locgroup = 'L53-1ecc';
 fprintf('\n%s...\n', str_locgroup)
 x_ref = {[0,0]};
 y_ref = {[-ecc, ecc]};
@@ -661,7 +662,7 @@ fxn_plotPF_diagram(str_locgroup, sz_marker_all,  x_ref, y_ref, x_allLoc, y_allLo
 %------------------------------------%
 
 % 5 single locations
-str_locgroup = 'FullVF';
+str_locgroup = 'L16645';
 fprintf('\n%s...\n', str_locgroup)
 x_ref = {[-ecc, ecc], [0,0]};
 y_ref = {[0,0], [-ecc, ecc]};
@@ -671,6 +672,36 @@ colors_allLoc = colors_comb([1, 6, 6, 3, 5], :);
 
 strParts_all = {'full'};
 indParts_all = {1:5};
+%------------------------------------%
+fxn_plotPF_diagram(str_locgroup, sz_marker_all,  x_ref, y_ref, x_allLoc, y_allLoc, colors_allLoc, strParts_all, indParts_all, outline_ecc, sz_line, nameFolder_Fig_Schematic);
+%------------------------------------%
+
+% 4 single locations (left and right separate)
+str_locgroup = 'L2345';
+fprintf('\n%s...\n', str_locgroup)
+x_ref = {[-ecc, ecc], [0,0]};
+y_ref = {[0,0], [-ecc, ecc]};
+x_allLoc = [ecc, -ecc,  0,   0];
+y_allLoc = [0,   0,  ecc, -ecc];
+colors_allLoc = colors_comb([2, 4, 3, 5], :);
+
+strParts_all = {'full'};
+indParts_all = {1:4};
+%------------------------------------%
+fxn_plotPF_diagram(str_locgroup, sz_marker_all,  x_ref, y_ref, x_allLoc, y_allLoc, colors_allLoc, strParts_all, indParts_all, outline_ecc, sz_line, nameFolder_Fig_Schematic);
+%------------------------------------%
+
+% L653
+str_locgroup = 'L653';
+fprintf('\n%s...\n', str_locgroup)
+x_ref = {[-ecc, ecc], [0,0]};
+y_ref = {[0,0], [-ecc, ecc]};
+x_allLoc = [ecc, -ecc,  0,   0];
+y_allLoc = [0,   0,  ecc, -ecc];
+colors_allLoc = colors_comb([6, 6, 3, 5], :);
+
+strParts_all = {'full'};
+indParts_all = {1:4};
 %------------------------------------%
 fxn_plotPF_diagram(str_locgroup, sz_marker_all,  x_ref, y_ref, x_allLoc, y_allLoc, colors_allLoc, strParts_all, indParts_all, outline_ecc, sz_line, nameFolder_Fig_Schematic);
 %------------------------------------%

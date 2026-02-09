@@ -24,7 +24,7 @@ nParts = length(indParts_all);
 
 for sz_marker = sz_marker_all
 
-    if sz_marker == sz_marker_all(1), str_size = 'small'; else, str_size = 'big'; end
+    
     for iPart = 1:nParts
         strParts = strParts_all{iPart};
         indParts = indParts_all{iPart};
@@ -61,7 +61,7 @@ for sz_marker = sz_marker_all
         end
 
         % Define the name of the folder
-        nameFolder = sprintf('%s/Size_%s', nameFolder_Figures_diagrams, str_size);
+        nameFolder = sprintf('%s/Size_sz%d', nameFolder_Figures_diagrams, sz_marker);
         if isempty(dir(nameFolder)), mkdir(nameFolder), end
         % Save the figure
         saveas(gcf, sprintf('%s/%s_%s.png', nameFolder, str_locgroup, strParts))

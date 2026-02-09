@@ -21,7 +21,7 @@ nSF = nORI;
 nameFolder_server = '/scratch/sx712/PF_RC'; str_envir = 'HPC'; 
 
 % if run on server (mute if run on OOD)
-nameFolder_server = '/Volumes/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC'; str_envir = 'Server';
+nameFolder_server = '/Volumes/server/Users/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC'; str_envir = 'Server';
 
 % if run on local for model simulation
 % nameFolder_server = '/Users/xueshutian/Desktop/GitHub_local/PF_RC'; str_envir = 'Local'; 
@@ -32,7 +32,6 @@ nameFolder_Data_NOM_Trialwise = sprintf('%s/Data_NOM_Trialwise_%d%d', nameFolder
 
 % Define names of folders to save figures (on the server)
 nameFolder_Figures = sprintf('%s/Figures', nameFolder_server);
-nameFolder_Figures_NOM = sprintf('%s/NOM_Trialwise_%d%d', nameFolder_Figures, nORI, nSF);
 
 %% Define the function to normalize Gabor SD
 fxn_getSigma_SPdomain = @(SF) 3 * sqrt(2*log(2)) / (2 * pi * SF);
@@ -169,13 +168,13 @@ options_fmin = optimoptions('fmincon', 'MaxIterations', 1e4, 'Display', 'off');
 % Noisy observer model names
 namesModelA = {'RC', 'IO', 'RandTemp'};
 
-namesModelB = {'FullModel', 'NoSharedN', 'NoMultiN', 'NoPrivN', 'JustPrivN', 'JustMultiN', 'JustSharedN'};
+namesModelB = {'FullModel', 'NoSharedN', 'NoMultiN', 'NoAddN', 'JustAddN', 'JustMultiN', 'JustSharedN'};
 namesModelBparams = {...
-    {'Multiplicative variability', 'Private variability', 'Shared variability'}, ... %1
-    {'Multiplicative variability', 'Private variability'                                       }, ... %2
-    {                                         'Private variability', 'Shared variability'}, ... %3
+    {'Multiplicative variability', 'Additive variability', 'Shared variability'}, ... %1
+    {'Multiplicative variability', 'Additive variability'                                       }, ... %2
+    {                                         'Additive variability', 'Shared variability'}, ... %3
     {'Multiplicative variability',                                'Shared variability'}, ... %4
-    {                                         'Private variability',                                      }, ... %5
+    {                                         'Additive variability',                                      }, ... %5
     {'Multiplicative variability',                                                                           }, ... %6
     {                                                                        'Shared variability'}};    %7
 
@@ -229,7 +228,7 @@ if ~exist('flag_standEnergy', 'var'), flag_standEnergy = 1; end
 
 % lb and ub that are consistent across models
 ORI_gain_lb = 1e-3; ORI_gain_ub = .5;
-ORI_width_lb = 1e-3; ORI_width_ub = 90;
+ORI_width_lb = 1e-3; ORI_width_ub = 60;
 ORI_base_lb = -.2; ORI_base_ub = ORI_gain_ub;
 
 SF_peak_lb = 1e-3; SF_peak_ub = 4;

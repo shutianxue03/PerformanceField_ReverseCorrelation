@@ -31,7 +31,7 @@ function basicFxn_drawCorrAsym_permutation(X_allIter_allSubj, Y_allIter_allSubj,
 wd_ref    = 3;   % reference line width
 wd_border = 4;   % axis/marker line width
 fsz_ticks = 45;
-sz_marker = 40;
+sz_marker = 30;
 CI_level = .90; % CI range for stats only! Default for plotting is .68; use 90% because of oone-tailed correlation
 
 %% ---- Validate / canonicalize shapes to [nIter x nSubj] ----

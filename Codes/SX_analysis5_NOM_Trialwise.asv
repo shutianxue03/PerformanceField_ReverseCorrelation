@@ -14,6 +14,8 @@ SX_RC1_setting
 
 set(0, 'DefaultFigureVisible', 'off') % avoid printing figures on the desktop
 
+%%%%%% Should copy from OOD_sim %%%%%%%%%%
+
 iModelA_sim_all = [1:2]; % 1=RC-derived template, 2=use IO template, 2=randomize template,
 iModelB_sim_all = [1:4]; % see SX_RC1_setting for namesModelB
 nIter = 200; % Number of iterations
@@ -134,8 +136,8 @@ for iRun=[2,1,3]
     metric_pred_allCond = metric_data_allCond;
     nLL_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nIter * nJob);
     params_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nIter * nJob, 3); % 3=Pre-allocate for max params
-    R2_NOM_allCond = nan(nModelsA, nModelsB, nLocComb8, nMetrics_prob, nsubj, nIter * nJob);
-    R2_w_NOM_allCond = R2_NOM_allCond;
+    % IC_nLL_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nIter * nJob, 3); % 3=AIC, AICc, BIC
+    R2_NOM_allCond= nan(nModelsA, nModelsB, nLocComb8, nMetrics_prob, nsubj, nIter * nJob);
 
     % Fitting tuning curves
     % nDatasets: 1=Full; 2=Template or test
@@ -153,7 +155,7 @@ for iRun=[2,1,3]
     margTunC_SF_allCond = nan(nModelsA, nModelsB, nLocComb8, nsubj, nIter * nJob, nDatasets, length(namesTunC_unit_perF{iFamily_SF, 2}));
 
     % The main analysis loop for all conditions for each subject (Models x Loc x Metrics)
-    fprintf('\n ===== START COMPILING ===== \n\n')
+    fprintf('\n ===== START COMPILING ...\n\n')
     for iJob = 1:nJob
         idxIter = (iJob-1)*nIter+1: iJob*nIter;
         fprintf('\n\n === Job %d/%d === ', iJob, nJob)
@@ -241,6 +243,14 @@ for iRun=[2,1,3]
                             % Calculate information critertion based on nLL
                             nData = sum(nTrials_allIter(iIter, :));
 
+                            % nLL_allIter
+                            % nLL = nLL_test_allIter(iIter);
+                            % nLL_allCond(iModelA, iModelB, iLocSingle, isubj, iIter) = IC_nLL;
+
+                            % Derive ICs based on nLL
+                            % IC_nLL = [getAIC_nLL(nLL, nParamsB), getAICc_nLL(nLL, nParamsB, nData), getBIC_nLL(nLL, nParamsB, nData)];
+                            % IC_nLL_allCond(iModelA, iModelB, iLocSingle, isubj, iIter, :) = IC_nLL;
+
                             % Compute tuning characteristics based on the fitted parameters
                             for iDataset=1:2 % needs to matchOOD_xx_compIV ("for iDataset = 1:2")
                                 % ORI
@@ -259,7 +269,6 @@ for iRun=[2,1,3]
 
                         % Calculate R2 for NOM prediction (for pYES and pA)
                         R2_NOM_allIter = nan(nMetrics_prob, nIter);
-                        R2_w_NOM_allIter = R2_NOM_allIter;
                         for iMetric_prob = 1:nMetrics_prob
                             for iIter = 1:nIter
                                 nData = squeeze(nTrials_allIter(iIter, :));
@@ -271,18 +280,16 @@ for iRun=[2,1,3]
                                 metric_pred = metric_pred(valid);
 
                                 % With weighting
-                                metric_ave = sum(nData .* metric_data) / sum(nData);
-                                SSres_w = sum(nData .* (metric_data - metric_pred).^2);
-                                SStot_w = sum(nData .* (metric_data - metric_ave).^2);
-                                if SStot_w == 0, R2_w = NaN; else, R2_w = 1 - SSres_w/SStot_w; end
+                                % metric_ave = sum(nData .* metric_data) / sum(nData);
+                                % SSres = sum(nData .* (metric_data - metric_pred).^2);
+                                % SStot = sum(nData .* (metric_data - metric_ave).^2);
 
                                 % No weighting
                                 SSres = sum((metric_data - metric_pred).^2);
                                 SStot = sum((metric_data - mean(metric_data)).^2);
-                                if SStot == 0, R2 = NaN; else, R2 = 1 - SSres/SStot; end
 
+                                if SStot == 0, R2 = NaN; else, R2 = 1 - SSres/SStot; end
                                 R2_NOM_allIter(iMetric_prob, iIter) = R2;
-                                R2_w_NOM_allIter(iMetric_prob, iIter) = R2_w;
                             end
                         end
 
@@ -317,7 +324,6 @@ for iRun=[2,1,3]
                         % IC_nLL_allCond is compiled above
                         params_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, 1:nParamsB) = params_est_allIter;
                         R2_NOM_allCond(iModelA, iModelB, iLocSingle, :, isubj, idxIter) = R2_NOM_allIter;
-                        R2_w_NOM_allCond(iModelA, iModelB, iLocSingle, :, isubj, idxIter) = R2_w_NOM_allIter;
 
                         clear *_allIter
 
@@ -434,13 +440,13 @@ for iRun=[2,1,3]
     [d70,~] = SX_sim06_SDT(.7, .3);
 
     sz_wd_perBar = 200;
-
+sz_wd_perBar = 200;
     for iSet = 1:numel(iLocSingle_allSets)
 
         iLocSingle_perSet = iLocSingle_allSets{iSet};
 
         nBars = numel(iLocSingle_perSet);
-        sz_fig = [nBars*sz_wd_perBar, 500];
+        sz_fig = [nBars*sz_wd_perBar, 350];
 
         for iMetric_prob = 1:nMetrics_behav
             switch iMetric_prob
@@ -459,8 +465,7 @@ for iRun=[2,1,3]
             %------------------------------%
             basicFxn_drawBars_permutation(data_allIter_allSubj, ref, colors_comb(iLocSingle_perSet, :), namesLocComb(iLocSingle_perSet), x_ticks, x_ticks, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj)
             % ------------------------------%
-            ylabel(namesMetrics_behav{iMetric_prob})
-
+            % ylabel(sprintf('%s %s', namesFeature{iFeature}, namesTunC_unit_perF{iFamily, 2}{iTunC}))
             saveas(gcf, sprintf('%s/n%d_L%s_%s.png', nameFolder_Fig_behav, nsubj, strjoin(string(iLocSingle_perSet), ''), namesMetrics_behav{iMetric_prob}))
             close(gcf)
         end % iMetric
@@ -540,7 +545,7 @@ for iRun=[2,1,3]
             end
             RCplot_2Dkernel(e2D_ave, cLim)
             title(sprintf('n=%d nIter=%d L%d %s (%s)', nsubj, nIterxJob, iLocComb, namesLocComb{iLocComb}, str_dataset))
-            saveas(gcf, sprintf('%s/n%d_group_L%d_A%d_%s.png', nameFolder_Fig_NOM_Template, nsubj, iLocComb, iModelA_plot, str_dataset))
+            saveas(gcf, sprintf('%s/n%d_group_L%d_A%dB%d_%s.png', nameFolder_Fig_NOM_Template, nsubj, iLocComb, iModelA_plot, iModelB_plot, str_dataset))
             close(gcf)
         end % iiLoc
 
@@ -645,7 +650,7 @@ for iRun=[2,1,3]
             1 - ti(2) - ti(4) - 2*sz_axOffset];
 
         % ---- save ----
-        outName = sprintf('%s/n%d_L%s_A%d_%s.png', nameFolder_Fig_Sep, nsubj, str_loc, iModelA_plot, str_dataset);
+        outName = sprintf('%s/n%d_L%s_A%dB%d_%s.png', nameFolder_Fig_Sep, nsubj, str_loc, iModelA_plot, iModelB_plot, str_dataset);
         saveas(gcf, outName);
         close(gcf);
 
@@ -660,7 +665,7 @@ for iRun=[2,1,3]
     load(nameFolder_Data_SaveCompile, 'marg*_allCond', 'margPred*_allCond', 'margR2*_allCond')
 
     % Define folder for saving figures
-    nameFolder_Fig_NOM_Tuning = sprintf('%s/TuningFxns_group', nameFolder_Fig_NOM_Trialwise);
+    nameFolder_Fig_NOM_Tuning = sprintf('%s/TuningFxns', nameFolder_Fig_NOM_Trialwise);
     if isempty(dir(nameFolder_Fig_NOM_Tuning)), mkdir(nameFolder_Fig_NOM_Tuning), end
 
     wd_border = 3.5; % default 5
@@ -769,7 +774,7 @@ for iRun=[2,1,3]
                 set(findall(gcf, '-property', 'linewidth'), 'linewidth', 2)
 
                 % Save the figure
-                saveas(gcf, sprintf('%s/n%d_L%d%d_A%d_%s_%s.png', nameFolder_Fig_NOM_Tuning, nsubj, iLocPair_all, iModelA_plot, namesFeature{iFeature}, namesDataset{iDataset}))
+                saveas(gcf, sprintf('%s/n%d_group_L%d%d_A%dB%d_%s_%s.png', nameFolder_Fig_NOM_Tuning, nsubj, iLocPair_all, iModelA_plot, iModelB_plot, namesFeature{iFeature}, namesDataset{iDataset}))
                 close(gcf)
             end % iFeature
         end % iGroup
@@ -784,7 +789,7 @@ for iRun=[2,1,3]
     load(nameFolder_Data_SaveCompile, 'marg*_allCond', 'margPred*_allCond', 'margParams*_allCond')
 
     % Define folder for saving figures
-    nameFolder_Fig_NOM_Tuning = sprintf('%s/TuningFxns_IDVD', nameFolder_Fig_NOM_Trialwise);
+    nameFolder_Fig_NOM_Tuning = sprintf('%s/TuningFxns', nameFolder_Fig_NOM_Trialwise);
     if isempty(dir(nameFolder_Fig_NOM_Tuning)), mkdir(nameFolder_Fig_NOM_Tuning), end
 
     wd_border = 4; % default 5
@@ -874,11 +879,11 @@ for iRun=[2,1,3]
                     % legend('Location', 'best')
 
                 end % isubj
-                sgtitle(sprintf('n=%d L%d%d [A%d] %s tuning (%s)', nsubj, iLocPair_all,iModelA_plot, namesFeature{iFeature}, namesDataset{iDataset}))
+                sgtitle(sprintf('n=%d L%d%d [A%dB%d] %s tuning (%s)', nsubj, iLocPair_all,iModelA_plot, iModelB_plot, namesFeature{iFeature}, namesDataset{iDataset}))
                 set(findall(gcf, '-property', 'fontsize'), 'fontsize', 10)
 
                 % Save the figure
-                saveas(gcf, sprintf('%s/n%d_L%d%d_A%d_%s_%s.png', nameFolder_Fig_NOM_Tuning, nsubj, iLocPair_all, iModelA_plot, namesFeature{iFeature}, namesDataset{iDataset}))
+                saveas(gcf, sprintf('%s/n%d_idvd_L%d%d_A%dB%d_%s_%s.png', nameFolder_Fig_NOM_Tuning, nsubj, iLocPair_all, iModelA_plot, iModelB_plot, namesFeature{iFeature}, namesDataset{iDataset}))
                 close(gcf)
             end % i=1:2
         end % iFeature
@@ -1021,7 +1026,7 @@ for iRun=[2,1,3]
                         end
                 end
 
-                str_title = sprintf('n=%d nIter=%d L%d%d [A%d] [%s] | %s %s', nsubj, nIterxJob, iLocPair_all, iModelA_plot, namesDataset{iDataset_plotRC}, namesFeature{iFeature}, namesTunC{iTunC});
+                str_title = sprintf('n=%d nIter=%d L%d%d [A%dB%d] [%s] | %s %s', nsubj, nIterxJob, iLocPair_all, iModelA_plot, iModelB_plot, namesDataset{iDataset_plotRC}, namesFeature{iFeature}, namesTunC{iTunC});
 
                 switch flag_plotDist
                     case 0
@@ -1037,7 +1042,7 @@ for iRun=[2,1,3]
                         ylabel('Probabillity')
                 end
                 % Save the figure
-                saveas(gcf, sprintf('%s/n%d_L%d%d_A%d_%s%d.png', nameFolder_Fig_tunC, nsubj, iLocPair_all, iModelA_plot, namesFeature{iFeature}, iTunC))
+                saveas(gcf, sprintf('%s/n%d_L%d%d_A%dB%d_%s%d.png', nameFolder_Fig_tunC, nsubj, iLocPair_all, iModelA_plot, iModelB_plot, namesFeature{iFeature}, iTunC))
                 close(gcf)
 
             end % end of iTunC
@@ -1797,7 +1802,8 @@ wd = 2;
 
                 % Save
                 saveas(gcf, sprintf('%s/n%d_L%s_%s_%s.png', ...
-                    nameFolder_Fig_NOM_metrics, nsubj, strjoin(string(iLocSingle_perSet), ''), namesMetrics_prob{iMetric_prob}, namesPlotMode{iPlotMode}));
+                    nameFolder_Fig_NOM_metrics, nsubj, strjoin(string(iLocSingle_perSet), ''), ...
+                    namesMetrics_prob{iMetric_prob}, namesPlotMode{iPlotMode}));
                 close(gcf)
 
             end % iMetric_prob

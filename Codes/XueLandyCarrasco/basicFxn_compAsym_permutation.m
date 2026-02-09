@@ -108,7 +108,7 @@ for iIter = 1:nIter
             tscore_allIter(iIter) = stats.tstat;
 
             % use your helper
-            CohenD_allIter(iIter) = fxn_getES(y1, y2);
+            CohenD_allIter(iIter) = fxn_getES(y1, y2, 'independent');
         end
     end
 end % iIter
@@ -132,7 +132,7 @@ y_med = getCI(asymY_allIter_allSubj, 1, 2);
 x_med = x_med(:);
 y_med = y_med(:);
 
-% --- bin subjects by x_med (quantile bins, like your per-iter code) ---
+% --- bin subjects by x_med (quantile bins) ---
 validXY = ~isnan(x_med) & ~isnan(y_med);
 if sum(validXY) < nBins
     error('Not enough valid subjects to form %d bins.', nBins);
@@ -154,58 +154,54 @@ if numel(unique(binIdx(valid))) < 2
 end
 
 % --- observed statistic on median y ---
-if nBins == 2
-    y1 = y_med(valid & binIdx == 1);
-    y2 = y_med(valid & binIdx == 2);
-
-    if isempty(y1) || isempty(y2)
-        error('Empty bin after binning (nBins=2).');
-    end
-
-    [~, ~, ~, stats] = ttest2(y1, y2);
-    t_obs = abs(stats.tstat);
+if nBins ~= 2
+    error('This block currently implemented for nBins==2 only (ttest2).');
 end
 
-% --- permutation: shuffle y across subjects (bins stay fixed) ---
-if nBins == 2
-    t_perm = nan(nPerm, 1);
+y1 = y_med(valid & binIdx == 1);
+y2 = y_med(valid & binIdx == 2);
+if isempty(y1) || isempty(y2)
+    error('Empty bin after binning (nBins=2).');
 end
 
-idxValid = find(valid);          % indices of valid subjects
-nValid   = numel(idxValid);
+% Signed observed t-stat (important for left vs right)
+[~, ~, ~, stats_obs] = ttest2(y1, y2);
+t_obs_signed = stats_obs.tstat;
+
+% --- permutation: shuffle y across subjects (bins fixed) ---
+t_perm_signed = nan(nPerm, 1);
 
 parfor iPerm = 1:nPerm
-    y_perm = y_med;
+    y_perm = y_med;  %#ok<PFBNS> copy
 
-    % permute y among valid subjects only (correct indexing)
-    perm = idxValid(randperm(nValid));
-    y_perm(idxValid) = y_med(perm);
+    % permute y among VALID subjects only (FIXED)
+    tmp = y_perm(valid);
+    tmp = tmp(randperm(numel(tmp)));
+    y_perm(valid) = tmp;
 
-    if nBins == 2
-        yp1 = y_perm(valid & binIdx == 1);
-        yp2 = y_perm(valid & binIdx == 2);
+    yp1 = y_perm(valid & binIdx == 1);
+    yp2 = y_perm(valid & binIdx == 2);
 
-        % guard against tiny bins / NaNs
-        yp1 = yp1(~isnan(yp1));
-        yp2 = yp2(~isnan(yp2));
-
-        if numel(yp1) >= 2 && numel(yp2) >= 2
-            [~, ~, ~, stp] = ttest2(yp1, yp2);
-            t_perm(iPerm) = abs(stp.tstat);
-        end
+    if ~isempty(yp1) && ~isempty(yp2)
+        [~, ~, ~, stp] = ttest2(yp1, yp2);
+        t_perm_signed(iPerm) = stp.tstat;
     end
 end
 
-% compute p using only finite permutation stats
-if nBins == 2
-    t_perm = t_perm(isfinite(t_perm));
-    if isempty(t_perm) || ~isfinite(t_obs)
-        p_ttest_perm = NaN;  % something degenerate happened
-    else
-        p_ttest_perm = (1 + sum(t_perm >= t_obs)) / (numel(t_perm) + 1);
-    end
-end
+% Drop failed perms (if any)
+t_perm_signed = t_perm_signed(~isnan(t_perm_signed));
+nEff = numel(t_perm_signed);
 
+% --- permutation p-values (L / 2 / R) with +1 correction ---
+p_left  = (1 + sum(t_perm_signed <= t_obs_signed)) / (nEff + 1);
+p_right = (1 + sum(t_perm_signed >= t_obs_signed)) / (nEff + 1);
+p_two   = (1 + sum(abs(t_perm_signed) >= abs(t_obs_signed))) / (nEff + 1);
+
+% for your title formatting, mimic the correlation script
+p_ttest_all = [p_left, p_two, p_right];     % order = L / 2 / R
+tail_lab = {'L','2','R'};
+pstr_ttest = sprintf('p(%s/%s/%s)=[%.3f, %.3f, %.3f]', ...
+    tail_lab{1}, tail_lab{2}, tail_lab{3}, p_ttest_all(1), p_ttest_all(2), p_ttest_all(3));
 
 %% 3) Median + CI for stats across iterations
 % [F_med, F_lb, F_ub]       = getCI(Fvalue_allIter, 1, 1, CI_level_stats);
@@ -218,8 +214,8 @@ if nBins == 2
     [t_med, t_lb, t_ub] = getCI(tscore_allIter, 1, 1, CI_level_stats);
     [d_med, d_lb, d_ub] = getCI(CohenD_allIter, 1, 1, CI_level_stats);
 
-    str_ttest = sprintf('2-sample t: t=%.2f [%.2f, %.2f], p=%.3f, CohenD=%.2f [%.2f, %.2f]', ...
-        t_med, t_lb, t_ub, p_ttest_perm, d_med, d_lb, d_ub);
+    str_ttest = sprintf('2-sample t: t=%.2f [%.2f, %.2f], %s, CohenD=%.2f [%.2f, %.2f]', ...
+        t_med, t_lb, t_ub, pstr_ttest, d_med, d_lb, d_ub);
 else
     str_ttest = '';
 end
@@ -271,7 +267,7 @@ xline(yDiff_lb95, 'r--', 'LineWidth', wd, 'Label', '95% CI', 'LabelHorizontalAli
 xline(yDiff_ub95, 'r--', 'LineWidth', wd, 'HandleVisibility', 'off');
 xline(yDiff_lb68, 'b--', 'LineWidth', wd, 'Label', '95% CI', 'LabelHorizontalAlignment', 'left', 'LabelVerticalAlignment', 'middle', 'HandleVisibility', 'off');
 xline(yDiff_ub68, 'b--', 'LineWidth', wd, 'HandleVisibility', 'off');
-xline(0, 'k--', 'LineWidth', wd*2, 'HandleVisibility', 'off');
+xline(0, 'k-', 'LineWidth', wd*2, 'Label', 'No difference', 'LabelHorizontalAlignment', 'left', 'LabelVerticalAlignment', 'middle', 'HandleVisibility', 'off');
 xlabel('Bin1 - Bin2');
 ylabel('Proportion of iterations');
 
