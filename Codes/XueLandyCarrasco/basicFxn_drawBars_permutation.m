@@ -14,7 +14,6 @@ sz_ticks = 25; % behav and sep: 35; tunC: 25
 sz_title = 10;
 wd = 3; % behav: 3; sep: 2; tunC: 3
 wd_bar = .5;
-wd_ref = wd;
 
 CI95 = .95;
 nPerm = 1e4;
@@ -38,183 +37,164 @@ pairs  = nchoosek(1:nCond, 2);
 nPairs = size(pairs, 1);
 
 %% Obtain median and CI of the data
-[data_med_allSubj, data_lb_allSubj, data_ub_allSubj] = getCI(data_allIter_allSubj, 1, 1, CI95); % [nSubj x nCond] median over iters
+[data_med_allSubj, ~, ~] = getCI(data_allIter_allSubj, 1, 1, CI95); % [nSubj x nCond] median over iters
 
-%% 1. [NHST] Per-iteration ANOVA + pairwise stats
-Fvalue_allIter = nan(nIter, 1);
-eta2p_allIter  = nan(nIter, 1);
+%% [NHST] Permutation p-values for ANOVA and paired contrasts (subject-level)
 
-t_pair_allIter = nan(nIter, nPairs);
-d_pair_allIter = nan(nIter, nPairs);   % your pooled-SD Cohen's d
-
-parfor iIter = 1:nIter
-    data_perIter = squeeze(data_allIter_allSubj(iIter, :, :)); % [nSubj x nCond]
-
-    % RM one-way ANOVA
-    [Fvalue_allIter(iIter), eta2p_allIter(iIter)] = rm_oneway(data_perIter);
-
-    % Pairwise paired t-tests (two-tailed) + Cohen's d (pooled SD)
-    for iPair = 1:nPairs
-        iCondA = pairs(iPair,1);
-        iCondB = pairs(iPair,2);
-        dataA = data_perIter(:, iCondA);
-        dataB = data_perIter(:, iCondB);
-        indOK = ~isnan(dataA) & ~isnan(dataB);
-        if sum(indOK) >= 2
-            [~, ~, ~, stat] = ttest(dataA(indOK), dataB(indOK)); % paired, two-tailed
-            t_pair_allIter(iIter, iPair) = stat.tstat;
-            d_pair_allIter(iIter, iPair) = fxn_getES(dataA(indOK), dataB(indOK)); % <- your formula
-        end
-    end
-end
-
-[Fvalue_med, Fvalue_lb, Fvalue_ub] = getCI(Fvalue_allIter, 1, 1, CI95);
-[eta2p_med,  eta2p_lb,  eta2p_ub]  = getCI(eta2p_allIter,  1, 1, CI95);
-[t_med_allPairs, t_lb_allPairs, t_ub_allPairs] = getCI(t_pair_allIter, 1, 1, CI95);
-[d_med_allPairs, d_lb_allPairs, d_ub_allPairs] = getCI(d_pair_allIter, 1, 1, CI95);
-
-%% 2. [NHST] Permutation p-values
-
-Fvalue_obs = rm_oneway(data_med_allSubj);
+% (A) Omnibus RM one-way ANOVA: within-subject label shuffle
+[Fvalue_obs, eta2p_obs]     = rm_oneway(data_med_allSubj);   % observed F on subject-level table
 Fvalue_allPerm = nan(nPerm, 1);
 
 parfor iPerm = 1:nPerm
-    Xp = data_med_allSubj;
+    data_perPerm = data_med_allSubj;
     for iSubj = 1:nSubj
-        Xp(iSubj,:) = Xp(iSubj, randperm(nCond));
+        data_perPerm(iSubj, :) = data_perPerm(iSubj, randperm(nCond));  % shuffle condition labels within subject
     end
-    Fvalue_allPerm(iPerm) = rm_oneway(Xp);
+    Fvalue_allPerm(iPerm) = rm_oneway(data_perPerm);
 end
+
 pperm_ANOVA = (1 + sum(Fvalue_allPerm >= Fvalue_obs)) / (nPerm + 1);
 
-% ---- pairwise permutation: sign-flip diffs (FAST; denom fixed) ----
-t_pair_obs   = nan(1, nPairs);
-pperm_diff_allPairs  = nan(1, nPairs);
+% (B) Planned pairwise contrasts: sign-flip permutation on within-subject differences
+t_obs_allPairs    = nan(1, nPairs);   % observed |t| for each pair
+d_obs_allPairs = t_obs_allPairs;
+pperm_allPairs    = t_obs_allPairs;   % uncorrected permutation p-values
+
+% sgnMat will be used to generate null distributions consistently across pairs.
+sgnMat = (rand(nSubj, nPerm) > 0.5) * 2 - 1; % [nSubj x nPerm]
 
 for iPair = 1:nPairs
-    iCondA = pairs(iPair,1);
-    iCondB = pairs(iPair,2);
-    diffk = data_med_allSubj(:, iCondA) - data_med_allSubj(:, iCondB);
+    iCondA = pairs(iPair, 1);
+    iCondB = pairs(iPair, 2);
+
+    diffk = data_med_allSubj(:, iCondA) - data_med_allSubj(:, iCondB);  % [nSubj x 1]
     indOK = ~isnan(diffk);
-    nk = sum(indOK);
     diffk = diffk(indOK);
+    nk    = numel(diffk);
+
+    if nk < 2 || std(diffk, 0) == 0
+        t_obs_allPairs(iPair) = NaN;
+        pperm_allPairs(iPair) = NaN;
+        continue;
+    end
+
+    % Observed paired-t statistic magnitude (two-tailed)
     denom = std(diffk, 0) / sqrt(nk);
-
     t_obs = abs(mean(diffk) / denom);
-    t_pair_obs(iPair) = t_obs;
+    t_obs_allPairs(iPair) = t_obs;
+    d_obs_allPairs(iPair) = mean(diffk)/std(diffk);
 
-    % sign flips: variance unchanged, only numerator changes
-    % generate +/- 1 signs: nk x nPerm
-    sgn = (rand(nk, nPerm) > 0.5)*2 - 1;
-    num_perm = mean(diffk .* sgn, 1);          % 1 x nPerm
-    t_perm   = abs(num_perm / denom);          % 1 x nPerm
+    % Sign-flip null: flip within-subject diffs by +/-1
+    % Use the first nk rows of sgnMat restricted to valid subjects.
+    sgn = sgnMat(indOK, :);                     % [nk x nPerm]
+    num_perm = mean(diffk .* sgn, 1);           % [1 x nPerm]
+    t_perm   = abs(num_perm / denom);           % [1 x nPerm]
 
-    pperm_diff_allPairs(iPair) = (1 + sum(t_perm >= t_obs)) / (nPerm + 1);
-end
-
-% Bonferroni correction (cap at 1)
-pperm_diff_allPairs = min(pperm_diff_allPairs * nPairs, 1);
-
-%% String for NHST
-str_ANOVA = sprintf('ANOVA: F=%.2f, p=%.3f, eta2p=%.2f [%.2f, %.2f]', Fvalue_med, pperm_ANOVA, eta2p_med, eta2p_lb, eta2p_ub);
-% string for t-tests are built below
-
-%% 3. [Non-NHST] Differences and CI
-% CI raneg with correction (no need to correct as long as all comparisons are planned)
-CI_corrected_pairs = 1-.05; % or .05/nPairs
-CI_corrected_ref = 1-.05; % or .05/nCond
-
-diff_pair_allBoot = nan(nBoot, nPairs);
-
-for iBoot = 1:nBoot
-    for iPair = 1:nPairs
-
-        iCondA = pairs(iPair,1);
-        iCondB = pairs(iPair,2);
-
-        indResampled = randi([1, nSubj], 1, nSubj);
-        A = data_med_allSubj(indResampled, iCondA);
-        B = data_med_allSubj(indResampled, iCondB);
-        diff_pair_allBoot(iBoot, iPair) = mean(A-B);
-    end % iPair
-
-end %iBoot
-
-[diff_med_allPairs, diff_lb_allPairs, diff_ub_allPairs] = getCI(diff_pair_allBoot, 1, 1, CI_corrected_pairs);
-
-%% String creation for pairwise comparison
-str_diff_allPairs = sprintf('%d pairs (%.2f%% CI)\n', nPairs, CI_corrected_pairs*100);
-
-for iPair = 1:nPairs
-    if diff_lb_allPairs(iPair)* diff_ub_allPairs(iPair)>0, str_cross0_diff = '*'; else, str_cross0_diff = ''; end
-
-    iCondA = pairs(iPair,1);
-    iCondB = pairs(iPair,2);
-    % Compile effect size and stats in one string
-    str_diff_allPairs = [str_diff_allPairs, sprintf('%s-%s%s: %.2f [%.2f, %.2f] | t=%.2f, p=%.3f, d=%.2f [%.2f, %.2f]\n', ...
-        x_ticklabels{iCondA}, x_ticklabels{iCondB}, str_cross0_diff, diff_med_allPairs(iPair), diff_lb_allPairs(iPair), diff_ub_allPairs(iPair), ...
-        t_med_allPairs(iPair), pperm_diff_allPairs(iPair), d_med_allPairs(iPair), d_lb_allPairs(iPair), d_ub_allPairs(iPair))];
-
+    pperm_allPairs(iPair) = (1 + sum(t_perm >= t_obs)) / (nPerm + 1);
 end % iPair
 
-%% Comparison to the reference (per condition)
-str_ref = 'No ref';
-if ~isnan(ref)
-    str_ref = sprintf('ref=%.1f (%.2f%% CI): ', ref, CI_corrected_ref);
-    for iCond = 1:nCond
-        if (data_lb_allSubj(iCond)-ref)* (data_ub_allSubj(iCond)-ref)>0, str_cross0_ref = '*'; else, str_cross0_ref = ''; end
-        str_ref = [str_ref, sprintf('%s%s: %.2f [%.2f, %.2f] | ', ...
-            x_ticklabels{iCond}, str_cross0_ref, data_med_allSubj(iCond), data_lb_allSubj(iCond), data_ub_allSubj(iCond))];
-    end % iCond
+% Strings for NHST
+str_ANOVA = sprintf('ANOVA: F=%.2f, p=%.3f, eta2p=%.2f', Fvalue_obs, pperm_ANOVA, eta2p_obs);
+% string for t-tests will be shown with bootstraps
+
+%% [Bootstrap] CIs for planned contrasts (row bootstrap over subjects)
+
+CI_level_diff = 1 - 0.05;   % planned -> 95%
+CI_level_ref  = 1 - 0.05;   % planned -> 95%
+
+diffCond_allBoot = nan(nBoot, nPairs); % difference among conditions
+diffRef_allBoot = nan(nBoot, nCond); % difference between each cond and the ref
+
+for iBoot = 1:nBoot
+    indResampled = randi(nSubj, [1, nSubj]);   % resample rows (subjects) with replacement
+
+    dataRand = data_med_allSubj(indResampled, :);   % [nSubj x nCond] bootstrap sample
+
+    % Pairwise planned differences
+    for iPair = 1:nPairs
+        iCondA = pairs(iPair, 1);
+        iCondB = pairs(iPair, 2);
+        diffCond_allBoot(iBoot, iPair) = mean(dataRand(:, iCondA) - dataRand(:, iCondB));
+    end
+
+    % Comparisons to reference
+    if ~isnan(ref)
+        for iCond = 1:nCond
+            diffRef_allBoot(iBoot, iCond) = mean(dataRand(:, iCond) - ref);
+        end
+    end
+end % iBoot
+
+[diffCond_med, diff_lb, diff_ub] = getCI(diffCond_allBoot, 1, 1, CI_level_diff);
+[diffRef_med, diffRef_lb, diffRef_ub] = getCI(diffRef_allBoot, 1, 1, CI_level_ref);
+
+%% Bootstrap group averages
+% We bootstrap subjects (rows) on data_med_allSubj (subject-level summaries).
+CI_plot = 0.68;          % 68% for plotting (visual readability)
+nBootPlot = 5000;
+
+ave_allBoot = nan(nBootPlot, nCond);
+for iBoot = 1:nBootPlot
+    idx = randi(nSubj, [1 nSubj]);                 % resample subjects with replacement
+    ave_allBoot(iBoot, :) = mean(data_med_allSubj(idx, :), 1);  % bootstrap mean per condition
 end
 
-%% 4. Plot group averages
-[data_ave, ~, ~, data_sem] = getCI(data_med_allSubj, 2, 1);
+% Obtain average and sem of group averages
+[data_ave, ~, ~, data_sem_neg, data_sem_pos] = getCI(ave_allBoot, 1, 1, CI_plot);  % across bootstraps
 
-if ~isnan(sz_fig)
-    figure('Position', [0, 200, sz_fig]);
-end
-hold on
+%% [Plot] Group averages
+figure('Position', [0, 200, sz_fig]); hold on
 
 for iCond = 1:nCond
-    bar(iCond, data_ave(iCond), 'FaceColor', colors(iCond,:), 'EdgeColor', colors(iCond,:), ...
-        'barwidth', wd_bar, 'HandleVisibility', 'off');
-    errorbar(iCond, data_ave(iCond), data_sem(iCond), '.', 'color', colors(iCond,:), ...
-        'CapSize', 0, 'linewidth', wd, 'HandleVisibility', 'off');
+    % Bootstrapped group average
+    bar(iCond, data_ave(iCond), 'FaceColor', colors(iCond,:), 'EdgeColor', colors(iCond,:), 'BarWidth', wd_bar, 'HandleVisibility', 'off');
 
-    % Fancy white overlay
+    % Error bars for bootstrap CI
+    errorbar(iCond, data_ave(iCond), data_sem_neg(iCond), data_sem_pos(iCond), '.', 'color', colors(iCond,:), 'CapSize', 0, 'linewidth', wd, 'HandleVisibility', 'off');
+
+    % Fancy white overlay (pure aesthetics)
     if data_ave(iCond) > 0
-        errorbar(iCond, data_ave(iCond), data_sem(iCond), 0, '.w', 'CapSize', 0, 'linewidth', wd, 'HandleVisibility', 'off');
+        errorbar(iCond, data_ave(iCond), data_sem_neg(iCond), 0, '.w', 'CapSize', 0, 'linewidth', wd, 'HandleVisibility', 'off');
     else
-        errorbar(iCond, data_ave(iCond), 0, data_sem(iCond), '.w', 'CapSize', 0, 'linewidth', wd, 'HandleVisibility', 'off');
+        errorbar(iCond, data_ave(iCond), 0, data_sem_pos(iCond), '.w', 'CapSize', 0, 'linewidth', wd, 'HandleVisibility', 'off');
     end
-end
+end % iCond
 
-%% Plot idvd lines
+%% [Plot] Idvd medians
 if flag_plotIDVD
-    if nCond==2, xIDVD=[1.3, 1.7];
-    else, xIDVD=1:nCond;
+    if nCond == 2
+        xIDVD = [1.3, 1.7];
+    else
+        xIDVD = 1:nCond;
     end
 
     for iSubj = 1:nSubj
         plot(xIDVD, data_med_allSubj(iSubj,:), '-', ...
-            'color', ones(1,3)*.7, 'markerfacecolor','w', 'markeredgecolor', ones(1,3)*.7, ...
-            'markersize', sz_marker_idvd, 'linewidth', wd);
+            'color', ones(1,3)*.7, 'markerfacecolor','w', 'markeredgecolor', ones(1,3)*.7, 'markersize', sz_marker_idvd, 'linewidth', wd);
     end
 end
 
-%% Plot reference
+%% [Plot] Reference
 if ~isnan(ref)
     yline(ref, '--', 'color', ones(1,3)/2, 'handlevisibility', 'off', 'linewidth', wd);
 end
 
-%% ticks, limits
+%% [Plot] ticks, limits
 xticks(1:nCond); xticklabels([])
 % if ~isempty(x_ticklabels), xticklabels(x_ticklabels), end
-if ~isnan(y_ticks), yticks(y_ticks), ylim(y_ticks([1, end])), end
-if ~isnan(y_ticklabels), yticklabels(y_ticklabels), end
+if ~isnan(y_ticks)
+    yticks(y_ticks);
+    ylim(y_ticks([1, end]));
+end
+if ~isnan(y_ticklabels)
+    yticklabels(y_ticklabels);
+end
 
-if flag_plotIDVD, buffer = .6; else, buffer = .5; end
+if flag_plotIDVD
+    buffer = .6;
+else
+    buffer = .5;
+end
 xlim([1-buffer, nCond+buffer]);
 
 ax = gca;
@@ -222,35 +202,122 @@ ax.XAxis.FontSize = sz_ticks;
 ax.YAxis.FontSize = sz_ticks;
 ax.LineWidth = wd;
 
-%% Plot "diff bar" (nCond==2 only) (must be placed after axis are set)
+%% [Plot] "diff bar" (nCond==2 only) (must be placed after axis are set)
+% Use bootstrap CI of the mean paired difference (not SEM).
 if nCond == 2 && flag_plotDiff
 
-    % Compute SEM of within-subject difference
-    [~, ~, ~, diff_sem] = getCI(data_med_allSubj(:, 1)-data_med_allSubj(:, 2), 2, 1);
+    % --- bootstrap CI for mean paired difference (subject bootstrap) ---
+    diff_allBoot = nan(nBootPlot, 1);
+    for iBoot = 1:nBootPlot
+        idx = randi(nSubj, [1 nSubj]);
+        diff_allBoot(iBoot) = mean(data_med_allSubj(idx, 1) - data_med_allSubj(idx, 2), 'omitnan');
+    end
 
-    % Make sure ylim is already set before this point
+    % 95% CI for reporting on plot
+    CI_plot_diff = 0.95;
+    [diff_med_plot, diff_lb_plot, diff_ub_plot] = getCI(diff_allBoot, 1, 1, CI_plot_diff);
+
+    % For the plotted vertical errorbar, use half-lengths around median
+    diff_sem_neg = diff_med_plot - diff_lb_plot;   % lower half-length
+    diff_sem_pos = diff_ub_plot - diff_med_plot;   % upper half-length
+
+    % --- place the comparison line using YLIM (not data max) ---
     yl = ylim;                      % [ymin ymax]
     yMin = yl(1);
     yMax = yl(2);
 
-    % Put the bar at 80% height of the axis
+    % Base height at 80% of y-axis span
     yBar = yMin + 0.80 * (yMax - yMin);
 
-    % If the vertical segment would exceed yMax, nudge downward slightly
-    yTop = yBar + diff_sem/2;
+    % If CI would exceed yMax, nudge downward
+    yTop = yBar + diff_sem_pos;
     if yTop > yMax
-        yBar = yMax - diff_sem/2 - 0.02*(yMax - yMin);
+        yBar = yMax - diff_sem_pos - 0.02 * (yMax - yMin);
     end
-
-    % Draw horizontal line between the two conditions
+    % --- draw horizontal line between the two conditions ---
     plot([1, 2], [yBar, yBar], 'k-', 'LineWidth', wd, 'HandleVisibility', 'off');
 
-    % Draw vertical line at the middle with total length = diff_sem
-    errorbar(1.5, yBar, diff_sem, 'k-', 'LineWidth', wd, 'HandleVisibility', 'off', 'capsize', 0);
+    % --- draw CI errorbar at the center ---
+    errorbar(1.5, yBar, diff_sem_neg, diff_sem_pos, 'k-', 'LineWidth', wd, 'HandleVisibility', 'off', 'CapSize', 0);
+
+    % --- print point + interval estimate above the line (aligned left) ---
+    % left anchor slightly to the right of x=1 to avoid overlap with the bar
+    % xText = 1.5;
+    % yText = yBar + 0.03 * (yMax - yMin);
+
+    xText = 1.5;                                  % left aligned near bar 1
+    yPad  = 0.02 * (yMax - yMin);                  % padding in axis units
+    yText = (yBar + diff_sem_pos) + yPad;          % above upper CI
+
+    % If that would exceed yMax, clamp a bit
+    if yText > yMax
+        yText = yMax - 0.01 * (yMax - yMin);
+    end
+
+    str_delta = sprintf('\\Delta=%.2f [%.2f, %.2f]', diff_med_plot, diff_lb_plot, diff_ub_plot);
+
+    text(xText, yText, str_delta, ...
+        'HorizontalAlignment', 'center', ...
+        'VerticalAlignment', 'bottom', ...
+        'FontSize', 20, ...
+        'Color', 'k', ...
+        'Interpreter', 'tex', ...
+        'Clipping', 'off');
 end
 
-%% title
-title(sprintf('%s\n%s\n%s%s\n', str_title, str_ANOVA, str_diff_allPairs, str_ref), 'fontsize', sz_title);
+%% Strings
+% (1) Pairwise comparisons
+str_diffCond = sprintf('Planned pairwise contrasts (%.1f%%CI)\n', CI_level_diff*100);
+for iPair = 1:nPairs
+    str_cross0 = '';
+    if diff_lb(iPair)*diff_ub(iPair)>0, str_cross0 = '*'; end
+    str_diffCond = [str_diffCond, sprintf('%s-%s%s=%.2f [%.2f, %.2f] | t=%.2f, p=%.3f, d=%.2f\n', ...
+        x_ticklabels{pairs(iPair,1)}, x_ticklabels{pairs(iPair,2)}, str_cross0, diffCond_med(iPair), diff_lb(iPair), diff_ub(iPair), t_obs_allPairs(iPair), pperm_allPairs(iPair), d_obs_allPairs(iPair))];
+end
+
+% (2) Compare to the reference
+str_ref = 'No ref';
+if ~isnan(ref)
+    str_ref = sprintf('Ref=%.1f (%.2f%% CI)\n', ref, CI_level_ref);
+
+    % NHST for each condition vs ref (sign-flip on (X-ref))
+    t_ref  = nan(1, nCond);    % signed t
+    d_ref = nan(1, nCond);    % dz = mean(diff)/sd(diff)
+    pperm_ref = nan(1, nCond);
+
+    % pre-generate sign flips once (consistent null draws)
+    sgnMat_ref = (rand(nSubj, nPerm) > 0.5) * 2 - 1;% [nk x nPerm]
+
+    for iCond = 1:nCond
+        diffk = data_med_allSubj(:, iCond) - ref;   % [nSubj x 1]
+        nk = numel(diffk);
+        sd_diff = std(diffk, 0);
+        denom = sd_diff / sqrt(nk);
+
+        % observed stats
+        t_ref(iCond)  = mean(diffk) / denom;      % signed
+        d_ref(iCond) = mean(diffk) / sd_diff;    % signed
+
+        % permutation p (two-tailed)
+        num_perm = mean(diffk .* sgnMat_ref, 1);
+        t_perm   = abs(num_perm / denom);
+
+        pperm_ref(iCond) = (1 + sum(t_perm >= abs(t_ref(iCond)))) / (nPerm + 1);
+
+        % Build string
+        str_cross0 = '';
+        if diffRef_lb(iCond)*diffRef_ub(iCond)>0, str_cross0 = '*'; end
+        str_ref = [str_ref, sprintf('%s%s: %.2f [%.2f, %.2f] | t=%.2f, p=%.3f, d=%.2f\n', ...
+            x_ticklabels{iCond}, str_cross0, data_ave(iCond), data_ave(iCond)-data_sem_neg(iCond), data_ave(iCond)+data_sem_pos(iCond), ...
+            t_ref(iCond), pperm_ref(iCond), d_ref(iCond))];
+
+    end % iCond
+
+
+end
+
+%% [Plot] Title
+title(sprintf('%s\n%s\n%s%s\n', str_title, str_ANOVA, str_diffCond, str_ref), 'fontsize', sz_title);
 
 
 end
