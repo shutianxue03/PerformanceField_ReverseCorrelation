@@ -271,8 +271,9 @@ fitMode = 2; % 1 = SSE, 2 = MLE;
 %% Names
 % General names
 % metrics = [dprime, criterion, [pC, pHit, pFA], nanmean(respC), pYES, mean(1./contrast), median(RT)];
-namesMetrics = {'dprime', 'criterion', 'pC', 'pHit', 'pFA', 'pA', 'pA1', 'pA0', 'CS'}; nmetrics = length(namesMetrics);
+% namesMetrics = {'dprime', 'criterion', 'pC', 'pHit', 'pFA', 'pA', 'pA1', 'pA0', 'CS'}; nmetrics = length(namesMetrics);
 namesMetrics = {'dprime', 'criterion', 'pC', 'pHit', 'pFA', 'pA', 'pA1', 'pA0', 'pYES', 'CS', 'RT'}; nMetrics = length(namesMetrics);
+namesMetricsLong = {'Dprime', 'criterion', 'Accuracy', 'pHit', 'pFA', 'pA', 'pA1', 'pA0', 'pYES', 'Contrast sensitivity', 'Resp. time'}; nMetrics = length(namesMetrics);
 namesFeature = {'ORI', 'SF'}; nFeatures = length(namesFeature);
 namesType = {'PRS', 'ABS', 'BOTH'}; nTypes = length(namesType);
 namesLoc2D = {'Fovea', 'Left', 'Upper', 'Right', 'Lower'};
