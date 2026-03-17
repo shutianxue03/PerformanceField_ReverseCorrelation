@@ -1,11 +1,11 @@
 function [maxIV, maxORI, maxSF_log] = getIndMax(IV2D_ORI_nonselected, ORI_bound, flag_plot)
 
-    %---------------%
-    SX_RC1_setting
-    %---------------%
+%---------------%
+SX_RC1_setting
+%---------------%
 
 
-    IV2D = IV2D_ORI_nonselected(ORI_bound(1):ORI_bound(2), :);
+IV2D = IV2D_ORI_nonselected(ORI_bound(1):ORI_bound(2), :);
 IV2D = IV2D_ORI_nonselected;
 
 maxIV = max(IV2D(:));

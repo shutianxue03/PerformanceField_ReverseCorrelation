@@ -21,8 +21,8 @@ wd_border = 3;
 sz_ticks = 40;
 sz_marker = 18;
 
-CI68 = 0.68; % per-point CI bars (X/Y across iterations) if flag_plotIdvdCI==1
-CI95 = 0.95; % CIs reported for correlations and regression bands
+CI68 = .68; % per-point CI bars (X/Y across iterations) if flag_plotIdvdCI==1
+CI95 = .95; % CIs reported for correlations and regression bands
 nPerm = 1e4;
 nBoot = 1e4;
 seedPerm = 1;
@@ -316,7 +316,7 @@ for iCond = 1:nCond
         if flag_plotIdvdCI == 1
             % errorbar([X_lb_plot(iSubj,iCond), X_ub_plot(iSubj,iCond)], [y0 y0], '-', 'Color', ones(1,3)*0.5, 'LineWidth', 1.5, 'HandleVisibility','off');
             % plot([x0 x0], [Y_lb_plot(iSubj,iCond), Y_ub_plot(iSubj,iCond)], '-', 'Color', ones(1,3)*0.5, 'LineWidth', 1.5, 'HandleVisibility','off');
-            errorbar(X_med(iSubj,iCond), Y_med(iSubj,iCond), Y_sem_neg(iSubj,iCond), Y_sem_pos(iSubj,iCond), 'vertical', '-', 'Color', ones(1,3)*0.5, 'LineWidth', 1.5, 'HandleVisibility','off')
+            errorbar(X_med(iSubj,iCond), Y_med(iSubj,iCond), Y_sem_neg(iSubj,iCond), Y_sem_pos(iSubj,iCond), 'vertical', '-', 'Color', ones(1,3)*0.5, 'LineWidth', 1.5, 'HandleVisibility','off', 'CapSize', 0)
         end
 
         plot(x0, y0, mk, ...
@@ -389,7 +389,7 @@ ax.XAxis.FontSize = sz_ticks;
 ax.YAxis.FontSize = sz_ticks;
 ax.LineWidth = wd_border;
 
-%% ---------------- print text blocks ----------------
+%% ---------------- print stats ----------------
 switch flag_UseRUseRho
     case 'useR'
         str_print = sprintf('Partial r=%.2f [%.2f, %.2f]' , r_partial_pc_med, r_partial_pc_lb, r_partial_pc_ub);
@@ -397,12 +397,13 @@ switch flag_UseRUseRho
         str_print = sprintf('Partial \\rho=%.2f [%.2f, %.2f]' , rho_partial_pc_med, rho_partial_pc_lb, rho_partial_pc_ub);
 end
 
-text(ax, 0.5, 0.02, str_print, 'Units', 'normalized', ...
+
+y_str = 0.02; % Figure 6: 0.02
+text(ax, 0.5, y_str, str_print, 'Units', 'normalized', ...
     'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom', ...
     'FontSize', 45, 'Color', 'k', 'Interpreter', 'tex', 'Clipping', 'off');
 
-title(sprintf('%s\n%s\n%s\n%s\n', str_title, str_partial_demean, str_partial_pc, str_perLoc), ...
-    'FontSize', 14);
+title(sprintf('%s\n%s\n%s\n%s\n', str_title, str_partial_demean, str_partial_pc, str_perLoc), 'FontSize', 14);
 
 %% Save CI for automatic CI range calcuation in CorrAsym
 PearsonR = [r_partial_pc_med, r_partial_pc_lb, r_partial_pc_ub];

@@ -1,5 +1,5 @@
 
-function [IV, max_allT] = fxn_getIV_v3(iModelA, e3D, convolveType, IVType, template_true, ORI_bound)
+function [IV, max_allT] = fxn_getIV_v3(e3D, template_input, convolveType, IVType, flag_permT, ORI_bound)
 
 flag_plotMax=0;
 
@@ -24,13 +24,13 @@ end
 % Because to have the same IV for paired trials, the template cannot be randomized
 % independently across trials (at least not for the pair of trials)
 
-if iModelA == 3 % Permute pixels in the template
+if flag_permT % Permute pixels in the template
     indRand = randperm(nORI*nSF);
-    template_true_v = template_true(:);
-    template_rand = template_true_v(indRand);
+    template_input_v = template_input(:);
+    template_rand = template_input_v(indRand);
     template = reshape(template_rand, nORI, nSF);
 else
-    template = template_true;
+    template = template_input;
 end
 
 for iTrial = 1:nTrials
@@ -47,9 +47,9 @@ for iTrial = 1:nTrials
     end
 
     % get the channel at which max value is found
-    [max_, maxORI, maxSF_log] = getIndMax(tempCovE, ORI_bound, flag_plotMax); % ORI_bound should be a vector of index of ori channels [ori_lb, ori_ub]
-    maxORI=nan;maxSF_log=nan;
-    max_allT(iTrial, :) = [maxORI, maxSF_log];
+    % [max_, maxORI, maxSF_log] = getIndMax(tempCovE, ORI_bound, flag_plotMax); % ORI_bound should be a vector of index of ori channels [ori_lb, ori_ub]
+    % maxORI=nan;maxSF_log=nan;
+    % max_allT(iTrial, :) = [maxORI, maxSF_log];
 
     %     quickPlot_tempCovE, waitforbuttonpress
     % decide the format of IV

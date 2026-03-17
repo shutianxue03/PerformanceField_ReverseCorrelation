@@ -1,7 +1,10 @@
 
 % This script generates plots for the estimated parameters and prediction metrics of the Noisy Observer Model (NOM).
 
+
 %% Compile data and pred for all iterations and bins
+set(0, 'DefaultFigureVisible', 'off') % avoid printing figures on the desktop
+
 pred = pred_test;
 
 pYES_data_allBins = nan(nIter, nBins);
@@ -112,7 +115,7 @@ title(sprintf('pA (r=%.2f, R²=%.2f)', r_pA, R2_pA));
 sgtitle(sprintf('Figure 1. Metrics vs. binned IV\n%s (ModelA%dB%d %s, L%d, nIter=%d)', ...
     subjName, iModelA, iModelB, namesModelB{iModelB}, iLocComb, nIter))
 
-saveas(gcf, sprintf('%s/3Metrics_%s_L%d_A%dB%d.jpg', nameFolder_Figures_NOM, subjName, iLocComb, iModelA, iModelB))
+saveas(gcf, sprintf('%s/4Metrics_L%d_A%dB%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA, iModelB))
 
 %% 2. Plot estimated parameters across iterations
 
@@ -137,7 +140,7 @@ end
 sgtitle(sprintf('Figure 2. Estimated parameters across iterations\n%s (ModelA%dB%d %s, L%d, nIter=%d)', ...
     subjName, iModelA, iModelB, namesModelB{iModelB}, iLocComb, nIter))
 
-saveas(gcf, sprintf('%s/4Params_%s_L%d_A%dB%d.jpg', nameFolder_Figures_NOM, subjName, iLocComb, iModelA, iModelB))
+saveas(gcf, sprintf('%s/5Params_L%d_A%dB%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA, iModelB))
 
 %% 3. Freeze other params and vary one param to see its corr with pA
 figure('Position', [0 0 1e3 300])
@@ -149,6 +152,13 @@ for iParamFreeze = 1:nParams
         NOM_test = NOM_grid(i);
 
         switch nParams
+            case 4
+                switch iParamFreeze
+                    case 1, params_test  = [NOM_test, params_est(2), params_est(3), params_est(4)]; % iModelB = 1
+                    case 2, params_test  = [params_est(1), NOM_test, params_est(3), params_est(4)]; % iModelB = 1
+                    case 3, params_test  = [params_est(1), params_est(2), NOM_test, params_est(4)]; % iModelB = 1
+                    case 4, params_test  = [params_est(1), params_est(2), params_est(3), NOM_test]; % iModelB = 1
+                end
             case 3
                 switch iParamFreeze
                     case 1, params_test  = [NOM_test, params_est(2), params_est(3)]; % iModelB = 1
@@ -161,7 +171,9 @@ for iParamFreeze = 1:nParams
                     case 2, params_test  = [params_est(1), NOM_test]; % iModelB = 2
                 end
         end
-        [~, pA_pred_allPairs, ~] = fxn_predMetrics_v2(iModelB, params_test, data_test, c_zscore_test);
+        %---------------------%
+        [~, pA_pred_allPairs, ~] = fxn_predMetrics_v3(iModelB, params_test, data_test, c_zscore_test);
+        %---------------------%
         pA_mean(i) = mean(pA_pred_allPairs);
 
         subplot(1,nParams, iParamFreeze)
@@ -175,4 +187,4 @@ end
 sgtitle(sprintf('Figure 3. Vary one param (and freeze others) to see its corr with pA\n%s (ModelA%dB%d %s, L%d, nIter=%d)', ...
     subjName, iModelA, iModelB, namesModelB{iModelB}, iLocComb, nIter))
 
-saveas(gcf, sprintf('%s/3FreezeCorr_%s_L%d_A%dB%d.jpg', nameFolder_Figures_NOM, subjName, iLocComb, iModelA, iModelB))
+saveas(gcf, sprintf('%s/6FreezeCorr_L%d_A%dB%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA, iModelB))

@@ -32,8 +32,6 @@ SX_RC1_setting
 %-------------%
 subjList = {'YK', 'SP', 'SX', 'LS', 'RE', 'MD', 'AS', 'HL', 'FH', 'HA',  'DT', 'CS', 'DU', 'SR', 'RC'};
 nblocks_allSubj = [200, 240, 210, 240, 220, 220, 215, 220, 205, 210, 205, 205, 205, 195, 205];
-subjList = {'HL'};
-nblocks_allSubj = [220];
 nsubj = length(subjList);
 
 ib_start = 1; % do NOT change!
@@ -92,7 +90,7 @@ for isubj = 1:nsubj
     name2 = {'noise', 'target'};
     name3 = {'noise_allT', 'target_allT'};
 
-    for iPatchMode = 1:2 %1=noise patch; 2=target patch
+    for iPatchMode = 2%1:2 %1=noise patch; 2=target patch
         nameFile_Patch = sprintf('%s/Data/%s/%s_%s.mat', nameFolder_Data, subjName, subjName, name2{iPatchMode});
         nameFile_EnergySource = sprintf('%s/%s%d/%s_energy_%s_%d_%d.mat', ...
             nameFolder_Data_OOD, subjName, nBlocks, subjName, name1{iPatchMode}, nORI, nSF);

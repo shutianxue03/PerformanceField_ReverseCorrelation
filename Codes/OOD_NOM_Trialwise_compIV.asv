@@ -75,6 +75,27 @@ addpath(genpath('SX_toolbox/bads-master'));
 SX_RC1_setting; % defines nameFolder_*, nORI, nSF, namesLocComb, namesModelA, etc.
 % --------------%
 
+%------- parameters related to nORI (To remove later) ----
+nORI = 17;
+nameFolder_Data_OOD = sprintf('%s/Data_OOD_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
+nameFolder_Data_NOM_Trialwise = sprintf('%s/Data_NOM_Trialwise_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
+
+fOri = linspace(0, 90, (nORI+1)/2); fOri = fOri(2:end);
+filtersOri_all = round([-flip(fOri), 0, fOri] + 90); % must +90 !! otherwise the ori filters are 90 deg phased off
+assert(nORI == length(filtersOri_all));
+
+% SF filter
+nSF = nORI;
+noise.SF_low = 1;
+noise.SF_high = 2/noise.SF_low*2; 
+noise.filtersSF_all_log = linspace(log2(noise.SF_low), log2(noise.SF_high), nSF); 
+noise.filtersSF_all = 2.^noise.filtersSF_all_log;
+filtersSF_all_log = noise.filtersSF_all_log;
+filtersSF_all = noise.filtersSF_all;
+
+noise.SF_low_sampling = noise.SF_low;
+noise.SF_high_sampling = noise.SF_high;
+%------- %------- %------- 
 %% -------------------- Deterministic RNG (grand seed + per-iteration substreams) -------------------- %%
 S_seed = GetGrandSeed(nIter, iJob, nJob, nameFolder_Data);
 

@@ -163,44 +163,70 @@ lm_med = polyfit(x_obs(indOK_med), y_obs(indOK_med), 1);
 yfit_OnMed = polyval(lm_med, x_lm);
 
 %% Generate color gradient
-% --- 1) Decide reference axis direction u ---
-switch flag_UseRUseRho
-    case 'useR'
-        sgnCorr = sign(r_med);
-    case 'useRho'
-        sgnCorr = sign(rho_med);
+% Inputs:
+%   X_med, Y_med : Nx1
+%   colors(1,:)  : purple RGB
+%   colors(2,:)  : green  RGB
+
+purple = colors(1,:);
+green  = colors(2,:);
+
+% 0) Fit regression (direction only)
+p = polyfit(X_med, Y_med, 1);
+slope = p(1);
+
+% 1) Regression-axis unit vector
+v = [1, slope];
+v = v ./ norm(v);
+
+% 2) Reference point on fitted line (so perpendicular lines behave correctly)
+x0 = mean(X_med);
+y0 = polyval(p, x0);
+
+% 3) Center data relative to that point on the fitted line
+Xc = X_med - x0;
+Yc = Y_med - y0;
+
+% 4) Coordinate along regression axis (color depends ONLY on this)
+t = Xc*v(1) + Yc*v(2);
+
+% 5) Robust normalization to get visible transition (clip outliers)
+tLo = prctile(t, 2);
+tHi = prctile(t, 98);
+if tHi <= tLo
+    s = 0.5 * ones(size(t));
+else
+    tClip = min(max(t, tLo), tHi);
+    s = (tClip - tLo) ./ (tHi - tLo);   % 0..1
 end
-u = [1, sgnCorr] / sqrt(2);
 
-% --- 2) Project each point onto the reference axis ---
-t = X_med * u(1) + Y_med * u(2);   % Nx1 signed coordinate along axis
+% Optional: increase mid-range contrast (more visible transition)
+gamma = 0.6;          % <1 spreads colors; try 0.5–0.8
+s = s.^gamma;
 
-% --- 3) FIX hue by side ---
-% bottom-left (typically t<0) -> colors(1,:)
-color0 = repmat(colors(1,:), numel(t), 1);   % default
-color0(t < 0, :) = repmat(colors(2,:), sum(t < 0), 1);
+% 6) Optional: make center colors "light but still colored" without going white
+% Do this by blending toward a *lightened version of each endpoint color*.
+lightMix = 0.55;      % 0=no lightening; 0.4–0.7 typical
+purple_light = (1-lightMix)*purple + lightMix*[1 1 1];
+green_light  = (1-lightMix)*green  + lightMix*[1 1 1];
 
-% --- 4) Brightness only, normalized SEPARATELY for t<0 and t>0 ---
-s = zeros(size(t));
+% Two-sided ramp:
+%  - s=0   -> pure purple
+%  - s=0.5 -> light purple/green boundary
+%  - s=1   -> pure green
+edgeColor_allSubj = zeros(numel(s),3);
 
-neg = (t < 0);
-pos = (t > 0);
+left  = (s <= 0.5);
+right = ~left;
 
-tmaxNeg = max(abs(t(neg)));   % farthest on negative side
-tmaxPos = max(abs(t(pos)));   % farthest on positive side
+% purple -> light purple (toward center)
+sL = s(left) / 0.5; % 0..1
+edgeColor_allSubj(left,:) = (1-sL).*purple + sL.*purple_light;
 
-if any(neg) && tmaxNeg > 0
-    s(neg) = abs(t(neg)) ./ tmaxNeg;   % 0 near origin -> 1 at neg extreme
-end
-if any(pos) && tmaxPos > 0
-    s(pos) = abs(t(pos)) ./ tmaxPos;   % 0 near origin -> 1 at pos extreme
-end
+% light green -> green (away from center)
+sR = (s(right)-0.5) / 0.5; % 0..1
+edgeColor_allSubj(right,:) = (1-sR).*green_light + sR.*green;
 
-s = max(0, min(1, s));  % clamp
-sMin=.25; % 
-s=sMin+(1-sMin)*s;
-% Mix with white: s=0 -> white-ish, s=1 -> pure hue
-edgeColor_allSubj = (1 - s).*ones(size(color0)) + s.*color0;  % Nx3
 
 %% ---- 5) Plot individual data (medians + optional per-point CI bars) ----
 figure('Position', [0 200 1e3 1e3]); hold on; box on
@@ -221,7 +247,7 @@ for iSubj = 1:nSubj
         edgeColor = 'k';
     end
 
-    edgeColor = edgeColor_allSubj(iSubj, :);
+    % edgeColor = edgeColor_allSubj(iSubj, :);
 
     % Plot 68% CI
     if flag_plotIdvdCI == 1
@@ -280,7 +306,7 @@ title(sprintf('%s %.0f%% CI \n%s\n', str_title, CI_level*100, str_corr));
 %% Print string at the bottom-center
 switch flag_UseRUseRho
     case 'useR'
-        str_print = sprintf('r = %.2f , CI_{%.0f}=[%.2f, %.2f]', r_med, CI_level*100, r_lb, r_ub);
+        str_print = sprintf('r = %.2f, CI_{%.0f}=[%.2f, %.2f]', r_med, CI_level*100, r_lb, r_ub);
     case 'useRho'
         str_print = sprintf('\\rho = %.2f, CI_{%.0f}=[%.2f, %.2f]', rho_med, CI_level*100, rho_lb, rho_ub);
 end

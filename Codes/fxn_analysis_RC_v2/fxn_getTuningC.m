@@ -30,7 +30,9 @@ if iFeature == 1
             % ORI-peak and bottom
             peakAmp_ORI = pred(ceil(nFilters/2)); % the same as max(pred) after mirroring
             bottom_ORI = pred(1); % the same as min(pred), assuming Gaussian and mirroring
-            width_ORI = params(2)*sqrt(2*log(2)); % half width at half height; has a math expression because the model is Gaussian
+            % width_ORI = params(2)*sqrt(2*log(2)); % half width at half height; has a math expression because the model is Gaussian
+            width_ORI = params(2)*sqrt(log(2)); % half width at half height; no "2" because my gaussian function is exp(-((x-mu)/sigma).^2);
+
             % compile
             tuningC = [peakAmp_ORI, width_ORI, bottom_ORI];
 

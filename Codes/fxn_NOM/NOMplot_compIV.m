@@ -30,6 +30,9 @@
 % This script is intended to be called after running OOD_NOM_Trialwise_compIV.m
 % It loads the saved output and generates plots for IV distribution, bin counts, and performance metrics.
 
+set(0, 'DefaultFigureVisible', 'off') % avoid printing figures on the desktop
+
+
 %% Figure 1: Performance Metrics across Iterations
 figure('Position', [100, 100, 2e3, 2e3])
 for iMetric = 1:nMetrics
@@ -71,7 +74,7 @@ set(findall(gcf, '-property', 'linewidth'), 'linewidth', 2)
 
 sgtitle(sprintf('Figure 1. Measured metrics (Ave across %d iterations +- 68%% CI)\n%s (Loc%d ModelA%d %s)', ...
     nIter, subjName, iLocComb, iModelA, namesModelA{iModelA}))
-saveas(gcf, sprintf('%s/1MetricMeasured_%s_L%d_A%d.jpg', nameFolder_Figures_NOM, subjName, iLocComb, iModelA))
+saveas(gcf, sprintf('%s/1MetricMeasured_L%d_A%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA))
 
 %% Figure 2: 2D Kernel
 template_tmpl_ave = squeeze(mean(template_tmpl_allIter, 1));
@@ -153,7 +156,7 @@ end
 sgtitle(sprintf('Figure 2. Recovered template\n%s (L%d, ModelA%d %s, nIter=%d)\nAveraged Pearson''s corr: r=%.2f (%.2f), p=%.3f (%.2f)', ...
     subjName, iLocComb, iModelA, namesModelA{iModelA}, nIter, r_med, r_SEM, p_med, p_SEM))
 
-saveas(gcf, sprintf('%s/2Template_%s_L%d_A%d.jpg', nameFolder_Figures_NOM, subjName, iLocComb, iModelA))
+saveas(gcf, sprintf('%s/2Template_L%d_A%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA))
 
 %% Figure 3. Plot marg and margPred, print R2 and params in the title
 [margORI_med, ~, ~, margORI_sem] = getCI(margORI_allIter, 1, 1);
@@ -177,6 +180,7 @@ xline(0, 'k--', 'LineWidth', 1); % ORI=0
 yline(0, 'k--', 'LineWidth', 1); % Marginalized kernel=0
 title(sprintf('ORI tuning function (training set)\nR2=%.2f (+-%.2f)| Params=[%s ]', margR2_ORI_med(1), margR2_ORI_sem(1), num2str(margParam_ORI_med(1, :), ' %.2f')));
 xlabel('Orientation (deg)'); ylabel('Amplitude');
+yticks(-.1:.1:1)
 
 % ORI tuning (full set)
 subplot(2,2,3); hold on;
@@ -186,6 +190,7 @@ xline(0, 'k--', 'LineWidth', 1); % ORI=0
 yline(0, 'k--', 'LineWidth', 1); % Marginalized kernel=0
 title(sprintf('ORI tuning function (full set)\nR2=%.2f (+-%.2f)| Params=[%s ]', margR2_ORI_med(2), margR2_ORI_sem(2), num2str(margParam_ORI_med(2, :), ' %.2f')));
 xlabel('Orientation (deg)'); ylabel('Amplitude');
+yticks(-.1:.1:1)
 
 % SF tuning (training set)
 subplot(2,2,2); hold on;
@@ -195,6 +200,7 @@ xline(1, 'k--', 'LineWidth', 1); % SF=2 cpd
 yline(0, 'k--', 'LineWidth', 1); % Marginalized kernel=0
 title(sprintf('SF tuning function (training set)\nR2=%.2f (+-%.2f)| Params=[%s]', margR2_SF_med(1), margR2_SF_sem(1), num2str(margParam_SF_med(1, :), ' %.2f')));
 xlabel('Log Spatial frequency (cpd)'); ylabel('Amplitude');
+yticks(-.1:.1:.6)
 
 % SF tuning (full set)
 subplot(2,2,4); hold on;
@@ -204,6 +210,7 @@ xline(1, 'k--', 'LineWidth', 1); % SF=2 cpd
 yline(0, 'k--', 'LineWidth', 1); % Marginalized kernel=0
 title(sprintf('SF tuning function (full set)\nR2=%.2f (+-%.2f)| Params=[%s]', margR2_SF_med(2), margR2_SF_sem(2), num2str(margParam_SF_med(2, :), ' %.2f')));
 xlabel('Log Spatial frequency (cpd)'); ylabel('Amplitude');
+yticks(-.1:.1:.6)
 
 sgtitle(sprintf('Figure 3. Tuning functions\n%s (L%d, ModelA%d %s, nIter=%d)', ...
     subjName, iLocComb, iModelA, namesModelA{iModelA}, nIter))
@@ -211,4 +218,4 @@ sgtitle(sprintf('Figure 3. Tuning functions\n%s (L%d, ModelA%d %s, nIter=%d)', .
 set(findall(gcf, '-property', 'fontsize'), 'fontsize', 20)
 % set(findall(gcf, '-property', 'linewidth'), 'linewidth', 2)
 
-saveas(gcf, sprintf('%s/3TuningFxn_%s_L%d_A%d.jpg', nameFolder_Figures_NOM, subjName, iLocComb, iModelA))
+saveas(gcf, sprintf('%s/3TuningFxn_L%d_A%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA))

@@ -10,10 +10,11 @@ function basicFxn_drawBars_permutation( ...
 
 %% ---- settings ----
 sz_marker_idvd = 10;
-sz_ticks = 35; % behav and sep: 25; tunC: 22; nLL: 35
+sz_ticks = 22; % behav, sep: 25; tunC: 22; nLL: 35;  NOM params: 25
 sz_title = 10;
 wd = 3; % behav: 3; sep: 2; tunC: 3
 wd_bar = .5;
+sz_text = 25;
 
 CI95 = .95;
 CI68 = .68;          % 68% for plotting (visual readability)
@@ -357,12 +358,13 @@ if nCond == 2 && flag_plotDiff
         yText = yMax - 0.01 * (yMax - yMin);
     end
 
-    str_delta = sprintf('\\Delta=%.2f, CI_{%.0f}=[%.2f, %.2f]', diffPair_med, CI95*100, diffPair_lb, diffPair_ub);
+    % str_delta = sprintf('\\Delta=%.2f, CI_{%.0f}=[%.2f, %.2f]', diffPair_med, CI95*100, diffPair_lb, diffPair_ub);
+    str_delta = sprintf('\\Delta=%.2f [%.2f, %.2f]', diffPair_med, diffPair_lb, diffPair_ub);
 
     text(xText, yText, str_delta, ...
         'HorizontalAlignment', 'center', ...
         'VerticalAlignment', 'bottom', ...
-        'FontSize', 20, ...
+        'FontSize', sz_text, ...
         'Color', 'k', ...
         'Interpreter', 'tex', ...
         'Clipping', 'off');

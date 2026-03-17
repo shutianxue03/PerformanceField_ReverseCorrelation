@@ -16,7 +16,6 @@ LW_AUX  = 2.0;  % auxiliary lines (means, IV lines)
 LW_MRK  = 3.0;  % markers/IV dots
 LW_ANN  = 3.0;  % annotation arrows (bandwidth)
 
-
 color_shade = [0.8 0.7 0.9]; % light purple
 color_cri = [0.4 0 0.6];
 facealpha = .3;
@@ -614,10 +613,10 @@ close all
 clc, close all
 sz_marker_all = [100];
 sz_line = 15;
-
-% EE (1 ecc)
 outline_ecc = 1.5;
 ecc = outline_ecc;
+
+% EE (1 ecc)
 str_locgroup = 'L18-1ecc';
 fprintf('\n%s...\n', str_locgroup)
 x_ref = {};
@@ -660,6 +659,37 @@ indParts_all = {1:2, 1, 2};
 %------------------------------------%
 fxn_plotPF_diagram(str_locgroup, sz_marker_all,  x_ref, y_ref, x_allLoc, y_allLoc, colors_allLoc, strParts_all, indParts_all, outline_ecc, sz_line, nameFolder_Fig_Schematic);
 %------------------------------------%
+
+% HM vs. LVM (1 ecc)
+str_locgroup = 'L65-1ecc';
+fprintf('\n%s...\n', str_locgroup)
+x_ref = {[-ecc, ecc], [0,0]};
+y_ref = {[0,0], [-ecc, ecc]};
+x_allLoc = [ecc, -ecc,  0];
+y_allLoc = [0,   0,  -ecc];
+colors_allLoc = colors_comb([6,6,5], :);
+
+strParts_all = {'full', 'HM', 'LVM'};
+indParts_all = {1:3, 1:2, 3};
+%------------------------------------%
+fxn_plotPF_diagram(str_locgroup, sz_marker_all,  x_ref, y_ref, x_allLoc, y_allLoc, colors_allLoc, strParts_all, indParts_all, outline_ecc, sz_line, nameFolder_Fig_Schematic);
+%------------------------------------%
+
+% HM vs. UVM (1 ecc)
+str_locgroup = 'L63-1ecc';
+fprintf('\n%s...\n', str_locgroup)
+x_ref = {[-ecc, ecc], [0,0]};
+y_ref = {[0,0], [-ecc, ecc]};
+x_allLoc = [ecc, -ecc,  0];
+y_allLoc = [0,   0,  ecc];
+colors_allLoc = colors_comb([6,6,3], :);
+
+strParts_all = {'full', 'HM', 'UVM'};
+indParts_all = {1:3, 1:2, 3};
+%------------------------------------%
+fxn_plotPF_diagram(str_locgroup, sz_marker_all,  x_ref, y_ref, x_allLoc, y_allLoc, colors_allLoc, strParts_all, indParts_all, outline_ecc, sz_line, nameFolder_Fig_Schematic);
+%------------------------------------%
+
 
 % 5 single locations
 str_locgroup = 'L16645';

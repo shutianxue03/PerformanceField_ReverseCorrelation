@@ -13,7 +13,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Define number of ORI (and SF) channels
-nORI = 29;
+nORI = 33;
 nSF = nORI;
 
 %% Define names of folders to load/save data (on the server)
@@ -93,27 +93,31 @@ params.noise=noise;
 
 %% Settings for ORI/SF filter
 % ORI filter
-switch nORI
-    case 29, fOri = [5:5:50, 60:10:90]; % nORI=29
-    case 19, fOri = [5:10:45, 60:10:90]; % nORI=19
-end
-% fOri = [2, 5:5:50, 60:15:90]; % nORI=29
-filtersOri_all = [-flip(fOri), 0, fOri] + 90; % must +90 !! otherwise the ori filters are 90 deg phased off
-nORI = length(filtersOri_all);
+% switch nORI
+%     case 29, 
+% fOri = [5:5:50, 60:10:90]; % nORI=29
+%     case 19, 
+% fOri = [5:10:45, 60:10:90]; % nORI=19
+% end
+fOri = linspace(0, 90, (nORI+1)/2); fOri = fOri(2:end);
+filtersOri_all = round([-flip(fOri), 0, fOri] + 90); % must +90 !! otherwise the ori filters are 90 deg phased off
+assert(nORI == length(filtersOri_all));
 
 % SF filter
 nSF = nORI; % could generate 0.5: 17, 29, 37
 noise.SF_low = 1;
-noise.SF_low = 1.1869;
-noise.SF_high = 2/noise.SF_low*2; noise.filtersSF_all_log = linspace(log2(noise.SF_low), log2(noise.SF_high), nSF); noise.filtersSF_all = 2.^noise.filtersSF_all_log;
-cut_ORI = 1:nORI; cut_SF = 1:nSF;
-nORI = length(cut_ORI);
-nSF = length(cut_SF);
+% noise.SF_low = 1.1869;
+noise.SF_high = 2/noise.SF_low*2; 
+noise.filtersSF_all_log = linspace(log2(noise.SF_low), log2(noise.SF_high), nSF); 
+noise.filtersSF_all = 2.^noise.filtersSF_all_log;
+% cut_ORI = 1:nORI; cut_SF = 1:nSF;
+% nORI = length(cut_ORI);
+% nSF = length(cut_SF);
 
-filtersOri_all = filtersOri_all(cut_ORI);
-nSF = length(cut_SF);
-filtersSF_all_log = noise.filtersSF_all_log(cut_SF);
-filtersSF_all = noise.filtersSF_all(cut_SF);
+% filtersOri_all = filtersOri_all(cut_ORI);
+% nSF = length(cut_SF);
+filtersSF_all_log = noise.filtersSF_all_log;
+filtersSF_all = noise.filtersSF_all;
 
 noise.SF_low_sampling = noise.SF_low;
 noise.SF_high_sampling = noise.SF_high;
@@ -151,11 +155,13 @@ ncomb8 = 8;
 NOMp1_lb = 1e-5;  NOMp1_ub = 1;     % induced noise 
 NOMp2_lb = 1e-5; NOMp2_ub = 50;   % idpdt constant noise
 NOMp3_lb  = 1e-5;  NOMp3_ub = 50; %  shared constant noise
+NOMc_lb = 0; , NOMc_ub = 1e3; % criterion; subject to change
 
 % Midpoint initial guesses
 NOMp1_0 = mean([NOMp1_lb,  NOMp1_ub]);
 NOMp2_0 = mean([NOMp2_lb, NOMp2_ub]);
 NOMp3_0   = mean([NOMp3_lb,   NOMp3_ub]);
+NOMc_0   = mean([NOMc_lb,   NOMc_ub]);
 
 % BADS options
 options_bads = bads('defaults');
@@ -177,6 +183,15 @@ namesModelBparams = {...
     {                                         'Additive variability',                                      }, ... %5
     {'Multiplicative variability',                                                                           }, ... %6
     {                                                                        'Shared variability'}};    %7
+
+namesModelBparams = {...
+    {'Multiplicative variability', 'Additive variability', 'Shared variability', 'CriterionNOM'}, ... %1
+    {'Multiplicative variability', 'Additive variability'                                , 'CriterionNOM'}, ... %2
+    {                                         'Additive variability', 'Shared variability',  'CriterionNOM'}, ... %3
+    {'Multiplicative variability',                                'Shared variability',    'CriterionNOM'}, ... %4
+    {                                         'Additive variability',                                 'CriterionNOM'}, ... %5
+    {'Multiplicative variability',                                                                  'CriterionNOM'}, ... %6
+    {                                                                        'Shared variability',    'CriterionNOM'}};    %7
 
 % namesModelB = {'FullModel', 'NoRho', 'NoInduced', 'NoConstant', 'NoInducedNoRho', 'NoConstantNoRho', 'NoNoise'};
 % namesModelBparams = {...
@@ -305,19 +320,19 @@ namesParamsMode = {'estP', 'tunC'};
 
 %% For plotting
 namesFeature_axis = {'Orientation (º)', 'Spatial frequency (cpd)'};
-namesFeature_axis_Tuning = {'Marginalized ORI kernel (a.u.)', 'Marginalized SF kernel (a.u.)'};
+namesFeature_axis_Tuning = {'Marginalized ORI weights (a.u.)', 'Marginalized SF weights (a.u.)'};
 % names of the estParams/tuningC
 clear namesTunC_unit_perF
 namesTunC_unit_perF{1,1} = {'Gain (a.u.)', 'Sigma (deg)', 'baseline (a.u.)'};
 % namesTunC_unit_perF{1,2} = {'Pref ORI (deg)', 'amplitude (a.u.)', 'width (deg)', 'baseline (a.u.)'};
 namesTunC_unit_perF{1,2} = {'amplitude (a.u.)', 'width (º)', 'baseline (a.u.)'};
 namesTunC_unit_perF{2,1} = {'peak SF (cpd)', 'Gain (a.u.)', 'Sigma (cpd)', 'baseline (a.u.)'};
-namesTunC_unit_perF{2,2} = {'peak SF (cpd)', 'amplitude (a.u.)', 'width (octave)', 'baseline (a.u.)'};
+namesTunC_unit_perF{2,2} = {'peak SF (cpd)', 'amplitude (a.u.)', 'width (octaves)', 'baseline (a.u.)'};
 namesTunC_unit_perF{3,1} = {'peak SF (cpd)', 'Gain (a.u.)', 'Sigma (cpd)', 'baseline (a.u.)', 'Truncation (a.u.)'};
-namesTunC_unit_perF{3,2} = {'peak SF (cpd)', 'amplitude (a.u.)', 'width (octave)', 'baseline (a.u.)', 'Truncation (a.u.)'};
+namesTunC_unit_perF{3,2} = {'peak SF (cpd)', 'amplitude (a.u.)', 'width (octaves)', 'baseline (a.u.)', 'Truncation (a.u.)'};
 namesTunC_unit_perF{8,1} = {'Gain 1 (a.u.)', 'Gain 2 (a.u.)', 'Sigma 1 (deg)', 'ratio (a.u.)', 'baseline (a.u.)'};
 namesTunC_unit_perF{8,2} = {'Pref ORI (deg)', 'amplitude (a.u.)', 'trough ori (deg)', 'trough mag. (a.u.)', 'width (deg)', 'baseline (a.u.)'};
-namesTunC_unit_perF{12,2} = {'peak SF1 (cpd)', 'amplitude 1 (a.u.)', 'width 1 (octave)', 'peak SF2 (cpd)', 'amplitude 2 (a.u.)', 'width 2 (octave)'};
+namesTunC_unit_perF{12,2} = {'peak SF1 (cpd)', 'amplitude 1 (a.u.)', 'width 1 (octaves)', 'peak SF2 (cpd)', 'amplitude 2 (a.u.)', 'width 2 (octaves)'};
 namesTunC_unit_perF{13,2} = {'amplitude (a.u.)', 'trough ori (deg)', 'trough mag, (a.u.)', 'width (deg)', 'baseline (a.u.)'};
 
 namesTunC_noUnit{1,1} = {'Gain', 'Sigma', 'baseline'};
