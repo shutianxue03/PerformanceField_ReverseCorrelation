@@ -13,19 +13,23 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Define number of ORI (and SF) channels
-nORI = 33;
+nORI = 19;
 nSF = nORI;
 
-%% Define names of folders to load/save data (on the server)
+%% Define environment
 % if run on HPC OOD
 nameFolder_server = '/scratch/sx712/PF_RC'; str_envir = 'HPC'; 
 
 % if run on server (mute if run on OOD)
-nameFolder_server = '/Volumes/server/Users/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC'; str_envir = 'Server';
+% nameFolder_server = '/Volumes/server/Users/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC'; str_envir = 'Server';
 
-% if run on local for model simulation
+% if run on local for model simulation (my laptop or iMac)
 % nameFolder_server = '/Users/xueshutian/Desktop/GitHub_local/PF_RC'; str_envir = 'Local'; 
 
+% if run on local for model simulation (the lab iMac)
+% nameFolder_server = '/Users/sx712/Desktop/GitHub_local/PF_RC'; str_envir = 'Local'; 
+
+%% Define names of folders to load/save data 
 nameFolder_Data = sprintf('%s/Data', nameFolder_server) ;
 nameFolder_Data_OOD = sprintf('%s/Data_OOD_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
 nameFolder_Data_NOM_Trialwise = sprintf('%s/Data_NOM_Trialwise_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
@@ -155,7 +159,7 @@ ncomb8 = 8;
 NOMp1_lb = 1e-5;  NOMp1_ub = 1;     % induced noise 
 NOMp2_lb = 1e-5; NOMp2_ub = 50;   % idpdt constant noise
 NOMp3_lb  = 1e-5;  NOMp3_ub = 50; %  shared constant noise
-NOMc_lb = 0; , NOMc_ub = 1e3; % criterion; subject to change
+NOMc_lb = 0; NOMc_ub = 13; % criterion; subject to change
 
 % Midpoint initial guesses
 NOMp1_0 = mean([NOMp1_lb,  NOMp1_ub]);
@@ -184,14 +188,14 @@ namesModelBparams = {...
     {'Multiplicative variability',                                                                           }, ... %6
     {                                                                        'Shared variability'}};    %7
 
-namesModelBparams = {...
-    {'Multiplicative variability', 'Additive variability', 'Shared variability', 'CriterionNOM'}, ... %1
-    {'Multiplicative variability', 'Additive variability'                                , 'CriterionNOM'}, ... %2
-    {                                         'Additive variability', 'Shared variability',  'CriterionNOM'}, ... %3
-    {'Multiplicative variability',                                'Shared variability',    'CriterionNOM'}, ... %4
-    {                                         'Additive variability',                                 'CriterionNOM'}, ... %5
-    {'Multiplicative variability',                                                                  'CriterionNOM'}, ... %6
-    {                                                                        'Shared variability',    'CriterionNOM'}};    %7
+% namesModelBparams = {...
+%     {'Multiplicative variability', 'Additive variability', 'Shared variability', 'CriterionNOM'}, ... %1
+%     {'Multiplicative variability', 'Additive variability'                                , 'CriterionNOM'}, ... %2
+%     {                                         'Additive variability', 'Shared variability',  'CriterionNOM'}, ... %3
+%     {'Multiplicative variability',                                'Shared variability',    'CriterionNOM'}, ... %4
+%     {                                         'Additive variability',                                 'CriterionNOM'}, ... %5
+%     {'Multiplicative variability',                                                                  'CriterionNOM'}, ... %6
+%     {                                                                        'Shared variability',    'CriterionNOM'}};    %7
 
 % namesModelB = {'FullModel', 'NoRho', 'NoInduced', 'NoConstant', 'NoInducedNoRho', 'NoConstantNoRho', 'NoNoise'};
 % namesModelBparams = {...

@@ -1,21 +1,30 @@
 clc, clear, close all, format compact, warning off
+set(0,'DefaultFigureVisible','off')
 
 %% Base settings %%
 SX_RC1_setting;
 
-noiseCST=.2; gaborCST=.5; iModelB_sim=1;
+noiseCST=.2; gaborCST=.4; iModelB_sim=1;
 % noiseP_true=[0 1e-5 1e-4];
 
-nORI_list = [9, 19, 29]; % 9, 19, 29
-nBanks = numel(nORI_list);
+nORI_list = [9, 19, 29]; nBanks = numel(nORI_list);
 nCommon = 10; % a common sampling to predict tuning functions from both true and estimated templates
-
-xNshared_true_list = [0, 5e-5, 1e-4];
+Nmul_true_list = [0, .1, .5];
+Nadd_true_list = [0, 5e-5, 1e-4];
+Nshared_true_list = [0, 5e-5, 1e-4];
 nTrials_list = [4]*1e3;
+nC = 3; %check simulate_responses_local() for three levels of z-scored criterion
 
-%% Loop 
+% For piloting
+% nORI_list = [9, 7]; nBanks = numel(nORI_list);
+% Nmul_true_list = [0, .1];
+% Nadd_true_list = [0, 5e-5];
+% Nshared_true_list = [0, 5e-5];
+% nTrials_list = [2]*1e3;
+
+%% Loop
 % Create placeholders
-corr_2D_allComb = cell(numel(nTrials_list), numel(Nshared_true_list), numel(Nadd_true_list), numel(Nmul_true_list));
+corr_2D_allComb = cell(numel(Nmul_true_list), numel(Nadd_true_list), numel(Nshared_true_list), nC, numel(nTrials_list));
 corr_ORI_allComb = corr_2D_allComb;
 corr_SF_allComb = corr_2D_allComb;
 
@@ -36,9 +45,6 @@ for Nmul_true = Nmul_true_list
                 % Nshared_true = noiseP_true(3);
 
                 noiseP_true = [Nmul_true, Nadd_true, Nshared_true];
-
-                nameCrossBank = sprintf('cN%.0f_cG%.0f_nT%s_Nm%s_Na%s_Ns%s', ...
-                    noiseCST*100, gaborCST*100, format_num2exp(nTrials), format_num2exp(Nmul_true), format_num2exp(Nadd_true), format_num2exp(Nshared_true));
 
                 templateType_true = 1; % 1 = raw;
                 IVType_true = 1; % 1 = sum of dot product;
@@ -96,16 +102,17 @@ for Nmul_true = Nmul_true_list
                 %% Main sim x fit loop ==================== %%
                 % Set empty placeholders
                 xORI_sim = cell(nBanks, 1);
-                xSF_sim = cell(nBanks, 1);
-                xORI_fit = cell(nBanks, 1);
-                xSF_fit = cell(nBanks, 1);
-                corr_2D = nan(nBanks, nBanks);
-                corr_ORI_Fine = nan(nBanks, nBanks);
-                corr_SF_Fine = nan(nBanks, nBanks);
-                margPredORI_true_cell = cell(nBanks, nBanks);
-                margPredSF_true_cell = cell(nBanks, nBanks);
-                margPredORI_deriv_cell = cell(nBanks, nBanks);
-                margPredSF_deriv_cell = cell(nBanks, nBanks);
+                xSF_sim = xORI_sim;
+                xORI_fit = xORI_sim;
+                xSF_fit = xORI_sim;
+
+                corr_2D = nan(nBanks, nC, nBanks);
+                corr_ORI_Fine = corr_2D;
+                corr_SF_Fine = corr_2D;
+                margPredORI_true_cell = cell(nBanks, nC, nBanks);
+                margPredSF_true_cell = margPredORI_true_cell;
+                margPredORI_deriv_cell = margPredORI_true_cell;
+                margPredSF_deriv_cell = margPredORI_true_cell;
 
                 for iBank_sim = 1:nBanks
                     nORI_sim = nORI_list(iBank_sim);
@@ -115,15 +122,9 @@ for Nmul_true = Nmul_true_list
                     xORI_sim{iBank_sim} = axis_tuning_sim{1};
                     xSF_sim{iBank_sim} = axis_tuning_sim{2};
 
-                    fprintf('\n-----------------------------------\n');
-                    fprintf('Simulate with nORI = %d....\n', nORI_sim);
-                    fprintf('\n-----------------------------------\n');
-
-                    nameIO = sprintf('IO_cN%.0f_cG%.0f_nT%s_Nm%s_Na%s_Ns%s_%d%d_B%d', ...
-                        noiseCST*100, gaborCST*100, format_num2exp(nTrials), format_num2exp(Nmul_true), format_num2exp(Nadd_true), format_num2exp(Nshared_true), nORI_sim, nSF_sim, iModelB_sim);
-
-                    nameFolder_Figures_perSubj = sprintf('%s/IO/%s', nameFolder_Figures, nameIO);
-                    if isempty(dir(nameFolder_Figures_perSubj)), mkdir(nameFolder_Figures_perSubj), end
+                    fprintf('\n--------------------------\n');
+                    fprintf('Simulating with nORI = %d....\n', nORI_sim);
+                    fprintf('----------------------------\n');
 
                     % --- SIM BANK ---
                     e3D_sim_allT = project_trials_to_energy_local(simStim, filtersOri_sim, filtersSF_sim, fxn_getSigma_SPdomain);
@@ -133,227 +134,245 @@ for Nmul_true = Nmul_true_list
 
                     ORI_bound_sim = [1 nORI_sim];
 
-                    simResp = simulate_responses_local( ...
-                        e3D_sim_allT, template_true_sim, ...
-                        simStim.iPRS_allT, simStim.iPair_allT, ...
-                        noiseP_true, IVType_true, convolveType_true, ...
-                        ORI_bound_sim, flag_permT);
+                    %---------------------%
+                    simResp = simulate_responses_local(e3D_sim_allT, template_true_sim, simStim.iPRS_allT, simStim.iPair_allT, noiseP_true, IVType_true, convolveType_true, ORI_bound_sim, flag_permT);
+                    %---------------------%
 
-                    fprintf('DONE\n')
+                    fprintf(' — DONE\n')
 
-                    %% Get metrics
-                    pYES_sim = mean(simResp.resp == 1);
-                    pHit_sim = sum((simStim.iPRS_allT == 1) & (simResp.resp == 1)) / sum(simStim.iPRS_allT == 1);
-                    pFA_sim = sum((simStim.iPRS_allT == 0) & (simResp.resp == 1)) / sum(simStim.iPRS_allT == 0);
-                    pC_sim = mean( (simStim.iPRS_allT==1 & simResp.resp==1) | (simStim.iPRS_allT==0 & simResp.resp==0) );
+                    for iC = 1:nC
+                        fprintf('\n\n Criterion#%d\n', iC)
 
-                    %--------------------------------------%
-                    [dprime_sim, c_zscore] = SX_sim06_SDT(pHit_sim, pFA_sim);
-                    %--------------------------------------%
+                        resp = simResp.resp{iC};
+                        criterion_true = simResp.criterion_true{iC};
 
-                    respC_sim = nan(nPairs, 1);
-                    for iPairUnik = 1:nPairs
-                        respAB = simResp.resp(simStim.iPair_allT == iPairUnik);
-                        respC_sim(iPairUnik) = (respAB(1) == respAB(2));
-                    end
-                    pA_sim = mean(respC_sim);
+                        % Define and create folders
+                        nameIO = sprintf('IO_cN%.0f_cG%.0f_nT%s_Nm%s_Na%s_Ns%s_c%d_%d%d_B%d', ...
+                            noiseCST*100, gaborCST*100, format_num2exp(nTrials), format_num2exp(Nmul_true), format_num2exp(Nadd_true), format_num2exp(Nshared_true), iC, nORI_sim, nSF_sim, iModelB_sim);
 
-                    %% Plot simulated responses
-                    figure('Position', [0 200 600 500]);
-                    hold on;
-                    histogram(simResp.noisyIV(simStim.iPRS_allT == 1), 'FaceColor', 'r', 'DisplayName', 'Signal Present', 'normalization', 'probability');
-                    histogram(simResp.noisyIV(simStim.iPRS_allT == 0), 'FaceColor', 'b', 'DisplayName', 'Signal Absent', 'normalization', 'probability');
-                    xline(simResp.criterion_true, 'LineWidth', 2, 'DisplayName', 'True criterion');
-                    xlim([min(simResp.noisyIV), max(simResp.noisyIV)]);
-                    ylabel('Proportion');
-                    legend('show', 'location', 'best');
+                        nameFolder_Figures_perSubj = sprintf('%s/IO/%s', nameFolder_Figures, nameIO);
+                        if isempty(dir(nameFolder_Figures_perSubj)), mkdir(nameFolder_Figures_perSubj), end
 
-                    title(sprintf(['CI_{95}=[%.1f, %.1f], Median=%.1f\n[TRUE] gN=%.0f%%, gC=%.0f%%, crit=%.1f, Nmul=%s, Nadd=%s, Nshared=%s' ...
-                        '\n[MEASURED] c_z=%.1f, pYES=%.0f%%, pC=%.0f%%, pHit=%.0f%%, pFA=%.0f%%\npA=%.0f%%, corrPass=%.2f'], ...
-                        round(quantile(simResp.noisyIV, [.05, .95, .5]), 1), noiseCST*100, gaborCST*100, simResp.criterion_true, format_num2exp(Nmul_true), format_num2exp(Nadd_true), format_num2exp(Nshared_true), ...
-                        c_zscore, pYES_sim*100, pC_sim*100, pHit_sim*100, pFA_sim*100, pA_sim*100, simResp.corrPass));
+                        %% Get metrics
+                        pYES_sim = mean(resp == 1);
+                        pHit_sim = sum((simStim.iPRS_allT == 1) & (resp == 1)) / sum(simStim.iPRS_allT == 1);
+                        pFA_sim = sum((simStim.iPRS_allT == 0) & (resp == 1)) / sum(simStim.iPRS_allT == 0);
+                        pC_sim = mean( (simStim.iPRS_allT==1 & resp==1) | (simStim.iPRS_allT==0 & resp==0) );
 
-                    saveas(gcf, sprintf('%s/0PerfHist.jpg', nameFolder_Figures_perSubj));
-                    close all;
+                        %--------------------------------------%
+                        [dprime_sim, c_zscore] = SX_sim06_SDT(pHit_sim, pFA_sim);
+                        %--------------------------------------%
 
-                    if pC_sim <.6,
-                        % error('ALERT: Simulated accuracy is %.0f%%, lower than 60%%!', pC_sim*100),
-                        flag_lowAcc=1;
-                    else
-                        flag_lowAcc=0;
-                    end
-
-                    %% Loop through each sampling scale for fitting
-                    for iBank_fit = 1:nBanks
-
-                        nORI_fit = nORI_list(iBank_fit);
-                        [filtersOri_fit, filtersSF_fit, axis_tuning_fit] = make_bank_from_nORI(nORI_fit, noise);
-
-                        xORI_fit{iBank_fit} = axis_tuning_fit{1};
-                        xSF_fit{iBank_fit} = axis_tuning_fit{2};
-
-                        % Print progress report
-                        fprintf('\n    Fit with nORI=%d...', nORI_fit)
-
-                        % --- FIT BANK ---
-                        e3D_fit_allT = project_trials_to_energy_local(simStim, filtersOri_fit, filtersSF_fit, fxn_getSigma_SPdomain);
-
-                        template_true_fit = make_true_template_local(stim, filtersOri_fit, filtersSF_fit, fxn_getSigma_SPdomain, templateType_true);
-                        template_true_fit = template_true_fit / max(template_true_fit(:)) * 0.2;
-
-                        % derive template using selected trials
-                        simStim.iPRS_allT = simStim.raw.iPRS_allT;
-                        simResp.resp = simResp.resp;
-                        cst_allT  = repmat(stim.gaborCST, nTrials, 1);
-
-                        switch itype_template
-                            case 1
-                                useIdx = (simStim.iPRS_allT == 1);
-                            case 2
-                                useIdx = (simStim.iPRS_allT == 0);
-                            otherwise
-                                useIdx = true(size(simStim.iPRS_allT));
+                        respC_sim = nan(nPairs, 1);
+                        for iPairUnik = 1:nPairs
+                            respAB = resp(simStim.iPair_allT == iPairUnik);
+                            respC_sim(iPairUnik) = (respAB(1) == respAB(2));
                         end
+                        pA_sim = mean(respC_sim);
 
-                        e3D_fit_sel = e3D_fit_allT(useIdx,:,:);
-                        iPRS_sel    = simStim.iPRS_allT(useIdx);
-                        resp_sel    = simResp.resp(useIdx);
-                        cst_sel     = cst_allT(useIdx);
+                        %% Plot simulated responses
+                        figure('Position', [0 200 600 500]);
+                        hold on;
+                        histogram(simResp.DV_noisy(simStim.iPRS_allT == 1), 'FaceColor', 'r', 'DisplayName', 'Signal Present', 'normalization', 'probability');
+                        histogram(simResp.DV_noisy(simStim.iPRS_allT == 0), 'FaceColor', 'b', 'DisplayName', 'Signal Absent', 'normalization', 'probability');
+                        xline(criterion_true, 'LineWidth', 2, 'DisplayName', 'True criterion');
+                        xlim([min(simResp.DV_noisy), max(simResp.DV_noisy)]);
+                        ylabel('Proportion');
+                        legend('show', 'location', 'best');
 
-                        if flag_standEnergy
-                            e3D_fit_norm = normEnergy(e3D_fit_sel, cst_sel, iPRS_sel);
+                        title(sprintf(['CI_{95}=[%.1f, %.1f], Median=%.1f\n[TRUE] gN=%.0f%%, gC=%.0f%%, crit=%.1f, Nmul=%s, Nadd=%s, Nshared=%s' ...
+                            '\n[MEASURED] c_z=%.1f, pYES=%.0f%%, pC=%.0f%%, pHit=%.0f%%, pFA=%.0f%%\npA=%.0f%%, corrPass=%.2f'], ...
+                            round(quantile(simResp.DV_noisy, [.05, .95, .5]), 1), noiseCST*100, gaborCST*100, criterion_true, format_num2exp(Nmul_true), format_num2exp(Nadd_true), format_num2exp(Nshared_true), ...
+                            c_zscore, pYES_sim*100, pC_sim*100, pHit_sim*100, pFA_sim*100, pA_sim*100, simResp.corrPass));
+
+                        saveas(gcf, sprintf('%s/0PerfHist.jpg', nameFolder_Figures_perSubj));
+                        close all;
+
+                        if pC_sim <.6,
+                            % error('ALERT: Simulated accuracy is %.0f%%, lower than 60%%!', pC_sim*100),
+                            flag_lowAcc=1;
                         else
-                            e3D_fit_norm = e3D_fit_sel;
+                            flag_lowAcc=0;
                         end
+                        fprintf('    Distribution plotted\n')
+                        %% Loop through each sampling scale for fitting
+                        for iBank_fit = 1:nBanks
 
-                        template_raw_fit = SX_sim07_RC(filtersSF_fit, filtersOri_fit, e3D_fit_norm, resp_sel);
-                        template_fit = fxn_getTemplate(template_raw_fit, templateType_true, 0);
+                            nORI_fit = nORI_list(iBank_fit);
+                            [filtersOri_fit, filtersSF_fit, axis_tuning_fit] = make_bank_from_nORI(nORI_fit, noise);
 
-                        %% Fit both templates and reconstruct tuning functions on the same sampling grid
-                        % True template
-                        fitTrue = fit_template_with_tuning_local( ...
-                            template_true_sim, axis_tuning_sim, ...
-                            iFamily_ORI, iFamily_SF, ...
-                            ub_full_all, lb_full_all, ...
-                            options_fmin, problem_setting, nRep, flag_plot_tuning, nCommon);
+                            xORI_fit{iBank_fit} = axis_tuning_fit{1};
+                            xSF_fit{iBank_fit} = axis_tuning_fit{2};
 
-                        % Estimated template
-                        fitSim = fit_template_with_tuning_local( ...
-                            template_fit, axis_tuning_fit, ...
-                            iFamily_ORI, iFamily_SF, ...
-                            ub_full_all, lb_full_all, ...
-                            options_fmin, problem_setting, nRep, flag_plot_tuning, nCommon);
+                            % Print progress report
+                            fprintf('\n    Fitting with nORI=%d...', nORI_fit)
 
-                        %% Compute and store correlation and pred tuning fxn (for plotting)
-                        if flag_lowAcc
-                            corr_ORI_Fine(iBank_sim, iBank_fit) = 0;
-                            corr_SF_Fine(iBank_sim, iBank_fit) = 0;
-                        else
-                            if iBank_sim == iBank_fit % calculate the correlation between two templates when their shapes match
-                                corr_2D(iBank_sim, iBank_fit) = corr(template_true_sim(:), template_fit(:));
+                            % --- FIT BANK ---
+                            e3D_fit_allT = project_trials_to_energy_local(simStim, filtersOri_fit, filtersSF_fit, fxn_getSigma_SPdomain);
+
+                            template_true_fit = make_true_template_local(stim, filtersOri_fit, filtersSF_fit, fxn_getSigma_SPdomain, templateType_true);
+                            template_true_fit = template_true_fit / max(template_true_fit(:)) * 0.2;
+
+                            % derive template using selected trials
+                            simStim.iPRS_allT = simStim.raw.iPRS_allT;
+                            cst_allT  = repmat(stim.gaborCST, nTrials, 1);
+
+                            switch itype_template
+                                case 1
+                                    useIdx = (simStim.iPRS_allT == 1);
+                                case 2
+                                    useIdx = (simStim.iPRS_allT == 0);
+                                otherwise
+                                    useIdx = true(size(simStim.iPRS_allT));
                             end
-                            corr_ORI_Fine(iBank_sim, iBank_fit) = corr(fitTrue.margPred_ORI_fine(:), fitSim.margPred_ORI_fine(:), 'rows', 'complete');
-                            corr_SF_Fine(iBank_sim, iBank_fit) = corr(fitTrue.margPred_SF_fine(:), fitSim.margPred_SF_fine(:), 'rows', 'complete');
-                        end
-                        margPredORI_true_cell{iBank_sim, iBank_fit} = fitTrue.margPred_ORI;
-                        margPredSF_true_cell{iBank_sim, iBank_fit}  = fitTrue.margPred_SF;
-                        margPredORI_deriv_cell{iBank_sim, iBank_fit} = fitSim.margPred_ORI;
-                        margPredSF_deriv_cell{iBank_sim, iBank_fit}  = fitSim.margPred_SF;
 
-                        fprintf('DONE')
-                    end % iBank_fit
+                            e3D_fit_sel = e3D_fit_allT(useIdx,:,:);
+                            iPRS_sel    = simStim.iPRS_allT(useIdx);
+                            resp_sel    = resp(useIdx);
+                            cst_sel     = cst_allT(useIdx);
+
+                            if flag_standEnergy
+                                e3D_fit_norm = normEnergy(e3D_fit_sel, cst_sel, iPRS_sel);
+                            else
+                                e3D_fit_norm = e3D_fit_sel;
+                            end
+
+                            template_raw_fit = SX_sim07_RC(filtersSF_fit, filtersOri_fit, e3D_fit_norm, resp_sel);
+                            template_fit = fxn_getTemplate(template_raw_fit, templateType_true, 0);
+
+                            %% Fit both templates and reconstruct tuning functions on the same sampling grid
+                            % True template
+                            fitTrue = fit_template_with_tuning_local( ...
+                                template_true_sim, axis_tuning_sim, ...
+                                iFamily_ORI, iFamily_SF, ...
+                                ub_full_all, lb_full_all, ...
+                                options_fmin, problem_setting, nRep, flag_plot_tuning, nCommon);
+
+                            % Estimated template
+                            fitSim = fit_template_with_tuning_local( ...
+                                template_fit, axis_tuning_fit, ...
+                                iFamily_ORI, iFamily_SF, ...
+                                ub_full_all, lb_full_all, ...
+                                options_fmin, problem_setting, nRep, flag_plot_tuning, nCommon);
+
+                            %% Compute and store correlation and pred tuning fxn (for plotting)
+                            if flag_lowAcc
+                                corr_ORI_Fine(iBank_sim, iC, iBank_fit) = 0;
+                                corr_SF_Fine(iBank_sim, iC, iBank_fit) = 0;
+                            else
+                                if iBank_sim == iBank_fit % calculate the correlation between two templates when their shapes match
+                                    corr_2D(iBank_sim, iC, iBank_fit) = corr(template_true_sim(:), template_fit(:));
+                                end
+                                corr_ORI_Fine(iBank_sim, iC, iBank_fit) = corr(fitTrue.margPred_ORI_fine(:), fitSim.margPred_ORI_fine(:), 'rows', 'complete');
+                                corr_SF_Fine(iBank_sim, iC, iBank_fit) = corr(fitTrue.margPred_SF_fine(:), fitSim.margPred_SF_fine(:), 'rows', 'complete');
+                            end
+                            margPredORI_true_cell{iBank_sim, iC, iBank_fit} = fitTrue.margPred_ORI;
+                            margPredSF_true_cell{iBank_sim, iC, iBank_fit}  = fitTrue.margPred_SF;
+                            margPredORI_deriv_cell{iBank_sim, iC, iBank_fit} = fitSim.margPred_ORI;
+                            margPredSF_deriv_cell{iBank_sim, iC, iBank_fit}  = fitSim.margPred_SF;
+
+                            fprintf('DONE')
+                        end % iBank_fit
+                    end % iC
                 end % iBank_sim
 
                 %% Plot correlation between fitted tuning functions on an identical grid -------------------- %%
-                figure('Position', [200 200 1e3 520]);
-                for iFeature = 1:2
-                    switch iFeature
-                        case 1
-                            corr_Fine = corr_ORI_Fine;
-                            str_label = 'nORI';
-                            nChannel_list = nORI_list;
-                        case 2
-                            corr_Fine = corr_SF_Fine;
-                            str_label = 'nSF';
-                            nChannel_list = nORI_list;
-                    end
-                    subplot(1,2,iFeature), hold on
-                    imagesc(corr_Fine);
-                    axis square; colorbar;
-                    xlabel(sprintf('Fit %s', str_label));
-                    xlabel(sprintf('Sim %s', str_label));
-                    caxis([.5, 1])
-                    set(gca, 'XTick', 1:nBanks, 'XTickLabel', string(nChannel_list), 'YTick', 1:nBanks, 'YTickLabel', string(nChannel_list));
-                    
-                    % Print correlation at the center of each cell
-                    for iBank_sim = 1:nBanks
-                        for iBank_fit = 1:nBanks
-                            % corr between reconstructed tuning fxns
-                            val_corr = round(corr_Fine(iBank_sim,iBank_fit), 2);
-                            % corr between 2D templates
-                            if iBank_sim == iBank_fit
-                                val_corr_2D = corr_2D(iBank_sim,iBank_fit);
-                                str_corr = sprintf('%.2f (%.2f)', val_corr, val_corr_2D);
-                            else
-                                str_corr = sprintf('%.2f', val_corr);
+                for iC = 1:nC
+                    nameCrossBank = sprintf('cN%.0f_cG%.0f_nT%s_Nm%s_Na%s_Ns%s_c%d', ...
+                        noiseCST*100, gaborCST*100, format_num2exp(nTrials), format_num2exp(Nmul_true), format_num2exp(Nadd_true), format_num2exp(Nshared_true), iC);
+
+                    %% Plot correlation matrix
+                    figure('Position', [200 200 1e3 520]);
+                    for iFeature = 1:2
+                        switch iFeature
+                            case 1
+                                corr_Fine = corr_ORI_Fine;
+                                str_label = 'nORI';
+                                nChannel_list = nORI_list;
+                            case 2
+                                corr_Fine = corr_SF_Fine;
+                                str_label = 'nSF';
+                                nChannel_list = nORI_list;
+                        end
+                        subplot(1,2,iFeature), hold on
+                        imagesc(squeeze(corr_Fine(:, iC, :)));
+                        axis square; colorbar;
+                        xlabel(sprintf('Fit %s', str_label));
+                        ylabel(sprintf('Sim %s', str_label));
+                        caxis([.5, 1])
+                        set(gca, 'XTick', 1:nBanks, 'XTickLabel', string(nChannel_list), 'YTick', 1:nBanks, 'YTickLabel', string(nChannel_list));
+
+                        % Print correlation at the center of each cell
+                        for iBank_sim = 1:nBanks
+                            for iBank_fit = 1:nBanks
+                                % corr between reconstructed tuning fxns
+                                val_corr = squeeze(corr_Fine(iBank_sim, iC, iBank_fit));
+                                % corr between 2D templates
+                                if iBank_sim == iBank_fit
+                                    val_corr_2D = squeeze(corr_2D(iBank_sim,iC, iBank_fit));
+                                    str_corr = sprintf('%.2f (%.2f)', val_corr, val_corr_2D);
+                                else
+                                    str_corr = sprintf('%.2f', val_corr);
+                                end
+
+                                text(iBank_fit, iBank_sim, sprintf('%s', str_corr), ...
+                                    'HorizontalAlignment', 'center', ...
+                                    'FontWeight', 'bold', ...
+                                    'Color', 'k');
+                            end % iBank_fit
+                        end % iBank_sim
+                    end % iFeature
+
+                    sgtitle(sprintf('Fine-grid reconstructed template correlation\n%s', nameCrossBank));
+                    saveas(gcf, sprintf('%s/IO/CrossBank_%s_2D.png', nameFolder_Figures, nameCrossBank))
+
+                    %% Plot tuning functions
+                    for iFeature=1:2
+                        switch iFeature
+                            case 1
+                                x_sim = xORI_sim;
+                                x_fit = xORI_fit;
+                                margPred_true_cell = margPredORI_true_cell;
+                                margPred_deriv_cell = margPredORI_deriv_cell;
+                                corr_Fine = corr_ORI_Fine;
+                                strF = 'ORI';
+                            case 2
+                                x_sim = xSF_sim;
+                                x_fit = xSF_fit;
+                                margPred_true_cell = margPredSF_true_cell;
+                                margPred_deriv_cell = margPredSF_deriv_cell;
+                                corr_Fine = corr_SF_Fine;
+                                strF = 'SF';
+                        end
+
+                        figure('Position', [200 200 2e3 2e3]);
+                        iPlot = 1;
+                        for iBank_sim = 1:nBanks
+                            for iBank_fit = 1:nBanks
+                                subplot(nBanks, nBanks, iPlot), hold on
+                                plot(x_sim{iBank_sim}, margPred_true_cell{iBank_sim, iC, iBank_fit}/max(margPred_true_cell{iBank_sim, iC, iBank_fit}), 'o-')
+                                plot(x_fit{iBank_fit}, margPred_deriv_cell{iBank_sim, iC, iBank_fit}/max(margPred_deriv_cell{iBank_sim, iC, iBank_fit}), '*-')
+                                title(sprintf('nBanks_{sim}=%d, nBanks_{fit}=%d | r=%.2f', ...
+                                    numel(x_sim{iBank_sim}), numel(x_fit{iBank_fit}), corr_Fine(iBank_sim, iC, iBank_fit)), ...
+                                    'interpreter', 'latex')
+                                iPlot = iPlot+1;
                             end
-
-                            text(iBank_fit, iBank_sim, sprintf('%s', str_corr), ...
-                                'HorizontalAlignment', 'center', ...
-                                'FontWeight', 'bold', ...
-                                'Color', 'k');
-                        end % iBank_fit
-                    end % iBank_sim
-                end % iFeature
-
-                sgtitle(sprintf('Fine-grid reconstructed template correlation\n%s', nameCrossBank));
-                saveas(gcf, sprintf('%s/IO/CrossBank_%s.png', nameFolder_Figures, nameCrossBank))
-
-                %% Plot tuning functions
-                % ORI
-                figure('Position', [200 200 8e2 6e2]);
-                iPlot = 1;
-                for iBank_sim = 1:nBanks
-                    for iBank_fit = 1:nBanks
-                        subplot(nBanks, nBanks, iPlot), hold on
-                        plot(xORI_sim{iBank_sim}, margPredORI_true_cell{iBank_sim, iBank_fit}/max(margPredORI_true_cell{iBank_sim, iBank_fit}), 'o-')
-                        plot(xORI_fit{iBank_fit}, margPredORI_deriv_cell{iBank_sim, iBank_fit}/max(margPredORI_deriv_cell{iBank_sim, iBank_fit}), '*-')
-                        title(sprintf('nBanks_{sim}=%d, nBanks_{fit}=%d | r=%.2f', ...
-                            numel(xORI_sim{iBank_sim}), numel(xORI_fit{iBank_fit}), corr_ORI_Fine(iBank_sim, iBank_fit)), ...
-                            'interpreter', 'latex')
-                        iPlot = iPlot+1;
+                        end
+                        legend({'Simulated', 'Predicted'})
+                        saveas(gcf, sprintf('%s/IO/CrossBank_%s_%s.png', nameFolder_Figures, nameCrossBank, strF))
                     end
-                end
-                legend({'Simulated', 'Predicted'})
-                saveas(gcf, sprintf('%s/IO/CrossBank_ORI_%s.png', nameFolder_Figures, nameCrossBank))
 
-                % SF
-                figure('Position', [200 200 8e2 6e2]);
-                iPlot = 1;
-                for iBank_sim = 1:nBanks
-                    for iBank_fit = 1:nBanks
-                        subplot(nBanks, nBanks, iPlot), hold on
-                        plot(xSF_sim{iBank_sim}, margPredSF_true_cell{iBank_sim, iBank_fit}/max(margPredSF_true_cell{iBank_sim, iBank_fit}), 'o-')
-                        plot(xSF_fit{iBank_fit}, margPredSF_deriv_cell{iBank_sim, iBank_fit}/max(margPredSF_deriv_cell{iBank_sim, iBank_fit}), '*-')
-                        title(sprintf('nBanks_{sim}=%d, nBanks_{fit}=%d | r=%.2f', ...
-                            numel(xSF_sim{iBank_sim}), numel(xSF_fit{iBank_fit}), corr_SF_Fine(iBank_sim, iBank_fit)), ...
-                            'interpreter', 'latex')
-                        iPlot = iPlot+1;
-                    end
-                end
-                legend({'Simulated', 'Predicted'})
-                saveas(gcf, sprintf('%s/IO/CrossBank_SF_%s.png', nameFolder_Figures, nameCrossBank))
+                    fprintf('\n\n')
 
-                fprintf('\n\n')
-
-                %% Save r per nTrials, and per parameter combination
-                i_Nmul = find(Nmul_true == Nmul_true_list);
-                i_Nadd = find(Nadd_true == Nadd_true_list); 
-                i_Nshared = find(Nshared_true == Nshared_true_list); 
-                i_nTrials = find(nTrials == nTrials_list);
-                corr_2D_allComb{i_Nmul, i_Nadd, i_Nshared, i_nTrials} = corr_2D;
-                corr_ORI_allComb{i_Nmul, i_Nadd, i_Nshared, i_nTrials} = corr_ORI_Fine;
-                corr_SF_allComb{i_Nmul, i_Nadd, i_Nshared, i_nTrials} = corr_SF_Fine;
+                    %% Save r per nTrials, and per parameter combination
+                    i_Nmul = find(Nmul_true == Nmul_true_list);
+                    i_Nadd = find(Nadd_true == Nadd_true_list);
+                    i_Nshared = find(Nshared_true == Nshared_true_list);
+                    i_nTrials = find(nTrials == nTrials_list);
+                    corr_2D_allComb{i_Nmul, i_Nadd, i_Nshared, iC, i_nTrials} = corr_2D;
+                    corr_ORI_allComb{i_Nmul, i_Nadd, i_Nshared, iC, i_nTrials} = corr_ORI_Fine;
+                    corr_SF_allComb{i_Nmul, i_Nadd, i_Nshared, iC, i_nTrials} = corr_SF_Fine;
+                end % iC
 
                 % Report duration
                 time_end = datetime('now')
@@ -364,7 +383,141 @@ for Nmul_true = Nmul_true_list
     end % Nadd_true
 end % Nmul_true
 
+% Save outputs for future analysis
+save(sprintf('%s/CrossBank_outputs.mat', nameFolder_Data), 'corr_2D_allComb', 'corr_ORI_allComb', 'corr_SF_allComb')
 
+%% Visualize corr 
+% ================= User choice =================
+if ~exist('i_nTrials', 'var')
+    i_nTrials = 1; % choose which nTrials slice to visualize
+end
+
+nBanks   = numel(nORI_list);
+nNmul    = numel(Nmul_true_list);
+nNadd    = numel(Nadd_true_list);
+nNshared = numel(Nshared_true_list);
+nC       = size(corr_ORI_allComb, 4); % criterion dimension in cell array
+
+clim_all = [0.5 1.00];   % adjust if needed
+flag_show_numbers = 1;    % 1 = print numbers inside mini heatmaps
+
+% ================= Make integrated mini-heatmap figures =================
+for iFeature = 1:2
+
+    switch iFeature
+        case 1
+            corr_allComb = corr_ORI_allComb;
+            str_feature = 'ORI';
+            str_title_feature = 'Orientation';
+        case 2
+            corr_allComb = corr_SF_allComb;
+            str_feature = 'SF';
+            str_title_feature = 'Spatial frequency';
+    end
+
+    for i_Nshared = 1:nNshared
+        for iC = 1:nC
+
+            figure('Position', [80 80 1200 1000]);
+            t = tiledlayout(nBanks, nBanks, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+            for iBank_sim = 1:nBanks
+                for iBank_fit = 1:nBanks
+
+                    nexttile; hold on
+
+                    % mini heatmap: rows = Nadd, cols = Nmul
+                    miniMat = nan(nNadd, nNmul);
+
+                    for i_Nadd = 1:nNadd
+                        for i_Nmul = 1:nNmul
+
+                            % Collect all non-empty values across the redundant cell-dim (4th dim)
+                            corr_all = nan(1, size(corr_allComb, 4));
+
+                            for iCcell = 1:size(corr_allComb, 4)
+                                tmp_cell = corr_allComb{i_Nmul, i_Nadd, i_Nshared, iCcell, i_nTrials};
+
+                                if isempty(tmp_cell)
+                                    continue
+                                end
+
+                                % Expected cases:
+                                % 1) tmp_cell is nBanks x nC x nBanks
+                                % 2) tmp_cell is nBanks x nBanks
+                                if ndims(tmp_cell) == 3
+                                    corr_all(iCcell) = tmp_cell(iBank_sim, iC, iBank_fit);
+                                elseif ismatrix(tmp_cell)
+                                    corr_all(iCcell) = tmp_cell(iBank_sim, iBank_fit);
+                                end
+                            end
+
+                            if all(isnan(corr_all))
+                                miniMat(i_Nadd, i_Nmul) = NaN;
+                            else
+                                [corr_ave, ~, ~] = getCI(corr_all, 2, 2, 0.68, 1); % mean across non-NaN values
+                                miniMat(i_Nadd, i_Nmul) = corr_ave;
+                            end
+                        end
+                    end
+
+                    imagesc(miniMat);
+                    axis square
+                    set(gca, 'YDir', 'normal')
+                    caxis(clim_all)
+
+                    set(gca, ...
+                        'XTick', 1:nNmul, 'XTickLabel', string(Nmul_true_list), ...
+                        'YTick', 1:nNadd, 'YTickLabel', string(Nadd_true_list), ...
+                        'FontSize', 8);
+
+                    % only show outer labels to reduce clutter
+                    if iBank_sim == nBanks
+                        xlabel('Nmul');
+                    else
+                        set(gca, 'XTickLabel', []);
+                    end
+
+                    if iBank_fit == 1
+                        ylabel('Nadd');
+                    else
+                        set(gca, 'YTickLabel', []);
+                    end
+
+                    title(sprintf('Sim %d | Fit %d', nORI_list(iBank_sim), nORI_list(iBank_fit)), ...
+                        'FontSize', 10);
+
+                    if flag_show_numbers
+                        for iRow = 1:nNadd
+                            for iCol = 1:nNmul
+                                if ~isnan(miniMat(iRow, iCol))
+                                    text(iCol, iRow, sprintf('%.2f', miniMat(iRow, iCol)), ...
+                                        'HorizontalAlignment', 'center', ...
+                                        'FontSize', 7, 'FontWeight', 'bold', 'Color', 'k');
+                                end
+                            end
+                        end
+                    end
+
+
+                end % iBank_fit
+            end % iBank_sim
+
+            cb = colorbar;
+            cb.Layout.Tile = 'east';
+            cb.Label.String = sprintf('Mean correlation (criterion %d)', iC);
+
+            sgtitle(sprintf('%s template recovery | Nshared = %s | criterion %d', ...
+                str_title_feature, format_num2exp(Nshared_true_list(i_Nshared)), iC));
+
+            % Save the figure
+            nameFolder_IntHeatmap = sprintf('%s/IO/IntegratedHeatmap', nameFolder_Figures);
+            if isempty(dir(nameFolder_IntHeatmap)), mkdir(nameFolder_IntHeatmap), end
+            saveas(gcf, sprintf('%s/%s_Ns%s_Cz%d.png', ...
+                nameFolder_IntHeatmap, str_feature, format_num2exp(Nshared_true_list(i_Nshared)), iC));
+        end % iC
+    end % i_Nshared
+end % iFeature
 %% HELPERS ============================
 
 function [filtersOri_all, filtersSF_all, axis_tuning] = make_bank_from_nORI(nORI, noise)
@@ -492,18 +645,58 @@ options_fmin = optimoptions('fmincon', 'MaxIterations', 1e4, 'Display', 'off');
 %---------------------------%
 fxn_loss_pC_ = @(criterion_potential) fxn_loss_pC(criterion_potential, pC_titrate, DV_noisy, iPRS_allT);
 %---------------------------%
-criterion_true = fmincon(fxn_loss_pC_, median(DV_noisy), [], [], [], [], min(DV_noisy), max(DV_noisy), [], options_fmin);
+% criterion_true_mid = fmincon(fxn_loss_pC_, median(DV_noisy), [], [], [], [], min(DV_noisy), max(DV_noisy), [], options_fmin);
+% Find the DV-space criterion that yields target c_z (here 0)
+c = .5;
+c_all = [-c, 0, c];
+criterion_true = cell(1, numel(c_all));
+resp_allT = cell(1, numel(c_all));
+c_z_true = nan(1, numel(c_all));
 
-% criterion = median(IV_target);
-resp = double(DV_noisy > criterion_true);
+% Candidate criteria in DV space:
+DV_sorted = sort(unique(DV_noisy(:)));
+criterion_grid = [-Inf; (DV_sorted(1:end-1) + DV_sorted(2:end))/2; Inf];
+
+for i = 1:numel(c_all)
+    target_cz = c_all(i);
+
+    loss_grid = nan(size(criterion_grid));
+    c_z_grid = nan(size(criterion_grid));
+
+    for j = 1:numel(criterion_grid)
+        c_try = criterion_grid(j);
+        [loss_grid(j), c_z_grid(j)] = criterion_loss_cz(c_try, DV_noisy, iPRS_allT, target_cz);
+    end
+
+    [~, idx_best] = min(loss_grid);
+
+    criterion_true{i} = criterion_grid(idx_best);
+    c_z_true(i) = c_z_grid(idx_best);
+    resp_allT{i} = double(DV_noisy > criterion_true{i});
+    [~,~, pHit, pFA] = criterion_loss_cz(criterion_grid(idx_best), DV_noisy, iPRS_allT, target_cz);
+
+    % fprintf('Target criterion in z unit = %.2f\n', target_cz);
+    % fprintf('Recovered criterion in z unit = %.2f\n', c_z_true(i));
+    % fprintf('pHit = %.2f, pFA=%.2f\n\n', pHit, pFA);
+end
+
+% figure('Position', [0 200 600 500]);
+% hold on;
+% histogram(DV_noisy(iPRS_allT == 1), 'FaceColor', 'r', 'DisplayName', 'Signal Present', 'normalization', 'probability');
+% histogram(DV_noisy(iPRS_allT == 0), 'FaceColor', 'b', 'DisplayName', 'Signal Absent', 'normalization', 'probability');
+% for i = 1:numel(c_all)
+%     xline(criterion_true{i}, 'LineWidth', 2);
+% end
+% xlim([min(DV_noisy), max(DV_noisy)]);
+% ylabel('Proportion');
+% legend('show', 'location', 'best');
 
 simResp.IV_target = DV_clean;
 simResp.corrPass = corrPass;
-simResp.noisyIV = DV_noisy;
-simResp.resp = resp;
+simResp.DV_noisy = DV_noisy;
+simResp.resp = resp_allT;
 simResp.criterion_true = criterion_true;
 end
-
 
 
 function fitOut = fit_template_with_tuning_local(template_InUse, axis_tuning, iFamily_ORI, iFamily_SF, ub_full_all, lb_full_all, options_fmin, problem_setting, nRep, flag_plot_tuning, nFine)
@@ -563,4 +756,24 @@ fitOut.margPred_SF_fine = margPred_SF_fine;
 fitOut.margR2_ORI = margR2_ORI;
 fitOut.margR2_SF  = margR2_SF;
 fitOut.templateFine = templateFine;
+end
+
+function [loss, c_z, pHit, pFA] = criterion_loss_cz(k, DV_noisy, iPRS_allT, target_cz)
+
+nPRS = sum(iPRS_allT == 1);
+nABS = sum(iPRS_allT == 0);
+eps_ = 0.5 / min(nPRS, nABS);
+
+resp = double(DV_noisy > k);
+
+pHit = sum(resp == 1 & iPRS_allT == 1) / nPRS;
+pFA  = sum(resp == 1 & iPRS_allT == 0) / nABS;
+
+% clip rates to avoid infinities
+pHit = min(max(pHit, eps_), 1 - eps_);
+pFA  = min(max(pFA,  eps_), 1 - eps_);
+
+c_z = -0.5 * (norminv(pHit) + norminv(pFA));
+
+loss = (c_z - target_cz).^2;
 end

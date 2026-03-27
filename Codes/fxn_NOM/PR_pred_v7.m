@@ -19,7 +19,7 @@ end
 
 %% -------- 2. Get pYES (trial-wise) and pA (pair-wise) from core function --------
 % fxn_predMetrics does all the noisy-observer math (sigma, criterion, bivariate DV, etc.)
-[pYES_pred_allT, pA_pred_allPairs, ~] = fxn_predMetrics(iModelB, params_est, data, c_zscore);
+[pYES_pred_allT, pA_pred_allPairs, ~] = fxn_predMetrics_v2(iModelB, params_est, data, c_zscore);
 
 % Sanity check
 if numel(pYES_pred_allT) ~= nTrials

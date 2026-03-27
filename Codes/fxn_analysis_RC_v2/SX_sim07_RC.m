@@ -22,7 +22,7 @@ function [kernel2D, intercept2D, R2, R2_Tjur, pValues, pCat, yfit] = SX_sim07_RC
 %   pCat             - 2D matrix of categorical prediction accuracy (ORI x SF)
 %   yfit             - 3D matrix of fitted responses for each trial (trials x ORI x SF)
 
-% flag_GLM = 'multivariate';
+flag_GLM = 'multivariate';
 flag_GLM = 'univariate';
 
 % Set default link function to 'probit' if not specified
@@ -53,6 +53,11 @@ switch flag_GLM
         x = nan(nTrials, nORI * nSF); ii=1; indORI = nan(nORI * nSF, 1); indSF = nan(nORI * nSF, 1);
         % reorganize
         for iORI = 1:nORI, for iSF = 1:nSF, x(:, ii) = e3D_allT(:, iORI, iSF); indORI(ii) = iORI; indSF(ii) = iSF; ii=ii+1; end, end
+        % Standardize 
+        mu = mean(x,1);
+        sd = std(x,0,1);
+        sd(sd==0) = 1;
+        x = (x - mu) ./ sd;
         %------------------------------------------------------
         beta = glmfit(x, resp_allT, 'binomial', 'Link', fxnLink);
         % beta_ = glmfit(zscore(x), resp_allT,  'binomial');

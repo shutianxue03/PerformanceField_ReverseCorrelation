@@ -1,4 +1,4 @@
-function OOD_NOM_Trialwise_compIV(isubj, iLocComb, iModelA, nIter, nJob, iJob)
+function OOD_NOM_Trialwise_compIV(isubj, iLocComb, lambda_whiten, iModelA, nIter, nJob, iJob)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % OOD_NOM_Trialwise_compIV.m
 %
@@ -14,42 +14,7 @@ function OOD_NOM_Trialwise_compIV(isubj, iLocComb, iModelA, nIter, nJob, iJob)
 % - data_allB{ii}: struct with IVs, binning info, responses, etc.
 % - data_metrics_allB(ii,:): behavioral metrics per  iteration
 % - kernel2D_allB(ii,:,:): 2D templates (ORI x SF) per  iteration
-%
-% INPUTS
-% isubj : index of subject or IO info
-% - numeric: index into subjList (human observers)
-% - cell: {nameIO, ...} for ideal observer
-% iLocComb : location combination index
-% 1=fovea; 8=periF (6 deg ecc);
-% 6=HM; 7=VM; 5=LVM; 3=UVM
-% iModelA : template model
-% 1 = RC-derived template
-% 2 = IO template
-% 3 = permuted template
-% IVType : how IV is computed from template × energy
-% 1 = sum of dot product / convolution
-% 2 = max
-% 3 = normalized, etc. (see fxn_getIV_v3)
-% templateType : how to extract 1D template from 2D kernel
-% 1 = raw
-% 2 = reconstructed kernel
-% 3 = mirrored template
-% flag_PatchMode : 1 = use target patch energy, 2 = use noise patch energy
-% itype_template : which trials to use for estimating the template
-% 1 = PRS (signal-present) trials only
-% 2 = ABS (signal-absent) trials only
-% 3 = both PRS and ABS (not implemented here, falls through)
-% nIter : number of resampling iterations
-%
-% OUTPUTS (saved to disk)
-% nameFile_compIV = '.../n%d_A%d_compIV.mat', containing:
-% - c_zscore : SDT criterion (z units) per  iteration
-% - data_allIter : cell array of "data" structs per  iteration
-% - data_metrics_allIter : behavioral metrics per  iteration
-% - Template_train_allIter : 2D kernels per  iteration (using trials in the training set)
-% - Template_full_allIter : 2D kernels per  iteration (using all trials)
-% - names*, flag*, ratio_train, ORI_bound, *Type, etc.
-%
+% 
 % Notes:
 % - This is the "before estimation" stage; model fits (iModelB) happen in
 % OOD_NOM_Trialwise_Est.m
@@ -61,7 +26,13 @@ function OOD_NOM_Trialwise_compIV(isubj, iLocComb, iModelA, nIter, nJob, iJob)
 clc; close all;
 warning off; % (You may want to remove this once things are stable.)
 format compact;
-time_start = datetime('now')
+
+time_start = datetime('now');
+fprintf('\n=======================================\n')
+fprintf('Step 1: Compute IVs and derive templates')
+fprintf('\n=======================================\n')
+
+fprintf('%s: Step 1 started.\n\n', time_start)
 
 addpath(genpath('fxn_exp'));
 addpath(genpath('fxn_NOM'));
@@ -82,13 +53,21 @@ S_seed = GetGrandSeed(nIter, iJob, nJob, nameFolder_Data);
 stream = RandStream('Threefry', 'Seed', S_seed.grandSeed);
 RandStream.setGlobalStream(stream);
 
+fprintf('%s: seed determined.\n\n', datetime('now'))
+
 %% -------------------- General parameters -------------------- %%
 
 IVType = 1; % 1=sum of the dot product/convolution; 2=max; 3=normalized
-templateType = 1; % (1) raw (2) reconstructed kernel (3) mirrored template
+templateType = 3; % (1) raw (2) reconstructed kernel (3) mirrored template
 itype_template = 2; % 1=estimate template from PRS trials, ABS trials, or BOTH trials
 flag_PatchMode = 1; % if flag_PatchMode == 1, patchMode = 'T'; else, patchMode = 'N'; end
 flag_plot_template = 0;
+
+% whiten features
+flag_whitenFeature = 1;     % 1 = whiten ORI×SF energy features before RC
+flag_whiten_useABSonly  = 1;     % estimate covariance from ABS trials only
+% lambda_whiten = .5;  % shrinkage toward identity (0 to 1, higher, stronger whitening)
+eps_whiten = 1e-3;  % floor for eigenvalues
 
 % Settings for fitting tuning functions
 nRep = 20;
@@ -100,7 +79,9 @@ flag_plot_tuning = 0;
 iSess_start = 1; % first session included
 convolveType = 1; % IV from 1=cross-correlation; 2=convolution (fxn_getIV_v3)
 flag_standEnergy = 1; % 1=z-score energy before RC
-flag_plot_compIV = 1; % plot IV distributions and kernels at the end
+flag_plot_compIV = 0; % plot IV distributions and kernels at the end
+if strcmp(str_envir,'HPC'), flag_plot_compIV = 0; end
+
 % ratio_train = 3/4; % proportion of trials in training set (for RC)
 ratio_split = [.6, .3, .1]; % proportion of trials in template set (for RC), training set (for estimating parameters) and test set (for metric predictions)
 ORI_bound = [5, 14]; % orientation window, passed to fxn_getIV_v3
@@ -173,7 +154,6 @@ end
 nameFile_compIV = sprintf('%s/n%d_J%d_A%d_compIV', nameFolder_NOM_save, nIter, iJob, iModelA);
 
 %% Print run info
-fprintf('\n==================================\nStep 1: Compute IVs and derive templates\n================================== \n\n')
 fprintf(['\nSubject/IO name: %s ' ...
     '\n - L%d [%s]', ...
     '\n - A%d [%s]', ...
@@ -245,19 +225,10 @@ else
     end
 end
 
-% %% -------------------- Templare/Train/Test split per location -------------------- %%
-% nTemp_perSingle = round(nTrials_perSingleLoc * ratio_split(1));
-% nTrain_perSingle = round(nTrials_perSingleLoc * ratio_split(2));
-% nTest_perSingle = round(nTrials_perSingleLoc * ratio_split(3));
-%
-% % Ensure even #trials in TRAIN (so we keep full pairs)
-% assert(rem(nTemp_perSingle, 2)==0, 'ALERT: Number of trials is not an even number!!')
-% % nTemp_perSingle = nTemp_perSingle + 1;
-% % nTest_perSingle = nTest_perSingle - 1;
-% % end
-
+fprintf('%s: sessions selected.\n\n', datetime('now'))
 
 %% -------------------- Ideal template -------------------- %%
+
 % For human observers, we still use this "ideal" Gabor-energy template when
 % iModelA == 3 (IO template). Otherwise, templates are derived from RC.
 
@@ -283,22 +254,23 @@ stim.gaborCST = gaborCST;
 % Create a pool of Gabor filters
 [filter_sin, filter_cos] = SX_sim02_setFilters(stim, noise.filtersSF_all, filtersOri_all, fxn_getSigma_SPdomain, 0);
 
-% Define the TRUE template (ORI x SF)
-template_gabor_true = exp_CreateGabor(stim, stim.gaborCST);
+% Define the IDEAL template (ORI x SF)
+template_gabor_ideal = exp_CreateGabor(stim, stim.gaborCST);
 %--------------------------------------------%
-template_true = SX_RC4_Energy_parfor(stim.mask, {template_gabor_true}, filter_sin, filter_cos);
+template_ideal = SX_RC4_Energy_parfor(stim.mask, {template_gabor_ideal}, filter_sin, filter_cos);
 %--------------------------------------------%
-template_true = squeeze(template_true); % remove singleton dim
-
-% Process the true template
+template_ideal = squeeze(template_ideal); % remove singleton dim
 %--------------------------------------------%
-template_true = fxn_getTemplate(template_true, templateType_true, 0);
+template_ideal = fxn_getTemplate(template_ideal, templateType_true, 0);
 %--------------------------------------------%
 
 % Normalize template to roughly match scale of subject-derived templates
-template_true = template_true / max(template_true(:)) * 0.2;
+% template_ideal = template_ideal / max(template_ideal(:)) * 0.2;
+
+fprintf('%s: ideal template created.\n\n', datetime('now'))
 
 %% -------------------- MAIN LOOP over  iterations -------------------- %%
+fprintf('%s: Creating empty placeholders for running iterations.\n\n', datetime('now'))
 data_metrics_allIter = nan(nIter, nDatasets_full, nMetrics); % see fxn_getMetrics for all 11 metrics
 data_train_allIter = cell(nIter, 1);
 data_test_allIter = data_train_allIter;
@@ -315,9 +287,9 @@ margPred_SF_allIter = nan(nIter, 2, nSF);
 margParams_SF_allIter = nan(nIter, 2, length(namesParams_all{iFamily_SF}));
 margR2_SF_allIter = nan(nIter, 2);
 
-fprintf('\n\nRunning nIter = %d: ', nIter);
-
 nameFile_progress = [nameFile_compIV, '.mat'];
+
+fprintf('%s: Started running %d iterations.\n\n', datetime('now'), nIter)
 
 for iIter = 1:nIter
     fprintf('%d... ', iIter);
@@ -373,6 +345,51 @@ for iIter = 1:nIter
         e3D_full_rand_norm = e3D_full_rand_sel;
     end
 
+    %% Whiten the features
+    % 2. Build whitening transform from template-set features
+    if flag_whitenFeature
+        % --- choose trials used to estimate feature covariance ---
+        if flag_whiten_useABSonly
+            idx_cov = (iPRS_tmpl_rand_sel == 0);
+        else
+            idx_cov = true(size(iPRS_tmpl_rand_sel));
+        end
+
+        E_cov = e3D_tmpl_rand_norm(idx_cov, :, :);   % nTrials x nORI x nSF
+        [nCov, nORI nSF] = size(E_cov);
+        X_cov = reshape(E_cov, [nCov, nORI*nSF]);    % trials x channels
+
+        % --- estimate mean and covariance in feature space ---
+        mu_cov = mean(X_cov, 1);
+        Xc_cov = X_cov - mu_cov;
+
+        Sigma = cov(Xc_cov, 1);   % population covariance
+
+        % --- shrinkage regularization ---
+        p = size(Sigma, 1);
+        Sigma_shrink = (1 - lambda_whiten) * Sigma + lambda_whiten * mean(diag(Sigma)) * eye(p);
+
+        % --- eigendecomposition for whitening ---
+        [V, D] = eig((Sigma_shrink + Sigma_shrink') / 2);
+        d = diag(D);
+        d(d < eps_whiten) = eps_whiten;
+
+        % whitening matrix: x_white = (x - mu) * W
+        W_white = V * diag(1 ./ sqrt(d)) * V';
+
+        % optional coloring matrix if you later want to map back
+        W_color = V * diag(sqrt(d)) * V';
+    end
+
+    % 3. Apply whitening to energy
+    if flag_whitenFeature
+        e3D_tmpl_rand_norm = whiten_e3D(e3D_tmpl_rand_norm, mu_cov, W_white);
+        e3D_full_rand_norm = whiten_e3D(e3D_full_rand_norm, mu_cov, W_white);
+    else
+        e3D_tmpl_rand_norm = e3D_tmpl_rand_norm;
+        e3D_full_rand_norm = e3D_full_rand_norm;
+    end
+
     %% ===== PCA-based template recovery =====
     if flag_plot_compIV
         % NOMplot_PCA
@@ -393,34 +410,20 @@ for iIter = 1:nIter
     %--------------------------------------------%
     % figure, subplot(1,2,1),imagesc(template_full_raw)
     % subplot(1,2,2),imagesc(template_full)
-    %
-    %
-    % %%
-    % kernel_raw = SX_sim07_RC(filtersSF_all, filtersOri_all, e3D_tmpl_rand_norm, resp_tmpl_rand_sel);
-    %
-    % nShifts = size(kernel_raw,1);
-    % rShift = nan(nShifts,1);
-    %
-    % for s = 0:nShifts-1
-    %     tempShift = circshift(kernel_raw, s, 1);
-    %     rShift(s+1) = corr(template_true(:), tempShift(:), 'rows', 'complete');
-    % end
-    %
-    % [bestR, bestIdx] = max(rShift);
-    % fprintf('Best shifted correlation = %.4f at shift = %d channels\n', bestR, bestIdx-1);
-    %
-    % figure;
-    % plot(0:nShifts-1, rShift, 'o-');
-    % xlabel('Circular shift along orientation dimension');
-    % ylabel('Correlation with true template');
-    % title('Shift test for recovered kernel');
 
-    %%
     % from TEMPLATE set
     %--------------------------------------------%
     template_tmpl_raw = SX_sim07_RC(filtersSF_all, filtersOri_all, e3D_tmpl_rand_norm, resp_tmpl_rand_sel);
     template_tmpl = fxn_getTemplate(template_tmpl_raw, templateType, flag_plot_template);
     %--------------------------------------------%
+
+    % back-transform the template so that it's in the original channel space
+    template_full_raw = unwhiten_kernel(template_full_raw, W_white, nORI, nSF);
+    template_tmpl_raw = unwhiten_kernel(template_tmpl_raw, W_white, nORI, nSF);
+    template_full = fxn_getTemplate(template_full_raw, templateType, flag_plot_template);
+    template_tmpl = fxn_getTemplate(template_tmpl_raw, templateType, flag_plot_template);
+
+    % figure, subplot(1,2,1), imagesc(template_full_raw), colorbar, subplot(1,2,2), imagesc(template_full_raw_), colorbar
 
     %% Check channel correlation
     % restrict to ABS if RC is intended to be ABS-only.
@@ -430,13 +433,13 @@ for iIter = 1:nIter
     E_tmpl = e3D_tmpl_rand_norm(isABS_tmpl, :, :);  % trials × ori × sf
 
     % Vectorize features: trials × (ori*sf)
-    [nT, nOri, nSF] = size(E_tmpl);
-    X_tmpl = reshape(E_tmpl, [nT, nOri*nSF]);
+    [nT, nORI, nSF] = size(E_tmpl);
+    X_tmpl = reshape(E_tmpl, [nT, nORI*nSF]);
     % Covariance of energy
     cov_E_tmpl = cov(X_tmpl);   % (ori*sf) × (ori*sf)
 
     That_tmpl = template_tmpl(:);
-    Ttrue = template_true(:);  % <-- your ground-truth template in energy space
+    Ttrue = template_ideal(:);  % <-- your ground-truth template in energy space
     r_true  = corr(That_tmpl, Ttrue); % → “does recovered template match the true template directly?”
 
     % T_pred: the predicted RC estimate given correlated features.
@@ -511,9 +514,8 @@ for iIter = 1:nIter
     metrics = [metrics_full; metrics_tmpl; metrics_train; metrics_test];
 
     % Save criterion in z units; later used to convert to criterion in IV
-    c_zscore_train = metrics_train(2);
-    c_zscore_test = metrics_test(2);
-    % CONFIRM if c_zscore should be from TRAIN set or TEST set!!
+    criterion_z_train = metrics_train(2);
+    criterion_z_test = metrics_test(2);
 
     clear data; % size of IV differs across subjects and  iterations
 
@@ -522,37 +524,37 @@ for iIter = 1:nIter
     if iModelA == 1 % Use RC-derived template
     else % Use the ideal template (Gabor energy profile)
         if ~isnumeric(isubj) % for IO, you may reload 'template_true' from disk
-            load(sprintf('%s/truth.mat', nameFolder_OOD_load), 'template_true');
+            load(sprintf('%s/truth.mat', nameFolder_OOD_load), 'template_ideal');
         end
-        template_tmpl = template_true;
+        template_tmpl = template_ideal;
     end
     flag_permT=0;
 
     % 5.2 Compute IV for training and test trials
     %---------------%
-    IV_train = fxn_getIV_v3(e3D_train_rand, template_tmpl, convolveType, IVType, flag_permT, ORI_bound);
-    IV_test = fxn_getIV_v3(e3D_test_rand, template_tmpl, convolveType, IVType, flag_permT, ORI_bound);
+    DV_train = fxn_getIV_v3(e3D_train_rand, template_tmpl, convolveType, IVType, flag_permT, ORI_bound);
+    DV_test = fxn_getIV_v3(e3D_test_rand, template_tmpl, convolveType, IVType, flag_permT, ORI_bound);
     %---------------%
-    nData_train = length(IV_train);
-    nData_test = length(IV_test);
+    nData_train = length(DV_train);
+    nData_test = length(DV_test);
 
     %% 7. Bin IV values
     % Separately for PRS and ABS trials
-    [nTrials_PRS_allBins_train, ~, iTrial4Bin_PRS_train] = histcounts(IV_train(iPRS_train_rand == 1), nBins);
-    [nTrials_ABS_allBins_train, ~, iTrial4Bin_ABS_train] = histcounts(IV_train(iPRS_train_rand == 0), nBins);
-    [nTrials_PRS_allBins_test, ~, iTrial4Bin_PRS_test] = histcounts(IV_test(iPRS_test_rand == 1), nBins);
-    [nTrials_ABS_allBins_test, ~, iTrial4Bin_ABS_test] = histcounts(IV_test(iPRS_test_rand == 0), nBins);
+    [nTrials_PRS_allBins_train, ~, iTrial4Bin_PRS_train] = histcounts(DV_train(iPRS_train_rand == 1), nBins);
+    [nTrials_ABS_allBins_train, ~, iTrial4Bin_ABS_train] = histcounts(DV_train(iPRS_train_rand == 0), nBins);
+    [nTrials_PRS_allBins_test, ~, iTrial4Bin_PRS_test] = histcounts(DV_test(iPRS_test_rand == 1), nBins);
+    [nTrials_ABS_allBins_test, ~, iTrial4Bin_ABS_test] = histcounts(DV_test(iPRS_test_rand == 0), nBins);
 
     % For all trials combined
-    [nTrials_allBins_train, ~, iTrial4Bin_train] = histcounts(IV_train, nBins);
-    [nTrials_allBins_test, ~, iTrial4Bin_test] = histcounts(IV_test, nBins);
+    [nTrials_allBins_train, ~, iTrial4Bin_train] = histcounts(DV_train, nBins);
+    [nTrials_allBins_test, ~, iTrial4Bin_test] = histcounts(DV_test, nBins);
 
     %% 8. Compile data struct for this  iteration
     % Store data_train
     data_train = struct();
-    data_train.c_zscore = c_zscore_train;
+    data_train.criterion_z = criterion_z_train;
     data_train.ndata = nData_train;
-    data_train.IV = IV_train;
+    data_train.IV = DV_train;
     data_train.nTrials_allBins = nTrials_allBins_train;
     data_train.iTrial4Bin = iTrial4Bin_train;
     data_train.nTrials_PRS_allBins = nTrials_PRS_allBins_train;
@@ -571,9 +573,9 @@ for iIter = 1:nIter
 
     % Store data_test
     data_test = struct();
-    data_test.c_zscore = c_zscore_test;
+    data_test.criterion_z = criterion_z_test;
     data_test.ndata = nData_test;
-    data_test.IV = IV_test;
+    data_test.IV = DV_test;
     data_test.nTrials_allBins = nTrials_allBins_test;
     data_test.iTrial4Bin = iTrial4Bin_test;
     data_test.nTrials_PRS_allBins = nTrials_PRS_allBins_test;
@@ -611,25 +613,52 @@ end % end for iIter
 
 % fprintf('\n\n[L%d ModelA%d] ALL  iterations DONE\n', iLocComb, iModelA);
 
+fprintf('\n\n%s: All iterations done.\n\n', datetime('now'))
+
 %% -------------------- SAVE -------------------- %%
-save(nameFile_compIV, 'time_progress', 'template_true', 'c_zscore*', '*_allIter', 'names*', 'flag*', 'ratio_split', 'ORI_bound', '*Type');
-fprintf('\n========== Binned IV saved ==========\n\n\n\n\n');
+save(nameFile_compIV, 'time_progress', 'template_ideal', 'criterion_z*', '*_allIter', 'names*', 'flag*', 'ratio_split', 'ORI_bound', '*Type');
 
 % Delete the progress report
 if exist(nameFile_progress_new, 'file')
     delete(nameFile_progress_new);
 end
 
+fprintf('\n\n%s: Outputs saved.\n\n', datetime('now'))
+
 %% -------------------- Plot (optional) -------------------- %%
 if flag_plot_compIV
     NOMplot_compIV;
+    fprintf('\n\n%s: Plots created.\n\n', datetime('now'))
 end
 close all;
 
 %% -------------------- End timing -------------------- %%
-time_end = datetime('now')
+time_end = datetime('now');
+fprintf('%s: Step 1 done.\n\n', time_end)
 elapsed = time_end - time_start;
-fprintf('\n\nDONE (time used: %s)\n\n\n\n', char(elapsed));
+fprintf('Time used: %s\n\n\n\n', char(elapsed));
 
+
+end
+
+%% HELPER
+function e3D_white = whiten_e3D(e3D_in, mu_cov, W_white)
+
+[nT, nOri, nSf] = size(e3D_in);
+X = reshape(e3D_in, [nT, nOri*nSf]);
+Xw = (X - mu_cov) * W_white;
+e3D_white = reshape(Xw, [nT, nOri, nSf]);
+
+end
+
+function kernel_orig = unwhiten_kernel(kernel_white, W_white, nOri, nSf)
+
+k_white = kernel_white(:);
+
+% If x_white = (x - mu) * W_white,
+% then beta_orig = W_white * beta_white
+k_orig = W_white * k_white;
+
+kernel_orig = reshape(k_orig, [nOri, nSf]);
 
 end

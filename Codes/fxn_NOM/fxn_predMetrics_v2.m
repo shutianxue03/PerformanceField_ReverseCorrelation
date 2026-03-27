@@ -52,7 +52,7 @@ switch iModelB
         sigmaShared = params_est(2);
 
     case 5 % JustPrivN: Additive only
-        Nmul = 0;
+        % Nmul = 0;
         sigmaAdd = params_est(1);
         % sigmaShared = 0;
 
@@ -71,11 +71,11 @@ switch iModelB
 end
 
 %% -------- 2. Extract data --------
-IV_allT = data.IV(:); % nTrials x 1
+DV_allT = data.IV(:); % nTrials x 1
 resp_allT = data.resp(:); % 1 = YES, 0 = NO
 iPair_allT = data.iPair(:); % pair id per trial
 
-nTrials = numel(IV_allT);
+nTrials = numel(DV_allT);
 if numel(resp_allT) ~= nTrials || numel(iPair_allT) ~= nTrials
     error('fxn_predMetrics_v2: Data fields IV, resp, iPair must have same length.');
 end
@@ -84,20 +84,21 @@ end
 
 % Constant variance (shared + independent)
 varConst = sigmaShared^2 + sigmaAdd^2;
+% varPriv = (Nmul .* DV_allT).^2 + sigmaAdd^2;
 
 % Trial-wise total noise SD (constant + Multi)
-sigma_pred_allT = sqrt(varConst + (Nmul .* IV_allT).^2 ); % nTrials x 1
+sigma_pred_allT = sqrt(sigmaShared^2 + sigmaAdd^2 + (Nmul .* DV_allT).^2 ); % nTrials x 1
 
 % Avoid exactly zero variance (mvncdf & normcdf can be unhappy)
 sigma_pred_allT = max(sigma_pred_allT, 1e-6);
 
 % Criterion in IV units (location-dependent via sigma_pred_allT)
-criterion_allT = median(IV_allT) + c_zscore .* sigma_pred_allT;
+criterion_allT = median(DV_allT) + c_zscore .* sigma_pred_allT;
 % Alternatively: criterion_allT = c_zscore * ones(size(IV_allT));
 
 %% -------- 4. Predicted pYES per trial --------
 
-pYES_pred_allT = lambda/2 + (1 - lambda) .* (1 - normcdf(criterion_allT, IV_allT, sigma_pred_allT));
+pYES_pred_allT = lambda/2 + (1 - lambda) .* (1 - normcdf(criterion_allT, DV_allT, sigma_pred_allT));
 
 % Safety: clamp probabilities away from 0 and 1
 pYES_pred_allT = min(max(pYES_pred_allT, eps), 1 - eps);
@@ -140,12 +141,12 @@ for iUnik = 1:nPairs
     indPassB = pairIdx(iUnik,2);
 
     % Center DVs relative to criterion:
-    mu_passA = IV_allT(indPassA) - criterion_allT(indPassA);
-    mu_passB = IV_allT(indPassB) - criterion_allT(indPassB);
+    mu_passA = DV_allT(indPassA) - criterion_allT(indPassA);
+    mu_passB = DV_allT(indPassB) - criterion_allT(indPassB);
 
     % Total variance per pass (constant (shared + private) + multiplicative)
-    var_total_passA = varConst + (Nmul * IV_allT(indPassA))^2;
-    var_total_passB = varConst + (Nmul * IV_allT(indPassB))^2;
+    var_total_passA = varConst + (Nmul * DV_allT(indPassA))^2;
+    var_total_passB = varConst + (Nmul * DV_allT(indPassB))^2;
 
     % Enforce strictly positive variances
     var_total_passA = max(var_total_passA, 1e-10);

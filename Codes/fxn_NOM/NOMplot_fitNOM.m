@@ -14,11 +14,11 @@ pC_pred_allBins = pYES_data_allBins;
 pA_data_allBins = pYES_data_allBins;
 pA_pred_allBins = pYES_data_allBins;
 nData_allBins = pYES_data_allBins;
-IV_allBins_all = pYES_data_allBins;
+DV_allBins_all = pYES_data_allBins;
 
 for iIter = 1:nIter
-    % IVbin_allB(ii, :) = data_allB{ii}.IV_allBins;
-    IV_allBins_all(iIter, :) = pred.metrics.IV_allBins;
+    
+    DV_allBins_all(iIter, :) = pred.metrics.IV_allBins;
 
     % dprime_data_allB(ii, :) = pred_metrics_allIter{ii}.metrics.dprime_data_allBins;
     % dprime_pred_allB(ii, :) = pred_metrics_allIter{ii}.metrics.dprime_pred_allBins;
@@ -37,8 +37,8 @@ end
 
 fprintf('\n *** Compiling DONE, READY to plot ***\n ')
 
-%% 1. pYES/pC/pA as a fxn of binned IV
-[IV_allBins_med] = getCI(IV_allBins_all, 1, 1);
+%% 1. pYES/pC/pA as a fxn of binned DV
+[DV_allBins_med] = getCI(DV_allBins_all, 1, 1);
 [nData_allB_med] = getCI(nData_allBins, 1, 1);
 % Obtain median and CI of data across iteractions (dot+errorbars)
 [pYES_data_med, ~, ~, pYES_data_SEM_neg, pYES_data_SEM_pos] = getCI(pYES_data_allBins, 1, 1);
@@ -53,39 +53,39 @@ sz_scale = 80;
 
 figure('Position', [0 200 300 800])
 subplot(3,1,1), hold on
-% plot(IV_allBins, pYES_pred_allBins, 'k-')
-for iBin=1:nBins
+
+for iBin = 1:nBins
     % Data (dot+errorbars)
-    plot(IV_allBins_med(iBin), pYES_data_med(iBin), 'ko', 'MarkerSize', nData_allB_med(iBin)/sz_scale+5)
-    errorbar(IV_allBins_med(iBin), pYES_data_med(iBin), pYES_data_SEM_neg(iBin), pYES_data_SEM_pos(iBin), 'k', 'CapSize', 0)
+    plot(DV_allBins_med(iBin), pYES_data_med(iBin), 'ko', 'MarkerSize', nData_allB_med(iBin)/sz_scale+5)
+    errorbar(DV_allBins_med(iBin), pYES_data_med(iBin), pYES_data_SEM_neg(iBin), pYES_data_SEM_pos(iBin), 'k', 'CapSize', 0)
 end
 % Pred (shaded errorbars)
-plot(IV_allBins_med, pYES_pred_med, 'k-')
-patch([IV_allBins_med, fliplr(IV_allBins_med)], [pYES_pred_lb, fliplr(pYES_pred_ub)], 'k', 'FaceAlpha', .2, 'EdgeColor', 'none');
-% xline(pred.criterion_IV, 'r-');
+plot(DV_allBins_med, pYES_pred_med, 'k-')
+patch([DV_allBins_med, fliplr(DV_allBins_med)], [pYES_pred_lb, fliplr(pYES_pred_ub)], 'k', 'FaceAlpha', .2, 'EdgeColor', 'none');
+
 yline(.5, 'k--');
 ylim([0,1])
-xlabel('Binned IV')
+xlabel('Binned DV')
 ylabel('pYES')
 % add r and R-squared
-r_pYES = corr(IV_allBins_med', pYES_data_med');
+r_pYES = corr(DV_allBins_med', pYES_data_med');
 R2_pYES = 1 - sum((pYES_data_med - pYES_pred_med).^2) / sum((pYES_data_med - mean(pYES_data_med)).^2);
 title(sprintf('pYES (r=%.2f, R²=%.2f)', r_pYES, R2_pYES));
 
 subplot(3,1,2), hold on
 for iBin = 1:nBins
     % Data (dot+errorbars)
-    plot(IV_allBins_med(iBin), pC_data_med(iBin), 'ko', 'MarkerSize', nData_allB_med(iBin)/sz_scale+5)
-    errorbar(IV_allBins_med(iBin), pC_data_med(iBin), pC_data_SEM_neg(iBin), pC_data_SEM_pos(iBin), 'k', 'CapSize', 0)
+    plot(DV_allBins_med(iBin), pC_data_med(iBin), 'ko', 'MarkerSize', nData_allB_med(iBin)/sz_scale+5)
+    errorbar(DV_allBins_med(iBin), pC_data_med(iBin), pC_data_SEM_neg(iBin), pC_data_SEM_pos(iBin), 'k', 'CapSize', 0)
 end
 % Pred (shaded errorbars)
-plot(IV_allBins_med, pC_pred_med, 'k-')
-patch([IV_allBins_med, fliplr(IV_allBins_med)], [pC_pred_lb, fliplr(pC_pred_ub)], 'k', 'FaceAlpha', .2, 'EdgeColor', 'none');
-% xline(pred.criterion_IV, 'r-');
+plot(DV_allBins_med, pC_pred_med, 'k-')
+patch([DV_allBins_med, fliplr(DV_allBins_med)], [pC_pred_lb, fliplr(pC_pred_ub)], 'k', 'FaceAlpha', .2, 'EdgeColor', 'none');
+
 yline(.5, 'k--');
 yline(mean(pC_data_med), 'k-');
 ylim([0,1])
-xlabel('Binned IV')
+xlabel('Binned DV')
 ylabel('pC')
 % add r and R-squared
 r_pC = corr(pC_pred_med', pC_data_med');
@@ -95,25 +95,26 @@ title(sprintf('pC (r=%.2f, R²=%.2f)', r_pC, R2_pC));
 subplot(3,1,3), hold on
 for iBin = 1:nBins
     % Data (dot+errorbars)
-    plot(IV_allBins_med(iBin), pA_data_med(iBin), 'ko', 'MarkerSize', nData_allB_med(iBin)/sz_scale+5)
-    errorbar(IV_allBins_med(iBin), pA_data_med(iBin), pA_data_SEM_neg(iBin), pA_data_SEM_pos(iBin), 'k', 'CapSize', 0)
+    plot(DV_allBins_med(iBin), pA_data_med(iBin), 'ko', 'MarkerSize', nData_allB_med(iBin)/sz_scale+5)
+    errorbar(DV_allBins_med(iBin), pA_data_med(iBin), pA_data_SEM_neg(iBin), pA_data_SEM_pos(iBin), 'k', 'CapSize', 0)
     % Plot predictied pA from measured pYES
-    % plot(IV_allBins_med(iBin), pYES_data_med(iBin)^2+(1-pYES_data_med(iBin))^2, 'co', 'MarkerSize', nData_allB_med(iBin)/sz_scale+5)
+    % plot(DV_allBins_med(iBin), pYES_data_med(iBin)^2+(1-pYES_data_med(iBin))^2, 'co', 'MarkerSize', nData_allB_med(iBin)/sz_scale+5)
 end
 % Pred (shaded errorbars)
-plot(IV_allBins_med, pA_pred_med, 'k-');
-patch([IV_allBins_med, fliplr(IV_allBins_med)], [pA_pred_lb, fliplr(pA_pred_ub)], 'k', 'FaceAlpha', .2, 'EdgeColor', 'none');
-% xline(pred.criterion_IV, 'r-');
+plot(DV_allBins_med, pA_pred_med, 'k-');
+patch([DV_allBins_med, fliplr(DV_allBins_med)], [pA_pred_lb, fliplr(pA_pred_ub)], 'k', 'FaceAlpha', .2, 'EdgeColor', 'none');
+
 ylim([.5,1])
-xlabel('Binned IV')
+xlabel('Binned DV')
 ylabel('pA')
 % add r and R-squared
 r_pA = corr(pA_pred_med', pA_data_med');
 R2_pA = 1 - sum((pA_data_med - pA_pred_med).^2) / sum((pA_data_med - mean(pA_data_med)).^2);
 title(sprintf('pA (r=%.2f, R²=%.2f)', r_pA, R2_pA));
 
-sgtitle(sprintf('Figure 1. Metrics vs. binned IV\n%s (ModelA%dB%d %s, L%d, nIter=%d)', ...
-    subjName, iModelA, iModelB, namesModelB{iModelB}, iLocComb, nIter))
+sgtitle(sprintf('Figure 1. Metrics vs. binned DV\n%s\nModelA%dB%d %s, L%d, nIter=%d', ...
+    subjName, iModelA, iModelB, namesModelB{iModelB}, iLocComb, nIter), ...
+    'fontsize', 10)
 
 saveas(gcf, sprintf('%s/4Metrics_L%d_A%dB%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA, iModelB))
 
@@ -133,7 +134,7 @@ for iParamFreeze = 1:nParams
     ylim([params_lb(iParamFreeze), params_ub(iParamFreeze)])
     xlabel('Iteration');
     ylabel(namesModelBparams{iModelB}{iParamFreeze});
-    title(['Parameter: ', namesModelBparams{iModelB}{iParamFreeze}]);
+    title(sprintf('Parameter: %s\n %.2f', namesModelBparams{iModelB}{iParamFreeze}, nanmean(params_est_allIter(:, iParamFreeze))));
 
 end
 
@@ -172,7 +173,7 @@ for iParamFreeze = 1:nParams
                 end
         end
         %---------------------%
-        [~, pA_pred_allPairs, ~] = fxn_predMetrics_v3(iModelB, params_test, data_test, c_zscore_test);
+        [~, pA_pred_allPairs, ~] = fxn_predMetrics_v2(iModelB, params_test, data_test, criterion_z_train);
         %---------------------%
         pA_mean(i) = mean(pA_pred_allPairs);
 

@@ -1,4 +1,4 @@
-function [pYES_pred_allT, pA_pred_allPairs, consistency_allPairs] = fxn_predMetrics_v2(iModelB, params_est, data, c_zscore)
+function [pYES_pred_allT, pA_pred_allPairs, consistency_allPairs] = fxn_predMetrics_v3(iModelB, params_est, data, c_zscore)
 % fxn_predMetrics_v3
 % Shared core that computes:
 % - sigma_pred_allT (trial-wise DV SD)
