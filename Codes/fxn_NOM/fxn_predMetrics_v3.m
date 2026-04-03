@@ -1,4 +1,4 @@
-function [pYES_pred_allT, pA_pred_allPairs, consistency_allPairs] = fxn_predMetrics_v3(iModelB, params_est, data, c_zscore)
+function [pYES_pred_allT, pA_pred_allPairs, consistency_allPairs, Cz_fit] = fxn_predMetrics_v3(iModelB, params_est, data)
 % fxn_predMetrics_v3
 % Shared core that computes:
 % - sigma_pred_allT (trial-wise DV SD)
@@ -56,34 +56,16 @@ switch iModelB
         sigmaShared = params_est(2);
         criterion = params_est(3);
 
-    case 5 % JustPrivN: Additive only
-        M = 0;
-        sigmaAdd = params_est(1);
-        % sigmaShared = 0;
-        criterion = params_est(2);
-
-    case 6 % JustMultiN: Multi only
-        M = params_est(1);
-        % sigmaAdd = 0;
-        % sigmaShared = 0;
-        criterion = params_est(2);
-
-    case 7 % JustSharedM: Shared only
-        % Nmul = 0;
-        % sigmaAdd = 0;
-        sigmaShared = params_est(1);
-        criterion = params_est(2);
-
     otherwise
         error('fxn_predMetrics_v2: Unknown iModelB = %d', iModelB);
 end
 
 %% -------- 2. Extract data --------
-ID_allT = data.IV(:); % nTrials x 1
+DV_allT = data.IV(:); % nTrials x 1
 resp_allT = data.resp(:); % 1 = YES, 0 = NO
 iPair_allT = data.iPair(:); % pair id per trial
 
-nTrials = numel(ID_allT);
+nTrials = numel(DV_allT);
 if numel(resp_allT) ~= nTrials || numel(iPair_allT) ~= nTrials
     error('fxn_predMetrics_v2: Data fields IV, resp, iPair must have same length.');
 end
@@ -94,17 +76,23 @@ end
 varConst = sigmaShared^2 + sigmaAdd^2;
 
 % Trial-wise total noise SD (constant + Multi)
-sigma_pred_allT = sqrt(varConst + (M .* ID_allT).^2 ); % nTrials x 1
+sigma_pred_allT = sqrt(varConst + (M .* DV_allT).^2 ); % nTrials x 1
 
 % Avoid exactly zero variance (mvncdf & normcdf can be unhappy)
 sigma_pred_allT = max(sigma_pred_allT, 1e-6);
 
 %% -------- 4. Predicted pYES per trial --------
 
-pYES_pred_allT = lambda/2 + (1 - lambda) .* (1 - normcdf(criterion, ID_allT, sigma_pred_allT));
+pYES_pred_allT = lambda/2 + (1 - lambda) .* (1 - normcdf(criterion, DV_allT, sigma_pred_allT));
 
 % Safety: clamp probabilities away from 0 and 1
 pYES_pred_allT = min(max(pYES_pred_allT, eps), 1 - eps);
+
+%% Compute fitted criterion in z units from predicted pHit and pFA
+pHit_fit = mean(pYES_pred_allT(data.iPRS == 1));
+pFA_fit  = mean(pYES_pred_allT(data.iPRS == 0));
+
+[~, Cz_fit] = SX_sim06_SDT(pHit_fit, pFA_fit);
 
 %% -------- 5. Build pair-wise structure for agreement (pA) --------
 
@@ -144,12 +132,12 @@ for iUnik = 1:nPairs
     indPassB = pairIdx(iUnik,2);
 
     % Center DVs relative to criterion:
-    mu_passA = ID_allT(indPassA) - criterion;
-    mu_passB = ID_allT(indPassB) - criterion;
+    mu_passA = DV_allT(indPassA) - criterion;
+    mu_passB = DV_allT(indPassB) - criterion;
 
     % Total variance per pass (constant (shared + private) + multiplicative)
-    var_total_passA = varConst + (M * ID_allT(indPassA))^2;
-    var_total_passB = varConst + (M * ID_allT(indPassB))^2;
+    var_total_passA = varConst + (M * DV_allT(indPassA))^2;
+    var_total_passB = varConst + (M * DV_allT(indPassB))^2;
 
     % Enforce strictly positive variances
     var_total_passA = max(var_total_passA, 1e-10);

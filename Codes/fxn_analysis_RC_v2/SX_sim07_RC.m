@@ -1,4 +1,4 @@
-function [kernel2D, intercept2D, R2, R2_Tjur, pValues, pCat, yfit] = SX_sim07_RC(filtersSF_all, filtersOri_all, e3D_allT, resp_allT, fxnLink)
+function [kernel2D, intercept2D, R2, R2_Tjur, pValues, pCat, yfit] = SX_sim07_RC(e3D_allT, resp_allT, fxnLink)
 % SX_sim07_RC: Computes regression model and metrics for each orientation and spatial frequency channel
 %
 % This function applies a generalized linear model (GLM) to calculate kernel coefficients,
@@ -29,9 +29,7 @@ flag_GLM = 'univariate';
 if nargin < 5, fxnLink = 'probit'; end
 
 % Extract the number of trials, orientations, and spatial frequencies
-nTrials = length(resp_allT);
-nSF = length(filtersSF_all);
-nORI = length(filtersOri_all);
+[nTrials, nORI, nSF] = size(e3D_allT);
 
 opts = statset('glmfit');
 opts.MaxIter = 1000;  % Increase from default (100)

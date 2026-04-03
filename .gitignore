@@ -1,21 +1,17 @@
-# Ignore data and figure folders (stored outside Git)
-Data*/            # All data files
-Figures/         # All analysis and paper figures
+Data/
+Data_Part1/
+Figures/
 
-# MATLAB-generated files
-*.mat               # MATLAB data files (e.g., saved variables)
-*.fig               # MATLAB figure files
-*.edf               # Eyelink/eye-tracking data (if used)
-*.asv               # MATLAB autosave backup files
-*~                  # Temporary files created by some text editors
-*.autosave          # Additional autosave files
-*.mex*              # Compiled MATLAB executable (platform-dependent)
-*.log               # Log files (e.g., MATLAB or toolbox logs)
+*.mat
+*.fig
+*.edf
+*.asv
+*~
+*.autosave
+*.mex*
+*.log
 
-# Temporary and OS-specific files
-.DS_Store           # macOS Finder metadata file
-*.bak               # Backup files
-*.tmp               # Temporary files
-*.swp               # Swap files (e.g., from vim or other editors)
-
-# SLURM job output logs (if submitting jo
+.DS_Store
+*.bak
+*.tmp
+*.swp

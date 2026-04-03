@@ -1,4 +1,4 @@
-function OOD_NOM_Trialwise_compIV(isubj, iLocComb, lambda_whiten, iModelA, nIter, nJob, iJob)
+function OOD_NOM_Trialwise_compIV(isubj, iLocComb, lambda_whiten, flag_regressType, iModelA, nIter, nJob, iJob)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % OOD_NOM_Trialwise_compIV.m
 %
@@ -14,7 +14,7 @@ function OOD_NOM_Trialwise_compIV(isubj, iLocComb, lambda_whiten, iModelA, nIter
 % - data_allB{ii}: struct with IVs, binning info, responses, etc.
 % - data_metrics_allB(ii,:): behavioral metrics per  iteration
 % - kernel2D_allB(ii,:,:): 2D templates (ORI x SF) per  iteration
-% 
+%
 % Notes:
 % - This is the "before estimation" stage; model fits (iModelB) happen in
 % OOD_NOM_Trialwise_Est.m
@@ -29,7 +29,7 @@ format compact;
 
 time_start = datetime('now');
 fprintf('\n=======================================\n')
-fprintf('Step 1: Compute IVs and derive templates')
+fprintf('Part 1: Compute DVs and derive templates')
 fprintf('\n=======================================\n')
 
 fprintf('%s: Step 1 started.\n\n', time_start)
@@ -64,23 +64,38 @@ flag_PatchMode = 1; % if flag_PatchMode == 1, patchMode = 'T'; else, patchMode =
 flag_plot_template = 0;
 
 % whiten features
-flag_whitenFeature = 1;     % 1 = whiten ORI×SF energy features before RC
-flag_whiten_useABSonly  = 1;     % estimate covariance from ABS trials only
-% lambda_whiten = .5;  % shrinkage toward identity (0 to 1, higher, stronger whitening)
 eps_whiten = 1e-3;  % floor for eigenvalues
+
+% Setting for multivariate regression with smoothing
+% 1=Univariate; 2=MultiSmooth and Univariate
+if flag_regressType == 2
+    opts = struct();
+    opts.link = 'probit';
+    opts.nBasisORI = 5;
+    opts.nBasisSF = 5;
+    opts.ridge = 1e-6;
+    opts.verbose = true;
+    opts.sigmaORI_deg = [];
+    opts.sigmaSF_log2 = [];
+    opts.oriPeriod_deg = 180;
+    opts.zscorePredictor = true;
+    opts.maxIter = 100;
+    opts.tol = 1e-6;
+end
 
 % Settings for fitting tuning functions
 nRep = 20;
 iFamily_ORI = 1; % 1=scaled gaussian, 8=DoG
 iFamily_SF = 2; % 2=log parabola
 problem_setting = MultiStart('StartPointsToRun', 'bounds','UseParallel', 1, 'Display', 'off');
+
 flag_plot_tuning = 0;
 
 iSess_start = 1; % first session included
 convolveType = 1; % IV from 1=cross-correlation; 2=convolution (fxn_getIV_v3)
 flag_standEnergy = 1; % 1=z-score energy before RC
-flag_plot_compIV = 0; % plot IV distributions and kernels at the end
-if strcmp(str_envir,'HPC'), flag_plot_compIV = 0; end
+flag_plot_compIV = 1; % plot IV distributions and kernels at the end
+if strcmp(str_envir,'HPC'), flag_plot_compIV = 0; end % don't plot when running on HPC
 
 % ratio_train = 3/4; % proportion of trials in training set (for RC)
 ratio_split = [.6, .3, .1]; % proportion of trials in template set (for RC), training set (for estimating parameters) and test set (for metric predictions)
@@ -91,7 +106,6 @@ if flag_PatchMode == 1
 else
     namePatchMode = 'N'; % noise patch
 end
-if ~strcmp('HPC', str_envir), flag_plot_compIV = 1; end % don't plot when running on HPC
 
 %% -------------------- Subject / IO and paths -------------------- %%
 if isnumeric(isubj)
@@ -264,8 +278,8 @@ template_ideal = squeeze(template_ideal); % remove singleton dim
 template_ideal = fxn_getTemplate(template_ideal, templateType_true, 0);
 %--------------------------------------------%
 
-% Normalize template to roughly match scale of subject-derived templates
-% template_ideal = template_ideal / max(template_ideal(:)) * 0.2;
+% Normalize template (Unit L2-norm)
+template_ideal = template_ideal / norm(template_ideal(:));
 
 fprintf('%s: ideal template created.\n\n', datetime('now'))
 
@@ -345,108 +359,148 @@ for iIter = 1:nIter
         e3D_full_rand_norm = e3D_full_rand_sel;
     end
 
-    %% Whiten the features
-    % 2. Build whitening transform from template-set features
-    if flag_whitenFeature
-        % --- choose trials used to estimate feature covariance ---
-        if flag_whiten_useABSonly
-            idx_cov = (iPRS_tmpl_rand_sel == 0);
-        else
-            idx_cov = true(size(iPRS_tmpl_rand_sel));
+    %% Deal with channel correlation
+    % Two alternative strategies (lambda_whiten = NaN  --> Way 2)
+    % Way 1: whiten the feature/channel energy before template estimation
+    % Way 2: estimate the template in the original feature space, then apply
+    %   - this is closer in spirit to AE1999 / AE2002 covariance correction
+
+    % -------------------------------------------------------------------------
+    % 1. Estimate covariance in channel-energy space separately for TEMPLATE and FULL
+    % -------------------------------------------------------------------------
+    [nTrials_tmpl_cov, nORI, nSF] = size(e3D_tmpl_rand_norm);
+    [nTrials_full_cov, ~,   ~  ] = size(e3D_full_rand_norm);
+
+    e3D_tmpl_vec = reshape(e3D_tmpl_rand_norm, [nTrials_tmpl_cov, nORI * nSF]); % trials x channels
+    e3D_full_vec = reshape(e3D_full_rand_norm, [nTrials_full_cov, nORI * nSF]); % trials x channels
+
+    % Mean and covariance of channel-energy vectors across trials
+    mu_cov_tmpl = mean(e3D_tmpl_vec, 1);
+    mu_cov_full = mean(e3D_full_vec, 1);
+
+    Sigma_tmpl = cov(e3D_tmpl_vec - mu_cov_tmpl, 1);   % population covariance
+    Sigma_full = cov(e3D_full_vec - mu_cov_full, 1);   % population covariance
+
+    % -------------------------------------------------------------------------
+    % 2. Choose covariance-handling strategy
+    % -------------------------------------------------------------------------
+    if isnan(lambda_whiten)
+        % =====================================================================
+        % Way 2: estimate template in ORIGINAL feature space,
+        %        then apply inverse-covariance correction to the recovered template
+        % =====================================================================
+
+        % Optional: no shrinkage in inverse-covariance mode
+        Sigma_tmpl_use = Sigma_tmpl;
+        Sigma_full_use = Sigma_full;
+
+        % --- TEMPLATE set inverse-covariance correction matrix ---
+        [V_tmpl, D_tmpl] = eig((Sigma_tmpl_use + Sigma_tmpl_use') / 2);
+        d_tmpl = diag(D_tmpl);
+        d_tmpl(d_tmpl < eps_whiten) = eps_whiten;
+        W_inv_tmpl = V_tmpl * diag(1 ./ d_tmpl) * V_tmpl';
+
+        % --- FULL set inverse-covariance correction matrix ---
+        [V_full, D_full] = eig((Sigma_full_use + Sigma_full_use') / 2);
+        d_full = diag(D_full);
+        d_full(d_full < eps_whiten) = eps_whiten;
+        W_inv_full = V_full * diag(1 ./ d_full) * V_full';
+
+        % Keep original features unchanged
+        e3D_tmpl_use = e3D_tmpl_rand_norm;
+        e3D_full_use = e3D_full_rand_norm;
+
+        % Estimate template in original feature space
+        switch flag_regressType
+            case 1  % Univariate
+                template_tmpl_raw = SX_sim07_RC(e3D_tmpl_use, resp_tmpl_rand_sel);
+                template_full_raw = SX_sim07_RC(e3D_full_use, resp_full_rand_sel);
+
+            case 2  % Multivariate + smoothing
+                out = SX_RC_smoothBasis_circORI_logSF(e3D_tmpl_use, resp_tmpl_rand_sel, axis_tuning{1}, axis_tuning{2}, opts);
+                template_tmpl_raw = out.template2D;
+
+                out = SX_RC_smoothBasis_circORI_logSF(e3D_full_use, resp_full_rand_sel, axis_tuning{1}, axis_tuning{2}, opts);
+                template_full_raw = out.template2D;
         end
 
-        E_cov = e3D_tmpl_rand_norm(idx_cov, :, :);   % nTrials x nORI x nSF
-        [nCov, nORI nSF] = size(E_cov);
-        X_cov = reshape(E_cov, [nCov, nORI*nSF]);    % trials x channels
+        % Apply inverse-covariance correction using each dataset's own covariance
+        template_tmpl_raw = invcov_kernel(template_tmpl_raw, W_inv_tmpl, nORI, nSF);
+        template_full_raw = invcov_kernel(template_full_raw, W_inv_full, nORI, nSF);
 
-        % --- estimate mean and covariance in feature space ---
-        mu_cov = mean(X_cov, 1);
-        Xc_cov = X_cov - mu_cov;
-
-        Sigma = cov(Xc_cov, 1);   % population covariance
-
-        % --- shrinkage regularization ---
-        p = size(Sigma, 1);
-        Sigma_shrink = (1 - lambda_whiten) * Sigma + lambda_whiten * mean(diag(Sigma)) * eye(p);
-
-        % --- eigendecomposition for whitening ---
-        [V, D] = eig((Sigma_shrink + Sigma_shrink') / 2);
-        d = diag(D);
-        d(d < eps_whiten) = eps_whiten;
-
-        % whitening matrix: x_white = (x - mu) * W
-        W_white = V * diag(1 ./ sqrt(d)) * V';
-
-        % optional coloring matrix if you later want to map back
-        W_color = V * diag(sqrt(d)) * V';
-    end
-
-    % 3. Apply whitening to energy
-    if flag_whitenFeature
-        e3D_tmpl_rand_norm = whiten_e3D(e3D_tmpl_rand_norm, mu_cov, W_white);
-        e3D_full_rand_norm = whiten_e3D(e3D_full_rand_norm, mu_cov, W_white);
     else
-        e3D_tmpl_rand_norm = e3D_tmpl_rand_norm;
-        e3D_full_rand_norm = e3D_full_rand_norm;
+        % =====================================================================
+        % Way 1: whiten the channel-energy predictors before template estimation
+        % =====================================================================
+
+        % Shrink covariance toward scaled identity
+        Sigma_shrink_tmpl = (1 - lambda_whiten) * Sigma_tmpl + ...
+            lambda_whiten * mean(diag(Sigma_tmpl)) * eye(size(Sigma_tmpl, 1));
+
+        Sigma_shrink_full = (1 - lambda_whiten) * Sigma_full + ...
+            lambda_whiten * mean(diag(Sigma_full)) * eye(size(Sigma_full, 1));
+
+        % lambda_whiten = 0 --> use the full empirical covariance
+        % lambda_whiten = 1 --> use a scaled identity covariance (ignore channel correlations)
+
+        % --- TEMPLATE set whitening matrix ---
+        [V_tmpl, D_tmpl] = eig((Sigma_shrink_tmpl + Sigma_shrink_tmpl') / 2);
+        d_tmpl = diag(D_tmpl);
+        d_tmpl(d_tmpl < eps_whiten) = eps_whiten;
+        W_white_tmpl = V_tmpl * diag(1 ./ sqrt(d_tmpl)) * V_tmpl';
+
+        % --- FULL set whitening matrix ---
+        [V_full, D_full] = eig((Sigma_shrink_full + Sigma_shrink_full') / 2);
+        d_full = diag(D_full);
+        d_full(d_full < eps_whiten) = eps_whiten;
+        W_white_full = V_full * diag(1 ./ sqrt(d_full)) * V_full';
+
+        % Apply whitening to each dataset using its own mean and covariance
+        e3D_tmpl_use = whiten_e3D(e3D_tmpl_rand_norm, mu_cov_tmpl, W_white_tmpl);
+        e3D_full_use = whiten_e3D(e3D_full_rand_norm, mu_cov_full, W_white_full);
+
+        % Estimate template in whitened feature space
+        switch flag_regressType
+            case 1  % Univariate
+                template_tmpl_raw = SX_sim07_RC(e3D_tmpl_use, resp_tmpl_rand_sel);
+                template_full_raw = SX_sim07_RC(e3D_full_use, resp_full_rand_sel);
+
+            case 2  % Multivariate + smoothing
+                out = SX_RC_smoothBasis_circORI_logSF(e3D_tmpl_use, resp_tmpl_rand_sel, axis_tuning{1}, axis_tuning{2}, opts);
+                template_tmpl_raw = out.template2D;
+
+                out = SX_RC_smoothBasis_circORI_logSF(e3D_full_use, resp_full_rand_sel, axis_tuning{1}, axis_tuning{2}, opts);
+                template_full_raw = out.template2D;
+        end
+
+        % No back-transformation here:
+        % template_tmpl_raw and template_full_raw now live in their respective
+        % whitened feature spaces and should stay there for subsequent DV computation.
     end
 
-    %% ===== PCA-based template recovery =====
+    %% Regularize the derived template
+    template_full = fxn_getTemplate(template_full_raw, templateType, flag_plot_template);
+    template_tmpl = fxn_getTemplate(template_tmpl_raw, templateType, flag_plot_template);
+
+    %% Check how channel correlation affects template estimation
+    % -----PCA-based template recovery =====
     if flag_plot_compIV
         % NOMplot_PCA
     end
 
-    %% Debug: check whether channels are too correlated thus redundant
+    % ----- Debug: check whether channels are too correlated thus redundant
     % !!!! Generate one figure per iteration !!!!
     if flag_plot_compIV
         % NOMplot_checkChannelCorr
     end
 
-    %% 3. Estimate the template
-
-    % from the FULL set
-    %--------------------------------------------%
-    template_full_raw = SX_sim07_RC(filtersSF_all, filtersOri_all, e3D_full_rand_norm, resp_full_rand_sel);
-    template_full = fxn_getTemplate(template_full_raw, templateType, flag_plot_template);
-    %--------------------------------------------%
-    % figure, subplot(1,2,1),imagesc(template_full_raw)
-    % subplot(1,2,2),imagesc(template_full)
-
-    % from TEMPLATE set
-    %--------------------------------------------%
-    template_tmpl_raw = SX_sim07_RC(filtersSF_all, filtersOri_all, e3D_tmpl_rand_norm, resp_tmpl_rand_sel);
-    template_tmpl = fxn_getTemplate(template_tmpl_raw, templateType, flag_plot_template);
-    %--------------------------------------------%
-
-    % back-transform the template so that it's in the original channel space
-    template_full_raw = unwhiten_kernel(template_full_raw, W_white, nORI, nSF);
-    template_tmpl_raw = unwhiten_kernel(template_tmpl_raw, W_white, nORI, nSF);
-    template_full = fxn_getTemplate(template_full_raw, templateType, flag_plot_template);
-    template_tmpl = fxn_getTemplate(template_tmpl_raw, templateType, flag_plot_template);
-
-    % figure, subplot(1,2,1), imagesc(template_full_raw), colorbar, subplot(1,2,2), imagesc(template_full_raw_), colorbar
-
-    %% Check channel correlation
-    % restrict to ABS if RC is intended to be ABS-only.
-    % You likely have iPRS coding present/absent. Adjust condition accordingly.
-    isABS_tmpl = (iPRS_tmpl_rand_sel == 0);   % <-- change if your coding differs
-
-    E_tmpl = e3D_tmpl_rand_norm(isABS_tmpl, :, :);  % trials × ori × sf
-
-    % Vectorize features: trials × (ori*sf)
-    [nT, nORI, nSF] = size(E_tmpl);
-    X_tmpl = reshape(E_tmpl, [nT, nORI*nSF]);
-    % Covariance of energy
-    cov_E_tmpl = cov(X_tmpl);   % (ori*sf) × (ori*sf)
-
-    That_tmpl = template_tmpl(:);
-    Ttrue = template_ideal(:);  % <-- your ground-truth template in energy space
-    r_true  = corr(That_tmpl, Ttrue); % → “does recovered template match the true template directly?”
-
-    % T_pred: the predicted RC estimate given correlated features.
-    T_pred = cov_E_tmpl*Ttrue;
-    r_sigT  = corr(That_tmpl, T_pred);  %→ “does recovered template match what RC should recover under feature correlations?”
-
-    % fprintf('[TEMPLATE set] corr(That, Ttrue)=%.3f, corr(That, Sigma*Ttrue)=%.3f\n', r_true, r_sigT);
+    % ----- Compare the univariate regression and multivariation regression with smoothing
+    % One of the two may not be generated; need to pause and generate manually
+    if flag_plot_compIV
+        % template_smooth = template_full_raw;
+        % template_noSmoothing = SX_sim07_RC(e3D_full_rand_norm, resp_full_rand_sel);
+        % RCplot_compTempSmoothing
+    end
 
     %% 4. Marginalization and fit tuning functions
     for iDataset = 1:2
@@ -519,7 +573,7 @@ for iIter = 1:nIter
 
     clear data; % size of IV differs across subjects and  iterations
 
-    %% 6. Compute internal variable (IV) from template and energy (TEST set)
+    %% 6. Compute decision variable (DV) from template and energy (TEST set)
     % 5.1 Derive template
     if iModelA == 1 % Use RC-derived template
     else % Use the ideal template (Gabor energy profile)
@@ -604,6 +658,7 @@ for iIter = 1:nIter
     time_progress = datetime('now');
     time_progress = ceil(minutes(time_progress-time_start)); % round up to minutes
     save(nameFile_progress, 'iIter')
+
     % rename (to avoid saving one file for each iteration)
     nameFile_progress_new = sprintf('%s_%d_%dmin.mat', nameFile_compIV, iIter, time_progress);
     movefile(nameFile_progress, nameFile_progress_new);
@@ -634,7 +689,7 @@ close all;
 
 %% -------------------- End timing -------------------- %%
 time_end = datetime('now');
-fprintf('%s: Step 1 done.\n\n', time_end)
+fprintf('%s: Compute DV done.\n\n', time_end)
 elapsed = time_end - time_start;
 fprintf('Time used: %s\n\n\n\n', char(elapsed));
 
@@ -643,22 +698,14 @@ end
 
 %% HELPER
 function e3D_white = whiten_e3D(e3D_in, mu_cov, W_white)
-
 [nT, nOri, nSf] = size(e3D_in);
-X = reshape(e3D_in, [nT, nOri*nSf]);
+X = reshape(e3D_in, [nT, nOri * nSf]);
 Xw = (X - mu_cov) * W_white;
 e3D_white = reshape(Xw, [nT, nOri, nSf]);
-
 end
 
-function kernel_orig = unwhiten_kernel(kernel_white, W_white, nOri, nSf)
-
-k_white = kernel_white(:);
-
-% If x_white = (x - mu) * W_white,
-% then beta_orig = W_white * beta_white
-k_orig = W_white * k_white;
-
-kernel_orig = reshape(k_orig, [nOri, nSf]);
-
+function kernel_corr = invcov_kernel(kernel_raw, W_inv, nOri, nSf)
+k_raw = kernel_raw(:);
+k_corr = W_inv * k_raw;
+kernel_corr = reshape(k_corr, [nOri, nSf]);
 end

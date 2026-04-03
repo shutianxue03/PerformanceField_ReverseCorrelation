@@ -1,4 +1,4 @@
-function pred = PR_pred_v8(iModelB, params_est, data, c_zscore, nBins, flag_plotPerIter)
+function pred = PR_pred_v8(iModelB, params_est, data, nBins, flag_plotPerIter)
 
 % Predict pYES, pC, and pA (and their binned versions) for the trial-wise noisy observer model.
 
@@ -20,7 +20,7 @@ end
 %% -------- 2. Get pYES (trial-wise) and pA (pair-wise) from core function --------
 % fxn_predMetrics does all the noisy-observer math (sigma, criterion, bivariate DV, etc.)
 %------------------------------%
-[pYES_pred_allT, pA_pred_allPairs, ~] = fxn_predMetrics_v3(iModelB, params_est, data, c_zscore);
+[pYES_pred_allT, pA_pred_allPairs, ~] = fxn_predMetrics_v3(iModelB, params_est, data);
 %------------------------------%
 
 % Sanity check

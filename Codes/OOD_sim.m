@@ -1,5 +1,5 @@
-function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, Cz_true, lambda_whiten, iModelA_sim, iModelB_sim)
-
+function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, Cz_true, ...
+    lambda_whiten, flag_regressType, flag_incluCrit, C_contribution, iModelA_sim, iModelB_sim, nIter)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Script name: OOD_sim.m
@@ -14,7 +14,6 @@ function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true
 % - Gabor SD is normalized by SF only when creating the filters,
 % not when creating the Gabor patches.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 
 % ---------------------------- Basic setup ----------------------------- %
 clc; close all;
@@ -41,19 +40,19 @@ nORI = nORI; % nORI is defined in SX_RC1_setting; repeated here just for parfor 
 nSF = nORI;
 
 % Number of bootstraps for compIV / fitNOM
-nIter = 100; % <-- adjust as needed
 nJob = 1;
 iJob = 1;
 
 % Model A/B indices for fitting
-iModelA_sim_allCond = iModelA_sim; % 1 = RC-derived template (Model A), 2=idealtemplate; 3=permuted template
+iModelA_sim_allCond = [2]; % 1 = RC-derived template (Model A), 2=idealtemplate; 3=permuted template
 iModelB_sim_allCond = iModelB_sim; % use same B for sim and fit
 
 templateType_true = 1; % 1 = raw;
 IVType_true = 1; % 1 = sum of dot product;
 convolveType_true = 1; % 1 = dot product; 2 = convolution (for fxn_getIV_v3)
 flag_permT = 0; %1=permute the input template per trial
-flag_plotDist = 0;
+flag_plotDist = 1;
+if strcmp(str_envir, 'HPC'), flag_plotDist = 0; end % don't plot when running on HPC
 
 % Internal-noise true parameters (from input)
 switch iModelB_sim
@@ -94,17 +93,20 @@ fprintf(' - nIter (for compIV/fitNOM) = %d\n', nIter);
 fprintf(' - noiseCST = %.2f\n', noiseCST);
 fprintf(' - gaborCST = %.2f\n', gaborCST);
 fprintf(' - nTrials = %d\n', nTrials);
+fprintf(' - iModelA_sim = %d (1=Data-derived template; 2=ideal template)\n', iModelA_sim);
 fprintf(' - iModelB_sim = %d (see updated Model B definitions)\n', iModelB_sim);
 fprintf(' - %d params: %s\n', nParams, str_IN);
 fprintf(' - Criterion (z unit)=%.1f \n', Cz_true);
-fprintf(' - Whitening strength (lambda): %.1f \n\n', lambda_whiten);
+fprintf(' - Contribution of criterion loss =%.1f \n', C_contribution);
+fprintf(' - Whitening strength (lambda): %.1f \n', lambda_whiten);
+fprintf(' - Regression type (1=Univariate; 2=Multi+smoothing): %d \n\n', flag_regressType);
 
 % ---------------------- Define IO name & folders ---------------------- %
-
-nameIO = sprintf('IO_cN%.0f_cG%.0f_nT%s_Nm%s_Na%s_Ns%s_Cz%.1f_whiten%.1f_%d%d_B%d', ...
+% Define the IO name
+nameIO = sprintf('IO_cN%.0f_cG%.0f_nT%s_Nm%s_Na%s_Ns%s_Cz%.1f_cont%.1f_whiten%.1f_R%d_%d%d_B%d', ...
     noiseCST*100, gaborCST*100, format_num2exp(nTrials), ...
     format_num2exp(Nmul_true), format_num2exp(Nadd_true), format_num2exp(Nshared_true), ...
-    Cz_true, lambda_whiten, nORI, nSF, iModelB_sim);
+    Cz_true, C_contribution, lambda_whiten, flag_regressType, nORI, nSF, iModelB_sim);
 
 % Folder to save IO data (energy + behav)
 nameFolder_Data_OOD_IO = sprintf('%s/%s', nameFolder_Data_OOD, nameIO);
@@ -182,11 +184,11 @@ template_true = squeeze(template_true);
 template_true = fxn_getTemplate(template_true, templateType_true, 0);
 %---------------------------%
 
-% Normalize template to roughly match scale of subject-derived templates
-% template_true = template_true / max(template_true(:)) * 0.2;
+% Normalize template (Unit L2-norm)
+template_true = template_true / norm(template_true(:));
 
 % Save "truth" (for IO template in Model A = 2)
-save(sprintf('%s/truth.mat', nameFolder_Data_OOD_IO), '*_true');
+save(sprintf('%s/truth.mat', nameFolder_Data_OOD_IO), 'nameIO', '*_true', 'noiseCST', 'gaborCST', 'nTrials', 'lambda_whiten', 'flag_regressType', 'flag_incluCrit', 'C_contribution', 'iModelA_sim_allCond', 'iModelB_sim_allCond', 'nIter');
 fprintf('\n\n%s: Truth (including the ideal template) created and saved.\n\n', datetime('now'))
 
 %% Preallocate sim arrays -------------------------- %
@@ -233,7 +235,7 @@ parfor iPair = 1:nPairs
     %---------------------------%
     e3D_target = squeeze(e3D_target);
 
-    % Internal variable from energy × template_true
+    % Decision variable from energy × template_true
     %---------------------------%
     DV_target = fxn_getIV_v3(e3D_target, template_true, convolveType_true, IVType_true, flag_permT, [1, nORI]);
     %---------------------------%
@@ -323,6 +325,8 @@ end
 [~, idx_best] = min(loss_grid);
 criterion_DV_true = criterion_grid(idx_best);
 
+save(sprintf('%s/truth.mat', nameFolder_Data_OOD_IO), 'criterion_DV_true', '-append');
+
 % Binary responses
 resp_allT = DVnoisy_sim_allT > criterion_DV_true;
 
@@ -351,7 +355,7 @@ pFA_sim = sum((iPRS_allT == 0) & (resp_allT == 1)) / sum(iPRS_allT == 0);
 pC_sim = mean( (iPRS_allT==1 & resp_allT==1) | (iPRS_allT==0 & resp_allT==0) );
 
 %--------------------------------------%
-[dprime_sim, criterion_z_sim] = SX_sim06_SDT(pHit_sim, pFA_sim);
+[dprime_sim, Cz_sim] = SX_sim06_SDT(pHit_sim, pFA_sim);
 %--------------------------------------%
 
 respC_sim = nan(nPairs, 1);
@@ -361,61 +365,29 @@ for iPairUnik = 1:nPairs
 end
 pA_sim = mean(respC_sim);
 
-metrics_sim = [dprime_sim, criterion_z_sim, pC_sim, pHit_sim, pFA_sim, pA_sim, pYES_sim];
-
-% Compare true criterion (IV space) vs SDT-derived criterion (converted)
-% c_IV_all = median(DVclean_sim_allT) + criterion_z .* sigma_pred_allT;
-fprintf('   True criterion (z unit) = %.1f, (DV unit)=%.1f\n', Cz_true, criterion_DV_true);
-fprintf('   Simulated criterion (z unit) = %.1f\n', criterion_z_sim);
+metrics_sim = [dprime_sim, Cz_sim, pC_sim, pHit_sim, pFA_sim, pA_sim, pYES_sim];
 
 % Save behavioral measures in behavMeas.mat (as expected by compIV)
-save(sprintf('%s/behavMeas.mat', nameFolder_Data_OOD_IO), 'dataMatrix', 'metrics_sim');
+save(sprintf('%s/behavMeas.mat', nameFolder_Data_OOD_IO), 'dataMatrix', 'metrics_sim', 'iPRS_allT', 'iPass_allT', 'iPair_allT', 'resp_allT');
 
 fprintf('\n%s: Behavioral data saved.\n\nReady for template generation\n\n', datetime('now'))
 
 %% -------------------------- Plotting DV dist and behav metrics------------------------- %
 if flag_plotDist
-figure('Position', [0 200 600 1e3]);
-subplot(2,1,1); hold on;
-histogram(DVnoisy_sim_allT(iPRS_allT == 1), 'FaceColor', 'r', 'DisplayName', 'Signal Present', 'normalization', 'probability');
-histogram(DVnoisy_sim_allT(iPRS_allT == 0), 'FaceColor', 'b', 'DisplayName', 'Signal Absent', 'normalization', 'probability');
-xline(criterion_DV_true, 'LineWidth', 2, 'DisplayName', 'True criterion');
-xlim([min(DVnoisy_sim_allT), max(DVnoisy_sim_allT)]);
-ylabel('Proportion');
-legend('show', 'location', 'best');
-
-subplot(2,1,2); hold on;
-plot(DVclean_sim_allT, resp_allT, 'ro', 'DisplayName', 'Binary response');
-plot(DVclean_sim_allT, pYES_pred_allT, 'k+', 'DisplayName', 'Pred pYES');
-xline(criterion_DV_true, 'LineWidth', 2, 'DisplayName', 'True criterion');
-xlabel('IV'); ylabel('pYES');
-yline(0.5, 'k--');
-xlim([min(DVnoisy_sim_allT), max(DVnoisy_sim_allT)]);
-metrics_sim_ = metrics_sim; metrics_sim_(3:end) = metrics_sim_(3:end)*100;
-
-sgtitle(sprintf(['CI_{95}=[%.1f, %.1f], Median=%.1f\n[TRUE] gN=%.2f, gC=%.2f, Nmul=%s, Nadd=%s, Nshared=%s, crit=%.1f (%.1f)' ...
-    '\n[MEASURED] pYES=%.2f, pC=%.2f, pHit=%.2f, pFA=%.2f, pA=%.2f, corrPass=%.2f'], ...
-    round(quantile(DVnoisy_sim_allT, [.05, .95, .5]), 1), noiseCST, gaborCST, ...
-    format_num2exp(Nmul_true), format_num2exp(Nadd_true), format_num2exp(Nshared_true), Cz_true, criterion_z_sim, ...
-    pYES_sim, pC_sim, pHit_sim, pFA_sim, pA_sim, corrPass), ...
-    'fontsize', 12);
-
-saveas(gcf, sprintf('%s/0PerfHist.jpg', nameFolder_Figures_perSubj));
-close all;
-fprintf('%s: Distribution of DV drawn.\n\n', datetime('now'))
+    NOMplot_dist
 end
-
+    
 %% ---------------- Run compIV and fitNOM on this IO --------------------- %
 for iModelA_fit = iModelA_sim_allCond
     % Step 1: compute IVs, templates, and test-set metrics
     %------------------------------------%
-    OOD_NOM_Trialwise_compIV({nameIO, criterion_DV_true}, iLocComb, lambda_whiten, iModelA_fit, nIter, nJob, iJob)
+    OOD_NOM_Trialwise_compIV({nameIO, criterion_DV_true}, iLocComb, lambda_whiten, flag_regressType, iModelA_fit, nIter, nJob, iJob)
     %------------------------------------%
 
     for iModelB_fit = iModelB_sim_allCond
         % Step 2: fit NOM parameters and predict metrics
         %------------------------------------%
-        OOD_NOM_Trialwise_fitNOM({nameIO, criterion_DV_true}, iLocComb, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
+        OOD_NOM_Trialwise_fitNOM({nameIO, criterion_DV_true}, iLocComb, flag_incluCrit, C_contribution, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
         %------------------------------------%
     end
 end

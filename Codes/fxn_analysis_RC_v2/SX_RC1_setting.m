@@ -24,7 +24,7 @@ nameFolder_server = '/scratch/sx712/PF_RC'; str_envir = 'HPC';
 % nameFolder_server = '/Volumes/server/Users/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC'; str_envir = 'Server';
 
 % if run on local for model simulation (my laptop or iMac)
-% nameFolder_server = '/Users/xueshutian/Desktop/GitHub_local/PF_RC'; str_envir = 'Local'; 
+nameFolder_server = '/Users/xueshutian/Desktop/GitHub_local/PF_RC'; str_envir = 'Local'; 
 
 % if run on local for model simulation (the lab iMac)
 % nameFolder_server = '/Users/sx712/Desktop/GitHub_local/PF_RC'; str_envir = 'Local'; 
@@ -157,15 +157,15 @@ ncomb8 = 8;
 
 % New model: induced noise (indpt), idpdt constant noise, and shared constant noise
 NOMp1_lb = 1e-5;  NOMp1_ub = 1;     % induced noise 
-NOMp2_lb = 1e-5; NOMp2_ub = 50;   % idpdt constant noise
-NOMp3_lb  = 1e-5;  NOMp3_ub = 50; %  shared constant noise
-NOMc_lb = 0; NOMc_ub = 13; % criterion; subject to change
+NOMp2_lb = 1e-5; NOMp2_ub = 100;   % idpdt constant noise
+NOMp3_lb  = 1e-5;  NOMp3_ub = 100; %  shared constant noise
+% NOMc_lb = 0; NOMc_ub = 500; % criterion; subject to change
 
 % Midpoint initial guesses
 NOMp1_0 = mean([NOMp1_lb,  NOMp1_ub]);
 NOMp2_0 = mean([NOMp2_lb, NOMp2_ub]);
 NOMp3_0   = mean([NOMp3_lb,   NOMp3_ub]);
-NOMc_0   = mean([NOMc_lb,   NOMc_ub]);
+% NOMc_0   = mean([NOMc_lb,   NOMc_ub]);
 
 % BADS options
 options_bads = bads('defaults');
@@ -179,34 +179,27 @@ options_fmin = optimoptions('fmincon', 'MaxIterations', 1e4, 'Display', 'off');
 namesModelA = {'RC', 'IO', 'RandTemp'};
 
 namesModelB = {'FullModel', 'NoSharedN', 'NoMultiN', 'NoAddN', 'JustAddN', 'JustMultiN', 'JustSharedN'};
-namesModelBparams = {...
-    {'Multiplicative variability', 'Additive variability', 'Shared variability'}, ... %1
-    {'Multiplicative variability', 'Additive variability'                                       }, ... %2
-    {                                         'Additive variability', 'Shared variability'}, ... %3
-    {'Multiplicative variability',                                'Shared variability'}, ... %4
-    {                                         'Additive variability',                                      }, ... %5
-    {'Multiplicative variability',                                                                           }, ... %6
-    {                                                                        'Shared variability'}};    %7
-
-% namesModelBparams = {...
-%     {'Multiplicative variability', 'Additive variability', 'Shared variability', 'CriterionNOM'}, ... %1
-%     {'Multiplicative variability', 'Additive variability'                                , 'CriterionNOM'}, ... %2
-%     {                                         'Additive variability', 'Shared variability',  'CriterionNOM'}, ... %3
-%     {'Multiplicative variability',                                'Shared variability',    'CriterionNOM'}, ... %4
-%     {                                         'Additive variability',                                 'CriterionNOM'}, ... %5
-%     {'Multiplicative variability',                                                                  'CriterionNOM'}, ... %6
-%     {                                                                        'Shared variability',    'CriterionNOM'}};    %7
-
-% namesModelB = {'FullModel', 'NoRho', 'NoInduced', 'NoConstant', 'NoInducedNoRho', 'NoConstantNoRho', 'NoNoise'};
-% namesModelBparams = {...
-%     {'Induced noise', 'Constant noise', 'Rho'}, ... 
-%     {'Induced noise', 'Constant noise'          }, ...
-%     {                          'Constant noise', 'Rho'}, ...
-%     {'Induced noise',                            'Rho'}, ...
-%     {                          'Constant noise',         }, ...
-%     {'Induced noise',                                   }, ...
-%     {                                                    'Rho'}};
-
+if ~exist('flag_incluCrit', 'var'), flag_incluCrit = 1; end
+switch flag_incluCrit
+    case 0
+        namesModelBparams = {...
+            {'Multiplicative variability', 'Additive variability', 'Shared variability'}, ... %1
+            {'Multiplicative variability', 'Additive variability'                                       }, ... %2
+            {                                         'Additive variability', 'Shared variability'}, ... %3
+            {'Multiplicative variability',                                'Shared variability'}, ... %4
+            {                                         'Additive variability',                                      }, ... %5
+            {'Multiplicative variability',                                                                           }, ... %6
+            {                                                                        'Shared variability'}};    %7
+    case 1
+        namesModelBparams = {...
+            {'Multiplicative variability', 'Additive variability', 'Shared variability', 'CriterionNOM'}, ... %1
+            {'Multiplicative variability', 'Additive variability'                                , 'CriterionNOM'}, ... %2
+            {                                         'Additive variability', 'Shared variability',  'CriterionNOM'}, ... %3
+            {'Multiplicative variability',                                'Shared variability',    'CriterionNOM'}, ... %4
+            {                                         'Additive variability',                                 'CriterionNOM'}, ... %5
+            {'Multiplicative variability',                                                                  'CriterionNOM'}, ... %6
+            {                                                                        'Shared variability',    'CriterionNOM'}};    %7
+end
 namesConvolveType = {'dot product', 'convolution'}; nConvolveType = length(namesConvolveType);
 namesIVType = {'sum all channels', 'channel with max IV'}; nIVType = length(namesIVType);
 
@@ -320,7 +313,6 @@ namesMCmode_long = {'10-fold cross validation (deviance is nLL)', ...
 namesYLabel = {'Deviance', 'Deviance', 'IC'};
 
 namesParamsMode = {'estP', 'tunC'};
-
 
 %% For plotting
 namesFeature_axis = {'Orientation (º)', 'Spatial frequency (cpd)'};

@@ -1,0 +1,9 @@
+# MATLAB data
+*.mat
+
+# Images
+*.png
+
+# Optional: common generated files
+*.fig
+*.asv

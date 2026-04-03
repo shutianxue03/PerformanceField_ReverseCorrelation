@@ -32,6 +32,7 @@
 
 set(0, 'DefaultFigureVisible', 'off') % avoid printing figures on the desktop
 
+xORI = axis_tuning{1}; xSF = axis_tuning{2};
 
 %% Figure 1: Performance Metrics across Iterations
 figure('Position', [100, 100, 2e3, 2e3])
@@ -50,7 +51,7 @@ for iMetric = 1:nMetrics
     xticklabels(namesDataset_full)
     % ylabel(namesMetrics{iMetric})
     title(namesMetrics{iMetric})
-    
+
     % Set y-axis limits based on metric type
     switch iMetric
         % metrics: [dprime, criterion, [pC, pHit, pFA], nanmean(respC), pYES, mean(1./contrast), median(RT)];
@@ -79,6 +80,9 @@ saveas(gcf, sprintf('%s/1MetricMeasured_L%d_A%d.jpg', nameFolder_Figures_perSubj
 %% Figure 2: 2D Kernel
 template_tmpl_ave = squeeze(mean(template_tmpl_allIter, 1));
 template_full_ave = squeeze(mean(template_full_allIter, 1));
+
+template_tmpl_ave = template_tmpl_ave/norm(template_tmpl_ave(:));
+template_full_ave = template_full_ave/norm(template_full_ave(:));
 
 figure('Position', [100, 100, 2e3, 2e3])
 
@@ -159,63 +163,78 @@ sgtitle(sprintf('Figure 2. Recovered template\n%s (L%d, ModelA%d %s, nIter=%d)\n
 saveas(gcf, sprintf('%s/2Template_L%d_A%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA))
 
 %% Figure 3. Plot marg and margPred, print R2 and params in the title
-[margORI_med, ~, ~, margORI_sem] = getCI(margORI_allIter, 1, 1);
-[margSF_med, ~, ~, margSF_sem] = getCI(margSF_allIter, 1, 1);
+if iModelA==1 % data-derived template
+    [margORI_med, ~, ~, margORI_sem] = getCI(margORI_allIter, 1, 1);
+    [margSF_med, ~, ~, margSF_sem] = getCI(margSF_allIter, 1, 1);
 
-[margPred_ORI_med, ~, ~, margPred_ORI_sem] = getCI(margPred_ORI_allIter, 1, 1);
-[margPred_SF_med, ~, ~, margPred_SF_sem] = getCI(margPred_SF_allIter, 1, 1);
+    [margPred_ORI_med, ~, ~, margPred_ORI_sem] = getCI(margPred_ORI_allIter, 1, 1);
+    [margPred_SF_med, ~, ~, margPred_SF_sem] = getCI(margPred_SF_allIter, 1, 1);
 
-[margParam_ORI_med, ~, ~, margParam_ORI_sem] = getCI(margParams_ORI_allIter, 1, 1);
-[margParam_SF_med, ~, ~, margParam_SF_sem] = getCI(margParams_SF_allIter, 1, 1);
+    [margParam_ORI_med, ~, ~, margParam_ORI_sem] = getCI(margParams_ORI_allIter, 1, 1);
+    [margParam_SF_med, ~, ~, margParam_SF_sem] = getCI(margParams_SF_allIter, 1, 1);
 
-[margR2_ORI_med, ~, ~, margR2_ORI_sem] = getCI(margR2_ORI_allIter, 1, 1);
-[margR2_SF_med, ~, ~, margR2_SF_sem] = getCI(margR2_SF_allIter, 1, 1);
+    [margR2_ORI_med, ~, ~, margR2_ORI_sem] = getCI(margR2_ORI_allIter, 1, 1);
+    [margR2_SF_med, ~, ~, margR2_SF_sem] = getCI(margR2_SF_allIter, 1, 1);
 
-figure('Position', [0 0 1e3 1e3])
-% ORI tuning (training set)
-subplot(2,2,1); hold on;
-plot(xORI, margORI_med(1, :), 'ko-', 'MarkerFaceColor', 'w');
-plot(xORI, margPred_ORI_med(1, :), 'k-', 'LineWidth', 2);
-xline(0, 'k--', 'LineWidth', 1); % ORI=0
-yline(0, 'k--', 'LineWidth', 1); % Marginalized kernel=0
-title(sprintf('ORI tuning function (training set)\nR2=%.2f (+-%.2f)| Params=[%s ]', margR2_ORI_med(1), margR2_ORI_sem(1), num2str(margParam_ORI_med(1, :), ' %.2f')));
-xlabel('Orientation (deg)'); ylabel('Amplitude');
-yticks(-.1:.1:1)
+    % Process the ideal template
+    margIO_ORI = mean(template_ideal, 2);
+    margIO_ORI_norm_training = margIO_ORI/max(margIO_ORI(:))*max(margORI_med(1, :));
+    margIO_ORI_norm_full = margIO_ORI/max(margIO_ORI(:))*max(margORI_med(2, :));
+    margIO_SF = mean(template_ideal, 1);
+    margIO_SF_norm_training = margIO_SF/max(margIO_SF(:))*max(margSF_med(1, :));
+    margIO_SF_norm_full = margIO_SF/max(margIO_SF(:))*max(margSF_med(2, :));
 
-% ORI tuning (full set)
-subplot(2,2,3); hold on;
-plot(xORI, margORI_med(2, :), 'ko-', 'MarkerFaceColor', 'w');
-plot(xORI, margPred_ORI_med(2, :), 'k-', 'LineWidth', 2);
-xline(0, 'k--', 'LineWidth', 1); % ORI=0
-yline(0, 'k--', 'LineWidth', 1); % Marginalized kernel=0
-title(sprintf('ORI tuning function (full set)\nR2=%.2f (+-%.2f)| Params=[%s ]', margR2_ORI_med(2), margR2_ORI_sem(2), num2str(margParam_ORI_med(2, :), ' %.2f')));
-xlabel('Orientation (deg)'); ylabel('Amplitude');
-yticks(-.1:.1:1)
+    figure('Position', [0 0 1e3 1e3])
+    % ORI tuning (training set)
+    subplot(2,2,1); hold on;
+    plot(xORI, margORI_med(1, :), 'ko-', 'MarkerFaceColor', 'w');
+    plot(xORI, margPred_ORI_med(1, :), 'k-', 'LineWidth', 2);
+    plot(xORI, margIO_ORI_norm_training, 'r-', 'LineWidth', 2); % ideal template
+    xline(0, 'k--', 'LineWidth', 1); % ORI=0
+    yline(0, 'k--', 'LineWidth', 1); % Marginalized kernel=0
+    title(sprintf('ORI tuning function (training set)\nR2=%.2f (+-%.2f)| Params=[%s ]', margR2_ORI_med(1), margR2_ORI_sem(1), num2str(margParam_ORI_med(1, :), ' %.2f')));
+    xlabel('Orientation (deg)'); ylabel('Amplitude');
+    yticks(-.1:.1:1)
+    legend({'Marg. ORI', 'Pred', 'Ideal'})
 
-% SF tuning (training set)
-subplot(2,2,2); hold on;
-plot(xSF, margSF_med(1, :), 'ko-', 'MarkerFaceColor', 'w');
-plot(xSF, margPred_SF_med(1, :), 'k-', 'LineWidth', 2);
-xline(1, 'k--', 'LineWidth', 1); % SF=2 cpd
-yline(0, 'k--', 'LineWidth', 1); % Marginalized kernel=0
-title(sprintf('SF tuning function (training set)\nR2=%.2f (+-%.2f)| Params=[%s]', margR2_SF_med(1), margR2_SF_sem(1), num2str(margParam_SF_med(1, :), ' %.2f')));
-xlabel('Log Spatial frequency (cpd)'); ylabel('Amplitude');
-yticks(-.1:.1:.6)
+    % ORI tuning (full set)
+    subplot(2,2,3); hold on;
+    plot(xORI, margORI_med(2, :), 'ko-', 'MarkerFaceColor', 'w');
+    plot(xORI, margPred_ORI_med(2, :), 'k-', 'LineWidth', 2);
+    plot(xORI, margIO_ORI_norm_full, 'r-', 'LineWidth', 2); % ideal template
+    xline(0, 'k--', 'LineWidth', 1); % ORI=0
+    yline(0, 'k--', 'LineWidth', 1); % Marginalized kernel=0
+    title(sprintf('ORI tuning function (full set)\nR2=%.2f (+-%.2f)| Params=[%s ]', margR2_ORI_med(2), margR2_ORI_sem(2), num2str(margParam_ORI_med(2, :), ' %.2f')));
+    xlabel('Orientation (deg)'); ylabel('Amplitude');
+    yticks(-.1:.1:1)
 
-% SF tuning (full set)
-subplot(2,2,4); hold on;
-plot(xSF, margSF_med(2, :), 'ko-', 'MarkerFaceColor', 'w');
-plot(xSF, margPred_SF_med(2, :), 'k-', 'LineWidth', 2);
-xline(1, 'k--', 'LineWidth', 1); % SF=2 cpd
-yline(0, 'k--', 'LineWidth', 1); % Marginalized kernel=0
-title(sprintf('SF tuning function (full set)\nR2=%.2f (+-%.2f)| Params=[%s]', margR2_SF_med(2), margR2_SF_sem(2), num2str(margParam_SF_med(2, :), ' %.2f')));
-xlabel('Log Spatial frequency (cpd)'); ylabel('Amplitude');
-yticks(-.1:.1:.6)
+    % SF tuning (training set)
+    subplot(2,2,2); hold on;
+    plot(xSF, margSF_med(1, :), 'ko-', 'MarkerFaceColor', 'w');
+    plot(xSF, margPred_SF_med(1, :), 'k-', 'LineWidth', 2);
+    plot(xSF, margIO_SF_norm_training, 'r-', 'LineWidth', 2); % ideal template
+    xline(1, 'k--', 'LineWidth', 1); % SF=2 cpd
+    yline(0, 'k--', 'LineWidth', 1); % Marginalized kernel=0
+    title(sprintf('SF tuning function (training set)\nR2=%.2f (+-%.2f)| Params=[%s]', margR2_SF_med(1), margR2_SF_sem(1), num2str(margParam_SF_med(1, :), ' %.2f')));
+    xlabel('Log Spatial frequency (cpd)'); ylabel('Amplitude');
+    yticks(-.1:.1:.6)
 
-sgtitle(sprintf('Figure 3. Tuning functions\n%s (L%d, ModelA%d %s, nIter=%d)', ...
-    subjName, iLocComb, iModelA, namesModelA{iModelA}, nIter))
+    % SF tuning (full set)
+    subplot(2,2,4); hold on;
+    plot(xSF, margSF_med(2, :), 'ko-', 'MarkerFaceColor', 'w');
+    plot(xSF, margPred_SF_med(2, :), 'k-', 'LineWidth', 2);
+    plot(xSF, margIO_SF_norm_full, 'r-', 'LineWidth', 2); % ideal template
+    xline(1, 'k--', 'LineWidth', 1); % SF=2 cpd
+    yline(0, 'k--', 'LineWidth', 1); % Marginalized kernel=0
+    title(sprintf('SF tuning function (full set)\nR2=%.2f (+-%.2f)| Params=[%s]', margR2_SF_med(2), margR2_SF_sem(2), num2str(margParam_SF_med(2, :), ' %.2f')));
+    xlabel('Log Spatial frequency (cpd)'); ylabel('Amplitude');
+    yticks(-.1:.1:.6)
 
-set(findall(gcf, '-property', 'fontsize'), 'fontsize', 20)
-% set(findall(gcf, '-property', 'linewidth'), 'linewidth', 2)
+    sgtitle(sprintf('Figure 3. Tuning functions\n%s (L%d, ModelA%d %s, nIter=%d)', ...
+        subjName, iLocComb, iModelA, namesModelA{iModelA}, nIter))
 
-saveas(gcf, sprintf('%s/3TuningFxn_L%d_A%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA))
+    set(findall(gcf, '-property', 'fontsize'), 'fontsize', 12)
+    % set(findall(gcf, '-property', 'linewidth'), 'linewidth', 2)
+
+    saveas(gcf, sprintf('%s/3TuningFxn_L%d_A%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA))
+end
