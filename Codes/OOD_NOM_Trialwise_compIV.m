@@ -1,24 +1,8 @@
-function OOD_NOM_Trialwise_compIV(isubj, iLocComb, lambda_whiten, flag_regressType, iModelA, nIter, nJob, iJob)
+function OOD_NOM_Trialwise_compIV(nBasisORI, nBasisSF, isubj, iLocComb, lambda_whiten, flag_regressType, iModelA_fit, nIter, nJob, iJob)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % OOD_NOM_Trialwise_compIV.m
 %
 % Trial-wise noisy observer model – PRE-ESTIMATION STAGE
-%
-% This function:
-% 1. Splits trials into template, training and test sets (via fxn_resampleTrials).
-% 2. Estimates a template from the template set (using stim energy + resp).
-% 3. Computes behavioral metrics in the test set (these are the metrics the model will later try to match).
-% 4. Computes, normalizes, and bins empirical internal variables (IVs) for the test set.
-
-% The output is a .mat file containing, for each  iteration:
-% - data_allB{ii}: struct with IVs, binning info, responses, etc.
-% - data_metrics_allB(ii,:): behavioral metrics per  iteration
-% - kernel2D_allB(ii,:,:): 2D templates (ORI x SF) per  iteration
-%
-% Notes:
-% - This is the "before estimation" stage; model fits (iModelB) happen in
-% OOD_NOM_Trialwise_Est.m
-% - IVs are computed in fxn_getIV_v3, typically as template ⊙ energy.
 %
 % Created by Shutian Xue on August 27, 2025
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -46,6 +30,10 @@ addpath(genpath('SX_toolbox/bads-master'));
 SX_RC1_setting; % defines nameFolder_*, nORI, nSF, namesLocComb, namesModelA, etc.
 % --------------%
 
+nameFolder_Data = sprintf('%s/Data_Part2_nBasis%d%d_noMirror', nameFolder_server, nBasisORI, nBasisSF) ;
+nameFolder_Data_OOD = sprintf('%s/Data_OOD_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
+nameFolder_Data_NOM_Trialwise = sprintf('%s/Data_NOM_Trialwise_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
+
 %% -------------------- Deterministic RNG (grand seed + per-iteration substreams) -------------------- %%
 S_seed = GetGrandSeed(nIter, iJob, nJob, nameFolder_Data);
 
@@ -58,10 +46,15 @@ fprintf('%s: seed determined.\n\n', datetime('now'))
 %% -------------------- General parameters -------------------- %%
 
 IVType = 1; % 1=sum of the dot product/convolution; 2=max; 3=normalized
-templateType = 3; % (1) raw (2) reconstructed kernel (3) mirrored template
+templateType = 1; % (1) raw (2) reconstructed kernel (3) mirrored template
 itype_template = 2; % 1=estimate template from PRS trials, ABS trials, or BOTH trials
 flag_PatchMode = 1; % if flag_PatchMode == 1, patchMode = 'T'; else, patchMode = 'N'; end
 flag_plot_template = 0;
+
+ratio_split = [.6, .3, .1]; % proportion of trials in template set (for RC), training set (for estimating parameters) and test set (for metric predictions)
+ratio_split = [.8, .15, .05]; % proportion of trials in template set (for RC), training set (for estimating parameters) and test set (for metric predictions)
+assert(abs(sum(ratio_split)-1)<1e-10)
+ORI_bound = [5, 14]; % orientation window, passed to fxn_getIV_v3
 
 % whiten features
 eps_whiten = 1e-3;  % floor for eigenvalues
@@ -70,10 +63,12 @@ eps_whiten = 1e-3;  % floor for eigenvalues
 % 1=Univariate; 2=MultiSmooth and Univariate
 if flag_regressType == 2
     opts = struct();
+    candidateORI = 2:9;
+    candidateSF = 2:9;
     opts.link = 'probit';
-    opts.nBasisORI = 5;
-    opts.nBasisSF = 5;
-    opts.ridge = 1e-6;
+    opts.nBasisORI = nBasisORI;
+    opts.nBasisSF = nBasisSF;
+    opts.ridge = 1e-3;
     opts.verbose = true;
     opts.sigmaORI_deg = [];
     opts.sigmaSF_log2 = [];
@@ -96,10 +91,6 @@ convolveType = 1; % IV from 1=cross-correlation; 2=convolution (fxn_getIV_v3)
 flag_standEnergy = 1; % 1=z-score energy before RC
 flag_plot_compIV = 1; % plot IV distributions and kernels at the end
 if strcmp(str_envir,'HPC'), flag_plot_compIV = 0; end % don't plot when running on HPC
-
-% ratio_train = 3/4; % proportion of trials in training set (for RC)
-ratio_split = [.6, .3, .1]; % proportion of trials in template set (for RC), training set (for estimating parameters) and test set (for metric predictions)
-ORI_bound = [5, 14]; % orientation window, passed to fxn_getIV_v3
 
 if flag_PatchMode == 1
     namePatchMode = 'T'; % target patch
@@ -165,7 +156,7 @@ end
 % fprintf('\nBehav and energy LOADED\n\n');
 
 % Output file name (before estimation)
-nameFile_compIV = sprintf('%s/n%d_J%d_A%d_compIV', nameFolder_NOM_save, nIter, iJob, iModelA);
+nameFile_compIV = sprintf('%s/n%d_J%d_A%d_compIV', nameFolder_NOM_save, nIter, iJob, iModelA_fit);
 
 %% Print run info
 fprintf(['\nSubject/IO name: %s ' ...
@@ -180,7 +171,7 @@ fprintf(['\nSubject/IO name: %s ' ...
     '\n - IV type: %s\n\n'], ...
     subjName, ...
     iLocComb, namesLocComb{iLocComb}, ...
-    iModelA, namesModelA{iModelA}, ...
+    iModelA_fit, namesModelA{iModelA_fit}, ...
     nIter, ...
     nblocks, nORI, nSF, ...
     namesType{itype_template}, flag_PatchMode, ...
@@ -189,12 +180,8 @@ fprintf(['\nSubject/IO name: %s ' ...
 %% -------------------- Choose energy source for NOM -------------------- %%
 switch flag_PatchMode
     case 1 % target patch energy
-        % e3D_allT_train = e3D_target_allT;
-        % e3D_allT_test = e3D_target_allT;
         e3D_allT = e3D_target_allT;
     case 2 % noise patch energy
-        % e3D_allT_train = e3D_noise_allT;
-        % e3D_allT_test = e3D_noise_allT;
         e3D_allT = e3D_noise_allT;
     otherwise
         error('flag_PatchMode must be 1 (target) or 2 (noise).');
@@ -202,12 +189,12 @@ end
 
 %% -------------------- Sanity check: iPRS consistent within pairs -------------------- %%
 % Col#1 = itrial_allT; Col#6 = iPRS; Col#8 = iPair;
-for ipair = 1:max(dataMatrix(:, 8))
-    iIter = find(dataMatrix(:, 8) == ipair);
+for iPair = 1:max(dataMatrix(:, 8))
+    iIter = find(dataMatrix(:, 8) == iPair);
     iPRS_A = dataMatrix(dataMatrix(:, 1) == iIter(1), 6);
     iPRS_B = dataMatrix(dataMatrix(:, 1) == iIter(2), 6);
     if iPRS_A ~= iPRS_B
-        fprintf('WARNING: when ipair=%d, iPRS_A=%d, iPRS_B=%d\n', ipair, iPRS_A, iPRS_B);
+        fprintf('WARNING: when ipair=%d, iPRS_A=%d, iPRS_B=%d\n', iPair, iPRS_A, iPRS_B);
     end
 end
 
@@ -244,7 +231,7 @@ fprintf('%s: sessions selected.\n\n', datetime('now'))
 %% -------------------- Ideal template -------------------- %%
 
 % For human observers, we still use this "ideal" Gabor-energy template when
-% iModelA == 3 (IO template). Otherwise, templates are derived from RC.
+% iModelA_sim == 3 (IO template). Otherwise, templates are derived from RC.
 
 % Precompute non-random pools
 e3D_nonrand = [];
@@ -290,6 +277,8 @@ data_train_allIter = cell(nIter, 1);
 data_test_allIter = data_train_allIter;
 template_tmpl_allIter = nan(nIter, nORI, nSF);
 template_full_allIter = template_tmpl_allIter;
+nBasisORI_tmpl_allIter = nan(nIter, 1);
+nBasisSF_tmpl_allIter = nan(nIter, 1);
 
 sep_allIter = nan(nIter, 2); % 1=template set, 2=full set
 margORI_allIter = nan(nIter, 2, nORI);
@@ -385,48 +374,47 @@ for iIter = 1:nIter
     % 2. Choose covariance-handling strategy
     % -------------------------------------------------------------------------
     if isnan(lambda_whiten)
-        % =====================================================================
-        % Way 2: estimate template in ORIGINAL feature space,
-        %        then apply inverse-covariance correction to the recovered template
-        % =====================================================================
-
-        % Optional: no shrinkage in inverse-covariance mode
-        Sigma_tmpl_use = Sigma_tmpl;
-        Sigma_full_use = Sigma_full;
-
-        % --- TEMPLATE set inverse-covariance correction matrix ---
-        [V_tmpl, D_tmpl] = eig((Sigma_tmpl_use + Sigma_tmpl_use') / 2);
-        d_tmpl = diag(D_tmpl);
-        d_tmpl(d_tmpl < eps_whiten) = eps_whiten;
-        W_inv_tmpl = V_tmpl * diag(1 ./ d_tmpl) * V_tmpl';
-
-        % --- FULL set inverse-covariance correction matrix ---
-        [V_full, D_full] = eig((Sigma_full_use + Sigma_full_use') / 2);
-        d_full = diag(D_full);
-        d_full(d_full < eps_whiten) = eps_whiten;
-        W_inv_full = V_full * diag(1 ./ d_full) * V_full';
-
-        % Keep original features unchanged
-        e3D_tmpl_use = e3D_tmpl_rand_norm;
-        e3D_full_use = e3D_full_rand_norm;
-
-        % Estimate template in original feature space
-        switch flag_regressType
-            case 1  % Univariate
-                template_tmpl_raw = SX_sim07_RC(e3D_tmpl_use, resp_tmpl_rand_sel);
-                template_full_raw = SX_sim07_RC(e3D_full_use, resp_full_rand_sel);
-
-            case 2  % Multivariate + smoothing
-                out = SX_RC_smoothBasis_circORI_logSF(e3D_tmpl_use, resp_tmpl_rand_sel, axis_tuning{1}, axis_tuning{2}, opts);
-                template_tmpl_raw = out.template2D;
-
-                out = SX_RC_smoothBasis_circORI_logSF(e3D_full_use, resp_full_rand_sel, axis_tuning{1}, axis_tuning{2}, opts);
-                template_full_raw = out.template2D;
-        end
-
-        % Apply inverse-covariance correction using each dataset's own covariance
-        template_tmpl_raw = invcov_kernel(template_tmpl_raw, W_inv_tmpl, nORI, nSF);
-        template_full_raw = invcov_kernel(template_full_raw, W_inv_full, nORI, nSF);
+        % % =====================================================================
+        % % Way 2: estimate template in ORIGINAL feature space,
+        % %        then apply inverse-covariance correction to the recovered template
+        % % =====================================================================
+        % % Optional: no shrinkage in inverse-covariance mode
+        % Sigma_tmpl_use = Sigma_tmpl;
+        % Sigma_full_use = Sigma_full;
+        % 
+        % % --- TEMPLATE set inverse-covariance correction matrix ---
+        % [V_tmpl, D_tmpl] = eig((Sigma_tmpl_use + Sigma_tmpl_use') / 2);
+        % d_tmpl = diag(D_tmpl);
+        % d_tmpl(d_tmpl < eps_whiten) = eps_whiten;
+        % W_inv_tmpl = V_tmpl * diag(1 ./ d_tmpl) * V_tmpl';
+        % 
+        % % --- FULL set inverse-covariance correction matrix ---
+        % [V_full, D_full] = eig((Sigma_full_use + Sigma_full_use') / 2);
+        % d_full = diag(D_full);
+        % d_full(d_full < eps_whiten) = eps_whiten;
+        % W_inv_full = V_full * diag(1 ./ d_full) * V_full';
+        % 
+        % % Keep original features unchanged
+        % e3D_tmpl_use = e3D_tmpl_rand_norm;
+        % e3D_full_use = e3D_full_rand_norm;
+        % 
+        % % Estimate template in original feature space
+        % switch flag_regressType
+        %     case 1  % Univariate
+        %         template_tmpl_raw = SX_sim07_RC(e3D_tmpl_use, resp_tmpl_rand_sel);
+        %         template_full_raw = SX_sim07_RC(e3D_full_use, resp_full_rand_sel);
+        % 
+        %     case 2  % Multivariate + smoothing
+        %         out = SX_RC_smoothBasis_circORI_logSF(e3D_tmpl_use, resp_tmpl_rand_sel, axis_tuning{1}, axis_tuning{2}, opts);
+        %         template_tmpl_raw = out.template2D;
+        % 
+        %         out = SX_RC_smoothBasis_circORI_logSF(e3D_full_use, resp_full_rand_sel, axis_tuning{1}, axis_tuning{2}, opts);
+        %         template_full_raw = out.template2D;
+        % end
+        % 
+        % % Apply inverse-covariance correction using each dataset's own covariance
+        % template_tmpl_raw = invcov_kernel(template_tmpl_raw, W_inv_tmpl, nORI, nSF);
+        % template_full_raw = invcov_kernel(template_full_raw, W_inv_full, nORI, nSF);
 
     else
         % =====================================================================
@@ -434,11 +422,8 @@ for iIter = 1:nIter
         % =====================================================================
 
         % Shrink covariance toward scaled identity
-        Sigma_shrink_tmpl = (1 - lambda_whiten) * Sigma_tmpl + ...
-            lambda_whiten * mean(diag(Sigma_tmpl)) * eye(size(Sigma_tmpl, 1));
-
-        Sigma_shrink_full = (1 - lambda_whiten) * Sigma_full + ...
-            lambda_whiten * mean(diag(Sigma_full)) * eye(size(Sigma_full, 1));
+        Sigma_shrink_tmpl = (1 - lambda_whiten) * Sigma_tmpl + lambda_whiten * mean(diag(Sigma_tmpl)) * eye(size(Sigma_tmpl, 1));
+        Sigma_shrink_full = (1 - lambda_whiten) * Sigma_full + lambda_whiten * mean(diag(Sigma_full)) * eye(size(Sigma_full, 1));
 
         % lambda_whiten = 0 --> use the full empirical covariance
         % lambda_whiten = 1 --> use a scaled identity covariance (ignore channel correlations)
@@ -466,19 +451,26 @@ for iIter = 1:nIter
                 template_full_raw = SX_sim07_RC(e3D_full_use, resp_full_rand_sel);
 
             case 2  % Multivariate + smoothing
-                out = SX_RC_smoothBasis_circORI_logSF(e3D_tmpl_use, resp_tmpl_rand_sel, axis_tuning{1}, axis_tuning{2}, opts);
+                % out = SX_RC_smoothBasis_circORI_logSF(e3D_tmpl_use, resp_tmpl_rand_sel, axis_tuning{1}, axis_tuning{2}, opts);
+                out = SX_RC_selectBasis_cv(e3D_tmpl_use, resp_tmpl_rand_sel, axis_tuning{1}, axis_tuning{2}, candidateORI, candidateSF, opts);
                 template_tmpl_raw = out.template2D;
+                nBasisORI_tmpl = out.nBasisORI;
+                nBasisSF_tmpl = out.nBasisSF;
 
-                out = SX_RC_smoothBasis_circORI_logSF(e3D_full_use, resp_full_rand_sel, axis_tuning{1}, axis_tuning{2}, opts);
+                % out = SX_RC_smoothBasis_circORI_logSF(e3D_full_use, resp_full_rand_sel, axis_tuning{1}, axis_tuning{2}, opts);
+                out = SX_RC_selectBasis_cv(e3D_full_use, resp_full_rand_sel, axis_tuning{1}, axis_tuning{2}, candidateORI, candidateSF, opts);
                 template_full_raw = out.template2D;
-        end
+                nBasisORI_full = out.nBasisORI;
+                nBasisSF_full= out.nBasisSF;
+
+        end % switch
 
         % No back-transformation here:
         % template_tmpl_raw and template_full_raw now live in their respective
         % whitened feature spaces and should stay there for subsequent DV computation.
-    end
+    end % isnan()
 
-    %% Regularize the derived template
+    %% Regularize the derived template 
     template_full = fxn_getTemplate(template_full_raw, templateType, flag_plot_template);
     template_tmpl = fxn_getTemplate(template_tmpl_raw, templateType, flag_plot_template);
 
@@ -503,26 +495,31 @@ for iIter = 1:nIter
     end
 
     %% 4. Marginalization and fit tuning functions
+    template_notNormed_tmpl = template_tmpl;
+    template_notNormed_full = template_full;
+
     for iDataset = 1:2
         switch iDataset
             case 1
-                template_InUse = template_tmpl;
+                template_notNormed = template_notNormed_tmpl;
             case 2
-                template_InUse = template_full;
+                template_notNormed = template_notNormed_full;
         end
 
         % Calculate separability
         templateType_recon = 2; % 2=reconstructed template
         %--------------------------------------------%
-        template_recon = fxn_getTemplate(template_InUse, templateType_recon, flag_plot_template);
+        template_recon = fxn_getTemplate(template_notNormed, templateType_recon, flag_plot_template);
         %--------------------------------------------%
-        sep = corr(template_InUse(:), template_recon(:));
+        sep = corr(template_notNormed(:), template_recon(:));
 
         % Marginalize the template into 1D ORI and SF profiles
-        margORI = mean(template_InUse, 2)';
-        margSF = mean(template_InUse, 1);
+        margORI = mean(template_notNormed, 2)';
+        margSF = mean(template_notNormed, 1);
 
         % Fitting
+        if any(isnan(margORI)), error('ALERT: NaN in margORI!'), end
+
         xORI = axis_tuning{1};
         fxn_tuningLoss_ORI = @(param_est) sum((margORI - predSFkernel(xORI, iFamily_ORI, param_est, flag_plot_tuning)).^2);
         problem_ORI = createOptimProblem('fmincon','objective', fxn_tuningLoss_ORI,'x0', (ub_full_all{iFamily_ORI}+lb_full_all{iFamily_ORI})/2,'lb',lb_full_all{iFamily_ORI},'ub',ub_full_all{iFamily_ORI},'options',options_fmin);
@@ -575,19 +572,25 @@ for iIter = 1:nIter
 
     %% 6. Compute decision variable (DV) from template and energy (TEST set)
     % 5.1 Derive template
-    if iModelA == 1 % Use RC-derived template
-    else % Use the ideal template (Gabor energy profile)
+    if iModelA_fit == 1 % Use RC-derived template
+    else % Use the true template (Gabor energy profile)
         if ~isnumeric(isubj) % for IO, you may reload 'template_true' from disk
-            load(sprintf('%s/truth.mat', nameFolder_OOD_load), 'template_ideal');
+            load(sprintf('%s/truth.mat', nameFolder_OOD_load), 'template_true');
+            template_notNormed = template_true;
+        else
+            template_notNormed = template_ideal;
         end
-        template_tmpl = template_ideal;
+        
     end
     flag_permT=0;
 
     % 5.2 Compute IV for training and test trials
+    % L2-Norm the template before calculating DV so that they are
+    % comparable to the simulated DV
+    template_normed = template_notNormed / norm(template_notNormed(:));
     %---------------%
-    DV_train = fxn_getIV_v3(e3D_train_rand, template_tmpl, convolveType, IVType, flag_permT, ORI_bound);
-    DV_test = fxn_getIV_v3(e3D_test_rand, template_tmpl, convolveType, IVType, flag_permT, ORI_bound);
+    DV_train = fxn_getIV_v3(e3D_train_rand, template_notNormed, convolveType, IVType, flag_permT, ORI_bound);
+    DV_test = fxn_getIV_v3(e3D_test_rand, template_notNormed, convolveType, IVType, flag_permT, ORI_bound);
     %---------------%
     nData_train = length(DV_train);
     nData_test = length(DV_test);
@@ -651,8 +654,14 @@ for iIter = 1:nIter
     data_metrics_allIter(iIter, :, :) = metrics;
 
     % Store templates
-    template_tmpl_allIter(iIter, :, :) = template_tmpl;
-    template_full_allIter(iIter, :, :) = template_full;
+    if iModelA_fit==2
+        template_notNormed_tmpl = template_notNormed;
+        template_notNormed_full = template_notNormed;
+    end
+    template_tmpl_allIter(iIter, :, :) = template_notNormed_tmpl;
+    template_full_allIter(iIter, :, :) = template_notNormed_full;
+    nBasisORI_tmpl_allIter(iIter, :) = nBasisORI_tmpl;
+    nBasisSF_tmpl_allIter(iIter, :) = nBasisSF_tmpl;
 
     %% Save a progress report in the folder to indicate the finished iteration and time spent
     time_progress = datetime('now');
@@ -666,7 +675,7 @@ for iIter = 1:nIter
 
 end % end for iIter
 
-% fprintf('\n\n[L%d ModelA%d] ALL  iterations DONE\n', iLocComb, iModelA);
+% fprintf('\n\n[L%d ModelA%d] ALL  iterations DONE\n', iLocComb, iModelA_sim);
 
 fprintf('\n\n%s: All iterations done.\n\n', datetime('now'))
 
@@ -682,7 +691,9 @@ fprintf('\n\n%s: Outputs saved.\n\n', datetime('now'))
 
 %% -------------------- Plot (optional) -------------------- %%
 if flag_plot_compIV
+    %-------------------%
     NOMplot_compIV;
+    %-------------------%
     fprintf('\n\n%s: Plots created.\n\n', datetime('now'))
 end
 close all;

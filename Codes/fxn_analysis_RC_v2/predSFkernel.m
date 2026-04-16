@@ -6,9 +6,13 @@ SX_normPDF = @(x,mu,sigma) exp(-((x-mu)/sigma).^2);
 switch iFamily
     case 1 % gaussian
         gain = params(1);
-        width = params(2);
+        width_deg = params(2);
         base = params(3);
-        y = gain * SX_normPDF(x, 0, width) + base;
+        y = gain * SX_normPDF(x, 0, width_deg) + base;
+
+        % periodDeg = 180;
+        % d = mod(x + periodDeg/2, periodDeg) - periodDeg/2;
+        % y = gain * exp(-0.5 * (d ./ width_deg).^2) + base;
 
     case 2 % log parabola
         peakSF = params(1);

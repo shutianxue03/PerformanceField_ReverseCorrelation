@@ -3,6 +3,9 @@ function [IV, max_allT] = fxn_getIV_v3(e3D, template_input, convolveType, IVType
 
 flag_plotMax=0;
 
+% Normalize template (Unit L2-norm)
+template_input = template_input / norm(template_input(:));
+
 if ndims(e3D)==3
     [nTrials, nORI, nSF] = size(e3D);
     IV = nan(nTrials, 1);

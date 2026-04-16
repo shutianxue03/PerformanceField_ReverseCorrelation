@@ -1,9 +1,10 @@
-Data/
-Data_Part1/
+Data*/
 Figures/
 
 *.mat
 *.fig
+*.png
+*.jpg
 *.edf
 *.asv
 *~

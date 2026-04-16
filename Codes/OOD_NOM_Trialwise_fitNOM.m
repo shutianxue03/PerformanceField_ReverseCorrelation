@@ -1,4 +1,4 @@
-function OOD_NOM_Trialwise_fitNOM(isubj, iLocComb, flag_incluCrit, C_contribution, iModelA, iModelB, nIter, nJob, iJob)
+function OOD_NOM_Trialwise_fitNOM(nBasisORI, nBasisSF, isubj, iLocComb, flag_incluCrit, C_contribution, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
 %==========================================================================%
 % OOD_NOM_Trialwise_fitNOM.m
 %--------------------------------------------------------------------------
@@ -42,8 +42,13 @@ addpath(genpath('SX_toolbox/bads-master'));
 %--------------%
 SX_RC1_setting; % defines nORI, nSF, namesLocComb, namesModelA, namesModelB, nBins, etc.
 %--------------%
+nameFolder_Data = sprintf('%s/Data_Part2_nBasis%d%d_noMirror', nameFolder_server, nBasisORI, nBasisSF) ;
+nameFolder_Data_OOD = sprintf('%s/Data_OOD_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
+nameFolder_Data_NOM_Trialwise = sprintf('%s/Data_NOM_Trialwise_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
+
+
 flag_fittingStep = 1; % one vs. two step fitting (one step is more standard)
-flag_fminconORbads = 1; % 1 = use fmincon (faster, local); 2 = use BADS (slower, more robust)
+flag_fminconORbads = 2; % 1 = use fmincon (faster, local); 2 = use BADS (slower, more robust)
 flag_plot_allIter = 1; % 1 = make summary plots across iterations
 flag_plot_perIter = 0; % 1 = plot per-iteration fits (can be slow)
 if strcmp('HPC', str_envir), flag_plot_allIter = 0; end % don't plot when running on HPC
@@ -88,8 +93,8 @@ if isempty(dir(nameFolder_Figures_perSubj))
     mkdir(nameFolder_Figures_perSubj);
 end
 % File names:
-nameFile_compIV = sprintf('%s/n%d_J%d_A%d_compIV', nameFolder_NOM_save, nIter, iJob, iModelA);
-nameFile_fitNOM = sprintf('%s/n%d_J%d_A%dB%d', nameFolder_NOM_save, nIter, iJob, iModelA, iModelB);
+nameFile_compIV = sprintf('%s/n%d_J%d_A%d_compIV', nameFolder_NOM_save, nIter, iJob, iModelA_fit);
+nameFile_fitNOM = sprintf('%s/n%d_J%d_A%dB%d', nameFolder_NOM_save, nIter, iJob, iModelA_fit, iModelB_fit);
 
 %% Print header
 fprintf(['\nSubject/IO name: %s ' ...
@@ -99,8 +104,8 @@ fprintf(['\nSubject/IO name: %s ' ...
     '\n - Number of iterations = %d\n\n'], ...
     subjName, ...
     iLocComb, namesLocComb{iLocComb}, ...
-    iModelA, namesModelA{iModelA}, ...
-    iModelB, namesModelB{iModelB}, ...
+    iModelA_fit, namesModelA{iModelA_fit}, ...
+    iModelB_fit, namesModelB{iModelB_fit}, ...
     nIter);
 
 %% Load trial-wise data and criterion from xx_compIV.mat file
@@ -112,7 +117,7 @@ criterion_z = criterion_z_train; % even when predicting using the test set, I sh
 %% Parameter vectors per Model B
 switch flag_incluCrit
     case 0
-        switch iModelB
+        switch iModelB_fit
             case 1  % FullModel: multi. + additive + shared
                 params0   = [NOMp1_0,   NOMp2_0,   NOMp3_0];
                 params_lb = [NOMp1_lb, NOMp2_lb, NOMp3_lb];
@@ -134,7 +139,7 @@ switch flag_incluCrit
                 params_ub = [NOMp1_ub, NOMp3_ub];
 
             otherwise
-                error('OOD_NOM_Trialwise_fitNOM: Unknown iModelB = %d', iModelB);
+                error('OOD_NOM_Trialwise_fitNOM: Unknown iModelB_fit = %d', iModelB_fit);
         end
     
     case 1
@@ -142,7 +147,7 @@ switch flag_incluCrit
         NOMc_lb = min(data_train_allIter{1}.IV);
         NOMc_ub = max(data_train_allIter{1}.IV);
         NOMc_0 = mean([NOMc_lb, NOMc_ub]);
-        switch iModelB
+        switch iModelB_fit
             case 1  % FullModel: multi. + additive + shared, criterion
                 params0   = [NOMp1_0,   NOMp2_0,   NOMp3_0, NOMc_0];
                 params_lb = [NOMp1_lb, NOMp2_lb, NOMp3_lb, NOMc_lb];
@@ -179,13 +184,13 @@ switch flag_incluCrit
                 params_ub = [NOMp3_ub, NOMc_ub];
 
             otherwise
-                error('OOD_NOM_Trialwise_fitNOM: Unknown iModelB = %d', iModelB);
+                error('OOD_NOM_Trialwise_fitNOM: Unknown iModelB_fit = %d', iModelB_fit);
         end
 
 end
 
 %% Preallocate outputs
-nParams = length(namesModelBparams{iModelB});
+nParams = length(namesModelBparams{iModelB_fit});
 params_est_allIter = nan(nIter, nParams);
 nLL_train_allIter = nan(nIter, 1);
 nLL_test_allIter = nLL_train_allIter;
@@ -215,11 +220,11 @@ for iIter = 1:nIter
             switch flag_incluCrit
                 case 0
                     %------------------------------%
-                    fxn_estParams = @(paramsNOM) fxn_getError_v7(iModelB, paramsNOM, data_train, criterion_z, iStep); % the full model has multi., additive noise (shared and additive across passes)
+                    fxn_estParams = @(paramsNOM) fxn_getError_v7(iModelB_fit, paramsNOM, data_train, criterion_z, iStep); % the full model has multi., additive noise (shared and additive across passes)
                     %------------------------------%
                 case 1
                     %------------------------------%
-                    fxn_estParams = @(paramsNOM) fxn_getError_v8(iModelB, paramsNOM, data_train, criterion_z, C_contribution, iStep); % the full model has multi., additive noise (shared and additive across passes)
+                    fxn_estParams = @(paramsNOM) fxn_getError_v8(iModelB_fit, paramsNOM, data_train, C_contribution, iStep); % the full model has multi., additive noise (shared and additive across passes)
                     %------------------------------%
             end
 
@@ -231,32 +236,34 @@ for iIter = 1:nIter
             end
 
         case 2 % Two-stage fitting: stabilize models that include a shared component across two passes
-            if any(iModelB == [1,3,4,7])
+            if any(iModelB_fit == [1,3,4,7])
 
-                % ==== Step 1: fit the “base” noise terms (excluding the shared term) ====
+                % ==== Step 1: fit the "base" noise terms (excluding the shared term) ====
                 iStep = 1;
                 switch flag_incluCrit
                     case 0
                         %------------------------------%
-                        fxn_estParams = @(paramsNOM) fxn_getError_v7(iModelB, paramsNOM, data_train, criterion_z, iStep); 
+                        fxn_estParams = @(paramsNOM) fxn_getError_v7(iModelB_fit, paramsNOM, data_train, criterion_z, iStep); 
                         %------------------------------%
                     case 1
                         %------------------------------%
-                        fxn_estParams = @(paramsNOM) fxn_getError_v8(iModelB, paramsNOM, data_train, criterion_z, C_contribution, iStep); 
+                        fxn_estParams = @(paramsNOM) fxn_getError_v8(iModelB_fit, paramsNOM, data_train, C_contribution, iStep); 
                         %------------------------------%
                 end
 
                 % Index the parameters to be included in step 1 (calculating nLL for detection prob.)
                 switch flag_incluCrit
                     case 0
-                        switch iModelB
+                        switch iModelB_fit
                             case 1, indStep1=1:2;
+                            case 2, indStep1=1;
                             case 3, indStep1=1;
                             case 4, indStep1=1;
                         end
                     case 1
-                        switch iModelB
+                        switch iModelB_fit
                             case 1, indStep1=[1,2,4];
+                            case 2, indStep1=[1,3]; % No Nshared; Nmul, Nadd, criterion
                             case 3, indStep1=[1,3]; % No Nmul; Nadd, Nshared, criterion
                             case 4, indStep1=[1,3]; % No Nadd; Nmul, Nshared, criterion
                         end
@@ -279,25 +286,26 @@ for iIter = 1:nIter
                 switch flag_incluCrit
                     case 0
                         %------------------------------%
-                        fxn_estParams = @(paramsNOM) fxn_getError_v7(iModelB, paramsNOM, data_train, criterion_z, iStep, params_est_fromStep1); % the full model has multi., additive noise (shared and additive across passes)
+                        fxn_estParams = @(paramsNOM) fxn_getError_v7(iModelB_fit, paramsNOM, data_train, criterion_z, iStep, params_est_fromStep1); % the full model has multi., additive noise (shared and additive across passes)
                         %------------------------------%
                     case 1
                         %------------------------------%
-                        fxn_estParams = @(paramsNOM) fxn_getError_v8(iModelB, paramsNOM, data_train, criterion_z, C_contribution, iStep, params_est_fromStep1); % the full model has multi., additive noise (shared and additive across passes)
+                        fxn_estParams = @(paramsNOM) fxn_getError_v8(iModelB_fit, paramsNOM, data_train, C_contribution, iStep, params_est_fromStep1); % the full model has multi., additive noise (shared and additive across passes)
                         %------------------------------%
                 end
 
                 % Index the parameters to be included in step 2 (calculating nLL for detection prob.)
                 switch flag_incluCrit
                     case 0
-                        switch iModelB
+                        switch iModelB_fit
                             case 1, indStep2=3;
                             case 3, indStep2=xx;
                             case 4, indStep2=xx;
                         end
                     case 1
-                        switch iModelB
+                        switch iModelB_fit
                             case 1, indStep2=3;
+                            case 2, indStep2=2;
                             case 3, indStep2=2;
                             case 4, indStep2=2;
                         end
@@ -320,8 +328,9 @@ for iIter = 1:nIter
                     case 0
                         params_est = [params_est_fromStep1([1,2]), params_est_step2];
                     case 1
-                        switch iModelB
+                        switch iModelB_fit
                             case 1, params_est = [params_est_fromStep1([1,2]), params_est_step2, params_est_fromStep1(3)];
+                            case 2, params_est = [params_est_fromStep1(1), params_est_step2, params_est_fromStep1(2)];
                             case 3, params_est = [params_est_fromStep1(1), params_est_step2, params_est_fromStep1(2)];
                             case 4, params_est = [params_est_fromStep1(1), params_est_step2, params_est_fromStep1(2)];
                         end
@@ -333,11 +342,11 @@ for iIter = 1:nIter
                 switch flag_incluCrit
                     case 0
                         %------------------------------%
-                        fxn_estParams = @(paramsNOM) fxn_getError_v7(iModelB, paramsNOM, data_train, criterion_z, iStep); % the full model has multi., additive noise (shared and additive across passes)
+                        fxn_estParams = @(paramsNOM) fxn_getError_v7(iModelB_fit, paramsNOM, data_train, criterion_z, iStep); % the full model has multi., additive noise (shared and additive across passes)
                         %------------------------------%
                     case 1
                         %------------------------------%
-                        fxn_estParams = @(paramsNOM) fxn_getError_v8(iModelB, paramsNOM, data_train, criterion_z, C_contribution, iStep); % the full model has multi., additive noise (shared and additive across passes)
+                        fxn_estParams = @(paramsNOM) fxn_getError_v8(iModelB_fit, paramsNOM, data_train, C_contribution, iStep); % the full model has multi., additive noise (shared and additive across passes)
                         %------------------------------%
                 end
                 % Estimate parameters
@@ -355,32 +364,32 @@ for iIter = 1:nIter
     switch flag_incluCrit
         case 0
             %------------------------------%
-            % pred_train = PR_pred_v7(iModelB, params_est, data_train, criterion_z, nBins, flag_plot_perIter);
+            % pred_train = PR_pred_v7(iModelB_fit, params_est, data_train, criterion_z, nBins, flag_plot_perIter);
             %------------------------------%
 
             % Calculate nLL for the test set
             %------------------------------%
-            nLL_test = fxn_getError_v7(iModelB, params_est, data_test, criterion_z, iStep);
+            nLL_test = fxn_getError_v7(iModelB_fit, params_est, data_test, criterion_z, iStep);
             %------------------------------%
 
             % Predict binned metrics from estimated parameters
             %------------------------------%
-            pred_test = PR_pred_v7(iModelB, params_est, data_test, criterion_z, nBins, flag_plot_perIter);
+            pred_test = PR_pred_v7(iModelB_fit, params_est, data_test, criterion_z, nBins, flag_plot_perIter);
             %------------------------------%
 
         case 1
             %------------------------------%
-            % pred_train = PR_pred_v8(iModelB, params_est, data_train, nBins, flag_plot_perIter);
+            % pred_train = PR_pred_v8(iModelB_fit, params_est, data_train, nBins, flag_plot_perIter);
             %------------------------------%
 
             % Calculate nLL for the test set
             %------------------------------%
-            nLL_test = fxn_getError_v8(iModelB, params_est, data_test, criterion_z, C_contribution, iStep);
+            nLL_test = fxn_getError_v8(iModelB_fit, params_est, data_test, C_contribution, iStep);
             %------------------------------%
 
             % Predict binned metrics from estimated parameters
             %------------------------------%
-            pred_test = PR_pred_v8(iModelB, params_est, data_test, nBins, flag_plot_perIter);
+            pred_test = PR_pred_v8(iModelB_fit, params_est, data_test, nBins, flag_plot_perIter);
             %------------------------------%
     end
     
@@ -415,7 +424,9 @@ fprintf('%s: Outputs saved.\n\n', datetime('now'))
 
 %% Plot
 if flag_plot_allIter
+    %-------------------%
     NOMplot_fitNOM;
+    %-------------------%
     fprintf('\n\n%s: Plots created.\n\n', datetime('now'))
 end
 close all;

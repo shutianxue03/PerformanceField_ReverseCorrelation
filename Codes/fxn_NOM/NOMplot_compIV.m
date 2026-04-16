@@ -74,8 +74,8 @@ set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
 set(findall(gcf, '-property', 'linewidth'), 'linewidth', 2)
 
 sgtitle(sprintf('Figure 1. Measured metrics (Ave across %d iterations +- 68%% CI)\n%s (Loc%d ModelA%d %s)', ...
-    nIter, subjName, iLocComb, iModelA, namesModelA{iModelA}))
-saveas(gcf, sprintf('%s/1MetricMeasured_L%d_A%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA))
+    nIter, subjName, iLocComb, iModelA_fit, namesModelA{iModelA_fit}))
+saveas(gcf, sprintf('%s/1MetricMeasured_L%d_A%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit))
 
 %% Figure 2: 2D Kernel
 template_tmpl_ave = squeeze(mean(template_tmpl_allIter, 1));
@@ -140,8 +140,6 @@ xticks(axisTicks_tuning{2}), xticklabels(axisTL_tuning{2})
 yticks(axisTicks_tuning{1}), yticklabels(axisTL_tuning{1})
 title('Difference with the true template')
 
-set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
-set(findall(gcf, '-property', 'linewidth'), 'linewidth',2)
 
 % Calculate Pearson's corr
 r_allIter = nan(nIter, 1);
@@ -157,13 +155,20 @@ end
 [r_med, ~, ~, r_SEM] = getCI(r_allIter, 1, 1);
 [p_med, ~, ~, p_SEM] = getCI(p_allIter, 1, 1);
 
-sgtitle(sprintf('Figure 2. Recovered template\n%s (L%d, ModelA%d %s, nIter=%d)\nAveraged Pearson''s corr: r=%.2f (%.2f), p=%.3f (%.2f)', ...
-    subjName, iLocComb, iModelA, namesModelA{iModelA}, nIter, r_med, r_SEM, p_med, p_SEM))
+sgtitle(sprintf('Figure 2. Recovered template\n%s\nL%d | ModelA%d [%s-derived] | nIter=%d | nBasisORI=%d (chosen %.0f%% iter.) | nBasisSF=%d (chosen %.0f%% iter.)\nMedian Pearson''s corr: r=%.2f (%.2f), p=%.3f (%.3f)', ...
+    subjName, iLocComb, iModelA_fit, namesModelA{iModelA_fit}, nIter, ...
+    mode(nBasisORI_tmpl_allIter), mean(nBasisORI_tmpl_allIter == mode(nBasisORI_tmpl_allIter))*100, ...
+    mode(nBasisSF_tmpl_allIter), mean(nBasisSF_tmpl_allIter == mode(nBasisSF_tmpl_allIter))*100, ...
+    r_med, r_SEM, p_med, p_SEM))
 
-saveas(gcf, sprintf('%s/2Template_L%d_A%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA))
+
+set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
+set(findall(gcf, '-property', 'linewidth'), 'linewidth',2)
+
+saveas(gcf, sprintf('%s/2Template_L%d_A%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit))
 
 %% Figure 3. Plot marg and margPred, print R2 and params in the title
-if iModelA==1 % data-derived template
+if iModelA_fit==1 % data-derived template
     [margORI_med, ~, ~, margORI_sem] = getCI(margORI_allIter, 1, 1);
     [margSF_med, ~, ~, margSF_sem] = getCI(margSF_allIter, 1, 1);
 
@@ -180,6 +185,7 @@ if iModelA==1 % data-derived template
     margIO_ORI = mean(template_ideal, 2);
     margIO_ORI_norm_training = margIO_ORI/max(margIO_ORI(:))*max(margORI_med(1, :));
     margIO_ORI_norm_full = margIO_ORI/max(margIO_ORI(:))*max(margORI_med(2, :));
+
     margIO_SF = mean(template_ideal, 1);
     margIO_SF_norm_training = margIO_SF/max(margIO_SF(:))*max(margSF_med(1, :));
     margIO_SF_norm_full = margIO_SF/max(margIO_SF(:))*max(margSF_med(2, :));
@@ -187,54 +193,58 @@ if iModelA==1 % data-derived template
     figure('Position', [0 0 1e3 1e3])
     % ORI tuning (training set)
     subplot(2,2,1); hold on;
-    plot(xORI, margORI_med(1, :), 'ko-', 'MarkerFaceColor', 'w');
-    plot(xORI, margPred_ORI_med(1, :), 'k-', 'LineWidth', 2);
-    plot(xORI, margIO_ORI_norm_training, 'r-', 'LineWidth', 2); % ideal template
+    plot(xORI, margORI_med(1, :)/max(margORI_med(1, :)), 'ko-', 'MarkerFaceColor', 'w');
+    plot(xORI, margPred_ORI_med(1, :)/max(margPred_ORI_med(1, :)), 'k-', 'LineWidth', 2);
+    plot(xORI, margIO_ORI_norm_training/max(margIO_ORI_norm_training), 'r-', 'LineWidth', 2); % ideal template
     xline(0, 'k--', 'LineWidth', 1); % ORI=0
     yline(0, 'k--', 'LineWidth', 1); % Marginalized kernel=0
     title(sprintf('ORI tuning function (training set)\nR2=%.2f (+-%.2f)| Params=[%s ]', margR2_ORI_med(1), margR2_ORI_sem(1), num2str(margParam_ORI_med(1, :), ' %.2f')));
     xlabel('Orientation (deg)'); ylabel('Amplitude');
-    yticks(-.1:.1:1)
+    % yticks(-.1:.1:1)
+    ylim([-.2, 1])
     legend({'Marg. ORI', 'Pred', 'Ideal'})
 
     % ORI tuning (full set)
     subplot(2,2,3); hold on;
-    plot(xORI, margORI_med(2, :), 'ko-', 'MarkerFaceColor', 'w');
-    plot(xORI, margPred_ORI_med(2, :), 'k-', 'LineWidth', 2);
-    plot(xORI, margIO_ORI_norm_full, 'r-', 'LineWidth', 2); % ideal template
+    plot(xORI, margORI_med(2, :)/max(margORI_med(2, :)), 'ko-', 'MarkerFaceColor', 'w');
+    plot(xORI, margPred_ORI_med(2, :)/max(margPred_ORI_med(2, :)), 'k-', 'LineWidth', 2);
+    plot(xORI, margIO_ORI_norm_full/max(margIO_ORI_norm_full), 'r-', 'LineWidth', 2); % ideal template
     xline(0, 'k--', 'LineWidth', 1); % ORI=0
     yline(0, 'k--', 'LineWidth', 1); % Marginalized kernel=0
     title(sprintf('ORI tuning function (full set)\nR2=%.2f (+-%.2f)| Params=[%s ]', margR2_ORI_med(2), margR2_ORI_sem(2), num2str(margParam_ORI_med(2, :), ' %.2f')));
     xlabel('Orientation (deg)'); ylabel('Amplitude');
-    yticks(-.1:.1:1)
+    % yticks(-.1:.1:1)
+    ylim([-.2, 1])
 
     % SF tuning (training set)
     subplot(2,2,2); hold on;
-    plot(xSF, margSF_med(1, :), 'ko-', 'MarkerFaceColor', 'w');
-    plot(xSF, margPred_SF_med(1, :), 'k-', 'LineWidth', 2);
-    plot(xSF, margIO_SF_norm_training, 'r-', 'LineWidth', 2); % ideal template
+    plot(xSF, margSF_med(1, :)/max(margSF_med(1, :)), 'ko-', 'MarkerFaceColor', 'w');
+    plot(xSF, margPred_SF_med(1, :)/max(margPred_SF_med(1, :)), 'k-', 'LineWidth', 2);
+    plot(xSF, margIO_SF_norm_training/max(margIO_SF_norm_training), 'r-', 'LineWidth', 2); % ideal template
     xline(1, 'k--', 'LineWidth', 1); % SF=2 cpd
     yline(0, 'k--', 'LineWidth', 1); % Marginalized kernel=0
     title(sprintf('SF tuning function (training set)\nR2=%.2f (+-%.2f)| Params=[%s]', margR2_SF_med(1), margR2_SF_sem(1), num2str(margParam_SF_med(1, :), ' %.2f')));
     xlabel('Log Spatial frequency (cpd)'); ylabel('Amplitude');
-    yticks(-.1:.1:.6)
+    % yticks(-.1:.1:.6)
+    ylim([-.2, 1])
 
     % SF tuning (full set)
     subplot(2,2,4); hold on;
-    plot(xSF, margSF_med(2, :), 'ko-', 'MarkerFaceColor', 'w');
-    plot(xSF, margPred_SF_med(2, :), 'k-', 'LineWidth', 2);
-    plot(xSF, margIO_SF_norm_full, 'r-', 'LineWidth', 2); % ideal template
+    plot(xSF, margSF_med(2, :)/max(margSF_med(2, :)), 'ko-', 'MarkerFaceColor', 'w');
+    plot(xSF, margPred_SF_med(2, :)/max(margPred_SF_med(2, :)), 'k-', 'LineWidth', 2);
+    plot(xSF, margIO_SF_norm_full/max(margIO_SF_norm_full), 'r-', 'LineWidth', 2); % ideal template
     xline(1, 'k--', 'LineWidth', 1); % SF=2 cpd
     yline(0, 'k--', 'LineWidth', 1); % Marginalized kernel=0
     title(sprintf('SF tuning function (full set)\nR2=%.2f (+-%.2f)| Params=[%s]', margR2_SF_med(2), margR2_SF_sem(2), num2str(margParam_SF_med(2, :), ' %.2f')));
     xlabel('Log Spatial frequency (cpd)'); ylabel('Amplitude');
-    yticks(-.1:.1:.6)
+    % yticks(-.1:.1:.6)
+    ylim([-.2, 1])
 
     sgtitle(sprintf('Figure 3. Tuning functions\n%s (L%d, ModelA%d %s, nIter=%d)', ...
-        subjName, iLocComb, iModelA, namesModelA{iModelA}, nIter))
+        subjName, iLocComb, iModelA_fit, namesModelA{iModelA_fit}, nIter))
 
     set(findall(gcf, '-property', 'fontsize'), 'fontsize', 12)
     % set(findall(gcf, '-property', 'linewidth'), 'linewidth', 2)
 
-    saveas(gcf, sprintf('%s/3TuningFxn_L%d_A%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA))
+    saveas(gcf, sprintf('%s/3TuningFxn_L%d_A%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit))
 end

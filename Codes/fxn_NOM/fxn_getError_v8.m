@@ -1,4 +1,4 @@
-function nLL = fxn_getError_v8(iModelB, params_est, data, Cz_emp, C_contribution, iStep, params_fromStep1)
+function nLL = fxn_getError_v8(iModelB, params_est, data, C_contribution, iStep, params_fromStep1)
 % Compute negative log-likelihood for the trial-wise noisy observer model,
 
 if nargin == 6, params_fromStep1 = []; end
@@ -34,6 +34,7 @@ switch iStep
         % Step 1: Predict pYES and estimate only the internal noise parameter
         switch iModelB
             case 1, params_est = [params_est([1,2]), 0, params_est(3)]; 
+            case 2, params_est = [params_est(1), 0, params_est(2)]; 
             case 3, params_est = [params_est(1), 0, params_est(2)]; 
             case 4, params_est = [params_est(1), 0, params_est(2)]; 
         end
@@ -47,6 +48,7 @@ switch iStep
         % Step 2: Predict pA and estimate only Nshared
         switch iModelB
             case 1, params_est = [params_fromStep1([1,2]), params_est, params_fromStep1(3)];
+            case 2, params_est = [params_fromStep1(1), params_est, params_fromStep1(2)]; 
             case 3, params_est = [params_fromStep1(1), params_est, params_fromStep1(2)]; 
             case 4, params_est = [params_fromStep1(1), params_est, params_fromStep1(2)]; 
         end

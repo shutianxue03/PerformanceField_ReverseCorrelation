@@ -116,10 +116,10 @@ R2_pA = 1 - sum((pA_data_med - pA_pred_med).^2) / sum((pA_data_med - mean(pA_dat
 title(sprintf('pA (r=%.2f, R²=%.2f)', r_pA, R2_pA));
 
 sgtitle(sprintf('Figure 1. Metrics vs. binned DV\n%s\nModelA%dB%d %s, L%d, nIter=%d', ...
-    subjName, iModelA, iModelB, namesModelB{iModelB}, iLocComb, nIter), ...
+    subjName, iModelA_fit, iModelB_fit, namesModelB{iModelB_fit}, iLocComb, nIter), ...
     'fontsize', 10)
 
-saveas(gcf, sprintf('%s/4Metrics_L%d_A%dB%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA, iModelB))
+saveas(gcf, sprintf('%s/4Metrics_L%d_A%dB%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit, iModelB_fit))
 
 %% 2. Plot estimated parameters across iterations
 nParams_full = 4; % Nmul, Nadd, Nshared, criterion_DV
@@ -130,7 +130,7 @@ for iParam = 1:nParams
     % Load and plot the true param
    if numel(subjName) > 10
         load(sprintf('%s/truth.mat', nameFolder_OOD_load), '*_true')
-        switch iModelB
+        switch iModelB_fit
             case 1 % full
                 subplot(1, nParams_full, iParam); hold on
                 switch iParam
@@ -139,6 +139,12 @@ for iParam = 1:nParams
                     case 3, val_yline = Nshared_true;
                     case 4, val_yline = criterion_DV_true;
                 end
+            case 2 % No Nshared
+                switch iParam
+                    case 1, val_yline = Nmul_true; subplot(1, nParams_full, iParam); hold on
+                    case 2, val_yline = Nadd_true; subplot(1, nParams_full, iParam); hold on
+                    case 3, val_yline = criterion_DV_true; subplot(1, nParams_full, iParam+1); hold on
+                end 
             case 3 % No Nmul
                 subplot(1, nParams_full, iParam+1); hold on
                 switch iParam
@@ -164,17 +170,23 @@ for iParam = 1:nParams
 
     ylim([params_lb(iParam), params_ub(iParam)])
     xlabel('Iteration');
-    ylabel(namesModelBparams{iModelB}{iParam});
-    title(sprintf('Parameter: %s\n %.2f', namesModelBparams{iModelB}{iParam}, nanmean(params_est_allIter(:, iParam))));
+    ylabel(namesModelBparams{iModelB_fit}{iParam});
+    title(sprintf('Parameter: %s\n %.2f', namesModelBparams{iModelB_fit}{iParam}, nanmean(params_est_allIter(:, iParam))));
 
     % Set ylimit
-    switch iModelB
+    switch iModelB_fit
         case 1 % full model: Nmul, Nadd, Nshared, criterion in DV
             switch iParam
                 case 1, ylim([0, 1])
                 case 2, ylim([0, 50])
                 case 3, ylim([0, 50])
                 case 4, ylim([0, 50])
+            end
+        case 2 % No Nshared
+            switch iParam
+                case 1, ylim([0, 1])
+                case 2, ylim([0, 50])
+                case 3, ylim([0, 50])
             end
         case 3 % No Nmul
             switch iParam
@@ -192,9 +204,9 @@ for iParam = 1:nParams
 end
 
 sgtitle(sprintf('Figure 2. Estimated parameters across iterations\n%s (ModelA%dB%d %s, L%d, nIter=%d)', ...
-    subjName, iModelA, iModelB, namesModelB{iModelB}, iLocComb, nIter))
+    subjName, iModelA_fit, iModelB_fit, namesModelB{iModelB_fit}, iLocComb, nIter))
 
-saveas(gcf, sprintf('%s/5Params_L%d_A%dB%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA, iModelB))
+saveas(gcf, sprintf('%s/5Params_L%d_A%dB%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit, iModelB_fit))
 
 %% 3. Freeze other params and vary one param to see its corr with pA
 % figure('Position', [0 0 1e3 800])
@@ -210,21 +222,21 @@ saveas(gcf, sprintf('%s/5Params_L%d_A%dB%d.jpg', nameFolder_Figures_perSubj, iLo
 %         switch nParams
 %             case 4
 %                 switch iParamFreeze
-%                     case 1, params_test  = [NOM_test, params_est(2), params_est(3), params_est(4)]; % iModelB = 1
-%                     case 2, params_test  = [params_est(1), NOM_test, params_est(3), params_est(4)]; % iModelB = 1
-%                     case 3, params_test  = [params_est(1), params_est(2), NOM_test, params_est(4)]; % iModelB = 1
-%                     case 4, params_test  = [params_est(1), params_est(2), params_est(3), NOM_test]; % iModelB = 1
+%                     case 1, params_test  = [NOM_test, params_est(2), params_est(3), params_est(4)]; % iModelB_fit = 1
+%                     case 2, params_test  = [params_est(1), NOM_test, params_est(3), params_est(4)]; % iModelB_fit = 1
+%                     case 3, params_test  = [params_est(1), params_est(2), NOM_test, params_est(4)]; % iModelB_fit = 1
+%                     case 4, params_test  = [params_est(1), params_est(2), params_est(3), NOM_test]; % iModelB_fit = 1
 %                 end
 %             case 3
 %                 switch iParamFreeze
-%                     case 1, params_test  = [NOM_test, params_est(2), params_est(3)]; % iModelB = 1
-%                     case 2, params_test  = [params_est(1), NOM_test, params_est(3)]; % iModelB = 1
-%                     case 3, params_test  = [params_est(1), params_est(2), NOM_test]; % iModelB = 1
+%                     case 1, params_test  = [NOM_test, params_est(2), params_est(3)]; % iModelB_fit = 1
+%                     case 2, params_test  = [params_est(1), NOM_test, params_est(3)]; % iModelB_fit = 1
+%                     case 3, params_test  = [params_est(1), params_est(2), NOM_test]; % iModelB_fit = 1
 %                 end
 %             case 2
 %                 switch iParamFreeze
-%                     case 1, params_test  = [NOM_test, params_est(2)]; % iModelB = 2
-%                     case 2, params_test  = [params_est(1), NOM_test]; % iModelB = 2
+%                     case 1, params_test  = [NOM_test, params_est(2)]; % iModelB_fit = 2
+%                     case 2, params_test  = [params_est(1), NOM_test]; % iModelB_fit = 2
 %                 end
 %         end
 %
@@ -232,11 +244,11 @@ saveas(gcf, sprintf('%s/5Params_L%d_A%dB%d.jpg', nameFolder_Figures_perSubj, iLo
 %         switch flag_incluCrit
 %             case 0
 %                 %---------------------%
-%                 [pYES_pred_allT, pA_pred_allPairs, ~] = fxn_predMetrics_v2(iModelB, params_test, data_test, criterion_z_train);
+%                 [pYES_pred_allT, pA_pred_allPairs, ~] = fxn_predMetrics_v2(iModelB_fit, params_test, data_test, criterion_z_train);
 %                 %---------------------%
 %             case 1
 %                 %---------------------%
-%                 [pYES_pred_allT, pA_pred_allPairs, ~, Cz_fit] = fxn_predMetrics_v3(iModelB, params_test, data_test);
+%                 [pYES_pred_allT, pA_pred_allPairs, ~, Cz_fit] = fxn_predMetrics_v3(iModelB_fit, params_test, data_test);
 %                 %---------------------%
 %         end
 %         pYES_mean(i) = mean(pYES_pred_allT);
@@ -245,18 +257,18 @@ saveas(gcf, sprintf('%s/5Params_L%d_A%dB%d.jpg', nameFolder_Figures_perSubj, iLo
 %         subplot(2,nParams, iParamFreeze)
 %         plot(NOM_grid, pYES_mean, '-o');
 %         ylim([0, 1])
-%         xlabel(sprintf('Only Vary %s', namesModelBparams{iModelB}{iParamFreeze}));
+%         xlabel(sprintf('Only Vary %s', namesModelBparams{iModelB_fit}{iParamFreeze}));
 %         ylabel('Mean pYES_{pred}');
 %
 %         subplot(2,nParams, iParamFreeze+nParams)
 %         plot(NOM_grid, pA_mean, '-o');
 %         ylim([.5, 1])
-%         xlabel(sprintf('Only Vary %s', namesModelBparams{iModelB}{iParamFreeze}));
+%         xlabel(sprintf('Only Vary %s', namesModelBparams{iModelB_fit}{iParamFreeze}));
 %         ylabel('Mean pA_{pred}');
 %     end
 % end
 %
 % sgtitle(sprintf('Figure 3. Vary one param (and freeze others) to see its corr with pA\n%s (ModelA%dB%d %s, L%d, nIter=%d)', ...
-%     subjName, iModelA, iModelB, namesModelB{iModelB}, iLocComb, nIter))
+%     subjName, iModelA_fit, iModelB_fit, namesModelB{iModelB_fit}, iLocComb, nIter))
 %
-% saveas(gcf, sprintf('%s/6FreezeCorr_L%d_A%dB%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA, iModelB))
+% saveas(gcf, sprintf('%s/6FreezeCorr_L%d_A%dB%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit, iModelB_fit))

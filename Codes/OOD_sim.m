@@ -1,5 +1,5 @@
 function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, Cz_true, ...
-    lambda_whiten, flag_regressType, flag_incluCrit, C_contribution, iModelA_sim, iModelB_sim, nIter)
+    lambda_whiten, flag_regressType, flag_incluCrit, C_contribution, iModelB_sim, nIter, nBasisORI, nBasisSF)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Script name: OOD_sim.m
@@ -17,8 +17,8 @@ function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true
 
 % ---------------------------- Basic setup ----------------------------- %
 clc; close all;
-warning off; % (You may want to remove this once things are stable.)
-format compact;
+warning off; 
+set(0, 'DefaultFigureVisible', 'off')
 
 time_start = datetime('now');
 fprintf('\n\n%s: Simulation starts\n\n', datetime('now'))
@@ -36,6 +36,7 @@ addpath(genpath('SX_toolbox'));
 %--------------%
 SX_RC1_setting;
 %--------------%
+
 nORI = nORI; % nORI is defined in SX_RC1_setting; repeated here just for parfor loop to work
 nSF = nORI;
 
@@ -44,8 +45,8 @@ nJob = 1;
 iJob = 1;
 
 % Model A/B indices for fitting
-iModelA_sim_allCond = [2]; % 1 = RC-derived template (Model A), 2=idealtemplate; 3=permuted template
-iModelB_sim_allCond = iModelB_sim; % use same B for sim and fit
+iModelA_fit_all = 1; % 1 = RC-derived template (Model A), 2=ideal template; 3=permuted template
+iModelB_fit_all = 1:4;
 
 templateType_true = 1; % 1 = raw;
 IVType_true = 1; % 1 = sum of dot product;
@@ -53,49 +54,17 @@ convolveType_true = 1; % 1 = dot product; 2 = convolution (for fxn_getIV_v3)
 flag_permT = 0; %1=permute the input template per trial
 flag_plotDist = 1;
 if strcmp(str_envir, 'HPC'), flag_plotDist = 0; end % don't plot when running on HPC
-
-% Internal-noise true parameters (from input)
-switch iModelB_sim
-    case 1
-        % Nmul_true = noiseP_true(1);
-        % Nadd_true = noiseP_true(2);
-        % Nshared_true = noiseP_true(3);
-        % Cz_true = noiseP_true(4);
-        str_IN = sprintf('Nmul_true = %.1f, Nadd_true = %.0f, Nshared_true = %.1f,', Nmul_true, Nadd_true, Nshared_true);
-    case 2 % no Nshared
-        % Nmul_true = noiseP_true(1);
-        % Nadd_true = noiseP_true(2);
-        Nshared_true = 0;
-        % Cz_true = noiseP_true(4);
-        str_IN = sprintf('Nmul_true = %.1f, Nadd_true = %.0f,', Nmul_true, Nadd_true);
-    case 3 % no Nmul
-        Nmul_true = 0;
-        % Nadd_true = noiseP_true(2);
-        % Nshared_true = noiseP_true(3);
-        % Cz_true = noiseP_true(4);
-        str_IN = sprintf('Nadd_true = %.0f, Nshared_true = %.1f,', Nadd_true, Nshared_true);
-    case 4 % no Nadd
-        % Nmul_true = noiseP_true(1);
-        Nadd_true = 0;
-        % Nshared_true = noiseP_true(3);
-        % Cz_true = noiseP_true(4);
-        str_IN = sprintf('Nmul_true = %.1f, Nshared_true = %.1f,', Nmul_true, Nshared_true);
-    otherwise
-        error('ALERT: no matching ModelB for simulation!!')
-end
-
 iLocComb = 1; % use single-location index (e.g., fovea) for IO
 
 % ---------------------------- Print info ------------------------------ %
-nParams = numel(namesModelBparams{iModelB_sim});
 
 fprintf(' - nIter (for compIV/fitNOM) = %d\n', nIter);
 fprintf(' - noiseCST = %.2f\n', noiseCST);
 fprintf(' - gaborCST = %.2f\n', gaborCST);
 fprintf(' - nTrials = %d\n', nTrials);
-fprintf(' - iModelA_sim = %d (1=Data-derived template; 2=ideal template)\n', iModelA_sim);
-fprintf(' - iModelB_sim = %d (see updated Model B definitions)\n', iModelB_sim);
-fprintf(' - %d params: %s\n', nParams, str_IN);
+fprintf(' - Simulated with ModelB = %d \n', iModelB_sim);
+fprintf(' - Fitted with ModelA = %s (1=Data-derived template; 2=ideal template)\n', strjoin(string(iModelA_fit_all), ' '));
+fprintf(' - Fitted with ModelB = %s (1=full, 2=No Nshared; 3=No Nmul; 4=No Nadd)\n', strjoin(string(iModelB_fit_all), ' '));
 fprintf(' - Criterion (z unit)=%.1f \n', Cz_true);
 fprintf(' - Contribution of criterion loss =%.1f \n', C_contribution);
 fprintf(' - Whitening strength (lambda): %.1f \n', lambda_whiten);
@@ -188,7 +157,8 @@ template_true = fxn_getTemplate(template_true, templateType_true, 0);
 template_true = template_true / norm(template_true(:));
 
 % Save "truth" (for IO template in Model A = 2)
-save(sprintf('%s/truth.mat', nameFolder_Data_OOD_IO), 'nameIO', '*_true', 'noiseCST', 'gaborCST', 'nTrials', 'lambda_whiten', 'flag_regressType', 'flag_incluCrit', 'C_contribution', 'iModelA_sim_allCond', 'iModelB_sim_allCond', 'nIter');
+save(sprintf('%s/truth.mat', nameFolder_Data_OOD_IO), ...
+    'nameIO', '*_true', 'noiseCST', 'gaborCST', 'nTrials', 'lambda_whiten', 'flag_regressType', 'flag_incluCrit', 'C_contribution', 'iModelB_sim', 'iModelA_fit_all', 'iModelB_fit_all', 'nIter');
 fprintf('\n\n%s: Truth (including the ideal template) created and saved.\n\n', datetime('now'))
 
 %% Preallocate sim arrays -------------------------- %
@@ -297,10 +267,6 @@ DVnoisy_sim_allT = DVclean_sim_allT + sigma_shared_allT .* z_sh_allT + sigma_pri
 % Total predicted SD if you need it for anything
 sigma_pred_allT = sqrt(sigma_priv_allT.^2 + sigma_shared_allT.^2);
 
-% Correlation between the noisy DV of two passes
-% (assuming first half and second half of trials are the same trials)
-corrPass = corr(DVnoisy_sim_allT(1:numel(DVnoisy_sim_allT)/2), DVnoisy_sim_allT(numel(DVnoisy_sim_allT)/2+1:numel(DVnoisy_sim_allT)));
-
 fprintf('%s: Internal noise sampled and added.\n\n', datetime('now'))
 
 %% Set a true criterion given the true criterion in z-score
@@ -317,9 +283,9 @@ criterion_grid = [-Inf; (DV_sorted(1:end-1) + DV_sorted(2:end))/2; Inf];
 loss_grid = nan(size(criterion_grid));
 c_z_grid = nan(size(criterion_grid));
 
-for j = 1:numel(criterion_grid)
-    c_try = criterion_grid(j);
-    [loss_grid(j), c_z_grid(j)] = criterion_loss_cz(c_try, DVnoisy_sim_allT, iPRS_allT, Cz_true);
+for iC = 1:numel(criterion_grid)
+    c_try = criterion_grid(iC);
+    [loss_grid(iC), c_z_grid(iC)] = criterion_loss_cz(c_try, DVnoisy_sim_allT, iPRS_allT, Cz_true);
 end
 % Choose the criterion in DV unit
 [~, idx_best] = min(loss_grid);
@@ -329,10 +295,6 @@ save(sprintf('%s/truth.mat', nameFolder_Data_OOD_IO), 'criterion_DV_true', '-app
 
 % Binary responses
 resp_allT = DVnoisy_sim_allT > criterion_DV_true;
-
-% % Lapses (if any)
-% lapse_mask = rand(size(DVnoisy_sim_allT)) < lapseRate_true;
-% resp_allT(lapse_mask) = ~resp_allT(lapse_mask);
 
 % pYES per trial from SDT mapping
 pYES_pred_allT = 1 - normcdf(criterion_DV_true, DVclean_sim_allT, sigma_pred_allT);
@@ -376,21 +338,23 @@ fprintf('\n%s: Behavioral data saved.\n\nReady for template generation\n\n', dat
 if flag_plotDist
     NOMplot_dist
 end
-    
+
 %% ---------------- Run compIV and fitNOM on this IO --------------------- %
-for iModelA_fit = iModelA_sim_allCond
+
+for iModelA_fit = iModelA_fit_all
     % Step 1: compute IVs, templates, and test-set metrics
     %------------------------------------%
-    OOD_NOM_Trialwise_compIV({nameIO, criterion_DV_true}, iLocComb, lambda_whiten, flag_regressType, iModelA_fit, nIter, nJob, iJob)
+    OOD_NOM_Trialwise_compIV(nBasisORI, nBasisSF, {nameIO, criterion_DV_true}, iLocComb, lambda_whiten, flag_regressType, iModelA_fit, nIter, nJob, iJob)
     %------------------------------------%
 
-    for iModelB_fit = iModelB_sim_allCond
+    for iModelB_fit = iModelB_fit_all
         % Step 2: fit NOM parameters and predict metrics
         %------------------------------------%
-        OOD_NOM_Trialwise_fitNOM({nameIO, criterion_DV_true}, iLocComb, flag_incluCrit, C_contribution, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
+        OOD_NOM_Trialwise_fitNOM(nBasisORI, nBasisSF, {nameIO, criterion_DV_true}, iLocComb, flag_incluCrit, C_contribution, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
         %------------------------------------%
     end
 end
+
 
 % Play sound to indicate end of analysis
 fs = 44100;              % sampling rate
