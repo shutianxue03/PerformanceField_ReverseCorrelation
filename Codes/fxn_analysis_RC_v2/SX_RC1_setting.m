@@ -21,7 +21,7 @@ nSF = nORI;
 nameFolder_server = '/scratch/sx712/PF_RC'; str_envir = 'HPC'; 
 
 % if run on server (mute if run on OOD)
-% nameFolder_server = '/Volumes/server/Users/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC'; str_envir = 'Server';
+nameFolder_server = '/Volumes/server/Users/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC'; str_envir = 'Server';
 
 % if run on local for model simulation (my laptop or iMac)
 nameFolder_server = '/Users/xueshutian/Desktop/GitHub_local/PF_RC'; str_envir = 'Local'; 

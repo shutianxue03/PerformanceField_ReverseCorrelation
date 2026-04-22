@@ -30,7 +30,7 @@ fprintf('\n=======================================\n')
 fprintf('Part 2: Fit NOM and predict metrics')
 fprintf('\n=======================================\n')
 
-fprintf('%s: Step 1 started.\n\n', time_start)
+% fprintf('%s: Step 2 started.\n\n', time_start)
 
 addpath(genpath('fxn_exp'));
 addpath(genpath('fxn_NOM'));
@@ -42,10 +42,9 @@ addpath(genpath('SX_toolbox/bads-master'));
 %--------------%
 SX_RC1_setting; % defines nORI, nSF, namesLocComb, namesModelA, namesModelB, nBins, etc.
 %--------------%
-nameFolder_Data = sprintf('%s/Data_Part2_nBasis%d%d_noMirror', nameFolder_server, nBasisORI, nBasisSF) ;
-nameFolder_Data_OOD = sprintf('%s/Data_OOD_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
-nameFolder_Data_NOM_Trialwise = sprintf('%s/Data_NOM_Trialwise_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
-
+% nameFolder_Data = sprintf('%s/Data_Part2_nBasis%d%d_noMirror', nameFolder_server, nBasisORI, nBasisSF) ;
+% nameFolder_Data_OOD = sprintf('%s/Data_OOD_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
+% nameFolder_Data_NOM_Trialwise = sprintf('%s/Data_NOM_Trialwise_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
 
 flag_fittingStep = 1; % one vs. two step fitting (one step is more standard)
 flag_fminconORbads = 2; % 1 = use fmincon (faster, local); 2 = use BADS (slower, more robust)
@@ -60,7 +59,7 @@ S_seed = GetGrandSeed(nIter, iJob, nJob, nameFolder_Data);
 stream = RandStream('Threefry', 'Seed', S_seed.grandSeed);
 RandStream.setGlobalStream(stream);
 
-fprintf('%s: seed determined.\n\n', datetime('now'))
+% fprintf('%s: seed determined.\n', datetime('now'))
 
 %% Set up file paths and names
 if isnumeric(isubj)

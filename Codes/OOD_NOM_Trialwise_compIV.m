@@ -16,7 +16,7 @@ fprintf('\n=======================================\n')
 fprintf('Part 1: Compute DVs and derive templates')
 fprintf('\n=======================================\n')
 
-fprintf('%s: Step 1 started.\n\n', time_start)
+% fprintf('%s: Step 1 started.\n\n', time_start)
 
 addpath(genpath('fxn_exp'));
 addpath(genpath('fxn_NOM'));
@@ -30,9 +30,9 @@ addpath(genpath('SX_toolbox/bads-master'));
 SX_RC1_setting; % defines nameFolder_*, nORI, nSF, namesLocComb, namesModelA, etc.
 % --------------%
 
-nameFolder_Data = sprintf('%s/Data_Part2_nBasis%d%d_noMirror', nameFolder_server, nBasisORI, nBasisSF) ;
-nameFolder_Data_OOD = sprintf('%s/Data_OOD_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
-nameFolder_Data_NOM_Trialwise = sprintf('%s/Data_NOM_Trialwise_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
+% nameFolder_Data = sprintf('%s/Data_Part2_nBasis%d%d_noMirror', nameFolder_server, nBasisORI, nBasisSF) ;
+% nameFolder_Data_OOD = sprintf('%s/Data_OOD_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
+% nameFolder_Data_NOM_Trialwise = sprintf('%s/Data_NOM_Trialwise_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
 
 %% -------------------- Deterministic RNG (grand seed + per-iteration substreams) -------------------- %%
 S_seed = GetGrandSeed(nIter, iJob, nJob, nameFolder_Data);
@@ -41,7 +41,7 @@ S_seed = GetGrandSeed(nIter, iJob, nJob, nameFolder_Data);
 stream = RandStream('Threefry', 'Seed', S_seed.grandSeed);
 RandStream.setGlobalStream(stream);
 
-fprintf('%s: seed determined.\n\n', datetime('now'))
+% fprintf('%s: seed determined.\n\n', datetime('now'))
 
 %% -------------------- General parameters -------------------- %%
 
@@ -63,13 +63,16 @@ eps_whiten = 1e-3;  % floor for eigenvalues
 % 1=Univariate; 2=MultiSmooth and Univariate
 if flag_regressType == 2
     opts = struct();
-    candidateORI = 2:9;
-    candidateSF = 2:9;
+    candidateORI = 3:9;
+    candidateSF = 3:9;
+    candidateBasisFamilyORI = {'circ_gaussian', 'vonmises'};
+    candidateBasisFamilySF  = {'gaussian_log2', 'asym_gaussian_log2'};
+    candidateRidge  = [0, 10.^(-3:2)];
+    % opts.ridge = ridge;
+    opts.nFolds = 5;
     opts.link = 'probit';
     opts.nBasisORI = nBasisORI;
     opts.nBasisSF = nBasisSF;
-    opts.ridge = 1e-3;
-    opts.verbose = true;
     opts.sigmaORI_deg = [];
     opts.sigmaSF_log2 = [];
     opts.oriPeriod_deg = 180;
@@ -226,7 +229,7 @@ else
     end
 end
 
-fprintf('%s: sessions selected.\n\n', datetime('now'))
+% fprintf('%s: sessions selected.\n\n', datetime('now'))
 
 %% -------------------- Ideal template -------------------- %%
 
@@ -271,7 +274,7 @@ template_ideal = template_ideal / norm(template_ideal(:));
 fprintf('%s: ideal template created.\n\n', datetime('now'))
 
 %% -------------------- MAIN LOOP over  iterations -------------------- %%
-fprintf('%s: Creating empty placeholders for running iterations.\n\n', datetime('now'))
+% fprintf('%s: Creating empty placeholders for running iterations.\n\n', datetime('now'))
 data_metrics_allIter = nan(nIter, nDatasets_full, nMetrics); % see fxn_getMetrics for all 11 metrics
 data_train_allIter = cell(nIter, 1);
 data_test_allIter = data_train_allIter;
@@ -279,6 +282,9 @@ template_tmpl_allIter = nan(nIter, nORI, nSF);
 template_full_allIter = template_tmpl_allIter;
 nBasisORI_tmpl_allIter = nan(nIter, 1);
 nBasisSF_tmpl_allIter = nan(nIter, 1);
+basisFxnORI_tmpl_allIter = data_train_allIter;
+basisFxnSF_tmpl_allIter = data_train_allIter;
+ridge_tmpl_allIter = nBasisSF_tmpl_allIter;
 
 sep_allIter = nan(nIter, 2); % 1=template set, 2=full set
 margORI_allIter = nan(nIter, 2, nORI);
@@ -295,7 +301,7 @@ nameFile_progress = [nameFile_compIV, '.mat'];
 fprintf('%s: Started running %d iterations.\n\n', datetime('now'), nIter)
 
 for iIter = 1:nIter
-    fprintf('%d... ', iIter);
+    fprintf('\n%s: %d...', datetime('now'), iIter);
 
     % Deterministic randomness for THIS iteration (global index across jobs)
     stream.Substream = S_seed.iterIdxList(iIter);
@@ -451,17 +457,17 @@ for iIter = 1:nIter
                 template_full_raw = SX_sim07_RC(e3D_full_use, resp_full_rand_sel);
 
             case 2  % Multivariate + smoothing
-                % out = SX_RC_smoothBasis_circORI_logSF(e3D_tmpl_use, resp_tmpl_rand_sel, axis_tuning{1}, axis_tuning{2}, opts);
-                out = SX_RC_selectBasis_cv(e3D_tmpl_use, resp_tmpl_rand_sel, axis_tuning{1}, axis_tuning{2}, candidateORI, candidateSF, opts);
+                opts.template_ideal = template_ideal;
+                out = SX_RC_selectBasis_cv(e3D_tmpl_use, resp_tmpl_rand_sel, axis_tuning{1}, axis_tuning{2}, candidateORI, candidateSF, candidateBasisFamilyORI, candidateBasisFamilySF, candidateRidge, opts);
                 template_tmpl_raw = out.template2D;
                 nBasisORI_tmpl = out.nBasisORI;
                 nBasisSF_tmpl = out.nBasisSF;
+                basisFxnORI_tmpl = out.basisFamilyORI;
+                basisFxnSF_tmpl = out.basisFamilySF;
+                ridge_tmpl = out.ridge;
 
-                % out = SX_RC_smoothBasis_circORI_logSF(e3D_full_use, resp_full_rand_sel, axis_tuning{1}, axis_tuning{2}, opts);
-                out = SX_RC_selectBasis_cv(e3D_full_use, resp_full_rand_sel, axis_tuning{1}, axis_tuning{2}, candidateORI, candidateSF, opts);
+                out = SX_RC_selectBasis_cv(e3D_full_use, resp_full_rand_sel, axis_tuning{1}, axis_tuning{2}, candidateORI, candidateSF, candidateBasisFamilyORI, candidateBasisFamilySF, candidateRidge, opts);
                 template_full_raw = out.template2D;
-                nBasisORI_full = out.nBasisORI;
-                nBasisSF_full= out.nBasisSF;
 
         end % switch
 
@@ -662,6 +668,9 @@ for iIter = 1:nIter
     template_full_allIter(iIter, :, :) = template_notNormed_full;
     nBasisORI_tmpl_allIter(iIter, :) = nBasisORI_tmpl;
     nBasisSF_tmpl_allIter(iIter, :) = nBasisSF_tmpl;
+    basisFxnORI_tmpl_allIter{iIter} = basisFxnORI_tmpl;
+    basisFxnSF_tmpl_allIter{iIter} = basisFxnSF_tmpl;
+    ridge_tmpl_allIter(iIter) = ridge_tmpl;
 
     %% Save a progress report in the folder to indicate the finished iteration and time spent
     time_progress = datetime('now');

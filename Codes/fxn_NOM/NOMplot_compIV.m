@@ -75,7 +75,7 @@ set(findall(gcf, '-property', 'linewidth'), 'linewidth', 2)
 
 sgtitle(sprintf('Figure 1. Measured metrics (Ave across %d iterations +- 68%% CI)\n%s (Loc%d ModelA%d %s)', ...
     nIter, subjName, iLocComb, iModelA_fit, namesModelA{iModelA_fit}))
-saveas(gcf, sprintf('%s/1MetricMeasured_L%d_A%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit))
+saveas(gcf, sprintf('%s/11MetricMeasured_L%d_A%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit))
 
 %% Figure 2: 2D Kernel
 template_tmpl_ave = squeeze(mean(template_tmpl_allIter, 1));
@@ -140,7 +140,6 @@ xticks(axisTicks_tuning{2}), xticklabels(axisTL_tuning{2})
 yticks(axisTicks_tuning{1}), yticklabels(axisTL_tuning{1})
 title('Difference with the true template')
 
-
 % Calculate Pearson's corr
 r_allIter = nan(nIter, 1);
 p_allIter = r_allIter;
@@ -161,11 +160,10 @@ sgtitle(sprintf('Figure 2. Recovered template\n%s\nL%d | ModelA%d [%s-derived] |
     mode(nBasisSF_tmpl_allIter), mean(nBasisSF_tmpl_allIter == mode(nBasisSF_tmpl_allIter))*100, ...
     r_med, r_SEM, p_med, p_SEM))
 
-
 set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
 set(findall(gcf, '-property', 'linewidth'), 'linewidth',2)
 
-saveas(gcf, sprintf('%s/2Template_L%d_A%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit))
+saveas(gcf, sprintf('%s/12Template_L%d_A%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit))
 
 %% Figure 3. Plot marg and margPred, print R2 and params in the title
 if iModelA_fit==1 % data-derived template
@@ -246,5 +244,109 @@ if iModelA_fit==1 % data-derived template
     set(findall(gcf, '-property', 'fontsize'), 'fontsize', 12)
     % set(findall(gcf, '-property', 'linewidth'), 'linewidth', 2)
 
-    saveas(gcf, sprintf('%s/3TuningFxn_L%d_A%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit))
+    saveas(gcf, sprintf('%s/13TuningFxn_L%d_A%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit))
+end
+
+
+%% Figure 4: Plot rank of selected basis counts / families / ridge across iterations
+% Assumes these variables already exist:
+%   nBasisORI_tmpl_allIter
+%   nBasisSF_tmpl_allIter
+%   basisFxnORI_tmpl_allIter
+%   basisFxnSF_tmpl_allIter
+%   ridge_tmpl_allIter
+
+figure('Position', [100 100 1600 800]);
+% tiledlayout(2, 3, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+% ---------- 1. nBasisORI ----------
+subplot(2,3,1); hold on;
+plot_ranked_categorical(nBasisORI_tmpl_allIter, 'nBasisORI');
+ylabel('% iterations selected');
+title('nBasisORI');
+box on;
+
+% ---------- 2. nBasisSF ----------
+subplot(2,3,2); hold on;
+plot_ranked_categorical(nBasisSF_tmpl_allIter, 'nBasisSF');
+ylabel('% iterations selected');
+title('nBasisSF');
+box on;
+
+% ---------- 3. basisFxnORI ----------
+subplot(2,3,4); hold on;
+plot_ranked_categorical(basisFxnORI_tmpl_allIter, 'basisFxnORI');
+ylabel('% iterations selected');
+title('basisFxnORI');
+box on;
+
+% ---------- 4. basisFxnSF ----------
+subplot(2,3,5); hold on;
+plot_ranked_categorical(basisFxnSF_tmpl_allIter, 'basisFxnSF');
+ylabel('% iterations selected');
+title('basisFxnSF');
+box on;
+
+% ---------- 5. ridge ----------
+subplot(2,3,3); hold on;
+plot_ranked_categorical(ridge_tmpl_allIter, 'ridge');
+ylabel('% iterations selected');
+title('ridge');
+box on;
+
+sgtitle('Rank of selected basis settings across iterations');
+
+saveas(gcf, sprintf('%s/14SelectedBasis_L%d_A%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit))
+
+%% ---------- local helper ----------
+function plot_ranked_categorical(vals, xLabelText)
+
+    % convert input to string labels
+    if isnumeric(vals) || islogical(vals)
+        vals = vals(:);
+        vals = vals(isfinite(vals));
+        labels = string(vals);
+
+    elseif iscell(vals)
+        labels = string(vals(:));
+        labels = labels(strlength(labels) > 0);
+
+    elseif isstring(vals) || iscategorical(vals)
+        labels = string(vals(:));
+        labels = labels(strlength(labels) > 0);
+
+    else
+        error('Unsupported type for ranked categorical plot.');
+    end
+
+    if isempty(labels)
+        text(0.5, 0.5, 'No data', 'HorizontalAlignment', 'center');
+        xlim([0 1]); ylim([0 1]);
+        return
+    end
+
+    % count frequencies
+    [u, ~, ic] = unique(labels);
+    counts = accumarray(ic, 1);
+    pct = counts / sum(counts) * 100;
+
+    % sort high to low
+    [pct_sorted, idxSort] = sort(pct, 'descend');
+    u_sorted = u(idxSort);
+
+    % bar plot
+    bar(1:numel(u_sorted), pct_sorted, 0.7);
+    xticks(1:numel(u_sorted));
+    xticklabels(u_sorted);
+    xtickangle(45);
+    xlabel(xLabelText);
+    ylim([0, max(pct_sorted)*1.15]);
+
+    % annotate percentage
+    for i = 1:numel(u_sorted)
+        text(i, pct_sorted(i), sprintf(' %.0f%%', pct_sorted(i)), ...
+            'VerticalAlignment', 'bottom', ...
+            'HorizontalAlignment', 'left', ...
+            'FontSize', 9);
+    end
 end

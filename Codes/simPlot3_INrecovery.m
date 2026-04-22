@@ -1,5 +1,4 @@
-%% ============================================================
-% simPlot3_GlobalRecoveryHeatmaps.m
+% simPlot3_INrecovery.m
 %
 % Global heatmaps for recovery metrics across simulation conditions
 %
@@ -23,8 +22,8 @@ set(0, 'DefaultFigureVisible', 'off');
 SX_RC1_setting;
 %--------------%
 
-%% ---------------- settings ----------------
-str_part = 'FlexBasis'; % <-- change if needed
+%% settings
+str_part = 'Part4'; % <-- change if needed
 iModelA_fit = 1; %1=use data-derived template; 2=use true template
 mask_pC = [.6, .8]; % only analyze simulated datasets wtih pC falling within this range
 nBfit = 4; % number of fitted models
@@ -33,26 +32,26 @@ nameFolder_Data = sprintf('%s/Data_%s', nameFolder_server, str_part);
 nameFolder_Data_OOD = sprintf('%s/Data_OOD_%d%d', nameFolder_Data, nORI, nSF);
 nameFolder_Data_NOM_Trialwise = sprintf('%s/Data_NOM_Trialwise_%d%d', nameFolder_Data, nORI, nSF);
 
-nameFolder_Figures_part3 = fullfile(nameFolder_Figures, sprintf('IO_%s_A%d', str_part, iModelA_fit));
+nameFolder_Figures_part3 = fullfile(nameFolder_Figures, sprintf('IO_%s_A%d/Part3', str_part, iModelA_fit));
 if ~exist(nameFolder_Figures_part3, 'dir')
     mkdir(nameFolder_Figures_part3);
 end
 
 namesMetrics_behav = {'pYES','pC','pA'};
 
-%% ---------------- find IO folders ----------------
-nameDir = dir(nameFolder_Data_OOD);
+%% find IO folders
+nameDir = dir(nameFolder_Data_NOM_Trialwise);
 nameDir = nameDir([nameDir.isdir]);
 nameDir = nameDir(~ismember({nameDir.name}, {'.', '..'}));
 nFiles = numel(nameDir);
 
 if nFiles == 0
-    error('No IO folders found in %s', nameFolder_Data_OOD);
+    error('No IO folders found in %s', nameFolder_Data_NOM_Trialwise);
 end
 
 fprintf('\nFound %d IO folders.\n', nFiles);
 
-%% ---------------- parse all conditions once ----------------
+%% parse all conditions once
 info_all = cell(nFiles, 1);
 keepParse = false(nFiles, 1);
 
@@ -78,7 +77,7 @@ nFiles = numel(info_all);
 
 fprintf('Parsed %d valid IO folders.\n', nFiles);
 
-%% ---------------- compile all fitted models ----------------
+%% compile all fitted models
 
 R = struct([]);
 
@@ -120,16 +119,17 @@ for iFile = 1:nFiles
         nIter = truth.nIter;
     else
         template_est_tmp = data_compIV.template_tmpl_allIter;
-        if ndims(template_est_tmp) == 3
-            nIter = size(template_est_tmp, 1);
-        else
-            nIter = size(template_est_tmp, 1);
-        end
+        % if ndims(template_est_tmp) == 3
+        nIter = size(template_est_tmp, 1);
+        % else
+        % nIter = size(template_est_tmp, 1);
+        % end
     end
 
     % initialize file-level shared fields
     fileBase.template_rmse = nan;
     fileBase.template_R2 = nan;
+    fileBase.template_rmse_iter = [];
 
     fileBase.nBasisORI_mode = nan;
     fileBase.nBasisORI_mode_pct = nan;
@@ -140,12 +140,15 @@ for iFile = 1:nFiles
     fileBase.margSF_true = nan(1, nSF);
     fileBase.margORI_est_med = nan(1, nORI);
     fileBase.margSF_est_med = nan(1, nSF);
+    fileBase.margORI_est_iter_norm = [];
+    fileBase.margSF_est_iter_norm = [];
 
     fileBase.pYES_data_med = nan; fileBase.pYES_data_lb = nan; fileBase.pYES_data_ub = nan;
     fileBase.pC_data_med = nan; fileBase.pC_data_lb = nan; fileBase.pC_data_ub = nan;
     fileBase.pA_data_med = nan; fileBase.pA_data_lb = nan; fileBase.pA_data_ub = nan;
 
     fileBase.DV_allBins_med = [];
+    fileBase.nTrials_allBins_med = [];
     fileBase.pYES_data_curve_med = [];
     fileBase.pC_data_curve_med = [];
     fileBase.pA_data_curve_med = [];
@@ -161,7 +164,8 @@ for iFile = 1:nFiles
 
     [fileBase.template_rmse, ~, ~] = getCI(template_rmse_iter, 1, 1);
     [fileBase.template_R2, ~, ~] = getCI(template_R2_iter, 1, 1);
-    
+    fileBase.template_rmse_iter = template_rmse_iter(:)';
+
     % ---------- marginalized templates ----------
     template_true_vec = truth.template_true(:)';
     template_true_2D = reshape(template_true_vec, [nORI, nSF]);
@@ -191,30 +195,69 @@ for iFile = 1:nFiles
         margSF_est_iter(iIter, :) = mean(tmp2D, 1);
     end
 
-    % Take median across iterations
-    margORI_est_med = getCI(margORI_est_iter, 1, 1);
-    margSF_est_med = getCI(margSF_est_iter, 1, 1);
+    % Normalize each iteration separately so iteration CI reflects tuning-shape variability.
+    margORI_est_iter_norm = margORI_est_iter;
+    margSF_est_iter_norm = margSF_est_iter;
+    for iIter = 1:nIter_est
+        mxORI = max(margORI_est_iter_norm(iIter, :), [], 2);
+        mxSF = max(margSF_est_iter_norm(iIter, :), [], 2);
+        if isfinite(mxORI) && mxORI ~= 0
+            margORI_est_iter_norm(iIter, :) = margORI_est_iter_norm(iIter, :) ./ mxORI;
+        end
+        if isfinite(mxSF) && mxSF ~= 0
+            margSF_est_iter_norm(iIter, :) = margSF_est_iter_norm(iIter, :) ./ mxSF;
+        end
+    end
 
-    % make max=1
-    margORI_est_med = margORI_est_med/max(margORI_est_med);
-    margSF_est_med = margSF_est_med/max(margSF_est_med);
+    % Take median across iterations
+    margORI_est_med = getCI(margORI_est_iter_norm, 1, 1);
+    margSF_est_med = getCI(margSF_est_iter_norm, 1, 1);
 
     % Store
     fileBase.margORI_est_med = margORI_est_med;
     fileBase.margSF_est_med = margSF_est_med;
+    fileBase.margORI_est_iter_norm = margORI_est_iter_norm;
+    fileBase.margSF_est_iter_norm = margSF_est_iter_norm;
 
     % =========================================================
     % File-level basis-count summary
-    % Replace the next two lines with the actual saved variable names
     % =========================================================
-    nBasisORI_allIter = data_compIV.nBasisORI_tmpl_allIter;   % <-- revise if needed
-    nBasisSF_allIter  = data_compIV.nBasisSF_tmpl_allIter;    % <-- revise if needed
-    
+    nBasisORI_allIter = data_compIV.nBasisORI_tmpl_allIter;
+    nBasisSF_allIter = data_compIV.nBasisSF_tmpl_allIter;
+
     fileBase.nBasisORI_mode = mode(nBasisORI_allIter);
     fileBase.nBasisORI_mode_pct = mean(nBasisORI_allIter == mode(nBasisORI_allIter));
 
     fileBase.nBasisSF_mode = mode(nBasisSF_allIter);
     fileBase.nBasisSF_mode_pct = mean(nBasisSF_allIter == mode(nBasisSF_allIter));
+
+    % =========================================================
+    % File-level basis-family summary
+    % =========================================================
+    S = string(data_compIV.basisFxnORI_tmpl_allIter(:));
+    [u, ~, ic] = unique(S);
+    counts = accumarray(ic, 1);
+    [~, idxMax] = max(counts);
+    fileBase.basisFxnORI_mode = u(idxMax);
+    fileBase.basisFxnORI_mode_pct = counts(idxMax) / numel(S);
+
+    S = string(data_compIV.basisFxnSF_tmpl_allIter(:));
+    [u, ~, ic] = unique(S);
+    counts = accumarray(ic, 1);
+    [~, idxMax] = max(counts);
+    fileBase.basisFxnSF_mode = u(idxMax);
+    fileBase.basisFxnSF_mode_pct = counts(idxMax) / numel(S);
+
+
+    % =========================================================
+    % File-level L2 ridge summary
+    % =========================================================
+    S = string(data_compIV.ridge_tmpl_allIter(:));
+    [u, ~, ic] = unique(S);
+    counts = accumarray(ic, 1);
+    [~, idxMax] = max(counts);
+    fileBase.ridge_mode = u(idxMax);
+    fileBase.ridge_mode_pct = counts(idxMax) / numel(S);
 
     % =========================================================
     % File-level simulated metrics
@@ -241,6 +284,7 @@ for iFile = 1:nFiles
 
         nBins_curve = numel(pred_metrics_allIter_probe{1}.metrics.IV_allBins);
         DV_allBins_iter = nan(nIter_probe, nBins_curve);
+        nTrials_allBins_iter = nan(nIter_probe, nBins_curve);
         pYES_data_curve_iter = nan(nIter_probe, nBins_curve);
         pC_data_curve_iter = nan(nIter_probe, nBins_curve);
         pA_data_curve_iter = nan(nIter_probe, nBins_curve);
@@ -251,6 +295,7 @@ for iFile = 1:nFiles
             pA_data_iter(iIter) = mean(pred_metrics_allIter_probe{iIter}.metrics.pA_data_allBins, 'omitnan');
 
             DV_allBins_iter(iIter, :) = pred_metrics_allIter_probe{iIter}.metrics.IV_allBins;
+            nTrials_allBins_iter(iIter, :) = pred_metrics_allIter_probe{iIter}.metrics.nTrials_allBins;
             pYES_data_curve_iter(iIter, :) = pred_metrics_allIter_probe{iIter}.metrics.pYES_data_allBins;
             pC_data_curve_iter(iIter, :) = pred_metrics_allIter_probe{iIter}.metrics.pC_data_allBins;
             pA_data_curve_iter(iIter, :) = pred_metrics_allIter_probe{iIter}.metrics.pA_data_allBins;
@@ -261,12 +306,14 @@ for iFile = 1:nFiles
         [fileBase.pA_data_med, fileBase.pA_data_lb, fileBase.pA_data_ub] = getCI(pA_data_iter, 1, 1);
 
         fileBase.DV_allBins_med = nan(1, nBins_curve);
+        fileBase.nTrials_allBins_med = nan(1, nBins_curve);
         fileBase.pYES_data_curve_med = nan(1, nBins_curve);
         fileBase.pC_data_curve_med = nan(1, nBins_curve);
         fileBase.pA_data_curve_med = nan(1, nBins_curve);
 
         for iBin = 1:nBins_curve
             [fileBase.DV_allBins_med(iBin), ~, ~] = getCI(DV_allBins_iter(:, iBin), 1, 1);
+            [fileBase.nTrials_allBins_med(iBin), ~, ~] = getCI(nTrials_allBins_iter(:, iBin), 1, 1);
             [fileBase.pYES_data_curve_med(iBin), ~, ~] = getCI(pYES_data_curve_iter(:, iBin), 1, 1);
             [fileBase.pC_data_curve_med(iBin), ~, ~] = getCI(pC_data_curve_iter(:, iBin), 1, 1);
             [fileBase.pA_data_curve_med(iBin), ~, ~] = getCI(pA_data_curve_iter(:, iBin), 1, 1);
@@ -419,17 +466,17 @@ end % iFile
 
 fprintf('\n\n%s: All files compiled. \n\n', datetime('now'))
 
-% ---------------- Post-processing ----------------
+% Post-processing
 % Apply filter on simulated pC
 R_unfiltered = R;
 R = R_unfiltered([R_unfiltered.keep_pC]);
-assert(nFilesKeep == numel(R)/nBfit)
+% assert(nFilesKeep == numel(R)/nBfit)
 fprintf('\nFiltering by simulated pC in [%.2f, %.2f]: kept %d / %d files.\n', mask_pC, nFilesKeep, nFiles);
 
 % Save the record to /Output
 save(sprintf('%s/Outputs/R_A%d.mat', nameFolder_server, iModelA_fit), 'R', 'R_unfiltered')
 
-% ---------------- Define unique variable levels ----------------
+% Define unique variable levels
 gaborCST_unik = unique([R.gaborCST]);
 Cz_unik = unique([R.Cz_true]);
 Nmul_unik = unique([R.Nmul_true]);
@@ -438,7 +485,8 @@ Nshared_unik = unique([R.Nshared_true]);
 Bsim_unik = unique([R.iModelB_sim]);
 Bfit_unik = unique([R.iModelB_fit]);
 
-%% ---------------- metric list to plot ----------------
+%% metric list to plot
+error
 metricNames_plot = {'template_rmse', 'template_R2', ...
     'pYES_rmse', 'pYES_R2', ...
     'pC_rmse', 'pC_R2', ...
@@ -454,7 +502,7 @@ end
 
 fprintf('\n\n%s: Convert metrics list to plot. \n\n', datetime('now'))
 
-%% ---------------- Figure 1: heatmaps of RMSE and R2----------------
+%% Figure 1: heatmaps of RMSE and R2
 fprintf('\n\n%s: Fig 1: Plot heatmaps of RMSE and R2. \n\n', datetime('now'))
 
 for iModelB_fit = 1:numel(Bfit_unik)
@@ -603,7 +651,7 @@ for iModelB_fit = 1:numel(Bfit_unik)
     end % iModelB_sim
 end % iModelB_fit
 
-%% ---------------- Figure 2: Scatter plots: true vs. estimated values ----------------
+%% Figure 2: Scatter plots: true vs. estimated values
 fprintf('\n\n%s: Fig 2: Scatter plots of true vs. estimated values. \n\n', datetime('now'))
 
 metricNames_scatter = {'pYES', 'pC', 'pA'};
@@ -756,7 +804,7 @@ for iModelB_fit = 1:numel(Bfit_unik)
     end % iParam
 end % iModelB_fit
 
-%% ---------------- Figure 3: Simulated & estimated tuning functions ----------------
+%% Figure 3: Simulated & estimated tuning functions
 % Note that ModelB_fit is not looped
 fprintf('\n\n%s: Fig 3: Marginalized tuning functions. \n\n', datetime('now'))
 
@@ -869,7 +917,7 @@ for iModelB_sim = 1:numel(Bsim_unik)
     end % iFeature
 end % iModelB_sim
 
-%% ---------------- Figure 4: simulated vs predicted metrics ----------------
+%% Figure 4: simulated vs predicted metrics
 fprintf('\n\n%s: Fig 4: Simulated vs predicted metrics.\n\n', datetime('now'))
 
 metricNames_curve = {'pYES', 'pC', 'pA'};
@@ -1018,7 +1066,7 @@ for iModelB_sim = 1:numel(Bsim_unik)
     end % iNshared
 end % iModelB_sim
 
-%% ---------------- Figure 5: model recovery ----------------
+%% Figure 5: model recovery
 fprintf('\n\n%s: Fig 5: Model recovery (panels are GaborCST x True Cz).\n\n', datetime('now'))
 
 scoreField = 'nLL_med'; % <-- change if needed
@@ -1355,12 +1403,18 @@ R2_iter = nan(nIter,1);
 for iIter = 1:nIter
     yData = pred_metrics_allIter{iIter}.metrics.([metricName '_data_allBins'])(:);
     yPred = pred_metrics_allIter{iIter}.metrics.([metricName '_pred_allBins'])(:);
+    nTrials = pred_metrics_allIter{iIter}.metrics.nTrials_allBins(:);
 
-    good = isfinite(yData) & isfinite(yPred);
+    good = isfinite(yData) & isfinite(yPred) & isfinite(nTrials) & (nTrials > 0);
     yData = yData(good);
     yPred = yPred(good);
+    w = nTrials(good);
 
-    rmse_iter(iIter) = sqrt(mean((yData - yPred).^2));
+    if isempty(yData)
+        continue
+    end
+
+    rmse_iter(iIter) = sqrt(sum(w .* (yData - yPred).^2) / sum(w));
 
     sse = sum((yData - yPred).^2);
     sst = sum((yData - mean(yData)).^2);
@@ -1508,7 +1562,7 @@ function fxn_addTuningLegends_oneFigure(Cz_unik, cmap_Cz, gabor_unik, lineStyles
 
 axMain = gca;
 
-% ---------------- Legend 1: color = Cz ----------------
+% Legend 1: color = Cz
 hCz = gobjects(numel(Cz_unik), 1);
 for i = 1:numel(Cz_unik)
     hCz(i) = plot(nan, nan, ...
@@ -1523,7 +1577,7 @@ leg1 = legend(axMain, hCz, ...
     'Orientation', 'horizontal');
 title(leg1, 'Cz');
 
-% ---------------- Legend 2: line style = signal contrast ----------------
+% Legend 2: line style = signal contrast
 ax2 = axes('Position', axMain.Position, 'Color', 'none', 'Visible', 'off');
 hold(ax2, 'on');
 

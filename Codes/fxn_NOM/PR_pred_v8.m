@@ -9,6 +9,10 @@ iPair_allT = data.iPair(:); % pair ID per trial
 iPRS_allT = data.iPRS(:); % 1=PRS, 0=ABS
 correctness_allT = (iPRS_allT == resp_allT); % trial-wise accuracy
 
+pHit_emp = mean(resp_allT(iPRS_allT == 1));
+pFA_emp  = mean(resp_allT(iPRS_allT== 0));
+[~, Cz_emp] = SX_sim06_SDT(pHit_emp, pFA_emp);
+
 nTrials_allBins = data.nTrials_allBins(:);
 iTrial4Bin = data.iTrial4Bin(:);
 
@@ -173,5 +177,7 @@ pred.metrics.pA_pred_allBins = pA_pred_allBins;
 pred.metrics.pA_data_allBins = pA_data_allBins;
 pred.R2_pA = getR2(pA_data_allBins, pA_pred_allBins, nan);
 pred.R2_weighted_pA = getR2(pA_data_allBins, pA_pred_allBins, nTrials_allBins);
+
+pred.Cz_emp = Cz_emp;
 
 end

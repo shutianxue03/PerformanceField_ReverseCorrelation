@@ -6,6 +6,12 @@ if nargin == 6, params_fromStep1 = []; end
 % Extract data
 resp_allT = data.resp(:); % 1 = YES, 0 = NO
 
+% Get Cz_emp
+pHit_emp = mean(data.resp(data.iPRS == 1));
+pFA_emp  = mean(data.resp(data.iPRS == 0));
+[~, Cz_emp] = SX_sim06_SDT(pHit_emp, pFA_emp);
+data.Cz_emp = Cz_emp;
+
 %% Compute nLL based on iStep (0=combine pYES and pA; 1=pYES only (step 1); 2=pA only (step 2))
 switch iStep
     case 0
@@ -20,15 +26,21 @@ switch iStep
         % Calculate nLL based on pA
         nLL_pA = -sum( consistency_allPairs .* log(pA_pred_allPairs) + (1 - consistency_allPairs) .* log(1 - pA_pred_allPairs) );
 
-        % Combine
+        % Combine behavioral likelihood terms
         nLL = nLL_pYES + nLL_pA;
 
-        % Add criterion penalty (actually does not make any difference...)
-        % penaltyCrit = (Cz_fit - Cz_emp)^2;
-        % sigmaC = 1;
-        % nLL_C = 0.5*log(2*pi*sigmaC^2) + 0.5*((Cz_emp - Cz_fit)^2)/(sigmaC^2);
-        % wCrit = C_contribution*nLL_comb / ((1-C_contribution)*nLL_C); % calculate the weight of criterion loss
-        % nLL = nLL_comb + wCrit*nLL_C;
+        % Add criterion penalty in z units, if available
+        if isfield(data, 'Cz_emp') && ~isempty(data.Cz_emp) && isfinite(data.Cz_emp)
+            sigmaC = 0.2; % tune this; smaller sigmaC → stricter penalty; larger sigmaC → weaker penalty;e similar to sd
+            % if we assuming Cz_emp is normally distibuted, centered at
+            % Cz_fit and has SD=sigmaC, then nLL is:
+            nLL_C = 0.5 * ((Cz_fit - data.Cz_emp) / sigmaC)^2;
+
+            % convex combination-like weighting
+            nTrials = numel(resp_allT);
+            nLL_behav = (nLL_pYES + nLL_pA) / nTrials;
+            nLL = (1 - C_contribution) * nLL_behav + C_contribution * nLL_C;
+        end
 
     case 1
         % Step 1: Predict pYES and estimate only the internal noise parameter

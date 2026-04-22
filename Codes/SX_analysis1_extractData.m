@@ -54,7 +54,7 @@ for isubj = 1:nsubj
     if strcmp(subjName, 'SP'), ib_start = 81; end
     ib_end = nBlocks;
     nBlocks = ib_end - ib_start+1;
-    fprintf('\n%s%d (S%d/%d) ...\n', subjName, nBlocks, isubj, nsubj)
+    fprintf('\n%s: %s%d (S%d/%d) ...\n', datetime('now'), subjName, nBlocks, isubj, nsubj)
 
     %% Define names of folders and files
     nameFolder_OOD =  sprintf('%s/%s%d/', nameFolder_Data_OOD, subjName, nBlocks);

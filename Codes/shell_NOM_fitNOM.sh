@@ -7,7 +7,8 @@
 # This script:
 # 1. Runs a small performance evaluation script (optional monitoring)
 # 2. Launches MATLAB and calls:
-# OOD_NOM_Trialwise_fitNOM(isubj, iLocComb, iModelA, iModelB, nIter)
+# loops over iModelB_fit=1:4, calling:
+# OOD_NOM_Trialwise_fitNOM(nBasisORI, nBasisSF, isubj, iLocComb, flag_incluCrit, C_contribution, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
 # ============================================================
 
 #SBATCH --nodes=1
@@ -36,7 +37,7 @@ MATLAB_PREFDIR=$(mktemp -d -t matlab-XXXX)
 echo
 echo "SLURM job ID : $SLURM_JOB_ID"
 echo "SLURM job name: $SLURM_JOB_NAME"
-echo "Subj=$1 Loc=$2 ModelA=$3 ModelB=$4 nIter=$5 iJob=$7/$6"
+echo "Subj=$1 Loc=$2 ModelA=$3 ModelB=1:4 nIter=$4 iJob=$6/$5"
 echo
 
 #############################
@@ -50,16 +51,23 @@ disp('====================================');
 
 isubj = $1;
 iLocComb = $2;
-iModelA = $3;
-iModelB=$4;
-nIter = $5;
-nJob = $6;
-iJob = $7;
+iModelA_fit = $3;
+nIter = $4;
+nJob = $5;
+iJob = $6;
 
-OOD_NOM_Trialwise_fitNOM(isubj, iLocComb, iModelA, iModelB, nIter, nJob, iJob);
+nBasisORI = 6; % hard-coded, not used in this function
+nBasisSF = 6; % hard-coded, not used in this function
+flag_incluCrit = 1; % hard-coded; used; 1=include criterion as a free parameter
+C_contribution = 0.5; % hard-coded; used; contribution of criterion to the model
+
+for iModelB_fit = 1:4
+    fprintf('\n--- ModelB=%d ---\n', iModelB_fit);
+    OOD_NOM_Trialwise_fitNOM(nBasisORI, nBasisSF, isubj, iLocComb, flag_incluCrit, C_contribution, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
+end
 
 disp('====================================');
-disp(' OOD_NOM_Trialwise_fitNOM finished.');
+disp(' OOD_NOM_Trialwise_fitNOM finished (all ModelB).');
 disp('====================================');
 
 exit

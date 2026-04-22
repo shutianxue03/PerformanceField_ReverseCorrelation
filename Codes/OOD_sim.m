@@ -17,7 +17,7 @@ function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true
 
 % ---------------------------- Basic setup ----------------------------- %
 clc; close all;
-warning off; 
+warning off;
 set(0, 'DefaultFigureVisible', 'off')
 
 time_start = datetime('now');
@@ -47,6 +47,7 @@ iJob = 1;
 % Model A/B indices for fitting
 iModelA_fit_all = 1; % 1 = RC-derived template (Model A), 2=ideal template; 3=permuted template
 iModelB_fit_all = 1:4;
+pC_filter = [.6, .8];
 
 templateType_true = 1; % 1 = raw;
 IVType_true = 1; % 1 = sum of dot product;
@@ -316,45 +317,49 @@ pHit_sim = sum((iPRS_allT == 1) & (resp_allT == 1)) / sum(iPRS_allT == 1);
 pFA_sim = sum((iPRS_allT == 0) & (resp_allT == 1)) / sum(iPRS_allT == 0);
 pC_sim = mean( (iPRS_allT==1 & resp_allT==1) | (iPRS_allT==0 & resp_allT==0) );
 
-%--------------------------------------%
-[dprime_sim, Cz_sim] = SX_sim06_SDT(pHit_sim, pFA_sim);
-%--------------------------------------%
+% Stop if simulated pC is too low or too high
+if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
+    %--------------------------------------%
+    [dprime_sim, Cz_sim] = SX_sim06_SDT(pHit_sim, pFA_sim);
+    %--------------------------------------%
 
-respC_sim = nan(nPairs, 1);
-for iPairUnik = 1:nPairs
-    respAB = resp_allT(iPair_allT == iPairUnik);
-    respC_sim(iPairUnik) = (respAB(1) == respAB(2));
-end
-pA_sim = mean(respC_sim);
-
-metrics_sim = [dprime_sim, Cz_sim, pC_sim, pHit_sim, pFA_sim, pA_sim, pYES_sim];
-
-% Save behavioral measures in behavMeas.mat (as expected by compIV)
-save(sprintf('%s/behavMeas.mat', nameFolder_Data_OOD_IO), 'dataMatrix', 'metrics_sim', 'iPRS_allT', 'iPass_allT', 'iPair_allT', 'resp_allT');
-
-fprintf('\n%s: Behavioral data saved.\n\nReady for template generation\n\n', datetime('now'))
-
-%% -------------------------- Plotting DV dist and behav metrics------------------------- %
-if flag_plotDist
-    NOMplot_dist
-end
-
-%% ---------------- Run compIV and fitNOM on this IO --------------------- %
-
-for iModelA_fit = iModelA_fit_all
-    % Step 1: compute IVs, templates, and test-set metrics
-    %------------------------------------%
-    OOD_NOM_Trialwise_compIV(nBasisORI, nBasisSF, {nameIO, criterion_DV_true}, iLocComb, lambda_whiten, flag_regressType, iModelA_fit, nIter, nJob, iJob)
-    %------------------------------------%
-
-    for iModelB_fit = iModelB_fit_all
-        % Step 2: fit NOM parameters and predict metrics
-        %------------------------------------%
-        OOD_NOM_Trialwise_fitNOM(nBasisORI, nBasisSF, {nameIO, criterion_DV_true}, iLocComb, flag_incluCrit, C_contribution, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
-        %------------------------------------%
+    respC_sim = nan(nPairs, 1);
+    for iPairUnik = 1:nPairs
+        respAB = resp_allT(iPair_allT == iPairUnik);
+        respC_sim(iPairUnik) = (respAB(1) == respAB(2));
     end
-end
+    pA_sim = mean(respC_sim);
 
+    metrics_sim = [dprime_sim, Cz_sim, pC_sim, pHit_sim, pFA_sim, pA_sim, pYES_sim];
+
+    % Save behavioral measures in behavMeas.mat (as expected by compIV)
+    save(sprintf('%s/behavMeas.mat', nameFolder_Data_OOD_IO), 'dataMatrix', 'metrics_sim', 'iPRS_allT', 'iPass_allT', 'iPair_allT', 'resp_allT', 'pC_filter');
+
+    fprintf('\n%s: Behavioral data saved.\n\nReady for template generation\n\n', datetime('now'))
+
+    %% -------------------------- Plotting DV dist and behav metrics------------------------- %
+    if flag_plotDist
+        NOMplot_dist
+    end
+
+    %% ---------------- Run compIV and fitNOM on this IO --------------------- %
+
+    for iModelA_fit = iModelA_fit_all
+        % Step 1: compute IVs, templates, and test-set metrics
+        %------------------------------------%
+        OOD_NOM_Trialwise_compIV(nBasisORI, nBasisSF, {nameIO, criterion_DV_true}, iLocComb, lambda_whiten, flag_regressType, iModelA_fit, nIter, nJob, iJob)
+        %------------------------------------%
+
+        for iModelB_fit = iModelB_fit_all
+            % Step 2: fit NOM parameters and predict metrics
+            %------------------------------------%
+            OOD_NOM_Trialwise_fitNOM(nBasisORI, nBasisSF, {nameIO, criterion_DV_true}, iLocComb, flag_incluCrit, C_contribution, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
+            %------------------------------------%
+        end
+    end
+else
+    fprintf('\n\n ** Simulated pC=%.2f, outof the range [%.2f, %.2f] ** \n\n', pC_sim, pC_filter)
+end % if
 
 % Play sound to indicate end of analysis
 fs = 44100;              % sampling rate
@@ -380,8 +385,8 @@ fprintf('%s: Simulation done.\n\n', time_end)
 elapsed = time_end - time_start;
 fprintf('Time used: %s\n\n\n\n', char(elapsed));
 
-end
 
+end
 %% helper
 function [loss, c_z, pHit, pFA] = criterion_loss_cz(k, DV_noisy, iPRS_allT, target_cz)
 

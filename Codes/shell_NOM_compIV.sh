@@ -7,7 +7,7 @@
 # This script:
 # 1. Runs a small performance evaluation script (optional monitoring)
 # 2. Launches MATLAB and calls:
-# OOD_NOM_Trialwise_compIV(isubj, iLocComb, iModelA, nIter)
+# OOD_NOM_Trialwise_compIV(nBasisORI, nBasisSF, isubj, iLocComb, lambda_whiten, flag_regressType, iModelA_fit, nIter, nJob, iJob)
 # ============================================================
 
 #SBATCH --nodes=1
@@ -52,12 +52,17 @@ disp('====================================');
 
 isubj = $1;
 iLocComb = $2;
-iModelA = $3;
+iModelA_fit = $3;
 nIter = $4;
 nJob = $5;
 iJob = $6;
 
-OOD_NOM_Trialwise_compIV(isubj, iLocComb, iModelA, nIter, nJob, iJob);
+nBasisORI = 6; # hard-coded, not used in this function
+nBasisSF = 6; # hard-coded, not used in this function
+lambda_whiten = 1; # hard-coded; used 
+flag_regressType = 2; # hard-coded; used; 2=multivariate regression + smoothing
+
+OOD_NOM_Trialwise_compIV(nBasisORI, nBasisSF, isubj, iLocComb, lambda_whiten, flag_regressType, iModelA_fit, nIter, nJob, iJob)
 
 disp('====================================');
 disp(' OOD_NOM_Trialwise_compIV finished.');

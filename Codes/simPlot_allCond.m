@@ -26,7 +26,7 @@ SX_RC1_setting;
 %% ---------------- settings ----------------
 str_part = 'FlexBasis';     % change if needed
 iModelA_all = 1;        % or 1:2
-iModelB_all = 1;        % or 1:4
+iModelB_all = 3;        % or 1:4
 
 nameFolder_Data = sprintf('%s/Data_%s', nameFolder_server, str_part);
 nameFolder_Data_OOD = sprintf('%s/Data_OOD_%d%d', nameFolder_Data, nORI, nSF);
@@ -36,6 +36,10 @@ nameFolder_Figures_part = fullfile(nameFolder_Figures, sprintf('IO_%s', str_part
 if ~exist(nameFolder_Figures_part, 'dir')
     mkdir(nameFolder_Figures_part);
 end
+
+
+namesMetrics = {'pYES', 'pC', 'pA'};
+nMetrics = numel(namesMetrics);
 
 %% ---------------- find IO folders ----------------
 nameDir = dir(nameFolder_Data_OOD);
@@ -73,14 +77,14 @@ for iModelA_fit = iModelA_all
 
             if ~exist(nameFile_truth, 'file')
                 fprintf('Missing truth.mat: %s\n', nameFile_truth);
-                continue
+                % continue
             end
 
             nameDir_compIV = dir(fullfile(nameFolder_NOM_load, str_loadCompIV));
             nameDir_compIV = nameDir_compIV(~contains({nameDir_compIV.name}, 'min'));
             if isempty(nameDir_compIV)
                 fprintf('No compIV file found in %s\n', nameFolder_NOM_load);
-                continue
+                % continue
             end
             nameFile_compIV = fullfile(nameDir_compIV(1).folder, nameDir_compIV(1).name);
 
@@ -88,7 +92,7 @@ for iModelA_fit = iModelA_all
             nameDir_fitNOM = nameDir_fitNOM(~contains({nameDir_fitNOM.name}, 'min'));
             if isempty(nameDir_fitNOM)
                 fprintf('No fitNOM file found in %s\n', nameFolder_NOM_load);
-                continue
+                % continue
             end
             nameFile_fitNOM = fullfile(nameDir_fitNOM(1).folder, nameDir_fitNOM(1).name);
 
@@ -104,23 +108,6 @@ for iModelA_fit = iModelA_all
             S_truth  = load(nameFile_truth);
             S_compIV = load(nameFile_compIV);
             S_fitNOM = load(nameFile_fitNOM);
-
-            %% ---------- clear potentially stale variables ----------
-            % Clear only variables that commonly appear in these saved files
-            % to avoid accidental carry-over across conditions.
-            clearvars -except ...
-                SX_RC1_setting str_part iModelA_all iModelB_all ...
-                nameFolder_server nameFolder_Figures nameFolder_Figures_part ...
-                nameFolder_Data nameFolder_Data_OOD nameFolder_Data_NOM_Trialwise ...
-                nameDir nFiles iFile iModelA_fit iModelB_fit ...
-                str_loadCompIV str_loadfitNOM namesModelB ...
-                nORI nSF axis_tuning axisTicks_tuning ...
-                nameIO nameFolder_OOD_load nameFolder_NOM_load ...
-                nameFile_truth nameFile_compIV nameFile_fitNOM ...
-                S_truth S_compIV S_fitNOM info
-
-            % Re-load settings function outputs after clearvars pruning if needed
-            % Usually not necessary because they are protected above.
 
             %% ---------- assign loaded fields into workspace ----------
             assign_struct_fields_to_caller(S_truth);
@@ -166,23 +153,67 @@ for iModelA_fit = iModelA_all
 
             %% ---------- Part 1: compIV ----------
             fprintf('%s: Plotting compIV\n', datetime('now'));
-            try
-                NOMplot_compIV
-            catch ME
-                fprintf(2, 'Error in NOMplot_compIV for %s, A=%d, B=%d\n', ...
-                    nameIO, iModelA_fit, iModelB_fit);
-                fprintf(2, '%s\n', getReport(ME, 'extended', 'hyperlinks', 'off'));
-            end
+            % try
+            NOMplot_compIV
+            % catch ME
+            %     fprintf(2, 'Error in NOMplot_compIV for %s, A=%d, B=%d\n', ...
+            %         nameIO, iModelA_fit, iModelB_fit);
+            %     fprintf(2, '%s\n', getReport(ME, 'extended', 'hyperlinks', 'off'));
+            % end
 
             %% ---------- Part 2: fitNOM ----------
             fprintf('%s: Plotting fitNOM\n', datetime('now'));
-            try
-                NOMplot_fitNOM
-            catch ME
-                fprintf(2, 'Error in NOMplot_fitNOM for %s, A=%d, B=%d\n', ...
-                    nameIO, iModelA_fit, iModelB_fit);
-                fprintf(2, '%s\n', getReport(ME, 'extended', 'hyperlinks', 'off'));
+            % Use the min and max of DV to constrain criterion
+            NOMc_lb = min(data_train_allIter{1}.IV);
+            NOMc_ub = max(data_train_allIter{1}.IV);
+            NOMc_0 = mean([NOMc_lb, NOMc_ub]);
+            switch iModelB_fit
+                case 1  % FullModel: multi. + additive + shared, criterion
+                    params0   = [NOMp1_0,   NOMp2_0,   NOMp3_0, NOMc_0];
+                    params_lb = [NOMp1_lb, NOMp2_lb, NOMp3_lb, NOMc_lb];
+                    params_ub = [NOMp1_ub, NOMp2_ub, NOMp3_ub, NOMc_ub];
+
+                case 2  % No Nshared: multi. + additive (no shared noise)
+                    params0   = [NOMp1_0,   NOMp2_0, NOMc_0];
+                    params_lb = [NOMp1_lb, NOMp2_lb, NOMc_lb];
+                    params_ub = [NOMp1_ub, NOMp2_ub, NOMc_ub];
+
+                case 3  % No Nmulti: additive + shared (no multi. noise)
+                    params0   = [NOMp2_0,   NOMp3_0, NOMc_0];
+                    params_lb = [NOMp2_lb, NOMp3_lb, NOMc_lb];
+                    params_ub = [NOMp2_ub, NOMp3_ub, NOMc_ub];
+
+                case 4  % No Nadd: multi. + shared (no additive noise)
+                    params0   = [NOMp1_0,   NOMp3_0, NOMc_0];
+                    params_lb = [NOMp1_lb, NOMp3_lb, NOMc_lb];
+                    params_ub = [NOMp1_ub, NOMp3_ub, NOMc_ub];
+
+                case 5  % Just Nadd: additive only
+                    params0   = [NOMp2_0, NOMc_0];
+                    params_lb = [NOMp2_lb, NOMc_lb];
+                    params_ub = [NOMp2_ub, NOMc_ub];
+
+                case 6  % Just Nmul: multi. only
+                    params0   = [NOMp1_0, NOMc_0];
+                    params_lb = [NOMp1_lb, NOMc_lb];
+                    params_ub = [NOMp1_ub, NOMc_ub];
+
+                case 7  % Just Nshared: shared only
+                    params0   = [NOMp3_0, NOMc_0];
+                    params_lb = [NOMp3_lb, NOMc_lb];
+                    params_ub = [NOMp3_ub, NOMc_ub];
+
+                otherwise
+                    error('OOD_NOM_Trialwise_fitNOM: Unknown iModelB_fit = %d', iModelB_fit);
             end
+
+            % try
+            NOMplot_fitNOM
+            % catch ME
+            %     fprintf(2, 'Error in NOMplot_fitNOM for %s, A=%d, B=%d\n', ...
+            %         nameIO, iModelA_fit, iModelB_fit);
+            %     fprintf(2, '%s\n', getReport(ME, 'extended', 'hyperlinks', 'off'));
+            % end
 
         end % iFile
     end % iModelB_fit
@@ -202,18 +233,13 @@ function info = fxn_parse_nameIO(nameIO)
 
 info = struct();
 
-% Example pattern:
-% ..._gabor0.3_Nmul0.5_Nadd10_Nshared20_Cz0.4_Bsim1
 tok = regexp(nameIO, ...
-    'gabor([-\d\.]+).*Nmul([-\d\.]+).*Nadd([-\d\.]+).*Nshared([-\d\.]+).*Cz([-\d\.]+).*Bsim(\d+)', ...
+    'cG([-\d\.eE]+).*Nm([-\d\.eE]+).*Na([-\d\.eE]+).*Ns([-\d\.eE]+).*Cz([-\d\.eE]+).*B(\d+)', ...
     'tokens', 'once');
 
-if isempty(tok)
-    warning('Could not parse nameIO: %s', nameIO);
-    return
-end
+assert(~isempty(tok), 'ALERT: Could not parse nameIO: %s', nameIO);
 
-info.gaborCST     = str2double(tok{1});
+info.gaborCST     = str2double(tok{1})/100;
 info.Nmul_true    = str2double(tok{2});
 info.Nadd_true    = str2double(tok{3});
 info.Nshared_true = str2double(tok{4});

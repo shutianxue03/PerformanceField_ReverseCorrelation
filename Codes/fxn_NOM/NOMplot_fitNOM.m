@@ -15,6 +15,7 @@ pA_data_allBins = pYES_data_allBins;
 pA_pred_allBins = pYES_data_allBins;
 nData_allBins = pYES_data_allBins;
 DV_allBins_all = pYES_data_allBins;
+Cz_emp_allIter = nan(nIter, 1);
 
 for iIter = 1:nIter
 
@@ -33,6 +34,8 @@ for iIter = 1:nIter
     pA_pred_allBins(iIter, :) = pred_metrics_allIter{iIter}.metrics.pA_pred_allBins;
 
     nData_allBins(iIter, :) = data_test_allIter{iIter}.nTrials_allBins;
+
+    Cz_emp_allIter(iIter) = pred_metrics_allIter{iIter}.Cz_emp;
 end
 
 % fprintf('\n *** Compiling DONE, READY to plot ***\n ')
@@ -119,94 +122,182 @@ sgtitle(sprintf('Figure 1. Metrics vs. binned DV\n%s\nModelA%dB%d %s, L%d, nIter
     subjName, iModelA_fit, iModelB_fit, namesModelB{iModelB_fit}, iLocComb, nIter), ...
     'fontsize', 10)
 
-saveas(gcf, sprintf('%s/4Metrics_L%d_A%dB%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit, iModelB_fit))
+saveas(gcf, sprintf('%s/21Metrics_L%d_A%dB%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit, iModelB_fit))
 
 %% 2. Plot estimated parameters across iterations
-nParams_full = 4; % Nmul, Nadd, Nshared, criterion_DV
+nParams_full = 5; % Nmul, Nadd, Nshared, criterion_DV, empirical Cz
+params_est_allIter = [params_est_allIter, Cz_emp_allIter];
 
-figure('Position', [100,100,nParams_full*400,400]);
+% Load truth once if this is a simulation dataset
+hasTruth = numel(subjName) > 10;
+if hasTruth
+    S_truth = load(fullfile(nameFolder_OOD_load, 'truth.mat'), '*_true');
+end
 
-for iParam = 1:nParams
-    % Load and plot the true param
-   if numel(subjName) > 10
-        load(sprintf('%s/truth.mat', nameFolder_OOD_load), '*_true')
-        switch iModelB_fit
-            case 1 % full
-                subplot(1, nParams_full, iParam); hold on
-                switch iParam
-                    case 1, val_yline = Nmul_true;
-                    case 2, val_yline = Nadd_true;
-                    case 3, val_yline = Nshared_true;
-                    case 4, val_yline = criterion_DV_true;
-                end
-            case 2 % No Nshared
-                switch iParam
-                    case 1, val_yline = Nmul_true; subplot(1, nParams_full, iParam); hold on
-                    case 2, val_yline = Nadd_true; subplot(1, nParams_full, iParam); hold on
-                    case 3, val_yline = criterion_DV_true; subplot(1, nParams_full, iParam+1); hold on
-                end 
-            case 3 % No Nmul
-                subplot(1, nParams_full, iParam+1); hold on
-                switch iParam
-                    case 1, val_yline = Nadd_true;
-                    case 2, val_yline = Nshared_true;
-                    case 3, val_yline = criterion_DV_true;
-                end
-            case 4 % No Nadd
-                switch iParam
-                    case 1, val_yline = Nmul_true; subplot(1, nParams_full, 1); hold on
-                    case 2, val_yline = Nshared_true; subplot(1, nParams_full, iParam+1); hold on
-                    case 3, val_yline = criterion_DV_true; subplot(1, nParams_full, iParam+1); hold on
-                end
-        end
-        yline(val_yline, 'r-');
+% Define fixed 5-column layout
+% Columns: 1=Nmul, 2=Nadd, 3=Nshared, 4=criterion_DV, 5=empirical Cz
+switch iModelB_fit
+    case 1 % Full: Nmul, Nadd, Nshared, criterion_DV
+        col_idx      = [1 2 3 4 5];
+        param_labels = {'Nmul', 'Nadd', 'Nshared', 'criterion_DV', 'Empirical Cz'};
+        ylim_list    = {[0 1], [0 50], [0 50], [0 50], [-1 1]};
+        true_vals    = get_true_vals(hasTruth, S_truth, {'Nmul_true','Nadd_true','Nshared_true','criterion_DV_true','Cz_true'});
+
+    case 2 % No Nshared: Nmul, Nadd, criterion_DV
+        col_idx      = [1 2 4 5];
+        param_labels = {'Nmul', 'Nadd', 'criterion_DV', 'Empirical Cz'};
+        ylim_list    = {[0 1], [0 50], [0 50], [-1 1]};
+        true_vals    = get_true_vals(hasTruth, S_truth, {'Nmul_true','Nadd_true','criterion_DV_true','Cz_true'});
+
+    case 3 % No Nmul: Nadd, Nshared, criterion_DV
+        col_idx      = [2 3 4 5];
+        param_labels = {'Nadd', 'Nshared', 'criterion_DV', 'Empirical Cz'};
+        ylim_list    = {[0 50], [0 50], [0 50], [-1 1]};
+        true_vals    = get_true_vals(hasTruth, S_truth, {'Nadd_true','Nshared_true','criterion_DV_true','Cz_true'});
+
+    case 4 % No Nadd: Nmul, Nshared, criterion_DV
+        col_idx      = [1 3 4 5];
+        param_labels = {'Nmul', 'Nshared', 'criterion_DV', 'Empirical Cz'};
+        ylim_list    = {[0 1], [0 50], [0 50], [-1 1]};
+        true_vals    = get_true_vals(hasTruth, S_truth, {'Nmul_true','Nshared_true','criterion_DV_true','Cz_true'});
+
+    otherwise
+        error('Unknown iModelB_fit = %d', iModelB_fit);
+end
+
+figure('Position', [100, 100, nParams_full * 400, 400]);
+
+for iParam = 1:size(params_est_allIter, 2)
+
+    thisCol   = col_idx(iParam);
+    thisLabel = param_labels{iParam};
+    thisYLim  = ylim_list{iParam};
+    thisVals  = params_est_allIter(:, iParam);
+
+    subplot(1, nParams_full, thisCol); hold on;
+
+    % Plot true value if available
+    if hasTruth && ~isnan(true_vals(iParam))
+        yline(true_vals(iParam), 'r-', 'LineWidth', 1.2, 'DisplayName', 'True value');
     end
 
     % Plot estimate per iteration
-    plot(params_est_allIter(:, iParam), '-o');
+    plot(thisVals, 'ko', 'LineWidth', 1, 'DisplayName', 'Estimates');
 
-    % Plot the average (should be changed to median later)
-    yline(nanmean(params_est_allIter(:, iParam)), 'k-')
+    % Plot median across iterations
+    medVal = nanmedian(thisVals);
+    SDVal = std(thisVals);
+    yline(medVal, 'k-', 'LineWidth', 1.2, 'DisplayName', 'Med. est.');
 
-    ylim([params_lb(iParam), params_ub(iParam)])
+    ylim(thisYLim);
     xlabel('Iteration');
-    ylabel(namesModelBparams{iModelB_fit}{iParam});
-    title(sprintf('Parameter: %s\n %.2f', namesModelBparams{iModelB_fit}{iParam}, nanmean(params_est_allIter(:, iParam))));
+    ylabel(thisLabel);
+    title(sprintf('Parameter: %s\n%.2f (SD=%.2f)', thisLabel, medVal, SDVal));
+    box on;
 
-    % Set ylimit
-    switch iModelB_fit
-        case 1 % full model: Nmul, Nadd, Nshared, criterion in DV
-            switch iParam
-                case 1, ylim([0, 1])
-                case 2, ylim([0, 50])
-                case 3, ylim([0, 50])
-                case 4, ylim([0, 50])
-            end
-        case 2 % No Nshared
-            switch iParam
-                case 1, ylim([0, 1])
-                case 2, ylim([0, 50])
-                case 3, ylim([0, 50])
-            end
-        case 3 % No Nmul
-            switch iParam
-                case 1, ylim([0, 50])
-                case 2, ylim([0, 50])
-                case 3, ylim([0, 50])
-            end
-        case 4 % No Nadd
-            switch iParam
-                case 1, ylim([0, 1])
-                case 2, ylim([0, 50])
-                case 3, ylim([0, 50])
-            end
+    if iParam==1
+        legend('show', 'Location', 'best')
     end
 end
 
 sgtitle(sprintf('Figure 2. Estimated parameters across iterations\n%s (ModelA%dB%d %s, L%d, nIter=%d)', ...
-    subjName, iModelA_fit, iModelB_fit, namesModelB{iModelB_fit}, iLocComb, nIter))
+    subjName, iModelA_fit, iModelB_fit, namesModelB{iModelB_fit}, iLocComb, nIter));
 
-saveas(gcf, sprintf('%s/5Params_L%d_A%dB%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit, iModelB_fit))
+saveas(gcf, sprintf('%s/22Params_L%d_A%dB%d.jpg', ...
+    nameFolder_Figures_perSubj, iLocComb, iModelA_fit, iModelB_fit));
+
+%% 3. Correlation between paired parameters across iterations
+params_plot = params_est_allIter(:, 1:numel(param_labels));
+nParams_plot = size(params_plot, 2);
+
+% 68% CI summary for each parameter across iterations
+param_med = nan(1, nParams_plot);
+param_lb68 = nan(1, nParams_plot);
+param_ub68 = nan(1, nParams_plot);
+for iParam = 1:nParams_plot
+    [param_med(iParam), param_lb68(iParam), param_ub68(iParam)] = getCI(params_plot(:, iParam), 1, 1);
+end
+
+figure('Position', [100, 100, 320*nParams_plot, 320*nParams_plot]);
+
+for iRow = 1:nParams_plot
+    for iCol = 1:nParams_plot
+        if iCol >= iRow
+        subplot(nParams_plot, nParams_plot, (iRow-1)*nParams_plot + iCol); hold on;
+
+        x = params_plot(:, iCol);
+        y = params_plot(:, iRow);
+        valid = ~isnan(x) & ~isnan(y);
+        x = x(valid);
+        y = y(valid);
+
+        if iRow == iCol
+            % diagonal: show 1D distribution across iterations
+            histogram(x, 'FaceColor', [0.7 0.7 0.7], 'EdgeColor', 'none');
+            xline(param_med(iCol), 'k-', 'LineWidth', 1.2);
+            xline(param_lb68(iCol), 'k--', 'LineWidth', 1);
+            xline(param_ub68(iCol), 'k--', 'LineWidth', 1);
+            if hasTruth && ~isnan(true_vals(iCol))
+                xline(true_vals(iCol), 'r-', 'LineWidth', 1.2);
+            end
+            xlabel(param_labels{iCol});
+            ylabel('Count');
+            title(param_labels{iCol}, 'Interpreter', 'none');
+        else
+            % scatter across iterations
+            plot(x, y, 'ko', 'MarkerSize', 4, 'MarkerFaceColor', [0.65 0.65 0.65], ...
+                'MarkerEdgeColor', [0.65 0.65 0.65]);
+
+            % median point with 68% CI error bars
+            errorbar(param_med(iCol), param_med(iRow), ...
+                param_med(iRow)-param_lb68(iRow), param_ub68(iRow)-param_med(iRow), ...
+                param_med(iCol)-param_lb68(iCol), param_ub68(iCol)-param_med(iCol), ...
+                'k', 'LineStyle', 'none', 'LineWidth', 1.2, 'CapSize', 0);
+            plot(param_med(iCol), param_med(iRow), 'kx', 'MarkerSize', 12, 'LineWidth', 2);
+
+            % true value cross for simulations
+            if hasTruth && ~isnan(true_vals(iCol)) && ~isnan(true_vals(iRow))
+                plot(true_vals(iCol), true_vals(iRow), 'rx', 'MarkerSize', 12, 'LineWidth', 2);
+            end
+
+            % correlation across iterations
+            if numel(x) >= 3 && std(x) > 0 && std(y) > 0
+                r_xy = corr(x, y, 'rows', 'complete');
+                title(sprintf('r = %.2f', r_xy));
+            end
+
+            xlabel(param_labels{iCol}, 'Interpreter', 'none');
+            ylabel(param_labels{iRow}, 'Interpreter', 'none');
+
+            % if true_vals(iRow)<=0
+            %     ylim([-1,1])
+            % elseif true_vals(iRow)<=1
+            %     ylim([0,1])
+            % else
+            %     ylim([0,20])
+            % end
+            % 
+            % if true_vals(iCol)<=0
+            %     xlim([-1,1])
+            % elseif true_vals(iCol)<=1
+            %     xlim([0,1])
+            % else
+            %     xlim([0,20])
+            % end
+
+        end
+
+        box on; axis square
+        end
+    end
+end
+
+sgtitle(sprintf(['Figure 3. Pairwise correlation between parameter estimates across iterations\n' ...
+    '%s (ModelA%dB%d %s, L%d, nIter=%d)'], ...
+    subjName, iModelA_fit, iModelB_fit, namesModelB{iModelB_fit}, iLocComb, nIter));
+
+saveas(gcf, sprintf('%s/23ParamCorr_L%d_A%dB%d.jpg', ...
+    nameFolder_Figures_perSubj, iLocComb, iModelA_fit, iModelB_fit));
 
 %% 3. Freeze other params and vary one param to see its corr with pA
 % figure('Position', [0 0 1e3 800])
@@ -271,4 +362,19 @@ saveas(gcf, sprintf('%s/5Params_L%d_A%dB%d.jpg', nameFolder_Figures_perSubj, iLo
 % sgtitle(sprintf('Figure 3. Vary one param (and freeze others) to see its corr with pA\n%s (ModelA%dB%d %s, L%d, nIter=%d)', ...
 %     subjName, iModelA_fit, iModelB_fit, namesModelB{iModelB_fit}, iLocComb, nIter))
 %
-% saveas(gcf, sprintf('%s/6FreezeCorr_L%d_A%dB%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit, iModelB_fit))
+% saveas(gcf, sprintf('%s/24FreezeCorr_L%d_A%dB%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit, iModelB_fit))
+
+
+
+%% -------- local helper --------
+function vals = get_true_vals(hasTruth, S_truth, field_names)
+vals = nan(1, numel(field_names));
+if ~hasTruth
+    return
+end
+for ii = 1:numel(field_names)
+    if isfield(S_truth, field_names{ii})
+        vals(ii) = S_truth.(field_names{ii});
+    end
+end
+end
