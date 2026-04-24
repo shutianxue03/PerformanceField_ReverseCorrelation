@@ -628,9 +628,11 @@ if ~isfield(opts, 'foldID'), opts.foldID = []; end
 if ~isfield(opts, 'rngSeed'), opts.rngSeed = []; end
 if ~isfield(opts, 'stratifyByResp') || isempty(opts.stratifyByResp), opts.stratifyByResp = true; end
 if ~isfield(opts, 'basisFamilyORI') || isempty(opts.basisFamilyORI), opts.basisFamilyORI = 'circ_gaussian'; end
-if ~isfield(opts, 'basisFamilySF') || isempty(opts.basisFamilySF), opts.basisFamilySF = 'gaussian_log2'; end
+if ~isfield(opts, 'basisFamilySF') || isempty(opts.basisFamilySF), opts.basisFamilySF = 'gaussianLog2'; end
 if ~isfield(opts, 'kappaORI'), opts.kappaORI = []; end
 if ~isfield(opts, 'widthSF_logParabola'), opts.widthSF_logParabola = []; end
+if ~isfield(opts, 'widthSF_logParabola_left'),  opts.widthSF_logParabola_left  = []; end
+if ~isfield(opts, 'widthSF_logParabola_right'), opts.widthSF_logParabola_right = []; end
 end
 
 %% Helper:
@@ -729,12 +731,12 @@ axis_sf_log2 = axis_sf_log2(:);
 axis_sf_cpd = 2 .^ axis_sf_log2;
 
 if ~isfield(opts, 'basisFamilySF') || isempty(opts.basisFamilySF)
-    opts.basisFamilySF = 'gaussian_log2';
+    opts.basisFamilySF = 'gaussianLog2';
 end
 
 switch lower(opts.basisFamilySF)
 
-    case 'gaussian_log2'
+    case 'gaussianlog2'
         centersSF_log2 = linspace(min(axis_sf_log2), max(axis_sf_log2), opts.nBasisSF);
 
         if isempty(opts.sigmaSF_log2)
@@ -769,7 +771,37 @@ switch lower(opts.basisFamilySF)
             Bsf(:,k) = logparabola_basis(axis_sf_cpd, centersSF_cpd(k), widthSF);
         end
 
-    case 'asym_gaussian_log2'
+    case 'asymlogparabola'
+        centersSF_cpd = logspace(log10(min(axis_sf_cpd)), log10(max(axis_sf_cpd)), opts.nBasisSF);
+
+        if ~isfield(opts, 'widthSF_logParabola_left') || isempty(opts.widthSF_logParabola_left)
+            if opts.nBasisSF > 1
+                d = mean(diff(log10(centersSF_cpd)));
+                width_left = max(d * 1.0, 1e-3);
+            else
+                width_left = 0.3;
+            end
+        else
+            width_left = opts.widthSF_logParabola_left;
+        end
+
+        if ~isfield(opts, 'widthSF_logParabola_right') || isempty(opts.widthSF_logParabola_right)
+            if opts.nBasisSF > 1
+                d = mean(diff(log10(centersSF_cpd)));
+                width_right = max(d * 1.5, 1e-3);
+            else
+                width_right = 0.5;
+            end
+        else
+            width_right = opts.widthSF_logParabola_right;
+        end
+
+        Bsf = zeros(length(axis_sf_cpd), numel(centersSF_cpd));
+        for k = 1:numel(centersSF_cpd)
+            Bsf(:,k) = asym_logparabola_basis(axis_sf_cpd, centersSF_cpd(k), width_left, width_right);
+        end
+
+    case 'asymgaussianlog2'
         centersSF_log2 = linspace(min(axis_sf_log2), max(axis_sf_log2), opts.nBasisSF);
         if ~isfield(opts, 'sigmaSF_log2_left') || isempty(opts.sigmaSF_log2_left)
             if opts.nBasisSF > 1
@@ -794,7 +826,6 @@ switch lower(opts.basisFamilySF)
         end
         Bsf = zeros(length(axis_sf_log2), numel(centersSF_log2));
         for k = 1:numel(centersSF_log2)
-
             Bsf(:,k) = asym_gaussian_log2_basis(axis_sf_log2, centersSF_log2(k), sigma_left, sigma_right);
         end
     otherwise
@@ -829,6 +860,22 @@ idxRight = x_log2 > center_log2;
 
 y(idxLeft)  = exp(-0.5 * ((x_log2(idxLeft)  - center_log2) ./ sigma_left ).^2);
 y(idxRight) = exp(-0.5 * ((x_log2(idxRight) - center_log2) ./ sigma_right).^2);
+end
+
+%% Helper:
+% Asymmetric log-parabola basis: uses different widths on the low-SF and
+% high-SF flanks. x_cpd and peakSF are in linear cpd; width_left/right
+% are in log10 octave units (same convention as logparabola_basis).
+function y = asym_logparabola_basis(x_cpd, peakSF, width_left, width_right)
+
+x_cpd = max(x_cpd(:), eps);
+y = zeros(size(x_cpd));
+
+idxLeft  = x_cpd <= peakSF;
+idxRight = x_cpd >  peakSF;
+
+y(idxLeft)  = 10 .^ (-(log10(x_cpd(idxLeft)  ./ peakSF) ./ width_left ).^2);
+y(idxRight) = 10 .^ (-(log10(x_cpd(idxRight) ./ peakSF) ./ width_right).^2);
 end
 
 %% Helper:

@@ -126,7 +126,7 @@ sgtitle(sprintf('Figure 1. Metrics vs. binned DV\n%s\nModelA%dB%d %s, L%d, nIter
     subjName, iModelA_fit, iModelB_fit, namesModelB{iModelB_fit}, iLocComb, nIter), ...
     'fontsize', 10)
 
-saveas(gcf, sprintf('%s/4Metrics_L%d_A%dB%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit, iModelB_fit))
+saveas(gcf, sprintf('%s/21Metrics_L%d_A%dB%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit, iModelB_fit))
 
 %% 2. Plot estimated parameters across iterations
 nParams_full = 5; % Nmul, Nadd, Nshared, criterion_DV, empirical Cz
@@ -267,7 +267,7 @@ end
 sgtitle(sprintf('Figure 2. Estimated parameters across iterations\n%s (ModelA%dB%d %s, L%d, nIter=%d)', ...
     subjName, iModelA_fit, iModelB_fit, namesModelB{iModelB_fit}, iLocComb, nIter));
 
-saveas(gcf, sprintf('%s/5Params_L%d_A%dB%d.jpg', ...
+saveas(gcf, sprintf('%s/22Params_L%d_A%dB%d.jpg', ...
     nameFolder_Figures_perSubj, iLocComb, iModelA_fit, iModelB_fit));
 
 %% 3. Correlation between paired parameters across iterations
@@ -363,7 +363,7 @@ sgtitle(sprintf(['Figure 3. Pairwise correlation between parameter estimates acr
     '%s (ModelA%dB%d %s, L%d, nIter=%d)'], ...
     subjName, iModelA_fit, iModelB_fit, namesModelB{iModelB_fit}, iLocComb, nIter));
 
-saveas(gcf, sprintf('%s/6ParamCorr_L%d_A%dB%d.jpg', ...
+saveas(gcf, sprintf('%s/23ParamCorr_L%d_A%dB%d.jpg', ...
     nameFolder_Figures_perSubj, iLocComb, iModelA_fit, iModelB_fit));
 
 %% 3. Freeze other params and vary one param to see its corr with pA
@@ -443,7 +443,7 @@ saveas(gcf, sprintf('%s/6ParamCorr_L%d_A%dB%d.jpg', ...
 %     subjName, iModelA_fit, iModelB_fit, namesModelB{iModelB_fit}, iLocComb, nIter))
 %     subjName, iModelA_fit, iModelB_fit, namesModelB{iModelB_fit}, iLocComb, nIter))
 %
-% saveas(gcf, sprintf('%s/6FreezeCorr_L%d_A%dB%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit, iModelB_fit))
+% saveas(gcf, sprintf('%s/24FreezeCorr_L%d_A%dB%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit, iModelB_fit))
 
 
 

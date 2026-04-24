@@ -27,7 +27,7 @@ nameFolder_server = '/Volumes/server/Users/purplab/EXPERIMENTS/1_Current_Experim
 nameFolder_server = '/Users/xueshutian/Desktop/GitHub_local/PF_RC'; str_envir = 'Local'; 
 
 % if run on local for model simulation (the lab iMac)
-nameFolder_server = '/Users/sx712/Desktop/GitHub_local/PF_RC'; str_envir = 'Local'; 
+% nameFolder_server = '/Users/sx712/Desktop/GitHub_local/PF_RC'; str_envir = 'Local'; 
 
 %% Define names of folders to load/save data 
 nameFolder_Data = sprintf('%s/Data', nameFolder_server) ;

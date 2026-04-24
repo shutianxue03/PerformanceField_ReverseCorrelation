@@ -87,7 +87,7 @@ template_full_ave = template_full_ave/norm(template_full_ave(:));
 figure('Position', [100, 100, 2e3, 2e3])
 
 subplot(2,3,1), hold on
-imagesc(axis_tuning{2}, axis_tuning{1}, template_ideal), axis square, colorbar, %clim([0, .2])
+imagesc(axis_tuning{2}, axis_tuning{1}, template_ideal); axis square; colorbar; %clim([0, .2])
 xline(1, 'r-'); % log gabor SF
 yline(0, 'r-'); % Gabor ori
 xlabel('Spatial Frequency'), ylabel('Orientation')
@@ -96,7 +96,7 @@ yticks(axisTicks_tuning{1}), yticklabels(axisTL_tuning{1})
 title('True template')
 
 subplot(2,3,2), hold on
-imagesc(axis_tuning{2}, axis_tuning{1}, template_tmpl_ave), axis square, colorbar, %clim([0, .2])
+imagesc(axis_tuning{2}, axis_tuning{1}, template_tmpl_ave); axis square; colorbar; %clim([0, .2])
 xline(1, 'r-'); % log gabor SF
 yline(0, 'r-'); % Gabor ori
 xlabel('Spatial Frequency'), ylabel('Orientation')
@@ -105,7 +105,7 @@ yticks(axisTicks_tuning{1}), yticklabels(axisTL_tuning{1})
 title('Template derived from TRAINING trials')
 
 subplot(2,3,3), hold on
-imagesc(axis_tuning{2}, axis_tuning{1}, template_tmpl_ave-template_ideal), axis square, colorbar
+imagesc(axis_tuning{2}, axis_tuning{1}, template_tmpl_ave-template_ideal); axis square; colorbar;
 xline(1, 'r-'); % log gabor SF
 yline(0, 'r-'); % Gabor ori
 xlabel('Spatial Frequency'), ylabel('Orientation')
@@ -114,7 +114,7 @@ yticks(axisTicks_tuning{1}), yticklabels(axisTL_tuning{1})
 title('Difference with the true template')
 
 subplot(2,3,4), hold on
-imagesc(axis_tuning{2}, axis_tuning{1}, template_tmpl_ave-template_full_ave), axis square, colorbar
+imagesc(axis_tuning{2}, axis_tuning{1}, template_tmpl_ave-template_full_ave); axis square; colorbar;
 xline(1, 'r-'); % log gabor SF
 yline(0, 'r-'); % Gabor ori
 xlabel('Spatial Frequency'), ylabel('Orientation')
@@ -123,7 +123,7 @@ yticks(axisTicks_tuning{1}), yticklabels(axisTL_tuning{1})
 title('Full template minus training template')
 
 subplot(2,3,5), hold on
-imagesc(axis_tuning{2}, axis_tuning{1}, template_full_ave), axis square, colorbar, %clim([0, .2])
+imagesc(axis_tuning{2}, axis_tuning{1}, template_full_ave); axis square; colorbar; %clim([0, .2])
 xline(1, 'r-'); % log gabor SF
 yline(0, 'r-'); % Gabor ori
 xlabel('Spatial Frequency'), ylabel('Orientation')
@@ -132,7 +132,7 @@ yticks(axisTicks_tuning{1}), yticklabels(axisTL_tuning{1})
 title('Template derived from ALL trials')
 
 subplot(2,3,6), hold on
-imagesc(axis_tuning{2}, axis_tuning{1}, template_full_ave-template_ideal), axis square, colorbar
+imagesc(axis_tuning{2}, axis_tuning{1}, template_full_ave-template_ideal); axis square; colorbar;
 xline(1, 'r-'); % log gabor SF
 yline(0, 'r-'); % Gabor ori
 xlabel('Spatial Frequency'), ylabel('Orientation')
