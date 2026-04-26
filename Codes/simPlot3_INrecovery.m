@@ -23,7 +23,7 @@ SX_RC1_setting;
 %--------------%
 
 %% settings
-str_part = 'Part4_Ccontr05'; % <-- change if needed
+str_part = 'Lambda1'; % <-- change if needed
 iModelA_fit = 1; %1=use data-derived template; 2=use true template
 mask_pC = [.6, .8]; % only analyze simulated datasets wtih pC falling within this range
 nBfit = 4; % number of fitted models
@@ -51,7 +51,7 @@ end
 
 fprintf('\nFound %d IO folders.\n', nFiles);
 
-%% parse all conditions once
+%% Parse all conditions once
 info_all = cell(nFiles, 1);
 keepParse = false(nFiles, 1);
 
@@ -77,7 +77,7 @@ nFiles = numel(info_all);
 
 fprintf('Parsed %d valid IO folders.\n', nFiles);
 
-%% compile all fitted models
+%% Compile all fitted models
 
 R = struct([]);
 
@@ -92,7 +92,7 @@ for iFile = 1:nFiles
     info = info_all{iFile};
 
     % =========================================================
-    % 1. Load file-level data once
+    % 1. Load data once
     % =========================================================
     nameFile_truth = fullfile(info.folder_OOD, 'truth.mat');
     if ~exist(nameFile_truth, 'file')
@@ -111,7 +111,7 @@ for iFile = 1:nFiles
     data_compIV = load(fullfile(nameDir_compIV(1).folder, nameDir_compIV(1).name));
 
     % =========================================================
-    % 2. File-level metadata and iteration count
+    % 2. metadata and iteration count
     % =========================================================
     fileBase = info;
 
@@ -126,7 +126,15 @@ for iFile = 1:nFiles
         % end
     end
 
-    % initialize file-level shared fields
+    % initialize shared fields
+    % true values -> template-related values -> tuning-related values ->
+    % metric-related values -> parameter-related values -> criterion-related values
+
+    % ---------- true values ----------
+    fileBase.lambda_whiten = nan;
+    fileBase.C_contribution = nan;
+
+    % ---------- template-related values ----------
     fileBase.template_rmse = nan;
     fileBase.template_R2 = nan;
     fileBase.template_rmse_iter = [];
@@ -135,7 +143,14 @@ for iFile = 1:nFiles
     fileBase.nBasisORI_mode_pct = nan;
     fileBase.nBasisSF_mode = nan;
     fileBase.nBasisSF_mode_pct = nan;
+    fileBase.basisFxnORI_mode = "";
+    fileBase.basisFxnORI_mode_pct = nan;
+    fileBase.basisFxnSF_mode = "";
+    fileBase.basisFxnSF_mode_pct = nan;
+    fileBase.ridge_mode = "";
+    fileBase.ridge_mode_pct = nan;
 
+    % ---------- tuning-related values ----------
     fileBase.margORI_true = nan(1, nORI);
     fileBase.margSF_true = nan(1, nSF);
     fileBase.margORI_est_med = nan(1, nORI);
@@ -143,6 +158,7 @@ for iFile = 1:nFiles
     fileBase.margORI_est_iter_norm = [];
     fileBase.margSF_est_iter_norm = [];
 
+    % ---------- metric-related values ----------
     fileBase.pYES_data_med = nan; fileBase.pYES_data_lb = nan; fileBase.pYES_data_ub = nan;
     fileBase.pC_data_med = nan; fileBase.pC_data_lb = nan; fileBase.pC_data_ub = nan;
     fileBase.pA_data_med = nan; fileBase.pA_data_lb = nan; fileBase.pA_data_ub = nan;
@@ -153,14 +169,18 @@ for iFile = 1:nFiles
     fileBase.pC_data_curve_med = [];
     fileBase.pA_data_curve_med = [];
 
+    % ---------- criterion-related values ----------
     fileBase.criterion_DV_true = nan;
     fileBase.keep_pC = false;
 
+    fileBase.lambda_whiten = truth.lambda_whiten;
+    fileBase.C_contribution = truth.C_contribution;
+
     % =========================================================
-    % 3. File-level template recovery
+    % 1. template recovery
     % =========================================================
     [template_rmse_iter, template_R2_iter] = fxn_templateRecovery_simPlot2Style_iter( ...
-        truth, data_compIV, nIter, nORI, nSF);
+        truth, data_compIV, nIter);
 
     [fileBase.template_rmse, ~, ~] = getCI(template_rmse_iter, 1, 1);
     [fileBase.template_R2, ~, ~] = getCI(template_R2_iter, 1, 1);
@@ -220,7 +240,7 @@ for iFile = 1:nFiles
     fileBase.margSF_est_iter_norm = margSF_est_iter_norm;
 
     % =========================================================
-    % File-level basis-count summary
+    % 2. Basis-settings-related values
     % =========================================================
     nBasisORI_allIter = data_compIV.nBasisORI_tmpl_allIter;
     nBasisSF_allIter = data_compIV.nBasisSF_tmpl_allIter;
@@ -231,9 +251,6 @@ for iFile = 1:nFiles
     fileBase.nBasisSF_mode = mode(nBasisSF_allIter);
     fileBase.nBasisSF_mode_pct = mean(nBasisSF_allIter == mode(nBasisSF_allIter));
 
-    % =========================================================
-    % File-level basis-family summary
-    % =========================================================
     S = string(data_compIV.basisFxnORI_tmpl_allIter(:));
     [u, ~, ic] = unique(S);
     counts = accumarray(ic, 1);
@@ -248,10 +265,7 @@ for iFile = 1:nFiles
     fileBase.basisFxnSF_mode = u(idxMax);
     fileBase.basisFxnSF_mode_pct = counts(idxMax) / numel(S);
 
-
-    % =========================================================
-    % File-level L2 ridge summary
-    % =========================================================
+    % L2 ridge summary
     S = string(data_compIV.ridge_tmpl_allIter(:));
     [u, ~, ic] = unique(S);
     counts = accumarray(ic, 1);
@@ -260,7 +274,7 @@ for iFile = 1:nFiles
     fileBase.ridge_mode_pct = counts(idxMax) / numel(S);
 
     % =========================================================
-    % File-level simulated metrics
+    % 3. Metric-related value
     % Use first available Bfit file only because simulated data do not depend on fitted model
     % =========================================================
     found_fit_for_data = false;
@@ -339,7 +353,7 @@ for iFile = 1:nFiles
     fprintf(': med sim pC=%.2f, keep? %d', fileBase.pC_data_med, fileBase.keep_pC)
 
     % =========================================================
-    % Fit-level quantities: one row per Bfit
+    % 4. Fitted-model-related values
     % =========================================================
     for iModelB_fit = 1:nBfit
 
@@ -356,6 +370,18 @@ for iFile = 1:nFiles
         Ri.iModelB_fit = iModelB_fit;
 
         % initialize fit-level fields
+        % true values -> template-related values -> tuning-related values ->
+        % metric-related values -> parameter-related values -> criterion-related values
+
+        % ---------- true values ----------
+
+        % ---------- template-related values ----------
+        % inherited from fileBase
+
+        % ---------- tuning-related values ----------
+        % inherited from fileBase
+
+        % ---------- metric-related values ----------
         Ri.pYES_rmse = nan; Ri.pYES_R2 = nan;
         Ri.pC_rmse = nan; Ri.pC_R2 = nan;
         Ri.pA_rmse = nan; Ri.pA_R2 = nan;
@@ -370,14 +396,16 @@ for iFile = 1:nFiles
 
         Ri.nLL_med = nan; Ri.nLL_lb = nan; Ri.nLL_ub = nan;
 
+    % ---------- parameter-related values ----------
+    Ri.Nmul_rmse = nan; Ri.Nmul_est_med = nan; Ri.Nmul_est_lb = nan; Ri.Nmul_est_ub = nan;
+    Ri.Nadd_rmse = nan; Ri.Nadd_est_med = nan; Ri.Nadd_est_lb = nan; Ri.Nadd_est_ub = nan;
+    Ri.Nshared_rmse = nan; Ri.Nshared_est_med = nan; Ri.Nshared_est_lb = nan; Ri.Nshared_est_ub = nan;
+
+    % ---------- criterion-related values ----------
         Ri.criterion_DV_rmse = nan;
         Ri.criterion_DV_est_med = nan;
         Ri.criterion_DV_est_lb = nan;
         Ri.criterion_DV_est_ub = nan;
-
-        Ri.Nmul_rmse = nan; Ri.Nmul_est_med = nan; Ri.Nmul_est_lb = nan; Ri.Nmul_est_ub = nan;
-        Ri.Nadd_rmse = nan; Ri.Nadd_est_med = nan; Ri.Nadd_est_lb = nan; Ri.Nadd_est_ub = nan;
-        Ri.Nshared_rmse = nan; Ri.Nshared_est_med = nan; Ri.Nshared_est_lb = nan; Ri.Nshared_est_ub = nan;
 
         % ---------- fit score ----------
         if isfield(data_fitNOM, 'nLL_test_allIter')
@@ -462,6 +490,7 @@ for iFile = 1:nFiles
 
         R = [R; Ri];
     end % iModelB_fit
+
 end % iFile
 
 fprintf('\n\n%s: All files compiled. \n\n', datetime('now'))
@@ -471,10 +500,7 @@ fprintf('\n\n%s: All files compiled. \n\n', datetime('now'))
 R_unfiltered = R;
 R = R_unfiltered([R_unfiltered.keep_pC]);
 % assert(nFilesKeep == numel(R)/nBfit)
-fprintf('\nFiltering by simulated pC in [%.2f, %.2f]: kept %d / %d files.\n', mask_pC, nFilesKeep, nFiles);
-
-% Save the record to /Output
-save(sprintf('%s/Outputs/R_A%d.mat', nameFolder_server, iModelA_fit), 'R', 'R_unfiltered')
+fprintf('\nFiltering by simulated pC in [%.2f, %.2f]: kept %d / %d files.\n', mask_pC(1), mask_pC(2), nFilesKeep, nFiles);
 
 % Define unique variable levels
 gaborCST_unik = unique([R.gaborCST]);
@@ -484,8 +510,14 @@ Nadd_unik = unique([R.Nadd_true]);
 Nshared_unik = unique([R.Nshared_true]);
 Bsim_unik = unique([R.iModelB_sim]);
 Bfit_unik = unique([R.iModelB_fit]);
+lambda_whiten_unik = unique([R.lambda_whiten]);
+C_contribution_unik = unique([R.C_contribution]);
 
-%% metric list to plot
+% Save the compiled record to /Output
+nameFile_R = sprintf('%s/Outputs/R_A%d.mat', nameFolder_server, iModelA_fit);
+save(nameFile_R, 'R', 'R_unfiltered', 'lambda_whiten_unik', 'C_contribution_unik')
+
+%% Metric list to plot
 error
 metricNames_plot = {'template_rmse', 'template_R2', ...
     'pYES_rmse', 'pYES_R2', ...
@@ -1357,7 +1389,7 @@ x = str2double(strrep(str_in, 'p', '.'));
 end
 
 %%
-function [template_rmse_iter, template_R2_iter] = fxn_templateRecovery_simPlot2Style_iter(truth, data_compIV, nIter, nORI, nSF)
+function [template_rmse_iter, template_R2_iter] = fxn_templateRecovery_simPlot2Style_iter(truth, data_compIV, nIter)
 
 if isfield(truth, 'template_true_raw')
     template_true = truth.template_true_raw(:)';

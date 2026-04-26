@@ -23,7 +23,7 @@ Nmul_true = 0;
 Nadd_true = 5;
 Nshared_true = 5;
 Cz_true = 0;
-lambda_whiten = 1;
+lambda_whiten = 0;
 flag_regressType = 2;
 flag_incluCrit = 1;
 C_contribution = .5;
@@ -363,8 +363,9 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
     OOD_NOM_Trialwise_compIV_A12(nBasisORI, nBasisSF, {nameIO, criterion_DV_true}, iLocComb, lambda_whiten, flag_regressType, nIter, nJob, iJob)
     %----------------------------%
 
-    % Step 2: fit NOM parameters and predict metrics
+    %% Step 2: fit NOM parameters and predict metrics
     for iModelA_fit=1:2
+        
         for iModelB_fit = iModelB_fit_all
             %----------------------------%
             OOD_NOM_Trialwise_fitNOM(nBasisORI, nBasisSF, {nameIO, criterion_DV_true}, iLocComb, flag_incluCrit, C_contribution, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
@@ -372,15 +373,16 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
 
             if iModelB_fit == iModelB_sim
                 % For the simulated model, also plot IV vs DV scatter and parameter recovery
-                %%
+                
                 plot_CorrBasisSetting(nameFolder_Data_NOM_IO, nameFolder_Figures_perSubj, nameIO, ...
                     nIter, iJob, iLocComb, iModelA_fit, iModelB_fit_all, namesModelBparams_short, ...
                     Nmul_true, Nadd_true, Nshared_true, criterion_DV_true, template_true);
-                %%
-            end
-        end
-    end
-
+                
+            end % if iModelB_fit == iModelB_sim
+        end % for iModelB_fit
+        
+    end % for iModelA_fit
+%%
     % Summarize model comparison after all A/B fits finish.
     plot_fit_model_comparison( ...
         nameFolder_Data_NOM_IO, nameFolder_Figures_perSubj, nameIO, ...

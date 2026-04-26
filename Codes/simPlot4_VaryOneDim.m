@@ -9,7 +9,7 @@
 
 clc; close all;
 %% Shared plotting formats
-iModelA_fit=1 % 1=fitting using data-derived template; 2=true template
+iModelA_fit = 1 % 1=fitting using data-derived template; 2=true template
 nBins_Part4 = 3; % define bins for collapsing parameter recovery points; use 3 for main text, 5 for Supp
 
 % Load data
@@ -40,7 +40,7 @@ setting.lineStyles_fit = {'-', '--', ':', '-.'};
 setting.bandAlpha = 0.16;
 setting.lineWidth = 1.6;
 setting.trueWidth = 2.8;
-setting.markerSize = 10;
+setting.markerSize = 6;
 setting.fontSize = 10;
 setting.errLineWidth = 1.1;
 setting.axisLineWidth = 1.0;
@@ -75,8 +75,8 @@ setting.fig1_mode_labels = {'ORI basis mode', 'SF basis mode', 'ORI basis family
 setting.fig1_pct_fields = {'nBasisORI_mode_pct', 'nBasisSF_mode_pct', 'basisFxnORI_mode_pct', 'basisFxnSF_mode_pct', 'ridge_mode_pct'};
 setting.fig1_pct_labels = {'ORI mode selection rate', 'SF mode selection rate', 'ORI basis family mode selection rate', 'SF basis family mode selection rate', 'Ridge mode selection rate'};
 
-setting.varFields = {'Nmul_true', 'Nadd_true', 'Nshared_true', 'gaborCST', 'Cz_true'};
-setting.varNames  = {'Nmul', 'Nadd', 'Nshared', 'signalCST', 'Cz'};
+setting.varFields = {'Nmul_true', 'Nadd_true', 'Nshared_true', 'gaborCST', 'Cz_true', 'lambda_whiten', 'C_contribution'};
+setting.varNames  = {'Nmul', 'Nadd', 'Nshared', 'signalCST', 'Cz', 'lambda_white', 'C_contribution'};
 
 setting.fig1_varFields = setting.varFields;
 setting.fig1_varNames  = setting.varNames;
@@ -99,6 +99,31 @@ Nadd_unik = unique([R.Nadd_true]);
 Nshared_unik = unique([R.Nshared_true]);
 Bsim_unik = unique([R.iModelB_sim]);
 Bfit_unik = unique([R.iModelB_fit]);
+lambda_whiten_unik = unique([R.lambda_whiten]);
+C_contribution_unik = unique([R.C_contribution]);
+
+% Expand plotting styles to match however many levels are present.
+base_cmap_Cz = setting.cmap_Cz;
+if numel(Cz_unik) <= size(base_cmap_Cz, 1)
+    setting.cmap_Cz = base_cmap_Cz(1:numel(Cz_unik), :);
+else
+    nExtraCz = numel(Cz_unik) - size(base_cmap_Cz, 1);
+    setting.cmap_Cz = [base_cmap_Cz; setting.palette(1:nExtraCz, :)];
+end
+
+base_marker_signal = setting.marker_signal;
+if numel(gaborCST_unik) > numel(base_marker_signal)
+    nRep = ceil(numel(gaborCST_unik) / numel(base_marker_signal));
+    setting.marker_signal = repmat(base_marker_signal, 1, nRep);
+end
+setting.marker_signal = setting.marker_signal(1:numel(gaborCST_unik));
+
+base_lineStyles_fit = setting.lineStyles_fit;
+if numel(Bfit_unik) > numel(base_lineStyles_fit)
+    nRep = ceil(numel(Bfit_unik) / numel(base_lineStyles_fit));
+    setting.lineStyles_fit = repmat(base_lineStyles_fit, 1, nRep);
+end
+setting.lineStyles_fit = setting.lineStyles_fit(1:numel(Bfit_unik));
 
 %% Figure 1: Basis selection
 fprintf('\n%s: Fig 1: Basis selection rates\n', string(datetime('now')))
@@ -228,167 +253,144 @@ fprintf('\n%s: Fig 2: Template recovery\n', string(datetime('now')))
 
 R_fig2 = R([R.iModelB_sim] == setting.fig12_Bsim & [R.iModelB_fit] == setting.fig12_Bfit);
 
-% --- composition specs for RMSE row: add/remove rows to change breakdown ---
-fig2_compFcns = {
-    @(r) sprintf('sigCST=%.3g x Cz=%.3g',          r.gaborCST,  r.Cz_true);
-    @(r) sprintf('Nmul=%g x Nadd=%g x Nshared=%g', r.Nmul_true, r.Nadd_true, r.Nshared_true);
-};
-fig2_compTags = {'sigCST_x_Cz', 'Nmul_x_Nadd_x_Nshared'};
-
 nVars = numel(setting.fig2_varFields);
+setting_fig2 = setting;
 
-for iComp = 1:numel(fig2_compFcns)
-    grpLabels = arrayfun(fig2_compFcns{iComp}, R_fig2, 'UniformOutput', false);
-    uGrp      = unique(grpLabels);
-    grpCmap   = setting.palette(1:numel(uGrp), :);
-    setting_fig2 = setting;
-    grpIdx    = cell(numel(uGrp), 1);
-    for iGrp = 1:numel(uGrp)
-        grpIdx{iGrp} = strcmp(grpLabels, uGrp{iGrp});
-    end
+% Row-1 grouping follows lambda_whiten x C_contribution combinations.
+grpLabels_lwcc = arrayfun(@(r) sprintf('lw=%.3g x cont=%.3g', r.lambda_whiten, r.C_contribution), ...
+    R_fig2, 'UniformOutput', false);
+uGrp_lwcc = unique(grpLabels_lwcc);
+grpCmap_lwcc = setting.palette(1:numel(uGrp_lwcc), :);
+grpIdx_lwcc = cell(numel(uGrp_lwcc), 1);
+for iGrp = 1:numel(uGrp_lwcc)
+    grpIdx_lwcc{iGrp} = strcmp(grpLabels_lwcc, uGrp_lwcc{iGrp});
+end
 
-    fig2Cache = struct([]);
-    for iCol = 1:nVars
-        vField  = setting.fig2_varFields{iCol};
-        vName   = setting.fig2_varNames{iCol};
-        vLevels = unique([R_fig2.(vField)]);
+fig2Cache = struct([]);
+for iCol = 1:nVars
+    vField  = setting.fig2_varFields{iCol};
+    vName   = setting.fig2_varNames{iCol};
+    vLevels = unique([R_fig2.(vField)]);
 
-        fig2Cache(iCol).vField = vField; %#ok<AGROW>
-        fig2Cache(iCol).vName = vName;
-        fig2Cache(iCol).vLevels = vLevels;
-        %=====================%
-        fig2Cache(iCol).rmse_all = fxn_collapse_scalar_by_x_iterCI( ...
+    fig2Cache(iCol).vField = vField; %#ok<AGROW>
+    fig2Cache(iCol).vName = vName;
+    fig2Cache(iCol).vLevels = vLevels;
+    fig2Cache(iCol).rmse_all = fxn_collapse_scalar_by_x_iterCI( ...
         R_fig2, vField, 'template_rmse_iter', vLevels, setting.scalarCollapseFcn);
-        %=====================%
-        fig2Cache(iCol).rmse_grp = cell(numel(uGrp), 1);
+    fig2Cache(iCol).rmse_lwcc = cell(numel(uGrp_lwcc), 1);
 
-        for iGrp = 1:numel(uGrp)
-            Rsub = R_fig2(grpIdx{iGrp});
-            %=====================%
-            fig2Cache(iCol).rmse_grp{iGrp} = fxn_collapse_scalar_by_x_iterCI( ...
-                Rsub, vField, 'template_rmse_iter', vLevels, setting.scalarCollapseFcn);
-            %=====================%
-        end
-
-        %=====================%
-        [xAxisORI, yTrueORI, curvesORI] = fxn_collapse_tuning_panel(R_fig2, vField, vLevels, 'ORI');
-        %=====================%
-        %=====================%
-        [xAxisSF,  yTrueSF,  curvesSF]  = fxn_collapse_tuning_panel(R_fig2, vField, vLevels, 'SF');
-        %=====================%
-        fig2Cache(iCol).tuning(1).xAxis = xAxisORI;
-        fig2Cache(iCol).tuning(1).yTrue = yTrueORI;
-        fig2Cache(iCol).tuning(1).curves = curvesORI;
-        fig2Cache(iCol).tuning(2).xAxis = xAxisSF;
-        fig2Cache(iCol).tuning(2).yTrue = yTrueSF;
-        fig2Cache(iCol).tuning(2).curves = curvesSF;
+    for iGrp = 1:numel(uGrp_lwcc)
+        Rsub = R_fig2(grpIdx_lwcc{iGrp});
+        fig2Cache(iCol).rmse_lwcc{iGrp} = fxn_collapse_scalar_by_x_iterCI( ...
+            Rsub, vField, 'template_rmse_iter', vLevels, setting.scalarCollapseFcn);
     end
 
-    h = figure('Position', [100 100 1800 1050]);
-    tiledlayout(3, nVars, 'TileSpacing', 'loose', 'Padding', 'loose');
+    [xAxisORI, yTrueORI, curvesORI] = fxn_collapse_tuning_panel(R_fig2, vField, vLevels, 'ORI');
+    [xAxisSF,  yTrueSF,  curvesSF]  = fxn_collapse_tuning_panel(R_fig2, vField, vLevels, 'SF');
+    fig2Cache(iCol).tuning(1).xAxis = xAxisORI;
+    fig2Cache(iCol).tuning(1).yTrue = yTrueORI;
+    fig2Cache(iCol).tuning(1).curves = curvesORI;
+    fig2Cache(iCol).tuning(2).xAxis = xAxisSF;
+    fig2Cache(iCol).tuning(2).yTrue = yTrueSF;
+    fig2Cache(iCol).tuning(2).curves = curvesSF;
+end
 
-    ax_rmse_last = [];
+h = figure('Position', [100 100 2400 1050]);
+tiledlayout(3, nVars, 'TileSpacing', 'loose', 'Padding', 'loose');
+ax_rmse_last = [];
 
-    for iCol = 1:nVars
-        vField  = fig2Cache(iCol).vField;
-        vName   = fig2Cache(iCol).vName;
+for iCol = 1:nVars
+    vName = fig2Cache(iCol).vName;
 
-        % ------ Row 1: RMSE ------
-        ax_rmse = nexttile(iCol); hold on;
-        ax_rmse_last = ax_rmse;
+    % ------ Row 1: RMSE ------
+    ax_rmse = nexttile(iCol); hold on;
+    ax_rmse_last = ax_rmse;
 
-        for iGrp = 1:numel(uGrp)
-            Ssub = fig2Cache(iCol).rmse_grp{iGrp};
+    % For Nmul/Nadd/Nshared/signalCST/Cz columns, plot lambda x contribution combos.
+    if iCol <= 5
+        for iGrp = 1:numel(uGrp_lwcc)
+            Ssub = fig2Cache(iCol).rmse_lwcc{iGrp};
             if isempty(Ssub.x), continue; end
-            %=====================%
-            fxn_plot_connected_dots_with_err(Ssub.x, Ssub.y, Ssub.lb, Ssub.ub, grpCmap(iGrp,:), setting_fig2);
-            %=====================%
+            fxn_plot_connected_dots_with_err(Ssub.x, Ssub.y, Ssub.lb, Ssub.ub, grpCmap_lwcc(iGrp,:), setting_fig2);
         end
-        S = fig2Cache(iCol).rmse_all;
-        if ~isempty(S.x)
-            Pthick = setting_fig2; Pthick.lineWidth = setting.trueWidth;
-            %=====================%
-            fxn_plot_connected_dots_with_err(S.x, S.y, S.lb, S.ub, [0 0 0], Pthick);
-            %=====================%
-        end
-        %=====================%
-        fxn_style_ax(gca, setting_fig2);
-        %=====================%
-        xticks(fig2Cache(iCol).vLevels);
-        %=====================%
-        xVals_al = unique(fig2Cache(iCol).vLevels(isfinite(fig2Cache(iCol).vLevels)));
-        if isempty(xVals_al)
-            xlim([0 1]);
+    end
+
+    % Always overlay grand mean.
+    S = fig2Cache(iCol).rmse_all;
+    if ~isempty(S.x)
+        Pthick = setting_fig2; Pthick.lineWidth = setting.trueWidth;
+        fxn_plot_connected_dots_with_err(S.x, S.y, S.lb, S.ub, [0 0 0], Pthick);
+    end
+
+    fxn_style_ax(gca, setting_fig2);
+    xticks(fig2Cache(iCol).vLevels);
+    xVals_al = unique(fig2Cache(iCol).vLevels(isfinite(fig2Cache(iCol).vLevels)));
+    if isempty(xVals_al)
+        xlim([0 1]);
+    else
+        xMin_al = min(xVals_al); xMax_al = max(xVals_al);
+        if numel(xVals_al) >= 2
+            buf_al = setting_fig2.fig2_top_axisBufferProp * (xMax_al - xMin_al);
         else
-            xMin_al = min(xVals_al); xMax_al = max(xVals_al);
-            if numel(xVals_al) >= 2
-                buf_al = setting_fig2.fig2_top_axisBufferProp * (xMax_al - xMin_al);
-            else
-                buf_al = setting_fig2.fig2_top_axisBufferProp * max(abs(xVals_al(1)), 1);
-            end
-            xlim([xMin_al - buf_al, xMax_al + buf_al]);
+            buf_al = setting_fig2.fig2_top_axisBufferProp * max(abs(xVals_al(1)), 1);
         end
-        %=====================%
-        xlabel(vName); ylabel('Template RMSE'); ylim([0 0.3]); title(vName);
+        xlim([xMin_al - buf_al, xMax_al + buf_al]);
+    end
+    xlabel(vName); ylabel('Template RMSE'); ylim([0 0.3]); title(vName);
 
-        % ------ Rows 2 & 3: ORI then SF tuning ------
-        for iRow = 1:2   % 1=ORI, 2=SF
-            nexttile(iRow*nVars + iCol); hold on;
+    % ------ Rows 2 & 3: ORI then SF tuning ------
+    for iRow = 1:2
+        nexttile(iRow*nVars + iCol); hold on;
 
-            yTrue = fig2Cache(iCol).tuning(iRow).yTrue;
-            curves = fig2Cache(iCol).tuning(iRow).curves;
-            if ~isempty(yTrue)
-                hTrue     = plot(axis_tuning{iRow}, yTrue, 'k-', 'LineWidth', setting.trueWidth);
-                yTrueNorm = yTrue / max(yTrue);
-                xIdx      = 1:numel(yTrueNorm);
+        yTrue = fig2Cache(iCol).tuning(iRow).yTrue;
+        curves = fig2Cache(iCol).tuning(iRow).curves;
+        if ~isempty(yTrue)
+            hTrue = plot(axis_tuning{iRow}, yTrue, 'r-', 'LineWidth', setting.trueWidth);
+            yTrueNorm = yTrue / max(yTrue);
+            xIdx = 1:numel(yTrueNorm);
 
-                nLev   = numel(curves);
-                legH   = [hTrue; gobjects(nLev, 1)];
-                legStr = [{'True'}; cell(nLev, 1)];
-                nLeg   = 1;
-                for iLev = 1:nLev
-                    if isempty(curves(iLev).y), continue; end
-                    nLeg = nLeg + 1;
-                    legH(nLeg)   = plot(axis_tuning{iRow}, curves(iLev).y, 'LineWidth', setting.lineWidth);
-                    [r2, rho]    = fxn_curve_fit_metrics(xIdx, yTrueNorm, xIdx, curves(iLev).y);
-                    rmse         = fxn_curve_rmse(xIdx, yTrueNorm, xIdx, curves(iLev).y);
-                    % legStr{nLeg} = sprintf('%g  R²=%.2f  r=%.2f  RMSE=%.3f', curves(iLev).level, r2, rho, rmse);
-                    legStr{nLeg} = sprintf('%g  RMSE=%.3f', curves(iLev).level, rmse);
-                end
-                %=====================%
-                l = legend(legH(1:nLeg), legStr(1:nLeg), 'Location', 'south', 'FontSize', setting_fig2.fontSize, 'Box', 'off');
-                %=====================%
+            nLev = numel(curves);
+            grayMin = 0.55;
+            grayMax = 0.00;
+            if nLev >= 2
+                grayVals = linspace(grayMin, grayMax, nLev)';
+            else
+                grayVals = grayMin;
             end
 
-            %=====================%
-            fxn_style_ax(gca, setting_fig2);
-            %=====================%
-            xticks(axisTicks_tuning{iRow}); xticklabels(axisTL_tuning{iRow});
-            %=====================%
-            ylim([-.2, 1]);
-            title(vName); ylabel('Marg. weight (divided by max)'); xlabel(namesFeature{iRow});
-        end % iRow
+            legH = [hTrue; gobjects(nLev, 1)];
+            legStr = [{'True'}; cell(nLev, 1)];
+            nLeg = 1;
+            for iLev = 1:nLev
+                if isempty(curves(iLev).y), continue; end
+                nLeg = nLeg + 1;
+                cLev = repmat(grayVals(iLev), 1, 3);
+                legH(nLeg) = plot(axis_tuning{iRow}, curves(iLev).y, 'LineWidth', setting.lineWidth, 'Color', cLev);
+                rmse = fxn_curve_rmse(xIdx, yTrueNorm, xIdx, curves(iLev).y);
+                legStr{nLeg} = sprintf('%g  RMSE=%.3f', curves(iLev).level, rmse);
+            end
+            legend(legH(1:nLeg), legStr(1:nLeg), 'Location', 'south', 'FontSize', setting_fig2.fontSize, 'Box', 'off');
+        end
 
-    end % iCol
-
-    %=====================%
-    h_gl = gobjects(numel(uGrp), 1);
-    for i_gl = 1:numel(uGrp)
-        h_gl(i_gl) = plot(ax_rmse_last, nan, nan, '-', 'Color', grpCmap(i_gl,:), 'LineWidth', 1.5);
+        fxn_style_ax(gca, setting_fig2);
+        xticks(axisTicks_tuning{iRow}); xticklabels(axisTL_tuning{iRow});
+        ylim([-.2, 1]);
+        title(vName); ylabel('Marg. weight (divided by max)'); xlabel(namesFeature{iRow});
     end
-    legend(ax_rmse_last, h_gl, cellstr(uGrp), 'Location', 'eastoutside', 'Box', 'off', 'FontSize', 7);
-    %=====================%
-    lgd_fig2 = legend(ax_rmse_last);
-    if isgraphics(lgd_fig2)
-        lgd_fig2.FontSize = setting_fig2.fontSize - 2;
-    end
-    sgtitle(sprintf('Fig 2 [%s]: Template RMSE + tuning recovery', strrep(fig2_compTags{iComp}, '_', ' ')), ...
-        'FontWeight', 'bold', 'FontSize', setting_fig2.fontSize);
-    saveas(h, fullfile(nameFolder_Figures_part4, ...
-        sprintf('FigS2_TemplateRecovery_%s.png', fig2_compTags{iComp})));
-    close(h);
+end
 
-end % iComp
+% Legend for lambda x contribution combo lines (only row 1 condition lines).
+if isgraphics(ax_rmse_last)
+    h_gl = gobjects(numel(uGrp_lwcc), 1);
+    for i_gl = 1:numel(uGrp_lwcc)
+        h_gl(i_gl) = plot(ax_rmse_last, nan, nan, '-', 'Color', grpCmap_lwcc(i_gl,:), 'LineWidth', 1.5);
+    end
+    legend(ax_rmse_last, h_gl, cellstr(uGrp_lwcc), 'Location', 'eastoutside', 'Box', 'off', 'FontSize', 7);
+end
+
+sgtitle('Fig 2: Template RMSE + tuning recovery', 'FontWeight', 'bold', 'FontSize', setting_fig2.fontSize);
+saveas(h, fullfile(nameFolder_Figures_part4, 'FigS2_TemplateRecovery.png'));
+close(h);
 
 %% Figure 3: Metric recovery
 %    Simulated curve from Bfit = 1 only; predictions from all Bfit
@@ -475,6 +477,7 @@ for iCol_Bsim = 1:numel(Bsim_unik)
 
             nLeg = nLeg + 1;
             legH(nLeg) = hPred;
+            fitLabel = sprintf('B%d', fitModel);
 
             if exist('namesModelB', 'var') && ~isempty(namesModelB) && fitModel >= 1 && fitModel <= numel(namesModelB)
                 fitLabel = char(string(namesModelB{fitModel}));
@@ -565,101 +568,6 @@ sgtitle('Fig 3: metric recovery | filtered', 'FontWeight', 'bold');
 saveas(h, fullfile(nameFolder_Figures_part4, 'FigS3_metricRecovery.png'));
 close(h);
 
-%% Figure 3B: metric recovery residuals
-fprintf('\n%s: Fig 3B\n', string(datetime('now')))
-
-h = figure('Position', [100 100 1300 900]);
-tiledlayout(numel(Bsim_unik), numel(setting.metricFields), 'TileSpacing', 'loose', 'Padding', 'loose');
-
-for iCol_Bsim = 1:numel(Bsim_unik)
-    simModel = Bsim_unik(iCol_Bsim);
-    R_data = R([R.iModelB_sim] == simModel & [R.iModelB_fit] == 1);
-
-    for iCol_metric = 1:numel(setting.metricFields)
-        mName = setting.metricFields{iCol_metric};
-        dataField = setting.metricCurveDataFields{iCol_metric};
-        predField = setting.metricCurvePredFields{iCol_metric};
-
-        nexttile; hold on;
-        %=====================%
-        Cdata = fxn_collapse_curve(R_data, 'DV_allBins_med', dataField, setting.curveNGrid, setting.curveCollapseFcn);
-        %=====================%
-
-        legH = gobjects(numel(Bfit_unik), 1);
-        legStr = cell(numel(Bfit_unik), 1);
-        nLeg = 0;
-
-        for iFit = 1:numel(Bfit_unik)
-            fitModel = Bfit_unik(iFit);
-            R_pred = R([R.iModelB_sim] == simModel & [R.iModelB_fit] == fitModel);
-            %=====================%
-            Cpred = fxn_collapse_curve(R_pred, 'DV_allBins_med', predField, setting.curveNGrid, setting.curveCollapseFcn);
-            %=====================%
-
-            Cres = struct('x', [], 'y', [], 'lb', [], 'ub', []);
-            if ~isempty(Cdata.x) && ~isempty(Cpred.x)
-                xCom = Cpred.x;
-                yD  = interp1(Cdata.x, Cdata.y,  xCom, 'linear', nan);
-                lbD = interp1(Cdata.x, Cdata.lb, xCom, 'linear', nan);
-                ubD = interp1(Cdata.x, Cdata.ub, xCom, 'linear', nan);
-                yP  = interp1(Cpred.x, Cpred.y,  xCom, 'linear', nan);
-                lbP = interp1(Cpred.x, Cpred.lb, xCom, 'linear', nan);
-                ubP = interp1(Cpred.x, Cpred.ub, xCom, 'linear', nan);
-                gd = isfinite(xCom) & isfinite(yD) & isfinite(yP);
-                if any(gd)
-                    Cres.x  = xCom(gd);  Cres.y  = yP(gd)  - yD(gd);
-                    Cres.lb = lbP(gd) - ubD(gd); Cres.ub = ubP(gd) - lbD(gd);
-                end
-            end
-
-            if isempty(Cres.x), continue; end
-
-            gd_band = isfinite(Cres.x) & isfinite(Cres.lb) & isfinite(Cres.ub);
-            if any(gd_band)
-                xb = Cres.x(gd_band); lbb = Cres.lb(gd_band); ubb = Cres.ub(gd_band);
-                patch([xb(:); flipud(xb(:))], [lbb(:); flipud(ubb(:))], [0 0 0], ...
-                    'FaceAlpha', setting.bandAlpha, 'EdgeColor', 'none');
-            end
-            plot(Cres.x, Cres.y, 'Color', [0 0 0], ...
-                'LineStyle', setting.lineStyles_fit{iFit}, 'LineWidth', setting.lineWidth);
-
-            nLeg = nLeg + 1;
-            legH(nLeg) = plot(nan, nan, 'k', 'LineStyle', setting.lineStyles_fit{iFit}, ...
-                'LineWidth', setting.lineWidth);
-            legStr{nLeg} = sprintf('Bfit=%d', fitModel);
-        end
-
-        %=====================%
-        yline(0, 'k:', 'LineWidth', 1);
-        %=====================%
-        fxn_style_ax(gca, setting);
-        %=====================%
-        if iCol_Bsim == numel(Bsim_unik)
-            xlabel('Collapsed DV bins');
-        end
-        if iCol_metric == 1
-            ylabel(sprintf('Bsim = %d', simModel));
-        end
-        title(sprintf('%s residual', mName));
-
-        if ~isempty(Cdata.x)
-            ylimMax = max(abs(ylim));
-            ylim([-ylimMax ylimMax]);
-        end
-
-        if nLeg > 0
-            %=====================%
-            legend(legH(1:nLeg), legStr(1:nLeg), 'Location', 'best', ...
-                'FontSize', setting.fontSize-2, 'Box', 'off');
-            %=====================%
-        end
-    end
-end
-
-sgtitle('Fig 3B: metric residuals (pred - data) | filtered', 'FontWeight', 'bold');
-saveas(h, fullfile(nameFolder_Figures_part4, 'FigS3B_metricResiduals.png'));
-close(h);
-
 %% Figure 4: parameter recovery
 %    Only matched pairs Bsim = Bfit
 
@@ -667,6 +575,15 @@ fprintf('\n%s: Fig 4: Parameter recovery\n', string(datetime('now')))
 
 setting_fig4 = setting;
 setting_fig4.fontSize = setting.fontSize;
+
+% Condition coding in Fig 4: color = C_contribution, marker = lambda_white.
+cmap_cont_fig4 = setting.palette(1:numel(C_contribution_unik), :);
+marker_lambda_fig4 = {'o', 's', '^', 'd', 'v', '>', '<', 'p', 'h', 'x', '+'};
+if numel(lambda_whiten_unik) > numel(marker_lambda_fig4)
+    nRep_mk = ceil(numel(lambda_whiten_unik) / numel(marker_lambda_fig4));
+    marker_lambda_fig4 = repmat(marker_lambda_fig4, 1, nRep_mk);
+end
+marker_lambda_fig4 = marker_lambda_fig4(1:numel(lambda_whiten_unik));
 
 h = figure('Position', [100 100 1300 900]);
 tiledlayout(numel(setting.fig4_paramNames), numel(Bfit_unik), 'TileSpacing', 'compact', 'Padding', 'compact');
@@ -695,12 +612,11 @@ for iRow_param = 1:numel(setting.fig4_paramNames)
             axis off; continue
         end
 
-        % one dot per signalCST × Cz after collapsing across IN parameters
-        % one series per signalCST × Cz, preserving the examined parameter levels
-        for iSig = 1:numel(gaborCST_unik)
-            for iCz = 1:numel(Cz_unik)
+        % one series per lambda_white x C_contribution, preserving parameter levels
+        for iLW = 1:numel(lambda_whiten_unik)
+            for iCont = 1:numel(C_contribution_unik)
 
-                S = fxn_collapse_param_byLevel(Rsub, pName, gaborCST_unik(iSig), Cz_unik(iCz), setting.scalarCollapseFcn, nBins_Part4);
+                S = fxn_collapse_param_byLevel(Rsub, pName, lambda_whiten_unik(iLW), C_contribution_unik(iCont), setting.scalarCollapseFcn, nBins_Part4);
 
                 if isempty(S.x), continue; end
 
@@ -708,7 +624,7 @@ for iRow_param = 1:numel(setting.fig4_paramNames)
                 good = isfinite(S.x) & isfinite(S.y);
                 if any(good)
                     plot(S.x(good), S.y(good), '-', ...
-                        'Color', setting.cmap_Cz(iCz,:), ...
+                        'Color', cmap_cont_fig4(iCont,:), ...
                         'LineWidth', 1);
                 end
 
@@ -729,11 +645,11 @@ for iRow_param = 1:numel(setting.fig4_paramNames)
 
                     %=====================%
                     line([S.x(iPt) S.x(iPt)], [S.lb(iPt) S.ub(iPt)], ...
-                        'Color', setting.cmap_Cz(iCz,:), 'LineWidth', Pplot.errLineWidth);
-                    plot(S.x(iPt), S.y(iPt), setting.marker_signal{iSig}, ...
+                        'Color', cmap_cont_fig4(iCont,:), 'LineWidth', Pplot.errLineWidth);
+                    plot(S.x(iPt), S.y(iPt), marker_lambda_fig4{iLW}, ...
                         'MarkerSize', Pplot.markerSize, ...
                         'MarkerFaceColor', 'w', ...
-                        'MarkerEdgeColor', setting.cmap_Cz(iCz,:), ...
+                        'MarkerEdgeColor', cmap_cont_fig4(iCont,:), ...
                         'LineStyle', 'none', ...
                         'LineWidth', Pplot.lineWidth);
                     %=====================%
@@ -778,7 +694,7 @@ for iRow_param = 1:numel(setting.fig4_paramNames)
         if iCol_Bsimfit == 1
             ylabel(pTitle);
         end
-        Ppanel = fxn_collect_fig4_panel_points(Rsub, pName, gaborCST_unik, Cz_unik, setting.scalarCollapseFcn, nBins_Part4);
+        Ppanel = fxn_collect_fig4_panel_points(Rsub, pName, lambda_whiten_unik, C_contribution_unik, setting.scalarCollapseFcn, nBins_Part4);
         [rho_panel, ~, ~, rmse_panel] = fxn_param_recovery_stats(Ppanel.x, Ppanel.y);
         title(sprintf('Bfit=Bsim=%d \nr=%.2f | RMSE=%.3f', Bsimfit, rho_panel, rmse_panel));
         ax_fig4_last = gca;
@@ -792,86 +708,34 @@ if isgraphics(ax_fig4_last)
     axColor_fig4 = axes('Position', pos_fig4leg, 'Color', 'none', 'Visible', 'off', ...
         'HitTest', 'off', 'HandleVisibility', 'off');
     hold(axColor_fig4, 'on');
-    hCz_fig4 = gobjects(numel(Cz_unik), 1);
-    for i_leg = 1:numel(Cz_unik)
-        hCz_fig4(i_leg) = plot(axColor_fig4, nan, nan, '-', 'Color', setting.cmap_Cz(i_leg,:), 'LineWidth', 2);
+    hCont_fig4 = gobjects(numel(C_contribution_unik), 1);
+    for i_leg = 1:numel(C_contribution_unik)
+        hCont_fig4(i_leg) = plot(axColor_fig4, nan, nan, '-', 'Color', cmap_cont_fig4(i_leg,:), 'LineWidth', 2);
     end
-    leg1_fig4 = legend(axColor_fig4, hCz_fig4, ...
-        arrayfun(@(x) sprintf('%g', x), Cz_unik, 'UniformOutput', false), ...
+    leg1_fig4 = legend(axColor_fig4, hCont_fig4, ...
+        arrayfun(@(x) sprintf('%g', x), C_contribution_unik, 'UniformOutput', false), ...
         'Location', 'northeast', 'Orientation', 'vertical', 'Box', 'on', ...
         'FontSize', max(ax_fig4_last.FontSize - 1, 7));
-    title(leg1_fig4, 'Cz');
+    title(leg1_fig4, 'C_contribution');
     axSig_fig4 = axes('Position', pos_fig4leg, 'Color', 'none', 'Visible', 'off', ...
         'HitTest', 'off', 'HandleVisibility', 'off');
     hold(axSig_fig4, 'on');
-    hSig_fig4 = gobjects(numel(gaborCST_unik), 1);
-    for i_leg = 1:numel(gaborCST_unik)
+    hSig_fig4 = gobjects(numel(lambda_whiten_unik), 1);
+    for i_leg = 1:numel(lambda_whiten_unik)
         hSig_fig4(i_leg) = plot(axSig_fig4, nan, nan, ...
             'LineStyle', 'none', ...
-            'Marker', setting.marker_signal{i_leg}, ...
+            'Marker', marker_lambda_fig4{i_leg}, ...
             'MarkerFaceColor', 'w', ...
             'MarkerEdgeColor', 'k');
     end
     leg2_fig4 = legend(axSig_fig4, hSig_fig4, ...
-        arrayfun(@(x) sprintf('%g', x), gaborCST_unik, 'UniformOutput', false), ...
+        arrayfun(@(x) sprintf('%g', x), lambda_whiten_unik, 'UniformOutput', false), ...
         'Location', 'southeast', 'Orientation', 'vertical', 'Box', 'on', ...
         'FontSize', max(ax_fig4_last.FontSize - 1, 7));
-    title(leg2_fig4, 'signalCST');
+    title(leg2_fig4, 'lambda_white');
 end
 saveas(h, fullfile(nameFolder_Figures_part4, 'FigS4_paramRecovery.png'));
 close(h);
-
-%% Figure 4B: parameter recovery summary
-% fprintf('\n%s: Fig 4B\n', string(datetime('now')))
-
-% statsNames = {'r', 'slope', 'bias', 'RMSE'};
-% statsTitles = {'Correlation', 'Slope', 'Bias', 'RMSE'};
-% M_stats = nan(numel(setting.fig4_paramNames), numel(Bfit_unik), numel(statsNames));
-
-% for iRow_param = 1:numel(setting.fig4_paramNames)
-%     pName = setting.fig4_paramNames{iRow_param};
-
-%     for iCol_Bsimfit = 1:numel(Bfit_unik)
-%         Bsimfit = Bfit_unik(iCol_Bsimfit);
-%         Rsub = R([R.iModelB_sim] == Bsimfit & [R.iModelB_fit] == Bsimfit);
-
-%         if strcmp(pName, 'Nshared') && ~any(strcmp(namesModelBparams_short{Bsimfit}, 'Nshared'))
-%             continue
-%         end
-%         if strcmp(pName, 'Nmul') && ~any(strcmp(namesModelBparams_short{Bsimfit}, 'Nmul'))
-%             continue
-%         end
-%         if strcmp(pName, 'Nadd') && ~any(strcmp(namesModelBparams_short{Bsimfit}, 'Nadd'))
-%             continue
-%         end
-
-%         Ppanel = fxn_collect_fig4_panel_points(Rsub, pName, gaborCST_unik, Cz_unik, setting.scalarCollapseFcn, nBins_Part4);
-%         if numel(Ppanel.x) < 2, continue; end
-
-%         [rho, slope, bias, rmse] = fxn_param_recovery_stats(Ppanel.x, Ppanel.y);
-%         M_stats(iRow_param, iCol_Bsimfit, :) = [rho, slope, bias, rmse];
-%     end
-% end
-
-% h = figure('Position', [100 100 1300 900]);
-% tiledlayout(2, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
-
-% for iStat = 1:numel(statsNames)
-%     nexttile; hold on;
-%     M = squeeze(M_stats(:, :, iStat));
-%     imagesc(1:numel(Bfit_unik), 1:numel(setting.fig4_paramNames), M);
-%     set(gca, 'YDir', 'normal', ...
-%         'XTick', 1:numel(Bfit_unik), 'XTickLabel', string(Bfit_unik), ...
-%         'YTick', 1:numel(setting.fig4_paramNames), 'YTickLabel', setting.fig4_paramTitles);
-%     xlabel('Bfit=Bsim');
-%     title(statsTitles{iStat});
-%     fxn_style_ax(gca, setting);
-%     colorbar;
-% end
-
-% sgtitle('Fig 4B: parameter recovery summary | matched pairs only', 'FontWeight', 'bold');
-% saveas(h, fullfile(nameFolder_Figures_part4, 'FigS4B_paramRecoverySummary.png'));
-% close(h);
 
 %% Figure 5: model recovery
 fprintf('\n%s: Fig 5: Model recovery\n', string(datetime('now')))
@@ -983,7 +847,7 @@ for iSim = 1:numel(Bsim_unik)
     end
 end
 
-% ---------- delta nLL matrix (median ΔnLL from best fit, aggregated across all conditions) ----------
+% ---------- delta NLL matrix (median ΔnLL from best fit, aggregated across all conditions) ----------
 M_deltaNLL = nan(numel(Bfit_unik), numel(Bsim_unik));
 
 if ~isempty(R) && isfield(R, 'nLL_med')
@@ -1036,7 +900,7 @@ end
 
 % ---------- 2x3 figure ----------
 % Layout:
-%   col 1: nLL metrics      | row 1: win rate,     row 2: median delta nLL
+%   col 1: NLL metrics      | row 1: win rate,     row 2: median delta NLL
 %   col 2: metric recovery  | row 1: RMSE,          row 2: R2
 %   col 2: metric/param RMSE | row 1: Metric RMSE,   row 2: Param RMSE
 
@@ -1045,7 +909,7 @@ end
 %   (2,1) Median ΔnLL   (2,2) Param RMSE
 panels_fig5 = { ...
     W_bestNLL,   'Best model win rate',      [0 1]; ...
-    M_deltaNLL,  'ΔnLL from best', [ 0 160]; ...
+    M_deltaNLL,  'ΔNLL from the best model', [ 0 160]; ...
     M_curveRMSE, 'Metrics RMSE',            [0.05, 0.07]; ...
     M_paramRMSE, 'Parameters RMSE',             [1 2.8] };
 
@@ -1239,9 +1103,9 @@ for iFit = 1:numel(Bfit_unik)
                 % Plot individual data points
                 plot(xGrp, yGrp, setting.marker_signal{iSig}, ...
                     'LineStyle', 'none', ...
-                    'MarkerSize', max(setting.markerSize - 1, 6), ...
+                    'MarkerSize', max(setting.markerSize, 6), ...
                     'MarkerFaceColor', setting.cmap_Cz(iCz,:), ...
-                    'MarkerEdgeColor', setting.cmap_Cz(iCz,:), ...
+                    'MarkerEdgeColor', 'w', ...
                     'LineWidth', 1.0);
 
                 % Fit and plot a linear regression line for the group
@@ -1570,11 +1434,17 @@ if nargin >= 5 && ~isempty(w) && numel(w) == numel(xRef)
     wSum = sum(wg);
     if wSum > 0
         wg = wg / wSum;
-        yR_wmean = sum(wg .* yR(:));
-        ss_res = sum(wg .* (yR(:) - yP(:)).^2);
-        ss_tot = sum(wg .* (yR(:) - yR_wmean).^2);
+        yR_col = yR(:);
+        yP_col = yP(:);
+        yR_wmean = sum(wg .* yR_col);
+        ss_res = sum(wg .* (yR_col - yP_col).^2);
+        ss_tot = sum(wg .* (yR_col - yR_wmean).^2);
         r2  = 1 - ss_res / max(ss_tot, eps);
-        rho = corr(yR(:), yP(:), 'Weights', wg);
+        yP_wmean = sum(wg .* yP_col);
+        cov_w = sum(wg .* (yR_col - yR_wmean) .* (yP_col - yP_wmean));
+        varR_w = sum(wg .* (yR_col - yR_wmean).^2);
+        varP_w = sum(wg .* (yP_col - yP_wmean).^2);
+        rho = cov_w / sqrt(max(varR_w * varP_w, eps));
         return
     end
 end
@@ -1695,11 +1565,11 @@ else
 end
 end
 
-function P = fxn_collect_fig4_panel_points(Rsub, pName, gaborCST_unik, Cz_unik, collapseFcn, nBins_Part4)
+function P = fxn_collect_fig4_panel_points(Rsub, pName, lambda_whiten_unik, C_contribution_unik, collapseFcn, nBins_Part4)
 P = struct('x', [], 'y', [], 'lb', [], 'ub', [], 'n', []);
-for iSig = 1:numel(gaborCST_unik)
-    for iCz = 1:numel(Cz_unik)
-        S = fxn_collapse_param_byLevel(Rsub, pName, gaborCST_unik(iSig), Cz_unik(iCz), collapseFcn, nBins_Part4);
+for iLW = 1:numel(lambda_whiten_unik)
+    for iCont = 1:numel(C_contribution_unik)
+        S = fxn_collapse_param_byLevel(Rsub, pName, lambda_whiten_unik(iLW), C_contribution_unik(iCont), collapseFcn, nBins_Part4);
         if isempty(S.x), continue; end
         P.x = [P.x; S.x(:)]; %#ok<AGROW>
         P.y = [P.y; S.y(:)]; %#ok<AGROW>
@@ -1725,14 +1595,14 @@ bias = mean(y(:) - x(:), 'omitnan');
 rmse = sqrt(mean((y(:) - x(:)).^2, 'omitnan'));
 end
 
-function S = fxn_collapse_param_byLevel(Rin, pName, sigVal, czVal, collapseFcn, nBins_Part4)
+function S = fxn_collapse_param_byLevel(Rin, pName, lambdaVal, contributionVal, collapseFcn, nBins_Part4)
 % Keep the examined parameter levels separate.
 % Collapse only across the other parameters.
 
 S = struct('x', [], 'y', [], 'lb', [], 'ub', [], 'n', []);
 
-% restrict to one signal contrast x criterion combination
-idx = [Rin.gaborCST] == sigVal & [Rin.Cz_true] == czVal;
+% restrict to one lambda_whiten x C_contribution combination
+idx = [Rin.lambda_whiten] == lambdaVal & [Rin.C_contribution] == contributionVal;
 Rsub = Rin(idx);
 if isempty(Rsub), return; end
 
