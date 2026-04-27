@@ -18,19 +18,34 @@
 % Simulation input parameters
 noiseCST = .2;
 gaborCST = .5;
-nTrials = 4e3;
-Nmul_true = .5;
-Nadd_true = 5;
-Nshared_true = 5;
+nTrials = 8e3;
+Nmul_true = .4;
+Nadd_true = 10;
+Nshared_true = 10;
 Cz_true = 0;
 lambda_whiten = 0;
 flag_regressType = 2;
 flag_incluCrit = 1;
-C_contribution = .5;
-iModelB_sim = 1;
+C_contribution = 0;
+iModelB_sim = 3;
 nIter = 5;
 nBasisORI = 6;
 nBasisSF = 5;
+
+% Enforce reduced-model ground truth by zeroing excluded IN terms.
+switch iModelB_sim
+    case 1  % Full: Nmul + Nadd + Nshared
+        % keep all as provided
+    case 2  % No Nshared
+        Nshared_true = 0;
+    case 3  % No Nmul
+        Nmul_true = 0;
+    case 4  % No Nadd
+        Nadd_true = 0;
+
+    otherwise
+        error('Unknown iModelB_sim = %d', iModelB_sim);
+end
 
 % Basic setup -%
 clc; close all;
@@ -81,6 +96,7 @@ fprintf(' - noiseCST = %.2f\n', noiseCST);
 fprintf(' - gaborCST = %.2f\n', gaborCST);
 fprintf(' - nTrials = %d\n', nTrials);
 fprintf(' - Simulated with ModelB = %d \n', iModelB_sim);
+fprintf(' - True IN params: Nmul=%.3g, Nadd=%.3g, Nshared=%.3g\n', Nmul_true, Nadd_true, Nshared_true);
 fprintf(' - Fitted with ModelA = %s (1=Data-derived template; 2=ideal template)\n', strjoin(string(iModelA_fit_all), ' '));
 fprintf(' - Fitted with ModelB = %s (1=full, 2=No Nshared; 3=No Nmul; 4=No Nadd)\n', strjoin(string(iModelB_fit_all), ' '));
 fprintf(' - Criterion (z unit)=%.1f \n', Cz_true);

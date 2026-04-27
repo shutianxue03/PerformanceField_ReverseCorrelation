@@ -71,7 +71,8 @@ if flag_regressType == 2
     candidateBasisFamilySF  = {'gaussianLog2', 'asymGaussianLog2', 'LogParabola', 'asymLogParabola'};
     % candidateBasisFamilySF  = {'asymGaussianLog2', 'asymLogParabola'};
     candidateRidge  = [0, 10.^(-3:2)];
-    % opts.ridge = ridge;
+    opts.basisWidthScale = .8;
+    opts. asymSF_rightLeftRatio=1.2;
     opts.nFolds = 5;
     opts.link = 'probit';
     opts.nBasisORI = nBasisORI;

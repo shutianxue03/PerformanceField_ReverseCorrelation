@@ -1,7 +1,7 @@
 function nLL = fxn_getError_v8(iModelB, params_est, data, C_contribution, iStep, params_fromStep1)
 % Compute negative log-likelihood for the trial-wise noisy observer model,
 
-if nargin == 6, params_fromStep1 = []; end
+if nargin < 6, params_fromStep1 = []; end
 
 % Extract data
 resp_allT = data.resp(:); % 1 = YES, 0 = NO
@@ -51,10 +51,20 @@ switch iStep
             case 4, params_est = [params_est(1), 0, params_est(2)]; 
         end
         %---------------------------%
-        [pYES_pred_allT] = fxn_predMetrics_v3(iModelB, params_est, data);
+        [pYES_pred_allT, ~, ~, Cz_fit] = fxn_predMetrics_v3(iModelB, params_est, data);
         %---------------------------%
         % Calculate nLL based on pYES
         nLL = -sum( resp_allT .* log(pYES_pred_allT) + (1 - resp_allT) .* log(1 - pYES_pred_allT) );
+
+        % Add criterion penalty (same as case 0), so criterion is constrained
+        % toward the empirical value even during step 1 of two-step fitting
+        if isfield(data, 'Cz_emp') && ~isempty(data.Cz_emp) && isfinite(data.Cz_emp)
+            sigmaC = 0.5;
+            nLL_C = 0.5 * ((Cz_fit - data.Cz_emp) / sigmaC)^2;
+            nTrials = numel(resp_allT);
+            nLL_behav = nLL / nTrials;
+            nLL = (1 - C_contribution) * nLL_behav + C_contribution * nLL_C;
+        end
         
     case 2
         % Step 2: Predict pA and estimate only Nshared

@@ -42,11 +42,8 @@ addpath(genpath('SX_toolbox/bads-master'));
 %--------------%
 SX_RC1_setting; % defines nORI, nSF, namesLocComb, namesModelA, namesModelB, nBins, etc.
 %--------------%
-% nameFolder_Data = sprintf('%s/Data_Part2_nBasis%d%d_noMirror', nameFolder_server, nBasisORI, nBasisSF) ;
-% nameFolder_Data_OOD = sprintf('%s/Data_OOD_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
-% nameFolder_Data_NOM_Trialwise = sprintf('%s/Data_NOM_Trialwise_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
 
-flag_fittingStep = 1; % one vs. two step fitting (one step is more standard)
+flag_fittingStep = 2; % one vs. two step fitting (one step is more standard)
 flag_fminconORbads = 2; % 1 = use fmincon (faster, local); 2 = use BADS (slower, more robust)
 flag_plot_allIter = 1; % 1 = make summary plots across iterations
 flag_plot_perIter = 0; % 1 = plot per-iteration fits (can be slow)

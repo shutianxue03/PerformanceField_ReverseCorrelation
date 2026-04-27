@@ -488,39 +488,6 @@ out.zscorePredictor = opts.zscorePredictor;
 out.opts = opts;
 end
 
-%% Helper: PREDICT FUNCTION
-function pred = predict_ridge_glm_from_Z(Z, resp, beta, muZ, sdZ, linkName, zscorePredictor)
-
-resp = resp(:);
-
-if zscorePredictor
-    Zfit = (Z - muZ) ./ sdZ;
-else
-    Zfit = Z;
-end
-
-X = [ones(size(Zfit,1),1), Zfit];
-eta = X * beta;
-eta = max(min(eta, 8), -8);
-
-switch lower(linkName)
-    case 'logit'
-        yhat = 1 ./ (1 + exp(-eta));
-    case 'probit'
-        yhat = normcdf(eta);
-    otherwise
-        error('Unknown link: use ''probit'' or ''logit''');
-end
-
-yhat = min(max(yhat, 1e-8), 1 - 1e-8);
-
-pred = struct();
-pred.yhat = yhat;
-pred.nLL = -sum(resp .* log(yhat) + (1 - resp) .* log(1 - yhat));
-end
-
-
-
 %% Helper: INTERNAL PREDICTION HELPER
 function pred = compute_predictions_from_beta(Z, resp, beta, muZ, sdZ, linkName, zscorePredictor)
 
@@ -630,6 +597,8 @@ if ~isfield(opts, 'stratifyByResp') || isempty(opts.stratifyByResp), opts.strati
 if ~isfield(opts, 'basisFamilyORI') || isempty(opts.basisFamilyORI), opts.basisFamilyORI = 'circ_gaussian'; end
 if ~isfield(opts, 'basisFamilySF') || isempty(opts.basisFamilySF), opts.basisFamilySF = 'gaussianLog2'; end
 if ~isfield(opts, 'kappaORI'), opts.kappaORI = []; end
+if ~isfield(opts, 'basisWidthScale') || isempty(opts.basisWidthScale), opts.basisWidthScale = 0.8; end
+if ~isfield(opts, 'asymSF_rightLeftRatio') || isempty(opts.asymSF_rightLeftRatio), opts.asymSF_rightLeftRatio = 1.5; end
 if ~isfield(opts, 'widthSF_logParabola'), opts.widthSF_logParabola = []; end
 if ~isfield(opts, 'widthSF_logParabola_left'),  opts.widthSF_logParabola_left  = []; end
 if ~isfield(opts, 'widthSF_logParabola_right'), opts.widthSF_logParabola_right = []; end
@@ -653,7 +622,7 @@ switch lower(opts.basisFamilyORI)
         if isempty(opts.sigmaORI_deg)
             if opts.nBasisORI > 1
                 d = opts.oriPeriod_deg / opts.nBasisORI;
-                sigmaORI_deg = d * 0.8;
+                sigmaORI_deg = d * opts.basisWidthScale;
             else
                 sigmaORI_deg = opts.oriPeriod_deg / 4;
             end
@@ -669,7 +638,7 @@ switch lower(opts.basisFamilyORI)
         if ~isfield(opts, 'kappaORI') || isempty(opts.kappaORI)
             if opts.nBasisORI > 1
                 d_deg = opts.oriPeriod_deg / opts.nBasisORI;
-                sigma_rad = deg2rad(d_deg * 0.8);
+                sigma_rad = deg2rad(d_deg * opts.basisWidthScale);
                 % crude mapping from Gaussian sigma to von Mises kappa
                 kappaORI = 1 / max(sigma_rad.^2, 1e-6);
             else
@@ -742,7 +711,7 @@ switch lower(opts.basisFamilySF)
         if isempty(opts.sigmaSF_log2)
             if opts.nBasisSF > 1
                 d = mean(diff(centersSF_log2));
-                sigmaSF_log2 = d * 0.8;
+                sigmaSF_log2 = d * opts.basisWidthScale;
             else
                 sigmaSF_log2 = range(axis_sf_log2) / 4 + eps;
             end
@@ -786,12 +755,7 @@ switch lower(opts.basisFamilySF)
         end
 
         if ~isfield(opts, 'widthSF_logParabola_right') || isempty(opts.widthSF_logParabola_right)
-            if opts.nBasisSF > 1
-                d = mean(diff(log10(centersSF_cpd)));
-                width_right = max(d * 1.5, 1e-3);
-            else
-                width_right = 0.5;
-            end
+            width_right = width_left * opts.asymSF_rightLeftRatio;
         else
             width_right = opts.widthSF_logParabola_right;
         end
@@ -806,7 +770,7 @@ switch lower(opts.basisFamilySF)
         if ~isfield(opts, 'sigmaSF_log2_left') || isempty(opts.sigmaSF_log2_left)
             if opts.nBasisSF > 1
                 d = mean(diff(centersSF_log2));
-                sigma_left = d * 0.8;
+                sigma_left = d * opts.basisWidthScale;
             else
                 sigma_left = range(axis_sf_log2) / 4 + eps;
             end
@@ -815,12 +779,7 @@ switch lower(opts.basisFamilySF)
         end
 
         if ~isfield(opts, 'sigmaSF_log2_right') || isempty(opts.sigmaSF_log2_right)
-            if opts.nBasisSF > 1
-                d = mean(diff(centersSF_log2));
-                sigma_right = d * 1.2;
-            else
-                sigma_right = range(axis_sf_log2) / 3 + eps;
-            end
+            sigma_right = sigma_left * opts.asymSF_rightLeftRatio;
         else
             sigma_right = opts.sigmaSF_log2_right;
         end
