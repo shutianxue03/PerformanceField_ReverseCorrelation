@@ -17,9 +17,9 @@
 
 % Simulation input parameters
 noiseCST = .2;
-gaborCST = .3;
-nTrials = 8e3;
-Nmul_true = 0;
+gaborCST = .5;
+nTrials = 4e3;
+Nmul_true = .5;
 Nadd_true = 5;
 Nshared_true = 5;
 Cz_true = 0;
@@ -28,7 +28,7 @@ flag_regressType = 2;
 flag_incluCrit = 1;
 C_contribution = .5;
 iModelB_sim = 1;
-nIter = 20;
+nIter = 5;
 nBasisORI = 6;
 nBasisSF = 5;
 

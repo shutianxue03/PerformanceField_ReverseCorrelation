@@ -292,6 +292,11 @@ for iFile = 1:nFiles
         str_loadfitNOM = sprintf('n*_A%dB%d.mat', iModelA_fit, iModelB_fit_probe);
         nameDir_fitNOM_probe = dir(fullfile(info.folder_NOM, str_loadfitNOM));
         nameDir_fitNOM_probe = nameDir_fitNOM_probe(~contains({nameDir_fitNOM_probe.name}, 'min'));
+
+        if isempty(nameDir_fitNOM_probe)
+            continue
+        end
+
         data_fitNOM_probe = load(fullfile(nameDir_fitNOM_probe(1).folder, nameDir_fitNOM_probe(1).name));
         pred_metrics_allIter_probe = data_fitNOM_probe.pred_metrics_allIter;
         nIter_probe = numel(pred_metrics_allIter_probe);
@@ -506,7 +511,7 @@ fprintf('\n\n%s: All files compiled. \n\n', datetime('now'))
 % Post-processing
 % Apply filter on simulated pC
 R_unfiltered = R;
-R = R_unfiltered([R_unfiltered.keep_pC]); % keep only rows whose condition passed the pC filter
+% R = R_unfiltered([R_unfiltered.keep_pC]); % keep only rows whose condition passed the pC filter
 % assert(nCondPass == numel(R)/nBfit)
 fprintf('\nFiltering by simulated pC in [%.2f, %.2f]: kept %d / %d conditions.\n', mask_pC(1), mask_pC(2), nCondPass, nFiles);
 

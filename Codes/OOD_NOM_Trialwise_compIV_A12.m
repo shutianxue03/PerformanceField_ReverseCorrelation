@@ -68,8 +68,8 @@ if flag_regressType == 2
     candidateORI = 3:8;
     candidateSF = 3:8;
     candidateBasisFamilyORI = {'circ_gaussian', 'vonmises'};
-    % candidateBasisFamilySF  = {'gaussianLog2', 'asymGaussianLog2', 'LogParabola', 'asymLogParabola'};
-    candidateBasisFamilySF  = {'asymGaussianLog2', 'asymLogParabola'};
+    candidateBasisFamilySF  = {'gaussianLog2', 'asymGaussianLog2', 'LogParabola', 'asymLogParabola'};
+    % candidateBasisFamilySF  = {'asymGaussianLog2', 'asymLogParabola'};
     candidateRidge  = [0, 10.^(-3:2)];
     % opts.ridge = ridge;
     opts.nFolds = 5;
