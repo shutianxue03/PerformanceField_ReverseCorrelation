@@ -643,6 +643,9 @@ R_fig1 = R([R.iModelB_sim] == setting.fig12_Bsim & [R.iModelB_fit] == setting.fi
 grpLabels_fig1 = arrayfun(@(r) sprintf('sig=%.3g x Cz=%.3g', r.gaborCST, r.Cz_true), ...
     R_fig1, 'UniformOutput', false);
 
+    grpLabels_fig1 = arrayfun(@(r) sprintf('sig=%.3g', r.gaborCST), ...
+    R_fig1, 'UniformOutput', false);
+
 % grpLabels_fig1 = arrayfun(@(r) sprintf('Nmul=%g x Nadd=%g x Nshared=%g', r.Nmul_true, r.Nadd_true, r.Nshared_true), ...
 %     R_fig1, 'UniformOutput', false);
 
