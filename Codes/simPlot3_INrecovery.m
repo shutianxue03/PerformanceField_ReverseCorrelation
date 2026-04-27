@@ -23,10 +23,10 @@ SX_RC1_setting;
 %--------------%
 
 %% settings
-str_part = 'Lambda1'; % <-- change if needed
+str_part = 'VaryLambdaCcont'; % <-- change if needed
 iModelA_fit = 1; %1=use data-derived template; 2=use true template
-mask_pC = [.6, .8]; % only analyze simulated datasets wtih pC falling within this range
-nBfit = 4; % number of fitted models
+mask_pC = [.6, .8]; % [min, max] range of median fraction correct (pC); conditions outside are excluded
+nBfit = 4;          % number of B-model variants to evaluate (each uses a different internal-noise structure)
 
 nameFolder_Data = sprintf('%s/Data_%s', nameFolder_server, str_part);
 nameFolder_Data_OOD = sprintf('%s/Data_OOD_%d%d', nameFolder_Data, nORI, nSF);
@@ -78,6 +78,8 @@ nFiles = numel(info_all);
 fprintf('Parsed %d valid IO folders.\n', nFiles);
 
 %% Compile all fitted models
+% R: growing struct array; one row per (simulation condition × fitted B-model) pair.
+% Fields are appended inside the loop below and the array grows via R = [R; Ri].
 
 R = struct([]);
 
@@ -86,7 +88,7 @@ fprintf('%s\n', datetime('now'))
 fprintf('Compiling all fitted models\n');
 fprintf('============================================\n');
 
-nFilesKeep = 0; % To count the number of file with pC within the range
+nCondPass = 0; % number of simulation conditions whose median pC falls within mask_pC
 for iFile = 1:nFiles
     fprintf('\n%d/%d', iFile, nFiles)
     info = info_all{iFile};
@@ -111,7 +113,11 @@ for iFile = 1:nFiles
     data_compIV = load(fullfile(nameDir_compIV(1).folder, nameDir_compIV(1).name));
 
     % =========================================================
-    % 2. metadata and iteration count
+    % 2. Condition-level base record
+    %    fileBase inherits parsed condition metadata from info, then is
+    %    augmented with compiled statistics (template recovery, behavioral
+    %    metrics, basis settings).  It is copied into Ri (one row per fitted
+    %    B-model) and each Ri is appended to R.
     % =========================================================
     fileBase = info;
 
@@ -251,31 +257,37 @@ for iFile = 1:nFiles
     fileBase.nBasisSF_mode = mode(nBasisSF_allIter);
     fileBase.nBasisSF_mode_pct = mean(nBasisSF_allIter == mode(nBasisSF_allIter));
 
-    S = string(data_compIV.basisFxnORI_tmpl_allIter(:));
-    [u, ~, ic] = unique(S);
-    counts = accumarray(ic, 1);
+    % Find the most frequently selected ORI basis function across iterations (modal value).
+    % strVec: one string entry per iteration; uniqueVals: deduplicated labels;
+    % groupIdx(i): which unique label iteration i maps to; counts: frequency of each label.
+    strVec = string(data_compIV.basisFxnORI_tmpl_allIter(:));
+    [uniqueVals, ~, groupIdx] = unique(strVec);
+    counts = accumarray(groupIdx, 1);
     [~, idxMax] = max(counts);
-    fileBase.basisFxnORI_mode = u(idxMax);
-    fileBase.basisFxnORI_mode_pct = counts(idxMax) / numel(S);
+    fileBase.basisFxnORI_mode     = uniqueVals(idxMax);
+    fileBase.basisFxnORI_mode_pct = counts(idxMax) / numel(strVec);
 
-    S = string(data_compIV.basisFxnSF_tmpl_allIter(:));
-    [u, ~, ic] = unique(S);
-    counts = accumarray(ic, 1);
+    % Same modal-value computation for SF basis function.
+    strVec = string(data_compIV.basisFxnSF_tmpl_allIter(:));
+    [uniqueVals, ~, groupIdx] = unique(strVec);
+    counts = accumarray(groupIdx, 1);
     [~, idxMax] = max(counts);
-    fileBase.basisFxnSF_mode = u(idxMax);
-    fileBase.basisFxnSF_mode_pct = counts(idxMax) / numel(S);
+    fileBase.basisFxnSF_mode     = uniqueVals(idxMax);
+    fileBase.basisFxnSF_mode_pct = counts(idxMax) / numel(strVec);
 
-    % L2 ridge summary
-    S = string(data_compIV.ridge_tmpl_allIter(:));
-    [u, ~, ic] = unique(S);
-    counts = accumarray(ic, 1);
+    % Modal L2 ridge regularization setting across iterations.
+    strVec = string(data_compIV.ridge_tmpl_allIter(:));
+    [uniqueVals, ~, groupIdx] = unique(strVec);
+    counts = accumarray(groupIdx, 1);
     [~, idxMax] = max(counts);
-    fileBase.ridge_mode = u(idxMax);
-    fileBase.ridge_mode_pct = counts(idxMax) / numel(S);
+    fileBase.ridge_mode     = uniqueVals(idxMax);
+    fileBase.ridge_mode_pct = counts(idxMax) / numel(strVec);
 
     % =========================================================
-    % 3. Metric-related value
-    % Use first available Bfit file only because simulated data do not depend on fitted model
+    % 3. Data-side behavioral metrics (pC, pA, pYES)
+    %    Simulated data metrics are identical regardless of which B-model is fitted,
+    %    so we load the first available fitNOM file solely to read the data columns.
+    %    found_fit_for_data flags whether any fitNOM file was found; if not, skip condition.
     % =========================================================
     found_fit_for_data = false;
 
@@ -349,7 +361,7 @@ for iFile = 1:nFiles
 
     % ---------- filtering rule: simulated pC median only ----------
     fileBase.keep_pC = (fileBase.pC_data_med >= mask_pC(1)) && (fileBase.pC_data_med <= mask_pC(2));
-    if fileBase.keep_pC, nFilesKeep = nFilesKeep+1; end
+    if fileBase.keep_pC, nCondPass = nCondPass + 1; end
     fprintf(': med sim pC=%.2f, keep? %d', fileBase.pC_data_med, fileBase.keep_pC)
 
     % =========================================================
@@ -366,6 +378,8 @@ for iFile = 1:nFiles
         end
         data_fitNOM = load(fullfile(nameDir_fitNOM(1).folder, nameDir_fitNOM(1).name));
 
+        % Ri: one record destined for R, for this (simulation condition × B-fit model) pair.
+        % It inherits all condition-level fields from fileBase, then adds fit-specific fields.
         Ri = fileBase;
         Ri.iModelB_fit = iModelB_fit;
 
@@ -396,12 +410,12 @@ for iFile = 1:nFiles
 
         Ri.nLL_med = nan; Ri.nLL_lb = nan; Ri.nLL_ub = nan;
 
-    % ---------- parameter-related values ----------
-    Ri.Nmul_rmse = nan; Ri.Nmul_est_med = nan; Ri.Nmul_est_lb = nan; Ri.Nmul_est_ub = nan;
-    Ri.Nadd_rmse = nan; Ri.Nadd_est_med = nan; Ri.Nadd_est_lb = nan; Ri.Nadd_est_ub = nan;
-    Ri.Nshared_rmse = nan; Ri.Nshared_est_med = nan; Ri.Nshared_est_lb = nan; Ri.Nshared_est_ub = nan;
+        % ---------- parameter-related values ----------
+        Ri.Nmul_rmse    = nan; Ri.Nmul_est_med    = nan; Ri.Nmul_est_lb    = nan; Ri.Nmul_est_ub    = nan;
+        Ri.Nadd_rmse    = nan; Ri.Nadd_est_med    = nan; Ri.Nadd_est_lb    = nan; Ri.Nadd_est_ub    = nan;
+        Ri.Nshared_rmse = nan; Ri.Nshared_est_med = nan; Ri.Nshared_est_lb = nan; Ri.Nshared_est_ub = nan;
 
-    % ---------- criterion-related values ----------
+        % ---------- criterion-related values ----------
         Ri.criterion_DV_rmse = nan;
         Ri.criterion_DV_est_med = nan;
         Ri.criterion_DV_est_lb = nan;
@@ -459,27 +473,32 @@ for iFile = 1:nFiles
         end
 
         % ---------- parameter estimates ----------
+        % params_mat: [nIter × nParams] matrix of fitted parameter values.
+        % Columns 1:(end-1) are the internal-noise parameters (Nmul, Nadd, Nshared, ...);
+        % the last column is always the decision criterion.
         if iscell(data_fitNOM.params_est_allIter)
-            P = cell2mat(cellfun(@(x) x(:)', data_fitNOM.params_est_allIter, 'UniformOutput', false));
+            params_mat = cell2mat(cellfun(@(x) x(:)', data_fitNOM.params_est_allIter, 'UniformOutput', false));
         else
-            P = data_fitNOM.params_est_allIter;
+            params_mat = data_fitNOM.params_est_allIter;
         end
 
-        criterion_est_iter = P(:, end);
+        criterion_est_iter  = params_mat(:, end);   % last column = decision criterion
         criterion_rmse_iter = abs(criterion_est_iter - fileBase.criterion_DV_true);
 
         [Ri.criterion_DV_rmse, ~, ~] = getCI(criterion_rmse_iter, 1, 1);
         [Ri.criterion_DV_est_med, Ri.criterion_DV_est_lb, Ri.criterion_DV_est_ub] = ...
             getCI(criterion_est_iter, 1, 1);
 
+        % param_names_all: all parameter names for this B-model (IN noise params + criterion).
+        % param_names_IN:  all except the last (criterion), i.e. only the internal-noise parameters.
         param_names_all = namesModelBparams_short{iModelB_fit};
-        param_names_IN = param_names_all(1:end-1);
+        param_names_IN  = param_names_all(1:end-1);
 
         for iParamIN = 1:numel(param_names_IN)
-            pName = param_names_IN{iParamIN};
-            trueVal = info.(sprintf('%s_true', pName));
+            pName   = param_names_IN{iParamIN};
+            trueVal = info.(sprintf('%s_true', pName)); % ground-truth value for this parameter
 
-            est_iter = P(:, iParamIN);
+            est_iter = params_mat(:, iParamIN);
             err_iter = abs(est_iter - trueVal);
 
             [Ri.(sprintf('%s_rmse', pName)), ~, ~] = getCI(err_iter, 1, 1);
@@ -498,11 +517,12 @@ fprintf('\n\n%s: All files compiled. \n\n', datetime('now'))
 % Post-processing
 % Apply filter on simulated pC
 R_unfiltered = R;
-R = R_unfiltered([R_unfiltered.keep_pC]);
-% assert(nFilesKeep == numel(R)/nBfit)
-fprintf('\nFiltering by simulated pC in [%.2f, %.2f]: kept %d / %d files.\n', mask_pC(1), mask_pC(2), nFilesKeep, nFiles);
+R = R_unfiltered([R_unfiltered.keep_pC]); % keep only rows whose condition passed the pC filter
+% assert(nCondPass == numel(R)/nBfit)
+fprintf('\nFiltering by simulated pC in [%.2f, %.2f]: kept %d / %d conditions.\n', mask_pC(1), mask_pC(2), nCondPass, nFiles);
 
-% Define unique variable levels
+% Enumerate the distinct levels of each simulation factor present in R.
+% These become the axis values for the heatmaps constructed later in this script.
 gaborCST_unik = unique([R.gaborCST]);
 Cz_unik = unique([R.Cz_true]);
 Nmul_unik = unique([R.Nmul_true]);
@@ -1356,104 +1376,6 @@ close(h);
 
 
 %% Local functions
-
-function info = fxn_parse_nameIO(nameIO)
-
-info = struct();
-
-tok = regexp(nameIO, ...
-    'IO_cN([-\d\.]+)_cG([-\d\.]+)_nT([A-Za-z0-9\.\-]+)_Nm([A-Za-z0-9\.\-]+)_Na([A-Za-z0-9\.\-]+)_Ns([A-Za-z0-9\.\-]+)_Cz([-\d\.]+)_cont([-\d\.]+)_whiten([-\d\.]+)_R(\d+)_\d+\d+_B(\d+)', ...
-    'tokens', 'once');
-
-if isempty(tok)
-    return
-end
-
-info.noiseCST = str2double(tok{1}) / 100;
-info.gaborCST = str2double(tok{2}) / 100;
-info.nTrials = fxn_parse_num2exp(tok{3});
-info.Nmul_true = fxn_parse_num2exp(tok{4});
-info.Nadd_true = fxn_parse_num2exp(tok{5});
-info.Nshared_true = fxn_parse_num2exp(tok{6});
-info.Cz_true = str2double(tok{7});
-info.C_contribution = str2double(tok{8});
-info.lambda_whiten = str2double(tok{9});
-info.flag_regressType = str2double(tok{10});
-info.iModelB_sim = str2double(tok{11});
-end
-
-%%
-function x = fxn_parse_num2exp(str_in)
-% parse strings like '8e3', '0', '10', etc.
-x = str2double(strrep(str_in, 'p', '.'));
-end
-
-%%
-function [template_rmse_iter, template_R2_iter] = fxn_templateRecovery_simPlot2Style_iter(truth, data_compIV, nIter)
-
-if isfield(truth, 'template_true_raw')
-    template_true = truth.template_true_raw(:)';
-elseif isfield(truth, 'template_true')
-    template_true = truth.template_true(:)';
-else
-    error('No template_true found in truth.mat');
-end
-
-template_true = template_true / max(template_true);
-template_est = data_compIV.template_tmpl_allIter;
-if ndims(template_est) == 3
-    template_est = reshape(template_est, size(template_est,1), []);
-end
-
-rowMax = max(template_est, [], 2);
-rowMax(rowMax == 0) = 1;
-template_est = template_est ./ rowMax;
-
-template_rmse_iter = sqrt(mean((template_est - template_true).^2, 2));
-
-template_R2_iter = nan(nIter,1);
-yTrue = template_true(:);
-yTrue = yTrue/max(yTrue);
-
-for iIter = 1:nIter
-    yEst = template_est(iIter,:)';
-    yEst = yEst/max(yEst);
-    sse = sum((yTrue - yEst).^2);
-    sst = sum((yTrue - mean(yTrue)).^2);
-    template_R2_iter(iIter) = 1 - sse / sst;
-    % template_R2_iter(iIter) = corr(yTrue, yEst);
-end
-end
-
-%%
-function [rmse_iter, R2_iter] = fxn_metricRecovery_iter(pred_metrics_allIter, metricName)
-
-nIter = numel(pred_metrics_allIter);
-rmse_iter = nan(nIter,1);
-R2_iter = nan(nIter,1);
-
-for iIter = 1:nIter
-    yData = pred_metrics_allIter{iIter}.metrics.([metricName '_data_allBins'])(:);
-    yPred = pred_metrics_allIter{iIter}.metrics.([metricName '_pred_allBins'])(:);
-    nTrials = pred_metrics_allIter{iIter}.metrics.nTrials_allBins(:);
-
-    good = isfinite(yData) & isfinite(yPred) & isfinite(nTrials) & (nTrials > 0);
-    yData = yData(good);
-    yPred = yPred(good);
-    w = nTrials(good);
-
-    if isempty(yData)
-        continue
-    end
-
-    rmse_iter(iIter) = sqrt(sum(w .* (yData - yPred).^2) / sum(w));
-
-    sse = sum((yData - yPred).^2);
-    sst = sum((yData - mean(yData)).^2);
-    R2_iter(iIter) = 1 - sse / sst;
-end
-end
-
 %%
 function fxn_plotScatterPanel(x_true, y_est, Nshared_vals, Nmul_vals, Nadd_vals, marker_list)
 

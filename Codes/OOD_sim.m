@@ -203,9 +203,7 @@ fprintf('%s: started running %d pairs.\n\n', datetime('now'), nPairs)
 parfor iPair = 1:nPairs
 
     % Filtered noise
-    %--%
     filtered_noise = exp_CreateFilteredNoise(noise);
-    %--%
 
     % Signal-present and signal-absent patches
     if iPRS_allT(iPair) == 1
@@ -218,15 +216,11 @@ parfor iPair = 1:nPairs
     % patch_noise = stim_ABS;
 
     % Energy profiles
-    %-%
     e3D_target = SX_RC4_Energy_parfor(mask, {patch_target}, filter_sin, filter_cos);
-    %-%
     e3D_target = squeeze(e3D_target);
 
     % Decision variable from energy × template_true
-    %-%
     DV_target = fxn_getIV_v3(e3D_target, template_true, convolveType_true, IVType_true, flag_permT, [1, nORI]);
-    %-%
     assert(~isnan(DV_target), 'IV_target is NaN');
     DV_target_sim_allT(iPair) = DV_target;
 
