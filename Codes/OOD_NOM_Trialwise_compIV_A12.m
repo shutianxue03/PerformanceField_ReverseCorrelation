@@ -560,11 +560,18 @@ for iIter = 1:nIter
 
     clear data; % size of IV differs across subjects and  iterations
 
-    %% 6. Compute decision variable (DV) from template and energy (TEST set)
+    %% 6. Compute decision variable (DV) from whitened energy (TEST set)
     flag_permT=0;
+    if isnan(lambda_whiten)
+        e3D_train_forDV = e3D_train_rand;
+        e3D_test_forDV = e3D_test_rand;
+    else
+        e3D_train_forDV = whiten_e3D(e3D_train_rand, mu_cov_full, W_white_full);
+        e3D_test_forDV = whiten_e3D(e3D_test_rand, mu_cov_full, W_white_full);
+    end
     %---------------%
-    DV_train = fxn_getIV_v3(e3D_train_rand, template_notNormed, convolveType, IVType, flag_permT, ORI_bound);
-    DV_test = fxn_getIV_v3(e3D_test_rand, template_notNormed, convolveType, IVType, flag_permT, ORI_bound);
+    DV_train = fxn_getIV_v3(e3D_train_forDV, template_notNormed, convolveType, IVType, flag_permT, ORI_bound);
+    DV_test = fxn_getIV_v3(e3D_test_forDV, template_notNormed, convolveType, IVType, flag_permT, ORI_bound);
     %---------------%
     nData_train = length(DV_train);
     nData_test = length(DV_test);
@@ -739,6 +746,30 @@ for iIter = 1:nIter
             useIdx_tmpl = true(size(iPRS_tmpl_rand));
     end
 
+    % Use the FULL selected set to define whitening for DV in this iteration
+    e3D_full_rand_sel = e3D_full_rand(useIdx_full, :, :);
+    cst_full_rand_sel = cst_full_rand(useIdx_full);
+    iPRS_full_rand_sel = iPRS_full_rand(useIdx_full);
+
+    if flag_standEnergy
+        e3D_full_rand_norm = normEnergy(e3D_full_rand_sel, cst_full_rand_sel, iPRS_full_rand_sel);
+    else
+        e3D_full_rand_norm = e3D_full_rand_sel;
+    end
+
+    [nTrials_full_cov, nORI_cov, nSF_cov] = size(e3D_full_rand_norm);
+    e3D_full_vec = reshape(e3D_full_rand_norm, [nTrials_full_cov, nORI_cov * nSF_cov]);
+    mu_cov_full = mean(e3D_full_vec, 1);
+    Sigma_full = cov(e3D_full_vec - mu_cov_full, 1);
+
+    if ~isnan(lambda_whiten)
+        Sigma_shrink_full = (1 - lambda_whiten) * Sigma_full + lambda_whiten * mean(diag(Sigma_full)) * eye(size(Sigma_full, 1));
+        [V_full, D_full] = eig((Sigma_shrink_full + Sigma_shrink_full') / 2);
+        d_full = diag(D_full);
+        d_full(d_full < eps_whiten) = eps_whiten;
+        W_white_full = V_full * diag(1 ./ sqrt(d_full)) * V_full';
+    end
+
     %% 5. Compute behavioral metrics for all data sets
     %--------------------------------------------%
     metrics_full = fxn_getMetrics(resp_full_rand, iPRS_full_rand, respC_full_rand, cst_full_rand, RT_full_rand);
@@ -756,12 +787,19 @@ for iIter = 1:nIter
 
     clear data; % size of IV differs across subjects and  iterations
 
-    %% 6. Compute decision variable (DV) from template and energy (TEST set)
+    %% 6. Compute decision variable (DV) from whitened energy (TEST set)
     flag_permT=0;
+    if isnan(lambda_whiten)
+        e3D_train_forDV = e3D_train_rand;
+        e3D_test_forDV = e3D_test_rand;
+    else
+        e3D_train_forDV = whiten_e3D(e3D_train_rand, mu_cov_full, W_white_full);
+        e3D_test_forDV = whiten_e3D(e3D_test_rand, mu_cov_full, W_white_full);
+    end
 
     %---------------%
-    DV_train = fxn_getIV_v3(e3D_train_rand, template_notNormed, convolveType, IVType, flag_permT, ORI_bound);
-    DV_test = fxn_getIV_v3(e3D_test_rand, template_notNormed, convolveType, IVType, flag_permT, ORI_bound);
+    DV_train = fxn_getIV_v3(e3D_train_forDV, template_notNormed, convolveType, IVType, flag_permT, ORI_bound);
+    DV_test = fxn_getIV_v3(e3D_test_forDV, template_notNormed, convolveType, IVType, flag_permT, ORI_bound);
     %---------------%
     nData_train = length(DV_train);
     nData_test = length(DV_test);

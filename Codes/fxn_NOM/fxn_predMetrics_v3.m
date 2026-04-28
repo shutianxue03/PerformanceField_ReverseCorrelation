@@ -57,7 +57,7 @@ switch iModelB
         criterion = params_est(3);
 
     otherwise
-        error('fxn_predMetrics_v2: Unknown iModelB = %d', iModelB);
+        error('fxn_predMetrics_v3: Unknown iModelB = %d', iModelB);
 end
 
 %% -------- 2. Extract data --------
@@ -67,7 +67,10 @@ iPair_allT = data.iPair(:); % pair id per trial
 
 nTrials = numel(DV_allT);
 if numel(resp_allT) ~= nTrials || numel(iPair_allT) ~= nTrials
-    error('fxn_predMetrics_v2: Data fields IV, resp, iPair must have same length.');
+    error('fxn_predMetrics_v3: Data fields IV, resp, iPair must have same length.');
+end
+if ~isfield(data, 'iPRS') || numel(data.iPRS) ~= nTrials
+    error('fxn_predMetrics_v3: data.iPRS must be present and nTrials x 1.');
 end
 
 %% -------- 3. Predict sigma and criterion (per trial) --------
@@ -105,7 +108,7 @@ pairIdx = nan(nPairs, 2); % indices of the two trials in each pair
 for iUnik = 1:nPairs
     idx = find(iPair_allT == iPairUnik(iUnik));
     if numel(idx) ~= 2
-        error('fxn_predMetrics_v2: Each iPair should have exactly 2 trials (found %d).', numel(idx));
+        error('fxn_predMetrics_v3: Each iPair should have exactly 2 trials (found %d).', numel(idx));
     end
 
     indPassA = idx(1);

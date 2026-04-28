@@ -17,8 +17,11 @@ nTrials_allBins = data.nTrials_allBins(:);
 iTrial4Bin = data.iTrial4Bin(:);
 
 nTrials = numel(IV_allT);
-if any([numel(resp_allT), numel(iPair_allT), numel(iTrial4Bin)] ~= nTrials)
-    error('PR_pred_v7: IV, resp, iPair, iTrial4Bin must have same length.');
+if any([numel(resp_allT), numel(iPair_allT), numel(iTrial4Bin), numel(iPRS_allT)] ~= nTrials)
+    error('PR_pred_v8: IV, resp, iPair, iTrial4Bin, iPRS must have same length.');
+end
+if numel(nTrials_allBins) ~= nBins
+    error('PR_pred_v8: nTrials_allBins must have length nBins (%d).', nBins);
 end
 
 %% -------- 2. Get pYES (trial-wise) and pA (pair-wise) from core function --------
@@ -29,7 +32,7 @@ end
 
 % Sanity check
 if numel(pYES_pred_allT) ~= nTrials
-    error('PR_pred_v7: pYES_pred must be trial-wise (nTrials x 1).');
+    error('PR_pred_v8: pYES_pred must be trial-wise (nTrials x 1).');
 end
 
 %% -------- 3. Map pair-wise pA back to trials --------
@@ -40,7 +43,7 @@ iPairUnik = unique(iPair_allT);
 nPairs = numel(iPairUnik);
 
 if numel(pA_pred_allPairs) ~= nPairs
-    error('PR_pred_v7: pA_pair must have length equal to numel(unique(iPair)).');
+    error('PR_pred_v8: pA_pair must have length equal to numel(unique(iPair)).');
 end
 
 pA_trial = nan(nTrials, 1);
@@ -48,7 +51,7 @@ for iPair = 1:nPairs
     thisPairID = iPairUnik(iPair);
     idx = (iPair_allT == thisPairID);
     if sum(idx) ~= 2
-        error('PR_pred_v7: each iPair must contain exactly 2 trials.');
+        error('PR_pred_v8: each iPair must contain exactly 2 trials.');
     end
     pA_trial(idx) = pA_pred_allPairs(iPair);
 end
@@ -70,7 +73,7 @@ pA_data_allBins = nan(nBins, 1);
 for iBin = 1:nBins
     indTrial = (iTrial4Bin == iBin);
     if nTrials_allBins(iBin) ~= sum(indTrial)
-        error('PR_pred_v7: inconsistent number of trials in bin %d.', iBin);
+        error('PR_pred_v8: inconsistent number of trials in bin %d.', iBin);
     end
 
     IV_allBins(iBin) = mean(IV_allT(indTrial));
@@ -93,7 +96,7 @@ for iBin = 1:nBins
 
     for iUnik = 1:nUnik
         idxPair = find(iPair_perBin == iPair_perBin_unik(iUnik)); 
-        assert(numel(idxPair) == 2, 'PR_pred_v7: each pair in a bin must have 2 trials.');
+        assert(numel(idxPair) == 2, 'PR_pred_v8: each pair in a bin must have 2 trials.');
         respC_perBin(iUnik) = (resp_perBin(idxPair(1)) == resp_perBin(idxPair(2)));
     end
     pA_data_allBins(iBin) = mean(respC_perBin);

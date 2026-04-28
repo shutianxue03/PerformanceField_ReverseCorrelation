@@ -18,17 +18,17 @@
 % Simulation input parameters
 noiseCST = .2;
 gaborCST = .5;
-nTrials = 8e3;
+nTrials = 1e4;
 Nmul_true = .3;
 Nadd_true = 10;
-Nshared_true = 10;
+Nshared_true = 5;
 Cz_true = 0;
 lambda_whiten = 0;
 flag_regressType = 2;
 flag_incluCrit = 1;
 C_contribution = 0;
 iModelB_sim = 1;
-nIter = 20;
+nIter = 10;
 nBasisORI = 6;
 nBasisSF = 5;
 
@@ -85,6 +85,7 @@ templateType_true = 1; % 1 = raw;
 IVType_true = 1; % 1 = sum of dot product;
 convolveType_true = 1; % 1 = dot product; 2 = convolution (for fxn_getIV_v3)
 flag_permT = 0; %1=permute the input template per trial
+eps_whiten = 1e-3; % floor for whitening eigenvalues
 flag_plotDist = 1;
 if strcmp(str_envir, 'HPC'), flag_plotDist = 0; end % don't plot when running on HPC
 iLocComb = 1; % use single-location index (e.g., fovea) for IO
@@ -213,7 +214,7 @@ mask = stim.mask;
 ratio_base = noise.ratio_base;
 ratio_gaborInTgt = noise.ratio_gaborInTgt;
 
-%% Simulate stimuli & IV
+%% Simulate stimuli & DV
 fprintf('%s: started running %d pairs.\n\n', datetime('now'), nPairs)
 
 parfor iPair = 1:nPairs
@@ -234,11 +235,6 @@ parfor iPair = 1:nPairs
     % Energy profiles
     e3D_target = SX_RC4_Energy_parfor(mask, {patch_target}, filter_sin, filter_cos);
     e3D_target = squeeze(e3D_target);
-
-    % Decision variable from energy × template_true
-    DV_target = fxn_getIV_v3(e3D_target, template_true, convolveType_true, IVType_true, flag_permT, [1, nORI]);
-    assert(~isnan(DV_target), 'IV_target is NaN');
-    DV_target_sim_allT(iPair) = DV_target;
 
     % Data matrix: col 11 = gabor contrast
     if iPRS_allT(iPair) == 1
@@ -264,6 +260,28 @@ assert(sum(e3D_target_allT(nPairs+1:end,:,:) - e3D_target_allT(1:nPairs,:,:), 'a
 % assert(sum(e3D_noise_allT(nPairs+1:end,:,:) - e3D_noise_allT(1:nPairs,:,:), 'all') == 0);
 
 fprintf('%s: Pass A copied to pass B done.\n\n', datetime('now'))
+
+%% Whiten energy for DV computation (keep raw energy for saving)
+[nTrials_cov, nOri_cov, nSf_cov] = size(e3D_target_allT);
+e3D_vec = reshape(e3D_target_allT, [nTrials_cov, nOri_cov * nSf_cov]);
+mu_cov = mean(e3D_vec, 1);
+Sigma = cov(e3D_vec - mu_cov, 1);
+
+if isnan(lambda_whiten)
+    e3D_target_white_allT = e3D_target_allT;
+else
+    Sigma_shrink = (1 - lambda_whiten) * Sigma + lambda_whiten * mean(diag(Sigma)) * eye(size(Sigma, 1));
+    [V, D] = eig((Sigma_shrink + Sigma_shrink') / 2);
+    d = diag(D);
+    d(d < eps_whiten) = eps_whiten;
+    W_white = V * diag(1 ./ sqrt(d)) * V';
+    e3D_target_white_allT = whiten_e3D(e3D_target_allT, mu_cov, W_white);
+end
+
+DV_target_sim_allT = fxn_getIV_v3(e3D_target_white_allT, template_true, convolveType_true, IVType_true, flag_permT, [1, nORI]);
+assert(~any(isnan(DV_target_sim_allT)), 'IV_target contains NaN after whitening');
+
+fprintf('%s: Whitening done and DV computed from whitened energy.\n\n', datetime('now'))
 
 %% Save energy for compIV
 % Use patchMode = 'T' in compIV; this file must contain both target + noise
@@ -1059,4 +1077,12 @@ if iscell(nameList) && numel(nameList) >= idx
 else
     name = sprintf('param%d', idx);
 end
+end
+
+%% helper
+function e3D_white = whiten_e3D(e3D_in, mu_cov, W_white)
+[nT, nOri, nSf] = size(e3D_in);
+X = reshape(e3D_in, [nT, nOri * nSf]);
+Xw = (X - mu_cov) * W_white;
+e3D_white = reshape(Xw, [nT, nOri, nSf]);
 end

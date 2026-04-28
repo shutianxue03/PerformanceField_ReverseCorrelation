@@ -31,9 +31,8 @@ switch iStep
 
         % Add criterion penalty in z units, if available
         if isfield(data, 'Cz_emp') && ~isempty(data.Cz_emp) && isfinite(data.Cz_emp)
-            sigmaC = 0.2; % tune this; smaller sigmaC → stricter penalty; larger sigmaC → weaker penalty;e similar to sd
-            % if we assuming Cz_emp is normally distibuted, centered at
-            % Cz_fit and has SD=sigmaC, then nLL is:
+            sigmaC = 0.2; % smaller sigmaC → stricter penalty; larger sigmaC → weaker penalty;e similar to sd
+            % Calculate nLL, assuming Cz_emp is normally distibuted, centered at Cz_fit and has SD=sigmaC
             nLL_C = 0.5 * ((Cz_fit - data.Cz_emp) / sigmaC)^2;
 
             % convex combination-like weighting
@@ -43,18 +42,20 @@ switch iStep
         end
 
     case 1
-        % Step 1: Predict pYES and estimate only the internal noise parameter
+        % Step 1: fit private-noise params (Nshared forced to 0)
         switch iModelB
-            case 1, params_est = [params_est([1,2]), 0, params_est(3)]; 
-            case 2, params_est = [params_est(1), 0, params_est(2)]; 
-            case 3, params_est = [params_est(1), 0, params_est(2)]; 
-            case 4, params_est = [params_est(1), 0, params_est(2)]; 
+            case 1, params_est = [params_est([1,2]), 0, params_est(3)]; % input=[Nmul,Nadd,criterion]  → full=[Nmul,Nadd,Nshared=0,criterion]
+            % case 2, params_est = [params_est(1), 0, params_est(2)];    % muted because iModelB can't be 2 in two-step fitting --- IGNORE ---
+            case 3, params_est = [params_est(1), 0, params_est(2)];    % input=[Nadd,criterion] → full=[Nmul,Nadd,Nshared=0,criterion]
+            case 4, params_est = [params_est(1), 0, params_est(2)];    % input=[Nmul,criterion] → full=[Nmul,Nadd,Nshared=0,criterion]
         end
         %---------------------------%
         [pYES_pred_allT, ~, ~, Cz_fit] = fxn_predMetrics_v3(iModelB, params_est, data);
         %---------------------------%
         % Calculate nLL based on pYES
-        nLL = -sum( resp_allT .* log(pYES_pred_allT) + (1 - resp_allT) .* log(1 - pYES_pred_allT) );
+        nLL_pYES = -sum( resp_allT .* log(pYES_pred_allT) + (1 - resp_allT) .* log(1 - pYES_pred_allT) );
+        % Combine
+        nLL = nLL_pYES;
 
         % Add criterion penalty (same as case 0), so criterion is constrained
         % toward the empirical value even during step 1 of two-step fitting
@@ -62,7 +63,7 @@ switch iStep
             sigmaC = 0.5;
             nLL_C = 0.5 * ((Cz_fit - data.Cz_emp) / sigmaC)^2;
             nTrials = numel(resp_allT);
-            nLL_behav = nLL / nTrials;
+            nLL_behav = nLL_pYES / nTrials;
             nLL = (1 - C_contribution) * nLL_behav + C_contribution * nLL_C;
         end
         
@@ -79,5 +80,6 @@ switch iStep
         %---------------------------%
 
         % Calculate nLL based on pA
-        nLL = -sum( consistency_allPairs .* log(pA_pred_allPairs) + (1 - consistency_allPairs) .* log(1 - pA_pred_allPairs) );
+        nLL_pA = -sum( consistency_allPairs .* log(pA_pred_allPairs) + (1 - consistency_allPairs) .* log(1 - pA_pred_allPairs) );
+        nLL = nLL_pA;
 end

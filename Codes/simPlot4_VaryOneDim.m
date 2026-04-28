@@ -406,6 +406,7 @@ for iFile = 1:nFiles
         Ri.pA_pred_curve_med = [];
 
         Ri.nLL_med = nan; Ri.nLL_lb = nan; Ri.nLL_ub = nan;
+        Ri.nLL_test_allIter = []; % full per-iteration test nLL vector (for iteration-level win rate)
 
         % ---------- parameter-related values ----------
         Ri.Nmul_rmse    = nan; Ri.Nmul_est_med    = nan; Ri.Nmul_est_lb    = nan; Ri.Nmul_est_ub    = nan;
@@ -421,6 +422,7 @@ for iFile = 1:nFiles
         % ---------- NLL ----------
         if isfield(data_fitNOM, 'nLL_test_allIter')
             [Ri.nLL_med, Ri.nLL_lb, Ri.nLL_ub] = getCI(data_fitNOM.nLL_test_allIter(:), 1, 1);
+            Ri.nLL_test_allIter = data_fitNOM.nLL_test_allIter(:)'; % store full iter vector
         end
 
         pred_metrics_allIter = data_fitNOM.pred_metrics_allIter;
@@ -643,7 +645,7 @@ R_fig1 = R([R.iModelB_sim] == setting.fig12_Bsim & [R.iModelB_fit] == setting.fi
 grpLabels_fig1 = arrayfun(@(r) sprintf('sig=%.3g x Cz=%.3g', r.gaborCST, r.Cz_true), ...
     R_fig1, 'UniformOutput', false);
 
-    grpLabels_fig1 = arrayfun(@(r) sprintf('sig=%.3g', r.gaborCST), ...
+grpLabels_fig1 = arrayfun(@(r) sprintf('sig=%.3g', r.gaborCST), ...
     R_fig1, 'UniformOutput', false);
 
 % grpLabels_fig1 = arrayfun(@(r) sprintf('Nmul=%g x Nadd=%g x Nshared=%g', r.Nmul_true, r.Nadd_true, r.Nshared_true), ...
@@ -905,7 +907,7 @@ for iCol_Bsim = 1:numel(Bsim_unik)
                     mSizes = mMin + (mMax - mMin) * (frac .^ setting.fig4_markerSizeExp);
                 end
             end
-            % Plot binned data 
+            % Plot binned data
             for iDot = 1:numel(Cdata.x)
                 plot(Cdata.x(iDot), Cdata.y(iDot), 'ko', ...
                     'MarkerSize', mSizes(iDot), ...
@@ -949,7 +951,7 @@ for iCol_Bsim = 1:numel(Bsim_unik)
             if ~isempty(Cdata.x)
                 [r2, ~] = fxn_curve_fit_metrics(Cdata.x, Cdata.y, Cpred.x, Cpred.y, nDataBins);
                 rmse = fxn_curve_rmse(Cdata.x, Cdata.y, Cpred.x, Cpred.y, nDataBins);
-                
+
                 if isFirstPanel
                     legStr{nLeg} = sprintf('%s | %.3f | %.2f', fitLabel, rmse, r2);
                 else
@@ -1203,8 +1205,13 @@ close(h);
 %% Figure 5: model recovery
 fprintf('\n%s: Fig 5: Model recovery\n', string(datetime('now')))
 
+% REPLACE the block from "W_bestNLL = nan(..." down to the closing "end" of that if-block
+
+% Win rate: for each condition (nameIO), compute the fraction of iterations on which
+% each fitted model has the lowest test nLL.  Then average those fractions across
+% conditions (equal weight per condition).
 W_bestNLL = nan(numel(Bfit_unik), numel(Bsim_unik));
-if ~isempty(R)
+if ~isempty(R) && isfield(R, 'nLL_test_allIter')
     if isfield(R, 'nameIO')
         datasetIDs_wr = string({R.nameIO});
     else
@@ -1215,30 +1222,47 @@ if ~isempty(R)
         simModel_wr = Bsim_unik(iSim_wr);
         idxSim_wr   = [R.iModelB_sim] == simModel_wr;
         idsSim_wr   = unique(datasetIDs_wr(idxSim_wr));
-        wins_wr     = zeros(numel(Bfit_unik), 1);
-        nValid_wr   = 0;
+
+        % winRatePerCond_wr: [nBfit x nConds] — per-condition per-model win rates
+        winRatePerCond_wr = nan(numel(Bfit_unik), numel(idsSim_wr));
+
         for iID_wr = 1:numel(idsSim_wr)
             idxID_wr = idxSim_wr & datasetIDs_wr == idsSim_wr(iID_wr);
             Rsub_wr  = R(idxID_wr);
             if isempty(Rsub_wr), continue; end
-            nllVals_wr = nan(numel(Bfit_unik), 1);
+
+            % Build [nBfit x nIter] matrix of test nLL values.
+            nIter_wr = max(cellfun(@numel, {Rsub_wr.nLL_test_allIter}));
+            if nIter_wr == 0, continue; end
+            nllMat_wr = nan(numel(Bfit_unik), nIter_wr);
             for iFit_wr = 1:numel(Bfit_unik)
-                idxFit_wr = [Rsub_wr.iModelB_fit] == Bfit_unik(iFit_wr);
-                vals_wr   = [Rsub_wr(idxFit_wr).nLL_med]';
-                vals_wr   = vals_wr(isfinite(vals_wr));
-                if ~isempty(vals_wr)
-                    nllVals_wr(iFit_wr) = mean(vals_wr, 'omitnan');
-                end
+                idxFit_wr = find([Rsub_wr.iModelB_fit] == Bfit_unik(iFit_wr), 1);
+                if isempty(idxFit_wr), continue; end
+                v = Rsub_wr(idxFit_wr).nLL_test_allIter(:)';
+                nllMat_wr(iFit_wr, 1:numel(v)) = v;
             end
-            if ~any(isfinite(nllVals_wr)), continue; end
-            [~, idxBest_wr] = min(nllVals_wr);
-            wins_wr(idxBest_wr) = wins_wr(idxBest_wr) + 1;
-            nValid_wr = nValid_wr + 1;
+
+            % Per-iteration winner vote.
+            wins_iter_wr  = zeros(numel(Bfit_unik), 1);
+            nValidIter_wr = 0;
+            for iIt = 1:nIter_wr
+                col = nllMat_wr(:, iIt);
+                if ~any(isfinite(col)), continue; end
+                [~, iBest] = min(col);
+                wins_iter_wr(iBest) = wins_iter_wr(iBest) + 1;
+                nValidIter_wr = nValidIter_wr + 1;
+            end
+            if nValidIter_wr > 0
+                winRatePerCond_wr(:, iID_wr) = wins_iter_wr / nValidIter_wr;
+            end
+        end % iID_wr
+
+        % Average win rate equally across conditions.
+        validCols_wr = any(isfinite(winRatePerCond_wr), 1);
+        if any(validCols_wr)
+            W_bestNLL(:, iSim_wr) = mean(winRatePerCond_wr(:, validCols_wr), 2, 'omitnan');
         end
-        if nValid_wr > 0
-            W_bestNLL(:, iSim_wr) = wins_wr / nValid_wr;
-        end
-    end
+    end % iSim_wr
 end
 
 M_curveRMSE = nan(numel(Bfit_unik), numel(Bsim_unik));
@@ -1371,7 +1395,7 @@ end
 %   (1,1) Win rate      (1,2) Metric RMSE
 %   (2,1) Median ΔnLL   (2,2) Param RMSE
 panels_fig5 = { ...
-    W_bestNLL,   'Best model win rate',      [0 1]; ...
+    W_bestNLL,   'Win rate (% iters, avg over conds)',  [0 1]; ...
     M_deltaNLL,  'ΔNLL from the best model', [ 0 160]; ...
     M_curveRMSE, 'Metrics RMSE',            [0.05, 0.07]; ...
     M_paramRMSE, 'Parameters RMSE',             [1 2.8] };
@@ -1644,6 +1668,174 @@ for iFit = 1:numel(Bfit_unik)
     saveas(h, fullfile(nameFolder_Figures_part4, sprintf('FigS6_paramCorr_B%d.png', fitModel)));
     close(h);
 end % iModelB_fit
+
+%% Figure 7: Iteration-level ΔnLL distributions (Generating model is the full model B1)
+%    For each reduced model Br, shows the per-iteration distribution of
+%    ΔnLL(Br − B1) aggregated across conditions.
+%    A positive ΔnLL means B1 fits the held-out data better on that iteration.
+%    If distributions straddle 0, B1 barely wins and identifiability is weak.
+
+fprintf('\n%s: Fig 7: Iteration-level delta-nLL distributions\n', string(datetime('now')))
+
+Br_fig7 = setdiff(Bfit_unik, 1); % reduced models to compare against B1
+nReduced_f7 = numel(Br_fig7);
+
+if ~isfield(R, 'nLL_test_allIter') || ~any([R.iModelB_sim] == 1) || nReduced_f7 == 0
+    fprintf('Skipping Fig 7: nLL_test_allIter not available or no B1-simulated data.\n');
+else
+    if isfield(R, 'nameIO')
+        datasetIDs_f7 = string({R.nameIO});
+    else
+        datasetIDs_f7 = string(arrayfun(@(r) sprintf('Nm%g_Na%g_Ns%g_G%g_Cz%g', ...
+            r.Nmul_true, r.Nadd_true, r.Nshared_true, r.gaborCST, r.Cz_true), R, 'UniformOutput', false));
+    end
+    idxSim1_f7 = [R.iModelB_sim] == 1;
+    idsSim1_f7 = unique(datasetIDs_f7(idxSim1_f7));
+    nConds_f7  = numel(idsSim1_f7);
+
+    dnLL_iter_allConds = cell(nReduced_f7, nConds_f7);
+    for iCond = 1:nConds_f7
+        idxCond = idxSim1_f7 & datasetIDs_f7 == idsSim1_f7(iCond);
+        Rcond   = R(idxCond);
+        if isempty(Rcond), continue; end
+
+        idxB1 = find([Rcond.iModelB_fit] == 1, 1);
+        if isempty(idxB1) || isempty(Rcond(idxB1).nLL_test_allIter), continue; end
+        nll_B1 = Rcond(idxB1).nLL_test_allIter(:);
+
+        for iR = 1:nReduced_f7
+            Br      = Br_fig7(iR);
+            idxBr   = find([Rcond.iModelB_fit] == Br, 1);
+            if isempty(idxBr) || isempty(Rcond(idxBr).nLL_test_allIter), continue; end
+            nll_Br  = Rcond(idxBr).nLL_test_allIter(:);
+            nIt     = min(numel(nll_B1), numel(nll_Br));
+            dnLL_iter_allConds{iR, iCond} = nll_Br(1:nIt) - nll_B1(1:nIt);
+        end
+    end
+
+    h = figure('Position', [100 100 280*nReduced_f7 480]);
+    tiledlayout(1, nReduced_f7, 'TileSpacing', 'loose', 'Padding', 'loose');
+
+    for iR = 1:nReduced_f7
+        Br = Br_fig7(iR);
+        nexttile; hold on;
+
+        condMeds = nan(nConds_f7, 1);
+        for iCond = 1:nConds_f7
+            v = dnLL_iter_allConds{iR, iCond};
+            if ~isempty(v), condMeds(iCond) = median(v, 'omitnan'); end
+        end
+
+        good = isfinite(condMeds);
+        if any(good)
+            xJit = 1 + 0.12 * (rand(sum(good), 1) - 0.5);
+            scatter(xJit, condMeds(good), 28, [0.5 0.5 0.5], 'filled', 'MarkerFaceAlpha', 0.5);
+            [gMed, gLb, gUb] = getCI(condMeds(good), 1, 1);
+            errorbar(1, gMed, gMed - gLb, gUb - gMed, 'ko', ...
+                'MarkerFaceColor', 'k', 'MarkerSize', 7, 'LineWidth', 1.8, 'CapSize', 8);
+            winRate_f7 = mean(condMeds(good) > 0);
+            text(1.35, gMed, sprintf('win=%.0f%%', winRate_f7*100), ...
+                'FontSize', setting.fontSize, 'VerticalAlignment', 'middle');
+        end
+
+        yline(0, 'k--', 'LineWidth', 1.2);
+        xlim([0.5 1.8]); xticks([]);
+        ylabel('\DeltanLL (B_r \minus B_1) per condition median');
+        title(sprintf('B%d \minus B1', Br));
+        fxn_style_ax(gca, setting);
+    end
+
+    sgtitle('Fig 7: \DeltanLL distributions | Bsim=B1', 'FontWeight', 'bold');
+    saveas(h, fullfile(nameFolder_Figures_part4, 'FigS7_dnLL_distributions.png'));
+    close(h);
+end
+
+%% Figure 8: ΔnLL vs true omitted parameter value (Generating model is the full model B1)
+%    For each reduced model Br, plots per-condition median ΔnLL(Br − B1) on the
+%    y-axis against the true value of the parameter Br omits on the x-axis.
+%    Expected: ΔnLL should increase as the omitted parameter grows away from 0.
+%    Weak or flat relationship = identifiability problem even with large true parameter.
+
+fprintf('\n%s: Fig 8: delta-nLL vs true omitted parameter\n', string(datetime('now')))
+
+omitB_fig8      = [2,          3,        4       ];
+omitParam_fig8  = {'Nshared',  'Nmul',   'Nadd'  };
+trueField_fig8  = {'Nshared_true', 'Nmul_true', 'Nadd_true'};
+
+keepPair = ismember(omitB_fig8, Bfit_unik);
+omitB_fig8     = omitB_fig8(keepPair);
+omitParam_fig8 = omitParam_fig8(keepPair);
+trueField_fig8 = trueField_fig8(keepPair);
+nPairs_f8 = numel(omitB_fig8);
+
+if ~isfield(R, 'nLL_test_allIter') || ~any([R.iModelB_sim] == 1) || nPairs_f8 == 0
+    fprintf('Skipping Fig 8: nLL_test_allIter not available or no valid model pairs.\n');
+else
+    if isfield(R, 'nameIO')
+        datasetIDs_f8 = string({R.nameIO});
+    else
+        datasetIDs_f8 = string(arrayfun(@(r) sprintf('Nm%g_Na%g_Ns%g_G%g_Cz%g', ...
+            r.Nmul_true, r.Nadd_true, r.Nshared_true, r.gaborCST, r.Cz_true), R, 'UniformOutput', false));
+    end
+    idxSim1_f8 = [R.iModelB_sim] == 1;
+    idsSim1_f8 = unique(datasetIDs_f8(idxSim1_f8));
+
+    paletteSrc = lines(max(nPairs_f8, 3));
+
+    h = figure('Position', [100 100 380*nPairs_f8 420]);
+    tiledlayout(1, nPairs_f8, 'TileSpacing', 'loose', 'Padding', 'loose');
+
+    for iP = 1:nPairs_f8
+        Br          = omitB_fig8(iP);
+        tField      = trueField_fig8{iP};
+        pLabel      = omitParam_fig8{iP};
+
+        xvals = nan(numel(idsSim1_f8), 1);
+        yvals = nan(numel(idsSim1_f8), 1);
+
+        for iCond = 1:numel(idsSim1_f8)
+            idxCond = idxSim1_f8 & datasetIDs_f8 == idsSim1_f8(iCond);
+            Rcond   = R(idxCond);
+            if isempty(Rcond), continue; end
+
+            if isfield(Rcond, tField), xvals(iCond) = Rcond(1).(tField); end
+
+            idxB1 = find([Rcond.iModelB_fit] == 1, 1);
+            idxBr = find([Rcond.iModelB_fit] == Br, 1);
+            if isempty(idxB1) || isempty(idxBr), continue; end
+            nll_B1 = Rcond(idxB1).nLL_test_allIter(:);
+            nll_Br = Rcond(idxBr).nLL_test_allIter(:);
+            if isempty(nll_B1) || isempty(nll_Br), continue; end
+            nIt = min(numel(nll_B1), numel(nll_Br));
+            yvals(iCond) = median(nll_Br(1:nIt) - nll_B1(1:nIt), 'omitnan');
+        end
+
+        good = isfinite(xvals) & isfinite(yvals);
+        nexttile; hold on;
+
+        scatter(xvals(good), yvals(good), 40, paletteSrc(iP, :), ...
+            'filled', 'MarkerFaceAlpha', 0.75);
+
+        if sum(good) >= 3
+            pCoef = polyfit(xvals(good), yvals(good), 1);
+            xFit  = linspace(min(xvals(good)), max(xvals(good)), 60);
+            plot(xFit, polyval(pCoef, xFit), '-', 'Color', paletteSrc(iP,:), 'LineWidth', 1.8);
+            [rho_f8, ~] = corr(xvals(good), yvals(good));
+            text(0.05, 0.92, sprintf('r = %.2f', rho_f8), 'Units', 'normalized', ...
+                'FontSize', setting.fontSize, 'Color', paletteSrc(iP,:));
+        end
+
+        yline(0, 'k--', 'LineWidth', 1.2);
+        xlabel(sprintf('True %s', pLabel));
+        ylabel(sprintf('\\DeltanLL median (B%d \\minus B1)', Br));
+        title(sprintf('B%d vs B1 | omitted: %s', Br, pLabel));
+        fxn_style_ax(gca, setting);
+    end
+
+    sgtitle('Fig 8: \DeltanLL vs true omitted parameter | Bsim=B1', 'FontWeight', 'bold');
+    saveas(h, fullfile(nameFolder_Figures_part4, 'FigS8_dnLL_vs_trueParam.png'));
+    close(h);
+end
 
 %% Local helpers  (only functions used 2+ times)
 
@@ -2021,7 +2213,7 @@ if sum(good) < 1
 end
 
 if nargin >= 5 && ~isempty(w) && numel(w) == numel(xRef)
-    wg = w(good); wg = wg(:) / sum(wg(isfinite(wg))); 
+    wg = w(good); wg = wg(:) / sum(wg(isfinite(wg)));
     rmse = sqrt(sum(wg' .* (yRef(good) - yInterp(good)).^2, 'omitnan'));
     assert(isscalar(rmse), 'ALERT: rmse is not a scalar but a vector!!')
 else
