@@ -1,5 +1,5 @@
 
-function [IV, max_allT] = fxn_getIV_v3(e3D, template_input, convolveType, IVType, flag_permT, ORI_bound)
+function [DV_allT, max_allT] = fxn_getIV_v3(e3D, template_input, convolveType, DV_allTType, flag_permT, ORI_bound)
 
 flag_plotMax=0;
 
@@ -8,12 +8,12 @@ template_input = template_input / norm(template_input(:));
 
 if ndims(e3D)==3
     [nTrials, nORI, nSF] = size(e3D);
-    IV = nan(nTrials, 1);
+    DV_allT = nan(nTrials, 1);
     max_allT = nan(nTrials, 2);
 else
     nTrials = 1;
     [nORI, nSF] = size(e3D);
-    IV = nan;
+    DV_allT = nan;
     max_allT = nan(1,2);
 end
 
@@ -24,7 +24,7 @@ end
 % e3D_noisy = e3D .* randn(size(e3D));
 
 % CANNOT permutate pixels of template here
-% Because to have the same IV for paired trials, the template cannot be randomized
+% Because to have the same DV_allT for paired trials, the template cannot be randomized
 % independently across trials (at least not for the pair of trials)
 
 if flag_permT % Permute pixels in the template
@@ -55,11 +55,11 @@ for iTrial = 1:nTrials
     % max_allT(iTrial, :) = [maxORI, maxSF_log];
 
     %     quickPlot_tempCovE, waitforbuttonpress
-    % decide the format of IV
-    switch IVType
-        case 1, IV(iTrial) = sum(tempCovE(:));
-        case 2, IV(iTrial) = max_;
-        case 3, IV(iTrial) = max_/(sum(tempCovE(:))); if sum(tempCovE(:)) == 0, error('ALERT: The suppressive drive is 0.'); end% SS stands for the estimated semi-saturation factor
+    % decide the format of DV_allT
+    switch DV_allTType
+        case 1, DV_allT(iTrial) = sum(tempCovE(:));
+        case 2, DV_allT(iTrial) = max_;
+        case 3, DV_allT(iTrial) = max_/(sum(tempCovE(:))); if sum(tempCovE(:)) == 0, error('ALERT: The suppressDV_allTe drDV_allTe is 0.'); end% SS stands for the estimated semi-saturation factor
     end
 end % end of itrial
 

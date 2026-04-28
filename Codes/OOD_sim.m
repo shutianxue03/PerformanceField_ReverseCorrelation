@@ -1,4 +1,4 @@
-% function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, Cz_true, ...
+% function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, cSDT_true, ...
 %     lambda_whiten, flag_regressType, flag_incluCrit, C_contribution, iModelB_sim, nIter, nBasisORI, nBasisSF)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -18,17 +18,17 @@
 % Simulation input parameters
 noiseCST = .2;
 gaborCST = .5;
-nTrials = 1e4;
-Nmul_true = .3;
-Nadd_true = 10;
-Nshared_true = 5;
-Cz_true = 0;
+nTrials = 2e3;
+Nmul_true = 1;
+Nadd_true = 1;
+Nshared_true = 1;
+cSDT_true = 0;
 lambda_whiten = 0;
 flag_regressType = 2;
 flag_incluCrit = 1;
 C_contribution = 0;
 iModelB_sim = 1;
-nIter = 10;
+nIter = 2;
 nBasisORI = 6;
 nBasisSF = 5;
 
@@ -86,6 +86,7 @@ IVType_true = 1; % 1 = sum of dot product;
 convolveType_true = 1; % 1 = dot product; 2 = convolution (for fxn_getIV_v3)
 flag_permT = 0; %1=permute the input template per trial
 eps_whiten = 1e-3; % floor for whitening eigenvalues
+flag_whitenDV = 1; % 1=compute DV from whitened energy; 0=use raw energy
 flag_plotDist = 1;
 if strcmp(str_envir, 'HPC'), flag_plotDist = 0; end % don't plot when running on HPC
 iLocComb = 1; % use single-location index (e.g., fovea) for IO
@@ -100,17 +101,17 @@ fprintf(' - Simulated with ModelB = %d \n', iModelB_sim);
 fprintf(' - True IN params: Nmul=%.3g, Nadd=%.3g, Nshared=%.3g\n', Nmul_true, Nadd_true, Nshared_true);
 fprintf(' - Fitted with ModelA = %s (1=Data-derived template; 2=ideal template)\n', strjoin(string(iModelA_fit_all), ' '));
 fprintf(' - Fitted with ModelB = %s (1=full, 2=No Nshared; 3=No Nmul; 4=No Nadd)\n', strjoin(string(iModelB_fit_all), ' '));
-fprintf(' - Criterion (z unit)=%.1f \n', Cz_true);
+fprintf(' - SDT Criterion=%.1f \n', cSDT_true);
 fprintf(' - Contribution of criterion loss =%.1f \n', C_contribution);
 fprintf(' - Whitening strength (lambda): %.1f \n', lambda_whiten);
 fprintf(' - Regression type (1=Univariate; 2=Multi+smoothing): %d \n\n', flag_regressType);
 
 % Define IO name & folders %
 % Define the IO name
-nameIO = sprintf('IO_cN%.0f_cG%.0f_nT%s_Nm%s_Na%s_Ns%s_Cz%.1f_cont%.1f_whiten%.1f_R%d_%d%d_B%d', ...
+nameIO = sprintf('IO_cN%.0f_cG%.0f_nT%s_Nm%s_Na%s_Ns%s_cSDT%.1f_cont%.1f_whiten%.1f_R%d_%d%d_B%d', ...
     noiseCST*100, gaborCST*100, format_num2exp(nTrials), ...
     format_num2exp(Nmul_true), format_num2exp(Nadd_true), format_num2exp(Nshared_true), ...
-    Cz_true, C_contribution, lambda_whiten, flag_regressType, nORI, nSF, iModelB_sim);
+    cSDT_true, C_contribution, lambda_whiten, flag_regressType, nORI, nSF, iModelB_sim);
 
 % Folder to save IO data (energy + behav)
 nameFolder_Data_OOD_IO = sprintf('%s/%s', nameFolder_Data_OOD, nameIO);
@@ -180,13 +181,9 @@ fprintf('%s: Filter banks (nORI=%d, nSF=%d) created and saved.\n\n', datetime('n
 
 %% True 2D template (ORI×SF)
 template_gabor_true = exp_CreateGabor(stim, stim.gaborCST);
-%-%
 template_true = SX_RC4_Energy_parfor(stim.mask, {template_gabor_true}, filter_sin, filter_cos);
-%-%
 template_true = squeeze(template_true);
-%-%
 template_true = fxn_getTemplate(template_true, templateType_true, 0);
-%-%
 
 % Normalize template (Unit L2-norm)
 template_true = template_true / norm(template_true(:));
@@ -206,9 +203,7 @@ iSess_allT = repmat(1:nSess, 1, nTrialsPerSess)';
 
 dataMatrix = nan(nTrials, nMetrics);
 e3D_target_allT = nan(nTrials, nORI, nSF);
-% e3D_noise_allT = nan(nTrials, nORI, nSF);
 DV_target_sim_allT= nan(nTrials, 1);
-% IV_noise_sim_allT = nan(nTrials, 1);
 
 mask = stim.mask;
 ratio_base = noise.ratio_base;
@@ -261,27 +256,26 @@ assert(sum(e3D_target_allT(nPairs+1:end,:,:) - e3D_target_allT(1:nPairs,:,:), 'a
 
 fprintf('%s: Pass A copied to pass B done.\n\n', datetime('now'))
 
-%% Whiten energy for DV computation (keep raw energy for saving)
-[nTrials_cov, nOri_cov, nSf_cov] = size(e3D_target_allT);
-e3D_vec = reshape(e3D_target_allT, [nTrials_cov, nOri_cov * nSf_cov]);
-mu_cov = mean(e3D_vec, 1);
-Sigma = cov(e3D_vec - mu_cov, 1);
-
-if isnan(lambda_whiten)
-    e3D_target_white_allT = e3D_target_allT;
-else
+%% Compute DV from raw or whitened energy (raw energy is always saved)
+if flag_whitenDV && ~isnan(lambda_whiten)
+    [nTrials_cov, nOri_cov, nSf_cov] = size(e3D_target_allT);
+    e3D_vec = reshape(e3D_target_allT, [nTrials_cov, nOri_cov * nSf_cov]);
+    mu_cov = mean(e3D_vec, 1);
+    Sigma = cov(e3D_vec - mu_cov, 1);
     Sigma_shrink = (1 - lambda_whiten) * Sigma + lambda_whiten * mean(diag(Sigma)) * eye(size(Sigma, 1));
     [V, D] = eig((Sigma_shrink + Sigma_shrink') / 2);
     d = diag(D);
     d(d < eps_whiten) = eps_whiten;
     W_white = V * diag(1 ./ sqrt(d)) * V';
-    e3D_target_white_allT = whiten_e3D(e3D_target_allT, mu_cov, W_white);
+    e3D_forDV = whiten_e3D(e3D_target_allT, mu_cov, W_white);
+    fprintf('%s: Energy whitened for DV (lambda=%.2f).\n\n', datetime('now'), lambda_whiten)
+else
+    e3D_forDV = e3D_target_allT; % use raw energy
+    fprintf('%s: DV computed from raw energy (flag_whitenDV=%d).\n\n', datetime('now'), flag_whitenDV)
 end
 
-DV_target_sim_allT = fxn_getIV_v3(e3D_target_white_allT, template_true, convolveType_true, IVType_true, flag_permT, [1, nORI]);
-assert(~any(isnan(DV_target_sim_allT)), 'IV_target contains NaN after whitening');
-
-fprintf('%s: Whitening done and DV computed from whitened energy.\n\n', datetime('now'))
+DV_target_sim_allT = fxn_getIV_v3(e3D_forDV, template_true, convolveType_true, IVType_true, flag_permT, [1, nORI]);
+assert(~any(isnan(DV_target_sim_allT)), 'IV_target contains NaN');
 
 %% Save energy for compIV
 % Use patchMode = 'T' in compIV; this file must contain both target + noise
@@ -315,23 +309,15 @@ sigma_pred_allT = sqrt(sigma_priv_allT.^2 + sigma_shared_allT.^2);
 
 fprintf('%s: Internal noise sampled and added.\n\n', datetime('now'))
 
-%% Set a true criterion given the true criterion in z-score
-% Old way: Titrate a criterion to reach target accuracy pC_titrate
-%-%
-% fxn_loss_pC_ = @(criterion_potential) fxn_loss_pC(criterion_potential, pC_titrate, DVnoisy_sim_allT, iPRS_allT);
-% %-%
-% criterion_true = fmincon(fxn_loss_pC_, median(DVnoisy_sim_allT), [], [], [], [], min(DVnoisy_sim_allT), max(DVnoisy_sim_allT));
-
+%% Set a true criterion given the true SDT criterion
 % Candidate criteria in DV space:
 DV_sorted = sort(unique(DVnoisy_sim_allT(:)));
 criterion_grid = [-Inf; (DV_sorted(1:end-1) + DV_sorted(2:end))/2; Inf];
-
 loss_grid = nan(size(criterion_grid));
 c_z_grid = nan(size(criterion_grid));
-
 for iC = 1:numel(criterion_grid)
     c_try = criterion_grid(iC);
-    [loss_grid(iC), c_z_grid(iC)] = criterion_loss_cz(c_try, DVnoisy_sim_allT, iPRS_allT, Cz_true);
+    [loss_grid(iC), c_z_grid(iC)] = fxn_loss_cSDT(c_try, DVnoisy_sim_allT, iPRS_allT, cSDT_true);
 end
 % Choose the criterion in DV unit
 [~, idx_best] = min(loss_grid);
@@ -339,6 +325,7 @@ criterion_DV_true = criterion_grid(idx_best);
 
 save(sprintf('%s/truth.mat', nameFolder_Data_OOD_IO), 'criterion_DV_true', '-append');
 
+%% Simulate responses and calculate pYES
 % Binary responses
 resp_allT = DVnoisy_sim_allT > criterion_DV_true;
 
@@ -364,7 +351,9 @@ pC_sim = mean( (iPRS_allT==1 & resp_allT==1) | (iPRS_allT==0 & resp_allT==0) );
 
 % Stop if simulated pC is too low or too high
 if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
-    [dprime_sim, Cz_sim] = SX_sim06_SDT(pHit_sim, pFA_sim);
+    fprintf('\n\n ** Simulated pC=%.2f, withtin the range [%.2f, %.2f] ** \n\n', pC_sim, pC_filter)
+
+    [dprime_sim, cSDT_sim] = SX_sim06_SDT(pHit_sim, pFA_sim);
 
     respC_sim = nan(nPairs, 1);
     for iPairUnik = 1:nPairs
@@ -373,7 +362,7 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
     end
     pA_sim = mean(respC_sim);
 
-    metrics_sim = [dprime_sim, Cz_sim, pC_sim, pHit_sim, pFA_sim, pA_sim, pYES_sim];
+    metrics_sim = [dprime_sim, cSDT_sim, pC_sim, pHit_sim, pFA_sim, pA_sim, pYES_sim];
 
     % Save behavioral measures in behavMeas.mat (as expected by compIV)
     save(sprintf('%s/behavMeas.mat', nameFolder_Data_OOD_IO), 'dataMatrix', 'metrics_sim', 'iPRS_allT', 'iPass_allT', 'iPair_allT', 'resp_allT', 'pC_filter');
@@ -388,7 +377,7 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
     %% Run compIV and fitNOM on this IO
     % Step 1: compute IVs, templates, and test-set metrics
     %----------------------------%
-    OOD_NOM_Trialwise_compIV_A12(nBasisORI, nBasisSF, {nameIO, criterion_DV_true}, iLocComb, lambda_whiten, flag_regressType, nIter, nJob, iJob)
+    OOD_NOM_Trialwise_compIV_A12(nBasisORI, nBasisSF, {nameIO, criterion_DV_true}, iLocComb, lambda_whiten, flag_regressType, flag_whitenDV, nIter, nJob, iJob)
     %----------------------------%
 
     %% Step 2: fit NOM parameters and predict metrics
@@ -419,7 +408,7 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
         Nmul_true, Nadd_true, Nshared_true, criterion_DV_true);
 
 else
-    fprintf('\n\n ** Simulated pC=%.2f, outof the range [%.2f, %.2f] ** \n\n', pC_sim, pC_filter)
+    fprintf('\n\n ** Simulated pC=%.2f, OUT OF the range [%.2f, %.2f] ** \n\n', pC_sim, pC_filter)
 end % if
 
 % Play sound to indicate end of analysis
@@ -446,7 +435,7 @@ fprintf('%s: Simulation done.\n\n', time_end)
 elapsed = time_end - time_start;
 fprintf('Time used: %s\n\n\n\n', char(elapsed));
 
-% end
+% end % end of the OOD_sim function
 
 %% helper
 function plot_fit_model_comparison(nameFolder_Data_NOM_IO, nameFolder_Figures_perSubj, nameIO, ...
@@ -664,7 +653,7 @@ end
 end
 
 %% helper
-function [loss, c_z, pHit, pFA] = criterion_loss_cz(k, DV_noisy, iPRS_allT, target_cz)
+function [loss, cSDT, pHit, pFA] = fxn_loss_cSDT(k, DV_noisy, iPRS_allT, target_cSDT)
 
 nPRS = sum(iPRS_allT == 1);
 nABS = sum(iPRS_allT == 0);
@@ -679,9 +668,9 @@ pFA  = sum(resp == 1 & iPRS_allT == 0) / nABS;
 pHit = min(max(pHit, eps_), 1 - eps_);
 pFA  = min(max(pFA,  eps_), 1 - eps_);
 
-c_z = -0.5 * (norminv(pHit) + norminv(pFA));
+cSDT = -0.5 * (norminv(pHit) + norminv(pFA));
 
-loss = (c_z - target_cz).^2;
+loss = (cSDT- target_cSDT).^2;
 end
 
 %% helper
@@ -1067,15 +1056,6 @@ try
     pSF(1:min(2, numel(pSF_fit))) = pSF_fit(1:min(2, numel(pSF_fit)));
 catch
     % keep NaN so plotting can continue for other DVs
-end
-end
-
-%% helper
-function name = get_param_name_local(nameList, idx)
-if iscell(nameList) && numel(nameList) >= idx
-    name = nameList{idx};
-else
-    name = sprintf('param%d', idx);
 end
 end
 

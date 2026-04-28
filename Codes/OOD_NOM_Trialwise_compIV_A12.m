@@ -1,4 +1,4 @@
-function OOD_NOM_Trialwise_compIV_A12(nBasisORI, nBasisSF, isubj, iLocComb, lambda_whiten, flag_regressType, nIter, nJob, iJob)
+function OOD_NOM_Trialwise_compIV_A12(nBasisORI, nBasisSF, isubj, iLocComb, lambda_whiten, flag_regressType, flag_whitenDV, nIter, nJob, iJob)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % OOD_NOM_Trialwise_compIV.m
 %
@@ -51,7 +51,6 @@ itype_template = 2; % 1=estimate template from PRS trials, ABS trials, or BOTH t
 flag_PatchMode = 1; % if flag_PatchMode == 1, patchMode = 'T'; else, patchMode = 'N'; end
 flag_plot_template = 0;
 
-ratio_split = [.6, .3, .1]; % proportion of trials in template set (for RC), training set (for estimating parameters) and test set (for metric predictions)
 ratio_split = [.8, .15, .05]; % proportion of trials in template set (for RC), training set (for estimating parameters) and test set (for metric predictions)
 assert(abs(sum(ratio_split)-1)<1e-10)
 ORI_bound = [5, 14]; % orientation window, passed to fxn_getIV_v3
@@ -72,7 +71,7 @@ if flag_regressType == 2
     candidateBasisFamilySF  = {'gaussianLog2', 'asymGaussianLog2', 'LogParabola', 'asymLogParabola'};
     % candidateBasisFamilySF  = {'asymGaussianLog2', 'asymLogParabola'};
     candidateRidge  = [0, 10.^(-3:2)];
-    candidateRidge  = 100;
+    % candidateRidge  = 100;
     opts.basisWidthScale = .8;
     opts. asymSF_rightLeftRatio = 1.2;
     opts.nFolds = 5;
@@ -258,14 +257,20 @@ template_ideal = fxn_getTemplate(template_ideal, templateType_true, 0);
 % Normalize template (Unit L2-norm)
 template_ideal = template_ideal / norm(template_ideal(:));
 
-fprintf('%s: ideal template created.\n\n', datetime('now'))
+fprintf('%s: Ideal template created.\n\n', datetime('now'))
+
+%% Stage overview
+% A1: estimate trial-wise templates from data and compute DVs.
+% A2: keep trial resampling/whitening/DV pipeline the same, but replace the
+% template with a fixed "true" template scaled to A1's mean derived amplitude.
+% Execution order matters because A2 depends on A1 outputs.
 
 %% A1
 % Output file name (before estimation)
-iModelA_fit=1;
+iModelA_fit = 1;
 nameFile_compIV_A1 = sprintf('%s/n%d_J%d_A%d_compIV', nameFolder_NOM_save, nIter, iJob, iModelA_fit);
 
-%% MAIN LOOP over iterations 
+%% A1—Main loop over iterations 
 % fprintf('%s: Creating empty placeholders for running iterations.\n\n', datetime('now'))
 data_metrics_allIter = nan(nIter, nDatasets_full, nMetrics); % see fxn_getMetrics for all 11 metrics
 data_train_allIter = cell(nIter, 1);
@@ -304,17 +309,7 @@ for iIter = 1:nIter
     %----------------%
 
     %% 2. Select which trials to use to estimate the template (TEMPLATE set)
-    switch itype_template
-        case 1 % PRS trials only
-            useIdx_full = (iPRS_full_rand == 1);
-            useIdx_tmpl = (iPRS_tmpl_rand == 1);
-        case 2 % ABS trials only
-            useIdx_full = (iPRS_full_rand == 0);
-            useIdx_tmpl = (iPRS_tmpl_rand == 0);
-        otherwise % 3 = both PRS and ABS (here we just keep everything)
-            useIdx_full = true(size(iPRS_full_rand));
-            useIdx_tmpl = true(size(iPRS_tmpl_rand));
-    end
+    [useIdx_full, useIdx_tmpl] = selectTemplateIndices(itype_template, iPRS_full_rand, iPRS_tmpl_rand);
 
     % sel for "selected"
     e3D_tmpl_rand_sel = e3D_tmpl_rand(useIdx_tmpl, :, :);
@@ -347,92 +342,33 @@ for iIter = 1:nIter
     % -------------------------------------------------------------------------
     % 1. Estimate covariance in channel-energy space separately for TEMPLATE and FULL
     % -------------------------------------------------------------------------
-    [nTrials_tmpl_cov, nORI, nSF] = size(e3D_tmpl_rand_norm);
-    [nTrials_full_cov, ~,   ~  ] = size(e3D_full_rand_norm);
-
-    e3D_tmpl_vec = reshape(e3D_tmpl_rand_norm, [nTrials_tmpl_cov, nORI * nSF]); % trials x channels
-    e3D_full_vec = reshape(e3D_full_rand_norm, [nTrials_full_cov, nORI * nSF]); % trials x channels
-
-    % Mean and covariance of channel-energy vectors across trials
-    mu_cov_tmpl = mean(e3D_tmpl_vec, 1);
-    mu_cov_full = mean(e3D_full_vec, 1);
-
-    Sigma_tmpl = cov(e3D_tmpl_vec - mu_cov_tmpl, 1);   % population covariance
-    Sigma_full = cov(e3D_full_vec - mu_cov_full, 1);   % population covariance
+    [mu_cov_tmpl, ~, W_white_tmpl] = computeWhiteningParams(e3D_tmpl_rand_norm, lambda_whiten, eps_whiten);
+    [mu_cov_full, ~, W_white_full] = computeWhiteningParams(e3D_full_rand_norm, lambda_whiten, eps_whiten);
 
     % -------------------------------------------------------------------------
     % 2. Choose covariance-handling strategy
     % -------------------------------------------------------------------------
     if isnan(lambda_whiten)
-        % % =====================================================================
-        % % Way 2: estimate template in ORIGINAL feature space,
-        % %        then apply inverse-covariance correction to the recovered template
-        % % =====================================================================
-        % % Optional: no shrinkage in inverse-covariance mode
-        % Sigma_tmpl_use = Sigma_tmpl;
-        % Sigma_full_use = Sigma_full;
-        % 
-        % % --- TEMPLATE set inverse-covariance correction matrix ---
-        % [V_tmpl, D_tmpl] = eig((Sigma_tmpl_use + Sigma_tmpl_use') / 2);
-        % d_tmpl = diag(D_tmpl);
-        % d_tmpl(d_tmpl < eps_whiten) = eps_whiten;
-        % W_inv_tmpl = V_tmpl * diag(1 ./ d_tmpl) * V_tmpl';
-        % 
-        % % --- FULL set inverse-covariance correction matrix ---
-        % [V_full, D_full] = eig((Sigma_full_use + Sigma_full_use') / 2);
-        % d_full = diag(D_full);
-        % d_full(d_full < eps_whiten) = eps_whiten;
-        % W_inv_full = V_full * diag(1 ./ d_full) * V_full';
-        % 
-        % % Keep original features unchanged
-        % e3D_tmpl_use = e3D_tmpl_rand_norm;
-        % e3D_full_use = e3D_full_rand_norm;
-        % 
-        % % Estimate template in original feature space
-        % switch flag_regressType
-        %     case 1  % Univariate
-        %         template_tmpl_raw = SX_sim07_RC(e3D_tmpl_use, resp_tmpl_rand_sel);
-        %         template_full_raw = SX_sim07_RC(e3D_full_use, resp_full_rand_sel);
-        % 
-        %     case 2  % Multivariate + smoothing
-        %         out = SX_RC_smoothBasis_circORI_logSF(e3D_tmpl_use, resp_tmpl_rand_sel, axis_tuning{1}, axis_tuning{2}, opts);
-        %         template_tmpl_raw = out.template2D;
-        % 
-        %         out = SX_RC_smoothBasis_circORI_logSF(e3D_full_use, resp_full_rand_sel, axis_tuning{1}, axis_tuning{2}, opts);
-        %         template_full_raw = out.template2D;
-        % end
-        % 
-        % % Apply inverse-covariance correction using each dataset's own covariance
-        % template_tmpl_raw = invcov_kernel(template_tmpl_raw, W_inv_tmpl, nORI, nSF);
-        % template_full_raw = invcov_kernel(template_full_raw, W_inv_full, nORI, nSF);
+        error('lambda_whiten = NaN path is not implemented in this script variant (A12).');
 
     else
         % =====================================================================
         % Way 1: whiten the channel-energy predictors before template estimation
         % =====================================================================
 
-        % Shrink covariance toward scaled identity
-        Sigma_shrink_tmpl = (1 - lambda_whiten) * Sigma_tmpl + lambda_whiten * mean(diag(Sigma_tmpl)) * eye(size(Sigma_tmpl, 1));
-        Sigma_shrink_full = (1 - lambda_whiten) * Sigma_full + lambda_whiten * mean(diag(Sigma_full)) * eye(size(Sigma_full, 1));
-
         % lambda_whiten = 0 --> use the full empirical covariance
         % lambda_whiten = 1 --> use a scaled identity covariance (ignore channel correlations)
-
-        % --- TEMPLATE set whitening matrix ---
-        [V_tmpl, D_tmpl] = eig((Sigma_shrink_tmpl + Sigma_shrink_tmpl') / 2);
-        d_tmpl = diag(D_tmpl);
-        d_tmpl(d_tmpl < eps_whiten) = eps_whiten;
-        W_white_tmpl = V_tmpl * diag(1 ./ sqrt(d_tmpl)) * V_tmpl';
-
-        % --- FULL set whitening matrix ---
-        [V_full, D_full] = eig((Sigma_shrink_full + Sigma_shrink_full') / 2);
-        d_full = diag(D_full);
-        d_full(d_full < eps_whiten) = eps_whiten;
-        W_white_full = V_full * diag(1 ./ sqrt(d_full)) * V_full';
 
         % Apply whitening to each dataset using its own mean and covariance
         e3D_tmpl_use = whiten_e3D(e3D_tmpl_rand_norm, mu_cov_tmpl, W_white_tmpl);
         e3D_full_use = whiten_e3D(e3D_full_rand_norm, mu_cov_full, W_white_full);
+
+        % Safe defaults for branch-specific outputs (used only for case 2)
+        nBasisORI_tmpl = nan;
+        nBasisSF_tmpl = nan;
+        basisFxnORI_tmpl = '';
+        basisFxnSF_tmpl = '';
+        ridge_tmpl = nan;
 
         % Estimate template in whitened feature space
         switch flag_regressType
@@ -543,102 +479,21 @@ for iIter = 1:nIter
         margR2_SF_allIter(iIter, iDataset) = margR2_SF;
     end % iDataset
 
-    %% 5. Compute behavioral metrics for all data sets
-    %--------------------------------------------%
-    metrics_full = fxn_getMetrics(resp_full_rand, iPRS_full_rand, respC_full_rand, cst_full_rand, RT_full_rand);
-    metrics_tmpl = fxn_getMetrics(resp_tmpl_rand, iPRS_tmpl_rand, respC_tmpl_rand, cst_tmpl_rand, RT_tmpl_rand);
-    metrics_train = fxn_getMetrics(resp_train_rand, iPRS_train_rand, respC_train_rand, cst_train_rand, RT_train_rand);
-    metrics_test = fxn_getMetrics(resp_test_rand, iPRS_test_rand, respC_test_rand, cst_test_rand, RT_test_rand);
-    %--------------------------------------------%
-
-    % metrics: [dprime, criterion, [pC, pHit, pFA], nanmean(respC), pYES, mean(1./contrast), median(RT)];
-    metrics = [metrics_full; metrics_tmpl; metrics_train; metrics_test];
-
-    % Save criterion in z units; later used to convert to criterion in IV
-    criterion_z_train = metrics_train(2);
-    criterion_z_test = metrics_test(2);
-
-    clear data; % size of IV differs across subjects and  iterations
-
-    %% 6. Compute decision variable (DV) from whitened energy (TEST set)
-    flag_permT=0;
-    if isnan(lambda_whiten)
-        e3D_train_forDV = e3D_train_rand;
-        e3D_test_forDV = e3D_test_rand;
-    else
-        e3D_train_forDV = whiten_e3D(e3D_train_rand, mu_cov_full, W_white_full);
-        e3D_test_forDV = whiten_e3D(e3D_test_rand, mu_cov_full, W_white_full);
-    end
-    %---------------%
-    DV_train = fxn_getIV_v3(e3D_train_forDV, template_notNormed, convolveType, IVType, flag_permT, ORI_bound);
-    DV_test = fxn_getIV_v3(e3D_test_forDV, template_notNormed, convolveType, IVType, flag_permT, ORI_bound);
-    %---------------%
-    nData_train = length(DV_train);
-    nData_test = length(DV_test);
-
-    %% 7. Bin IV values
-    % Separately for PRS and ABS trials
-    [nTrials_PRS_allBins_train, ~, iTrial4Bin_PRS_train] = histcounts(DV_train(iPRS_train_rand == 1), nBins);
-    [nTrials_ABS_allBins_train, ~, iTrial4Bin_ABS_train] = histcounts(DV_train(iPRS_train_rand == 0), nBins);
-    [nTrials_PRS_allBins_test, ~, iTrial4Bin_PRS_test] = histcounts(DV_test(iPRS_test_rand == 1), nBins);
-    [nTrials_ABS_allBins_test, ~, iTrial4Bin_ABS_test] = histcounts(DV_test(iPRS_test_rand == 0), nBins);
-
-    % For all trials combined
-    [nTrials_allBins_train, ~, iTrial4Bin_train] = histcounts(DV_train, nBins);
-    [nTrials_allBins_test, ~, iTrial4Bin_test] = histcounts(DV_test, nBins);
-
-    %% 8. Compile data struct for this  iteration
-    % Store data_train
-    data_train = struct();
-    data_train.criterion_z = criterion_z_train;
-    data_train.ndata = nData_train;
-    data_train.IV = DV_train;
-    data_train.nTrials_allBins = nTrials_allBins_train;
-    data_train.iTrial4Bin = iTrial4Bin_train;
-    data_train.nTrials_PRS_allBins = nTrials_PRS_allBins_train;
-    data_train.iTrial4Bin_PRS = iTrial4Bin_PRS_train;
-    data_train.nTrials_ABS_allBins = nTrials_ABS_allBins_train;
-    data_train.iTrial4Bin_ABS = iTrial4Bin_ABS_train;
-
-    data_train.iPRS = iPRS_train_rand;
-    data_train.resp = resp_train_rand;
-    data_train.cst = cst_train_rand;
-    data_train.iPair = iPair_train_rand;
-    data_train.respC = respC_train_rand;
-    data_train.RT = RT_train_rand;
-    data_train.metrics_sim = metrics_train; % keep field name 'metrics_sim'
+    %% 5-8. Metrics, DV, binning, data structs
+    d_full  = struct('resp', resp_full_rand,  'iPRS', iPRS_full_rand,  'respC', respC_full_rand,  'cst', cst_full_rand,  'RT', RT_full_rand);
+    d_tmpl  = struct('resp', resp_tmpl_rand,  'iPRS', iPRS_tmpl_rand,  'respC', respC_tmpl_rand,  'cst', cst_tmpl_rand,  'RT', RT_tmpl_rand);
+    d_train = struct('resp', resp_train_rand, 'iPRS', iPRS_train_rand, 'respC', respC_train_rand, 'cst', cst_train_rand, 'RT', RT_train_rand, 'iPair', iPair_train_rand);
+    d_test  = struct('resp', resp_test_rand,  'iPRS', iPRS_test_rand,  'respC', respC_test_rand,  'cst', cst_test_rand,  'RT', RT_test_rand,  'iPair', iPair_test_rand);
+    [data_train, data_test, metrics] = fxn_compDV_packData( ...
+        d_full, d_tmpl, d_train, d_test, ...
+        e3D_train_rand, e3D_test_rand, ...
+        flag_whitenDV, lambda_whiten, mu_cov_full, W_white_full, ...
+        template_notNormed, convolveType, IVType, ORI_bound, nBins);
     data_train_allIter{iIter} = data_train;
-
-    % Store data_test
-    data_test = struct();
-    data_test.criterion_z = criterion_z_test;
-    data_test.ndata = nData_test;
-    data_test.IV = DV_test;
-    data_test.nTrials_allBins = nTrials_allBins_test;
-    data_test.iTrial4Bin = iTrial4Bin_test;
-    data_test.nTrials_PRS_allBins = nTrials_PRS_allBins_test;
-    data_test.iTrial4Bin_PRS = iTrial4Bin_PRS_test;
-    data_test.nTrials_ABS_allBins = nTrials_ABS_allBins_test;
-    data_test.iTrial4Bin_ABS = iTrial4Bin_ABS_test;
-
-    data_test.iPRS = iPRS_test_rand;
-    data_test.resp = resp_test_rand;
-    data_test.cst = cst_test_rand;
-    data_test.iPair = iPair_test_rand;
-    data_test.respC = respC_test_rand;
-    data_test.RT = RT_test_rand;
-    data_test.metrics_sim = metrics_test; % keep field name 'metrics_sim'
-    % Store
-    data_test_allIter{iIter} = data_test;
-
-    % Store metrics of three datasets together (for fast plotting in NOMplot_compIV)
+    data_test_allIter{iIter}  = data_test;
     data_metrics_allIter(iIter, :, :) = metrics;
 
     % Store templates
-    if iModelA_fit==2
-        template_notNormed_tmpl = template_notNormed;
-        template_notNormed_full = template_notNormed;
-    end
     template_tmpl_allIter(iIter, :, :) = template_notNormed_tmpl;
     template_full_allIter(iIter, :, :) = template_notNormed_full;
     nBasisORI_tmpl_allIter(iIter, :) = nBasisORI_tmpl;
@@ -661,8 +516,9 @@ end % end for iIter
 
 fprintf('\n\n%s: A1 All iterations done.\n\n', datetime('now'))
 
-%% SAVE 
-save(nameFile_compIV_A1, 'time_progress', 'template_ideal', 'criterion_z*', '*_allIter', 'names*', 'flag*', 'ratio_split', 'ORI_bound', '*Type');
+%% SAVE  A1
+% save(nameFile_compIV_A1, 'time_progress', 'template_ideal', 'criterion_z*', '*_allIter', 'names*', 'flag*', 'ratio_split', 'ORI_bound', '*Type');
+save(nameFile_compIV_A1, 'time_progress', 'template_ideal', '*_allIter', 'names*', 'flag*', 'ratio_split', 'ORI_bound', '*Type');
 
 % Delete the progress report
 if exist(nameFile_progress_new, 'file')
@@ -671,7 +527,7 @@ end
 
 fprintf('\n\n%s: A1 Outputs saved.\n\n', datetime('now'))
 
-%% Plot (optional) 
+%% Plot A1 (optional) 
 if flag_plot_compIV
     %-------------------%
     NOMplot_compIV;
@@ -680,14 +536,13 @@ if flag_plot_compIV
 end
 close all;
 
-%% End timing 
+%% End timing for A1
 time_end = datetime('now');
 fprintf('%s: A1 Compute DV done.\n\n', time_end)
 elapsed = time_end - time_start;
 fprintf('A1 Time used: %s\n\n\n\n', char(elapsed));
 
 %% A2
-% Output file name (before estimation)
 iModelA_fit=2;
 nameFile_compIV_A2 = sprintf('%s/n%d_J%d_A%d_compIV', nameFolder_NOM_save, nIter, iJob, iModelA_fit);
 
@@ -695,7 +550,7 @@ nameFile_compIV_A2 = sprintf('%s/n%d_J%d_A%d_compIV', nameFolder_NOM_save, nIter
 % Average the derived template (tmpl set) across iterations
 template_tmpl_ave_A1 = squeeze(mean(template_tmpl_allIter, 1, 'omitnan'));
 peak_tmpl_A1 = max(abs(template_tmpl_ave_A1(:)));
-% Rescale the true/ideak template to match the peak of the derived template
+% Rescale the true/ideal template to match the peak of the derived template
 % (apply scaling right after template_notNormed is loaded below)
         if ~isnumeric(isubj) % for IO, you may reload 'template_true' from disk
             load(sprintf('%s/truth.mat', nameFolder_OOD_load), 'template_true');
@@ -711,7 +566,7 @@ if isfinite(peak_tmpl_A1) && peak_tmpl_A1 > 0
     end
 end
 
-%% MAIN LOOP over iterations 
+%% A2: Main loop over iterations 
 % fprintf('%s: Creating empty placeholders for running iterations.\n\n', datetime('now'))
 data_metrics_allIter = nan(nIter, nDatasets_full, nMetrics); % see fxn_getMetrics for all 11 metrics
 data_train_allIter = cell(nIter, 1);
@@ -734,17 +589,7 @@ for iIter = 1:nIter
     %----------------%
 
     %% 2. Select which trials to use to estimate the template (TEMPLATE set)
-    switch itype_template
-        case 1 % PRS trials only
-            useIdx_full = (iPRS_full_rand == 1);
-            useIdx_tmpl = (iPRS_tmpl_rand == 1);
-        case 2 % ABS trials only
-            useIdx_full = (iPRS_full_rand == 0);
-            useIdx_tmpl = (iPRS_tmpl_rand == 0);
-        otherwise % 3 = both PRS and ABS (here we just keep everything)
-            useIdx_full = true(size(iPRS_full_rand));
-            useIdx_tmpl = true(size(iPRS_tmpl_rand));
-    end
+    [useIdx_full, useIdx_tmpl] = selectTemplateIndices(itype_template, iPRS_full_rand, iPRS_tmpl_rand);
 
     % Use the FULL selected set to define whitening for DV in this iteration
     e3D_full_rand_sel = e3D_full_rand(useIdx_full, :, :);
@@ -757,120 +602,31 @@ for iIter = 1:nIter
         e3D_full_rand_norm = e3D_full_rand_sel;
     end
 
-    [nTrials_full_cov, nORI_cov, nSF_cov] = size(e3D_full_rand_norm);
-    e3D_full_vec = reshape(e3D_full_rand_norm, [nTrials_full_cov, nORI_cov * nSF_cov]);
-    mu_cov_full = mean(e3D_full_vec, 1);
-    Sigma_full = cov(e3D_full_vec - mu_cov_full, 1);
+    [mu_cov_full, ~, W_white_full] = computeWhiteningParams(e3D_full_rand_norm, lambda_whiten, eps_whiten);
 
-    if ~isnan(lambda_whiten)
-        Sigma_shrink_full = (1 - lambda_whiten) * Sigma_full + lambda_whiten * mean(diag(Sigma_full)) * eye(size(Sigma_full, 1));
-        [V_full, D_full] = eig((Sigma_shrink_full + Sigma_shrink_full') / 2);
-        d_full = diag(D_full);
-        d_full(d_full < eps_whiten) = eps_whiten;
-        W_white_full = V_full * diag(1 ./ sqrt(d_full)) * V_full';
-    end
-
-    %% 5. Compute behavioral metrics for all data sets
-    %--------------------------------------------%
-    metrics_full = fxn_getMetrics(resp_full_rand, iPRS_full_rand, respC_full_rand, cst_full_rand, RT_full_rand);
-    metrics_tmpl = fxn_getMetrics(resp_tmpl_rand, iPRS_tmpl_rand, respC_tmpl_rand, cst_tmpl_rand, RT_tmpl_rand);
-    metrics_train = fxn_getMetrics(resp_train_rand, iPRS_train_rand, respC_train_rand, cst_train_rand, RT_train_rand);
-    metrics_test = fxn_getMetrics(resp_test_rand, iPRS_test_rand, respC_test_rand, cst_test_rand, RT_test_rand);
-    %--------------------------------------------%
-
-    % metrics: [dprime, criterion, [pC, pHit, pFA], nanmean(respC), pYES, mean(1./contrast), median(RT)];
-    metrics = [metrics_full; metrics_tmpl; metrics_train; metrics_test];
-
-    % Save criterion in z units; later used to convert to criterion in IV
-    criterion_z_train = metrics_train(2);
-    criterion_z_test = metrics_test(2);
-
-    clear data; % size of IV differs across subjects and  iterations
-
-    %% 6. Compute decision variable (DV) from whitened energy (TEST set)
-    flag_permT=0;
-    if isnan(lambda_whiten)
-        e3D_train_forDV = e3D_train_rand;
-        e3D_test_forDV = e3D_test_rand;
-    else
-        e3D_train_forDV = whiten_e3D(e3D_train_rand, mu_cov_full, W_white_full);
-        e3D_test_forDV = whiten_e3D(e3D_test_rand, mu_cov_full, W_white_full);
-    end
-
-    %---------------%
-    DV_train = fxn_getIV_v3(e3D_train_forDV, template_notNormed, convolveType, IVType, flag_permT, ORI_bound);
-    DV_test = fxn_getIV_v3(e3D_test_forDV, template_notNormed, convolveType, IVType, flag_permT, ORI_bound);
-    %---------------%
-    nData_train = length(DV_train);
-    nData_test = length(DV_test);
-
-    %% 7. Bin IV values
-    % Separately for PRS and ABS trials
-    [nTrials_PRS_allBins_train, ~, iTrial4Bin_PRS_train] = histcounts(DV_train(iPRS_train_rand == 1), nBins);
-    [nTrials_ABS_allBins_train, ~, iTrial4Bin_ABS_train] = histcounts(DV_train(iPRS_train_rand == 0), nBins);
-    [nTrials_PRS_allBins_test, ~, iTrial4Bin_PRS_test] = histcounts(DV_test(iPRS_test_rand == 1), nBins);
-    [nTrials_ABS_allBins_test, ~, iTrial4Bin_ABS_test] = histcounts(DV_test(iPRS_test_rand == 0), nBins);
-
-    % For all trials combined
-    [nTrials_allBins_train, ~, iTrial4Bin_train] = histcounts(DV_train, nBins);
-    [nTrials_allBins_test, ~, iTrial4Bin_test] = histcounts(DV_test, nBins);
-
-    %% 8. Compile data struct for this  iteration
-    % Store data_train
-    data_train = struct();
-    data_train.criterion_z = criterion_z_train;
-    data_train.ndata = nData_train;
-    data_train.IV = DV_train;
-    data_train.nTrials_allBins = nTrials_allBins_train;
-    data_train.iTrial4Bin = iTrial4Bin_train;
-    data_train.nTrials_PRS_allBins = nTrials_PRS_allBins_train;
-    data_train.iTrial4Bin_PRS = iTrial4Bin_PRS_train;
-    data_train.nTrials_ABS_allBins = nTrials_ABS_allBins_train;
-    data_train.iTrial4Bin_ABS = iTrial4Bin_ABS_train;
-
-    data_train.iPRS = iPRS_train_rand;
-    data_train.resp = resp_train_rand;
-    data_train.cst = cst_train_rand;
-    data_train.iPair = iPair_train_rand;
-    data_train.respC = respC_train_rand;
-    data_train.RT = RT_train_rand;
-    data_train.metrics_sim = metrics_train; % keep field name 'metrics_sim'
+    %% 5-8. Metrics, DV, binning, data structs
+    d_full  = struct('resp', resp_full_rand,  'iPRS', iPRS_full_rand,  'respC', respC_full_rand,  'cst', cst_full_rand,  'RT', RT_full_rand);
+    d_tmpl  = struct('resp', resp_tmpl_rand,  'iPRS', iPRS_tmpl_rand,  'respC', respC_tmpl_rand,  'cst', cst_tmpl_rand,  'RT', RT_tmpl_rand);
+    d_train = struct('resp', resp_train_rand, 'iPRS', iPRS_train_rand, 'respC', respC_train_rand, 'cst', cst_train_rand, 'RT', RT_train_rand, 'iPair', iPair_train_rand);
+    d_test  = struct('resp', resp_test_rand,  'iPRS', iPRS_test_rand,  'respC', respC_test_rand,  'cst', cst_test_rand,  'RT', RT_test_rand,  'iPair', iPair_test_rand);
+    [data_train, data_test, metrics] = fxn_compDV_packData( ...
+        d_full, d_tmpl, d_train, d_test, ...
+        e3D_train_rand, e3D_test_rand, ...
+        flag_whitenDV, lambda_whiten, mu_cov_full, W_white_full, ...
+        template_notNormed, convolveType, IVType, ORI_bound, nBins);
     data_train_allIter{iIter} = data_train;
-
-    % Store data_test
-    data_test = struct();
-    data_test.criterion_z = criterion_z_test;
-    data_test.ndata = nData_test;
-    data_test.IV = DV_test;
-    data_test.nTrials_allBins = nTrials_allBins_test;
-    data_test.iTrial4Bin = iTrial4Bin_test;
-    data_test.nTrials_PRS_allBins = nTrials_PRS_allBins_test;
-    data_test.iTrial4Bin_PRS = iTrial4Bin_PRS_test;
-    data_test.nTrials_ABS_allBins = nTrials_ABS_allBins_test;
-    data_test.iTrial4Bin_ABS = iTrial4Bin_ABS_test;
-
-    data_test.iPRS = iPRS_test_rand;
-    data_test.resp = resp_test_rand;
-    data_test.cst = cst_test_rand;
-    data_test.iPair = iPair_test_rand;
-    data_test.respC = respC_test_rand;
-    data_test.RT = RT_test_rand;
-    data_test.metrics_sim = metrics_test; % keep field name 'metrics_sim'
-    % Store
-    data_test_allIter{iIter} = data_test;
-
-    % Store metrics of three datasets together (for fast plotting in NOMplot_compIV)
+    data_test_allIter{iIter}  = data_test;
     data_metrics_allIter(iIter, :, :) = metrics;
 
     % Store templates
-    if iModelA_fit==2
-        template_notNormed_tmpl = template_notNormed;
-        template_notNormed_full = template_notNormed;
-    end
+    % if iModelA_fit==2
+    template_notNormed_tmpl = template_notNormed;
+    template_notNormed_full = template_notNormed;
+    % end
     template_tmpl_allIter(iIter, :, :) = template_notNormed_tmpl;
     template_full_allIter(iIter, :, :) = template_notNormed_full;
 
-    %% Save a progress report in the folder to indicate the finished iteration and time spent
+    %% A2: Save a progress report in the folder to indicate the finished iteration and time spent
     time_progress = datetime('now');
     time_progress = ceil(minutes(time_progress-time_start)); % round up to minutes
     save(nameFile_progress, 'iIter')
@@ -884,8 +640,8 @@ end % end for iIter
 
 fprintf('\n\n%s: A2 All iterations done.\n\n', datetime('now'))
 
-%% SAVE 
-save(nameFile_compIV_A2, 'time_progress', 'template_ideal', 'criterion_z*', '*_allIter', 'names*', 'flag*', 'ratio_split', 'ORI_bound', '*Type');
+%% SAVE for A2
+save(nameFile_compIV_A2, 'time_progress', 'template_ideal', '*_allIter', 'names*', 'flag*', 'ratio_split', 'ORI_bound', '*Type');
 
 % Delete the progress report
 if exist(nameFile_progress_new, 'file')
@@ -896,11 +652,126 @@ fprintf('\n\n%s: A2 Outputs saved.\n\n', datetime('now'))
 end
 
 %% HELPER
+function [data_train, data_test, metrics] = fxn_compDV_packData( ...
+    d_full, d_tmpl, d_train, d_test, ...
+    e3D_train_rand, e3D_test_rand, ...
+    flag_whitenDV, lambda_whiten, mu_cov_full, W_white_full, ...
+    template_notNormed, convolveType, IVType, ORI_bound, nBins)
+    
+% Sections 5-8 shared by A1 and A2 loops:
+%   behavioral metrics, DV from raw/whitened energy, bin IV, compile data structs.
+% d_full/tmpl : struct with fields resp, iPRS, respC, cst, RT
+% d_train/test: struct with fields resp, iPRS, respC, cst, RT, iPair
+
+%% 5. Compute behavioral metrics
+metrics_full  = fxn_getMetrics(d_full.resp,  d_full.iPRS,  d_full.respC,  d_full.cst,  d_full.RT);
+metrics_tmpl  = fxn_getMetrics(d_tmpl.resp,  d_tmpl.iPRS,  d_tmpl.respC,  d_tmpl.cst,  d_tmpl.RT);
+metrics_train = fxn_getMetrics(d_train.resp, d_train.iPRS, d_train.respC, d_train.cst, d_train.RT);
+metrics_test  = fxn_getMetrics(d_test.resp,  d_test.iPRS,  d_test.respC,  d_test.cst,  d_test.RT);
+% [dprime, criterion, pC, pHit, pFA, nanmean(respC), pYES, mean(1./contrast), median(RT)]
+metrics = [metrics_full; metrics_tmpl; metrics_train; metrics_test];
+criterion_z_train = metrics_train(2);
+criterion_z_test  = metrics_test(2);
+
+%% 6. Compute decision variable (DV) from raw or whitened energy
+flag_permT = 0;
+if flag_whitenDV && ~isnan(lambda_whiten)
+    e3D_train_forDV = whiten_e3D(e3D_train_rand, mu_cov_full, W_white_full);
+    e3D_test_forDV  = whiten_e3D(e3D_test_rand,  mu_cov_full, W_white_full);
+else
+    e3D_train_forDV = e3D_train_rand;
+    e3D_test_forDV  = e3D_test_rand;
+end
+DV_train    = fxn_getIV_v3(e3D_train_forDV, template_notNormed, convolveType, IVType, flag_permT, ORI_bound);
+DV_test     = fxn_getIV_v3(e3D_test_forDV,  template_notNormed, convolveType, IVType, flag_permT, ORI_bound);
+nData_train = length(DV_train);
+nData_test  = length(DV_test);
+
+%% 7. Bin IV values
+[nTrials_PRS_allBins_train, ~, iTrial4Bin_PRS_train] = histcounts(DV_train(d_train.iPRS == 1), nBins);
+[nTrials_ABS_allBins_train, ~, iTrial4Bin_ABS_train] = histcounts(DV_train(d_train.iPRS == 0), nBins);
+[nTrials_PRS_allBins_test,  ~, iTrial4Bin_PRS_test]  = histcounts(DV_test(d_test.iPRS  == 1), nBins);
+[nTrials_ABS_allBins_test,  ~, iTrial4Bin_ABS_test]  = histcounts(DV_test(d_test.iPRS  == 0), nBins);
+[nTrials_allBins_train, ~, iTrial4Bin_train] = histcounts(DV_train, nBins);
+[nTrials_allBins_test,  ~, iTrial4Bin_test]  = histcounts(DV_test,  nBins);
+
+%% 8. Compile data structs
+data_train = struct();
+data_train.criterion_z         = criterion_z_train;
+data_train.ndata               = nData_train;
+data_train.IV                  = DV_train;
+data_train.nTrials_allBins     = nTrials_allBins_train;
+data_train.iTrial4Bin          = iTrial4Bin_train;
+data_train.nTrials_PRS_allBins = nTrials_PRS_allBins_train;
+data_train.iTrial4Bin_PRS      = iTrial4Bin_PRS_train;
+data_train.nTrials_ABS_allBins = nTrials_ABS_allBins_train;
+data_train.iTrial4Bin_ABS      = iTrial4Bin_ABS_train;
+data_train.iPRS                = d_train.iPRS;
+data_train.resp                = d_train.resp;
+data_train.cst                 = d_train.cst;
+data_train.iPair               = d_train.iPair;
+data_train.respC               = d_train.respC;
+data_train.RT                  = d_train.RT;
+data_train.metrics_sim         = metrics_train; % keep field name 'metrics_sim'
+
+data_test = struct();
+data_test.criterion_z         = criterion_z_test;
+data_test.ndata               = nData_test;
+data_test.IV                  = DV_test;
+data_test.nTrials_allBins     = nTrials_allBins_test;
+data_test.iTrial4Bin          = iTrial4Bin_test;
+data_test.nTrials_PRS_allBins = nTrials_PRS_allBins_test;
+data_test.iTrial4Bin_PRS      = iTrial4Bin_PRS_test;
+data_test.nTrials_ABS_allBins = nTrials_ABS_allBins_test;
+data_test.iTrial4Bin_ABS      = iTrial4Bin_ABS_test;
+data_test.iPRS                = d_test.iPRS;
+data_test.resp                = d_test.resp;
+data_test.cst                 = d_test.cst;
+data_test.iPair               = d_test.iPair;
+data_test.respC               = d_test.respC;
+data_test.RT                  = d_test.RT;
+data_test.metrics_sim         = metrics_test; % keep field name 'metrics_sim'
+end
+
 function e3D_white = whiten_e3D(e3D_in, mu_cov, W_white)
 [nT, nOri, nSf] = size(e3D_in);
 X = reshape(e3D_in, [nT, nOri * nSf]);
 Xw = (X - mu_cov) * W_white;
 e3D_white = reshape(Xw, [nT, nOri, nSf]);
+end
+
+function [useIdx_full, useIdx_tmpl] = selectTemplateIndices(itype_template, iPRS_full_rand, iPRS_tmpl_rand)
+% Shared selector for template/full trial subsets used by A1 and A2.
+switch itype_template
+    case 1 % PRS trials only
+        useIdx_full = (iPRS_full_rand == 1);
+        useIdx_tmpl = (iPRS_tmpl_rand == 1);
+    case 2 % ABS trials only
+        useIdx_full = (iPRS_full_rand == 0);
+        useIdx_tmpl = (iPRS_tmpl_rand == 0);
+    otherwise % 3 = both PRS and ABS
+        useIdx_full = true(size(iPRS_full_rand));
+        useIdx_tmpl = true(size(iPRS_tmpl_rand));
+end
+end
+
+function [mu_cov, Sigma, W_white] = computeWhiteningParams(e3D_norm, lambda_whiten, eps_whiten)
+% Compute mean/covariance and optional whitening transform in channel space.
+[nTrials_cov, nOri_cov, nSf_cov] = size(e3D_norm);
+e3D_vec = reshape(e3D_norm, [nTrials_cov, nOri_cov * nSf_cov]);
+mu_cov = mean(e3D_vec, 1);
+Sigma = cov(e3D_vec - mu_cov, 1); % population covariance
+
+if isnan(lambda_whiten)
+    W_white = [];
+    return;
+end
+
+Sigma_shrink = (1 - lambda_whiten) * Sigma + lambda_whiten * mean(diag(Sigma)) * eye(size(Sigma, 1));
+[V, D] = eig((Sigma_shrink + Sigma_shrink') / 2);
+d = diag(D);
+d(d < eps_whiten) = eps_whiten;
+W_white = V * diag(1 ./ sqrt(d)) * V';
 end
 
 function kernel_corr = invcov_kernel(kernel_raw, W_inv, nOri, nSf)

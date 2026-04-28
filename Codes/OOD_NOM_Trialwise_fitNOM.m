@@ -105,39 +105,11 @@ fprintf(['\nSubject/IO name: %s ' ...
     nIter);
 
 %% Load trial-wise data and criterion from xx_compIV.mat file
-load(nameFile_compIV, 'data_*allIter', 'criterion_z*');
-fprintf('%s: Loaded xx_compIV.mat for "data_allIter" and "criterion_z".\n\n', datetime('now'))
-
-criterion_z = criterion_z_train; % even when predicting using the test set, I should keep using the criterion from training set
+load(nameFile_compIV, 'data_*allIter');
+fprintf('%s: Loaded xx_compIV.mat for "data_allIter" .\n\n', datetime('now'))
 
 %% Parameter vectors per Model B
 switch flag_incluCrit
-    % case 0
-    %     switch iModelB_fit
-    %         case 1  % FullModel: multi. + additive + shared
-    %             params0   = [NOMp1_0,   NOMp2_0,   NOMp3_0];
-    %             params_lb = [NOMp1_lb, NOMp2_lb, NOMp3_lb];
-    %             params_ub = [NOMp1_ub, NOMp2_ub, NOMp3_ub];
-
-    %         case 2  % No Nshared: multi. + additive (no shared noise)
-    %             params0   = [NOMp1_0,   NOMp2_0];
-    %             params_lb = [NOMp1_lb, NOMp2_lb];
-    %             params_ub = [NOMp1_ub, NOMp2_ub];
-
-    %         case 3  % No Nmulti: additive + shared (no multi. noise)
-    %             params0   = [NOMp2_0,   NOMp3_0];
-    %             params_lb = [NOMp2_lb, NOMp3_lb];
-    %             params_ub = [NOMp2_ub, NOMp3_ub];
-
-    %         case 4  % No Add: multi. + shared (no additive noise)
-    %             params0   = [NOMp1_0,   NOMp3_0];
-    %             params_lb = [NOMp1_lb, NOMp3_lb];
-    %             params_ub = [NOMp1_ub, NOMp3_ub];
-
-    %         otherwise
-    %             error('OOD_NOM_Trialwise_fitNOM: Unknown iModelB_fit = %d', iModelB_fit);
-    %     end
-
     case 1
         % Use the min and max of DV to constrain criterion
         NOMc_lb = min(data_train_allIter{1}.IV);

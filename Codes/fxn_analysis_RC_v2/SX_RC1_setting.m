@@ -156,9 +156,9 @@ ncomb8 = 8;
 % NOMp3_lb  = 1e-5;  NOMp3_ub = 1 - NOMp3_lb; % Correlation parameter (rhoDV)
 
 % New model: induced noise (indpt), idpdt constant noise, and shared constant noise
-NOMp1_lb = 1e-5;  NOMp1_ub = 1;     % induced noise 
-NOMp2_lb = 1e-5; NOMp2_ub = 20;   % idpdt constant noise
-NOMp3_lb  = 1e-5;  NOMp3_ub = 20; %  shared constant noise
+NOMp1_lb = 1e-5;  NOMp1_ub = 3;     % induced noise 
+NOMp2_lb = 1e-5; NOMp2_ub = 3;   % idpdt constant noise
+NOMp3_lb  = 1e-5;  NOMp3_ub = 3; %  shared constant noise
 % NOMc_lb = 0; NOMc_ub = 500; % criterion; subject to change
 
 % Midpoint initial guesses
