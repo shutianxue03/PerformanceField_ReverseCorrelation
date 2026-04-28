@@ -19,7 +19,7 @@
 noiseCST = .2;
 gaborCST = .5;
 nTrials = 8e3;
-Nmul_true = .4;
+Nmul_true = .3;
 Nadd_true = 10;
 Nshared_true = 10;
 Cz_true = 0;
@@ -27,8 +27,8 @@ lambda_whiten = 0;
 flag_regressType = 2;
 flag_incluCrit = 1;
 C_contribution = 0;
-iModelB_sim = 3;
-nIter = 5;
+iModelB_sim = 1;
+nIter = 20;
 nBasisORI = 6;
 nBasisSF = 5;
 

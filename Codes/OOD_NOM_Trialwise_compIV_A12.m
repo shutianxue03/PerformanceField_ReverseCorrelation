@@ -68,11 +68,13 @@ if flag_regressType == 2
     candidateORI = 3:8;
     candidateSF = 3:8;
     candidateBasisFamilyORI = {'circ_gaussian', 'vonmises'};
+    candidateBasisFamilyORI = {'vonmises'};
     candidateBasisFamilySF  = {'gaussianLog2', 'asymGaussianLog2', 'LogParabola', 'asymLogParabola'};
     % candidateBasisFamilySF  = {'asymGaussianLog2', 'asymLogParabola'};
     candidateRidge  = [0, 10.^(-3:2)];
+    candidateRidge  = 100;
     opts.basisWidthScale = .8;
-    opts. asymSF_rightLeftRatio=1.2;
+    opts. asymSF_rightLeftRatio = 1.2;
     opts.nFolds = 5;
     opts.link = 'probit';
     opts.nBasisORI = nBasisORI;

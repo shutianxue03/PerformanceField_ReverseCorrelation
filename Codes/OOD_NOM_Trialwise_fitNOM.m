@@ -43,7 +43,7 @@ addpath(genpath('SX_toolbox/bads-master'));
 SX_RC1_setting; % defines nORI, nSF, namesLocComb, namesModelA, namesModelB, nBins, etc.
 %--------------%
 
-flag_fittingStep = 2; % one vs. two step fitting (one step is more standard)
+flag_fittingStep = 1; % one vs. two step fitting (one step is more standard)
 flag_fminconORbads = 2; % 1 = use fmincon (faster, local); 2 = use BADS (slower, more robust)
 flag_plot_allIter = 1; % 1 = make summary plots across iterations
 flag_plot_perIter = 0; % 1 = plot per-iteration fits (can be slow)
