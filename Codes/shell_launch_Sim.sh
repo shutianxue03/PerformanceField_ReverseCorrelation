@@ -16,6 +16,10 @@
 
 set -euo pipefail
 
+# Resolve paths from this script location so submission works from any cwd.
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+project_root="$(cd "${script_dir}/.." && pwd)"
+
 for gaborCST in 0.5; do
   for Nmul_true in 0.9; do
     for Nadd_true in 9; do
@@ -36,7 +40,8 @@ for gaborCST in 0.5; do
 
                               sbatch \
                                 --job-name="${job_name}" \
-                                ./shell_Sim.sh \
+                                --chdir="${project_root}" \
+                                "${script_dir}/shell_Sim.sh" \
                                 "${noiseCST}" \
                                 "${gaborCST}" \
                                 "${nTrials}" \

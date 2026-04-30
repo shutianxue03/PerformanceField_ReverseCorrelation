@@ -17,9 +17,18 @@ nORI = 19;
 nSF = nORI;
 
 %% Define environment
-nameFolder_server = pwd;
+nameFolder_current = pwd;
 
-% Infer environment name from the current path.
+% Resolve project root: strip everything from the first /Codes component onward.
+% This works whether the caller's pwd is PF_RC, PF_RC/Codes, or PF_RC/Codes/subfolder.
+idx_codes = regexp(nameFolder_current, [filesep 'Codes' '($|' regexptranslate('escape', filesep) ')'], 'once', 'ignorecase');
+if ~isempty(idx_codes)
+    nameFolder_server = nameFolder_current(1:idx_codes - 1);
+else
+    nameFolder_server = nameFolder_current;
+end
+
+% Infer environment name from the project root path.
 nameFolder_server_lower = lower(nameFolder_server);
 if contains(nameFolder_server_lower, 'scratch')
     str_envir = 'HPC';
@@ -30,6 +39,7 @@ else
 end
 
 %% Define names of folders to load/save data
+% Keep Data/Figures parallel to Codes under the PF_RC project root.
 nameFolder_Data = sprintf('%s/Data', nameFolder_server) ;
 nameFolder_Data_OOD = sprintf('%s/Data_OOD_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
 nameFolder_Data_NOM_Trialwise = sprintf('%s/Data_NOM_Trialwise_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data

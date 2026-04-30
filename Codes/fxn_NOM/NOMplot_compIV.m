@@ -309,7 +309,7 @@ title('basisWidthScaleSF');
 box on;
 
 % ---------- 7. ridge ----------
-subplot(2,4,7); hold on;
+subplot(2,4,4); hold on;
 plot_ranked_categorical(ridge_tmpl_allIter, 'ridge');
 ylabel('% iterations selected');
 title('ridge');

@@ -131,10 +131,6 @@ if isempty(dir(nameFolder_Data_NOM_IO)), mkdir(nameFolder_Data_NOM_IO); end
 % Folder to save figures
 nameFolder_Figures_perSubj = sprintf('%s/IO/%s', nameFolder_Figures, nameIO);
 
-if isempty(dir(nameFolder_Figures_perSubj))
-    mkdir(nameFolder_Figures_perSubj);
-end
-
 fprintf('\nIO name: %s\n', nameIO);
 fprintf('Data_OOD folder: %s\n', nameFolder_Data_OOD_IO);
 fprintf('Data_NOM folder: %s\n\n', nameFolder_Data_NOM_IO);
@@ -375,6 +371,11 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
 
     fprintf('\n%s: Behavioral data saved.\n\nReady for template generation\n\n', datetime('now'))
 
+    % Create figure folder only when plotting is enabled (never on HPC).
+    if flag_plotDist && isempty(dir(nameFolder_Figures_perSubj))
+        mkdir(nameFolder_Figures_perSubj);
+    end
+
     %% Plotting DV dist and behav metrics
     if flag_plotDist
         NOMplot_dist
@@ -397,22 +398,24 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
             if iModelB_fit == iModelB_sim
                 % For the simulated model, also plot IV vs DV scatter and parameter recovery
 
+                if flag_plotDist
                 plot_CorrBasisSetting(nameFolder_Data_NOM_IO, nameFolder_Figures_perSubj, nameIO, ...
                     nIter, iJob, iLocComb, iModelA_fit, iModelB_fit_all, namesModelBparams_short, ...
                     Nmul_true, Nadd_true, Nshared_true, criterion_DV_true, template_true);
-
+                end
             end % if iModelB_fit == iModelB_sim
         end % for iModelB_fit
 
     end % for iModelA_fit
 %%
     % Summarize model comparison after all A/B fits finish.
+    if flag_plotDist
     plot_fit_model_comparison( ...
         nameFolder_Data_NOM_IO, nameFolder_Figures_perSubj, nameIO, ...
         iModelA_fit_all, iModelB_fit_all, namesModelA, namesModelB, namesModelBparams_short, ...
         nIter, iJob, iLocComb, iModelB_sim, ...
         Nmul_true, Nadd_true, Nshared_true, criterion_DV_true);
-
+    end
 else
     fprintf('\n\n ** Simulated pC=%.2f, OUT OF the range [%.2f, %.2f] ** \n\n', pC_sim, pC_filter)
 end % if

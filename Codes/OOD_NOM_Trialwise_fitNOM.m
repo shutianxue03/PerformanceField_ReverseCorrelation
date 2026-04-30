@@ -84,9 +84,10 @@ if isempty(dir(nameFolder_NOM_save))
     mkdir(nameFolder_NOM_save);
 end
 
-if isempty(dir(nameFolder_Figures_perSubj))
+if ~strcmp(str_envir, 'HPC') && isempty(dir(nameFolder_Figures_perSubj))
     mkdir(nameFolder_Figures_perSubj);
 end
+
 % File names:
 nameFile_compIV = sprintf('%s/n%d_J%d_A%d_compIV', nameFolder_NOM_save, nIter, iJob, iModelA_fit);
 nameFile_fitNOM = sprintf('%s/n%d_J%d_A%dB%d', nameFolder_NOM_save, nIter, iJob, iModelA_fit, iModelB_fit);

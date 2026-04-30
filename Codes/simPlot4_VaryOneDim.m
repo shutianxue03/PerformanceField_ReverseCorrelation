@@ -24,10 +24,10 @@ SX_RC1_setting;
 %--------------%
 
 %% settings
-str_part = 'VaryLambdaCcont'; % <-- change if needed
-iModelA_fit = 2; %1=use data-derived template; 2=use true template
+str_part = ''; % <-- change if needed
+iModelA_fit = 1; %1=use data-derived template; 2=use true template
 mask_pC = [.6, .8]; % [min, max] range of median fraction correct (pC); conditions outside are excluded
-nBfit = 4;          % number of B-model variants to evaluate (each uses a different internal-noise structure)
+nBfit = 1;          % number of B-model variants to evaluate (each uses a different internal-noise structure)
 nBins_Part4 = 3; % define bins for collapsing parameter recovery points; use 3 for main text, 5 for Supp
 
 nameFolder_Data = sprintf('%s/Data_%s', nameFolder_server, str_part);
@@ -519,7 +519,7 @@ fprintf('\nFiltering by simulated pC in [%.2f, %.2f]: kept %d / %d conditions.\n
 
 % ---------- unique levels ----------
 gaborCST_unik = unique([R.gaborCST]);
-Cz_unik = unique([R.Cz_true]);
+cSDT_unik = unique([R.cSDT_true]);
 Nmul_unik = unique([R.Nmul_true]);
 Nadd_unik = unique([R.Nadd_true]);
 Nshared_unik = unique([R.Nshared_true]);
@@ -597,7 +597,7 @@ setting.fig1_mode_labels = {'ORI basis mode', 'SF basis mode', 'ORI basis family
 setting.fig1_pct_fields = {'nBasisORI_mode_pct', 'nBasisSF_mode_pct', 'basisFxnORI_mode_pct', 'basisFxnSF_mode_pct', 'ridge_mode_pct'};
 setting.fig1_pct_labels = {'ORI mode selection rate', 'SF mode selection rate', 'ORI basis family mode selection rate', 'SF basis family mode selection rate', 'Ridge mode selection rate'};
 
-setting.varFields = {'Nmul_true', 'Nadd_true', 'Nshared_true', 'gaborCST', 'Cz_true', 'lambda_whiten', 'C_contribution'};
+setting.varFields = {'Nmul_true', 'Nadd_true', 'Nshared_true', 'gaborCST', 'cSDT_true', 'lambda_whiten', 'C_contribution'};
 setting.varNames  = {'Nmul', 'Nadd', 'Nshared', 'signalCST', 'Cz', 'lambda_white', 'C_contribution'};
 
 setting.fig1_varFields = setting.varFields;
@@ -615,10 +615,10 @@ setting.fig4_paramTitles = {'Nmul', 'Nadd', 'Nshared', 'criterion DV'};
 
 % Expand plotting styles to match however many levels are present.
 base_cmap_Cz = setting.cmap_Cz;
-if numel(Cz_unik) <= size(base_cmap_Cz, 1)
-    setting.cmap_Cz = base_cmap_Cz(1:numel(Cz_unik), :);
+if numel(cSDT_unik) <= size(base_cmap_Cz, 1)
+    setting.cmap_Cz = base_cmap_Cz(1:numel(cSDT_unik), :);
 else
-    nExtraCz = numel(Cz_unik) - size(base_cmap_Cz, 1);
+    nExtraCz = numel(cSDT_unik) - size(base_cmap_Cz, 1);
     setting.cmap_Cz = [base_cmap_Cz; setting.palette(1:nExtraCz, :)];
 end
 
@@ -642,7 +642,7 @@ fprintf('\n%s: Fig 1: Basis selection rates\n', string(datetime('now')))
 R_fig1 = R([R.iModelB_sim] == setting.fig12_Bsim & [R.iModelB_fit] == setting.fig12_Bfit);
 
 % group labels: signalCST × Cz, one per entry in R_fig1
-grpLabels_fig1 = arrayfun(@(r) sprintf('sig=%.3g x Cz=%.3g', r.gaborCST, r.Cz_true), ...
+grpLabels_fig1 = arrayfun(@(r) sprintf('sig=%.3g x cSDT=%.3g', r.gaborCST, r.cSDT_true), ...
     R_fig1, 'UniformOutput', false);
 
 grpLabels_fig1 = arrayfun(@(r) sprintf('sig=%.3g', r.gaborCST), ...
@@ -1215,8 +1215,8 @@ if ~isempty(R) && isfield(R, 'nLL_test_allIter')
     if isfield(R, 'nameIO')
         datasetIDs_wr = string({R.nameIO});
     else
-        datasetIDs_wr = string(arrayfun(@(r) sprintf('Nm%g_Na%g_Ns%g_G%g_Cz%g', ...
-            r.Nmul_true, r.Nadd_true, r.Nshared_true, r.gaborCST, r.Cz_true), R, 'UniformOutput', false));
+        datasetIDs_wr = string(arrayfun(@(r) sprintf('Nm%g_Na%g_Ns%g_G%g_cSDT%g', ...
+            r.Nmul_true, r.Nadd_true, r.Nshared_true, r.gaborCST, r.cSDT_true), R, 'UniformOutput', false));
     end
     for iSim_wr = 1:numel(Bsim_unik)
         simModel_wr = Bsim_unik(iSim_wr);
@@ -1341,8 +1341,8 @@ if ~isempty(R) && isfield(R, 'nLL_med')
     if isfield(R, 'nameIO')
         datasetIDs_dn = string({R.nameIO});
     else
-        datasetIDs_dn = string(arrayfun(@(r) sprintf('Nm%g_Na%g_Ns%g_G%g_Cz%g', ...
-            r.Nmul_true, r.Nadd_true, r.Nshared_true, r.gaborCST, r.Cz_true), R, 'UniformOutput', false));
+        datasetIDs_dn = string(arrayfun(@(r) sprintf('Nm%g_Na%g_Ns%g_G%g_cSDT%g', ...
+            r.Nmul_true, r.Nadd_true, r.Nshared_true, r.gaborCST, r.cSDT_true), R, 'UniformOutput', false));
     end
 
     for iSim_dn = 1:numel(Bsim_unik)
@@ -1535,14 +1535,14 @@ for iFit = 1:numel(Bfit_unik)
     end
 
     sigVals_all = [Rsub.gaborCST]';
-    czVals_all = [Rsub.Cz_true]';
+    czVals_all = [Rsub.cSDT_true]';
     [isSig, sigIdx_all] = ismember(sigVals_all, gaborCST_unik);
-    [isCz, czIdx_all] = ismember(czVals_all, Cz_unik);
+    [isCz, czIdx_all] = ismember(czVals_all, cSDT_unik);
     validGroupBase = isfinite(sigVals_all) & isfinite(czVals_all) & isSig & isCz;
 
-    groupRows = cell(numel(gaborCST_unik), numel(Cz_unik));
+    groupRows = cell(numel(gaborCST_unik), numel(cSDT_unik));
     for iSig = 1:numel(gaborCST_unik)
-        for iCz = 1:numel(Cz_unik)
+        for iCz = 1:numel(cSDT_unik)
             groupRows{iSig, iCz} = find(validGroupBase & sigIdx_all == iSig & czIdx_all == iCz);
         end
     end
@@ -1577,7 +1577,7 @@ for iFit = 1:numel(Bfit_unik)
         end
 
         for iSig = 1:numel(gaborCST_unik)
-            for iCz = 1:numel(Cz_unik)
+            for iCz = 1:numel(cSDT_unik)
                 idxRows = groupRows{iSig, iCz};
                 if isempty(idxRows), continue; end
 
@@ -1627,15 +1627,15 @@ for iFit = 1:numel(Bfit_unik)
         fxn_style_ax(gca, setting);
     end
 
-    % Figure-level legends (color=Cz, marker=signalCST)
+    % Figure-level legends (color=cSDT, marker=signalCST)
     axBase = gca;
     pos = axBase.Position;
 
     axColor = axes('Position', pos, 'Color', 'none', 'Visible', 'off', ...
         'HitTest', 'off', 'HandleVisibility', 'off');
     hold(axColor, 'on');
-    hCz = gobjects(numel(Cz_unik), 1);
-    for iCz = 1:numel(Cz_unik)
+    hCz = gobjects(numel(cSDT_unik), 1);
+    for iCz = 1:numel(cSDT_unik)
         hCz(iCz) = plot(axColor, nan, nan, 'o', ...
             'LineStyle', 'none', ...
             'MarkerFaceColor', setting.cmap_Cz(iCz,:), ...
@@ -1643,9 +1643,9 @@ for iFit = 1:numel(Bfit_unik)
             'MarkerSize', 7);
     end
     leg1 = legend(axColor, hCz, ...
-        arrayfun(@(x) sprintf('%g', x), Cz_unik, 'UniformOutput', false), ...
+        arrayfun(@(x) sprintf('%g', x), cSDT_unik, 'UniformOutput', false), ...
         'Location', 'northeast', 'Box', 'on', 'FontSize', max(setting.fontSize - 1, 8));
-    title(leg1, 'Cz');
+    title(leg1, 'cSDT');
 
     axSig = axes('Position', pos, 'Color', 'none', 'Visible', 'off', ...
         'HitTest', 'off', 'HandleVisibility', 'off');
@@ -1686,8 +1686,8 @@ else
     if isfield(R, 'nameIO')
         datasetIDs_f7 = string({R.nameIO});
     else
-        datasetIDs_f7 = string(arrayfun(@(r) sprintf('Nm%g_Na%g_Ns%g_G%g_Cz%g', ...
-            r.Nmul_true, r.Nadd_true, r.Nshared_true, r.gaborCST, r.Cz_true), R, 'UniformOutput', false));
+        datasetIDs_f7 = string(arrayfun(@(r) sprintf('Nm%g_Na%g_Ns%g_G%g_cSDT%g', ...
+            r.Nmul_true, r.Nadd_true, r.Nshared_true, r.gaborCST, r.cSDT_true), R, 'UniformOutput', false));
     end
     idxSim1_f7 = [R.iModelB_sim] == 1;
     idsSim1_f7 = unique(datasetIDs_f7(idxSim1_f7));
@@ -1774,8 +1774,8 @@ else
     if isfield(R, 'nameIO')
         datasetIDs_f8 = string({R.nameIO});
     else
-        datasetIDs_f8 = string(arrayfun(@(r) sprintf('Nm%g_Na%g_Ns%g_G%g_Cz%g', ...
-            r.Nmul_true, r.Nadd_true, r.Nshared_true, r.gaborCST, r.Cz_true), R, 'UniformOutput', false));
+        datasetIDs_f8 = string(arrayfun(@(r) sprintf('Nm%g_Na%g_Ns%g_G%g_cSDT%g', ...
+            r.Nmul_true, r.Nadd_true, r.Nshared_true, r.gaborCST, r.cSDT_true), R, 'UniformOutput', false));
     end
     idxSim1_f8 = [R.iModelB_sim] == 1;
     idsSim1_f8 = unique(datasetIDs_f8(idxSim1_f8));
@@ -1844,7 +1844,7 @@ fprintf('\n%s: Fig 9: Template RMSE vs parameter RMSE correlations\n', string(da
 % Use matched pairs (Bsim == Bfit) only, so each row is a consistent condition.
 % For each panel: scatter template_rmse (x) vs that parameter's RMSE (y) and annotate r.
 % Panels 1-4: RMSE of fitted noise params + DV criterion (never excluded).
-% Panel 5:    True SDT criterion |Cz_true| — shows if criterion bias predicts template error.
+% Panel 5:    True SDT criterion |cSDT_true| — shows if criterion bias predicts template error.
 
 % --- RMSE-based panels (one per fitted parameter) ---
 rmseParamNames_fig9  = {'Nmul',       'Nadd',       'Nshared',       'criterion_DV'};
@@ -1915,16 +1915,16 @@ for iP9 = 1:numel(rmseParamNames_fig9)
     end
 end % iP9
 
-% --- Final panel: template RMSE vs true SDT criterion |Cz_true| ---
+% --- Final panel: template RMSE vs true SDT criterion |cSDT_true| ---
 nexttile; hold on;
 hLines_sdt = gobjects(numel(Bfit_unik), 1);
 for iBfit9 = 1:numel(Bfit_unik)
     fitModel9 = Bfit_unik(iBfit9);
     Rsub9 = R([R.iModelB_sim] == fitModel9 & [R.iModelB_fit] == fitModel9);
-    if isempty(Rsub9) || ~isfield(Rsub9, 'Cz_true'), continue; end
+    if isempty(Rsub9) || ~isfield(Rsub9, 'cSDT_true'), continue; end
 
     x9   = [Rsub9.template_rmse]';
-    y9   = abs([Rsub9.Cz_true]');
+    y9   = abs([Rsub9.cSDT_true]');
     good9 = isfinite(x9) & isfinite(y9);
     if sum(good9) < 2, continue; end
 
@@ -1950,7 +1950,7 @@ if ~isempty(validH_sdt)
     legend(validH_sdt, 'Location', 'best', 'Box', 'off', 'FontSize', max(setting.fontSize-1,7));
 end
 
-    sgtitle('Fig 9: Template RMSE vs Parameter RMSE & SDT Criterion | Matched Bsim=Bfit', 'FontWeight', 'bold');
+sgtitle('Fig 9: Template RMSE vs Parameter RMSE & SDT Criterion | Matched Bsim=Bfit', 'FontWeight', 'bold');
 saveas(h, fullfile(nameFolder_Figures_part4, 'FigS9_Corr_tempRMSE_paramRMSE.png'));
 close(h);
 
@@ -1961,7 +1961,7 @@ function info = fxn_parse_nameIO(nameIO)
 info = struct();
 
 tok = regexp(nameIO, ...
-    'IO_cN([-\d\.]+)_cG([-\d\.]+)_nT([A-Za-z0-9\.\-]+)_Nm([A-Za-z0-9\.\-]+)_Na([A-Za-z0-9\.\-]+)_Ns([A-Za-z0-9\.\-]+)_Cz([-\d\.]+)_cont([-\d\.]+)_whiten([-\d\.]+)_R(\d+)_\d+\d+_B(\d+)', ...
+    'IO_cN([-\d\.]+)_cG([-\d\.]+)_nT([A-Za-z0-9\.\-]+)_Nm([A-Za-z0-9\.\-]+)_Na([A-Za-z0-9\.\-]+)_Ns([A-Za-z0-9\.\-]+)_cSDT([-\d\.]+)_cont([-\d\.]+)_whiten([-\d\.]+)_R(\d+)_\d+\d+_B(\d+)', ...
     'tokens', 'once');
 
 if isempty(tok)
@@ -1974,7 +1974,7 @@ info.nTrials = fxn_parse_num2exp(tok{3});
 info.Nmul_true = fxn_parse_num2exp(tok{4});
 info.Nadd_true = fxn_parse_num2exp(tok{5});
 info.Nshared_true = fxn_parse_num2exp(tok{6});
-info.Cz_true = str2double(tok{7});
+info.cSDT_true = str2double(tok{7});
 info.C_contribution = str2double(tok{8});
 info.lambda_whiten = str2double(tok{9});
 info.flag_regressType = str2double(tok{10});

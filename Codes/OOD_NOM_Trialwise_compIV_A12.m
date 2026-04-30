@@ -165,7 +165,7 @@ if isempty(dir(nameFolder_NOM_save))
     mkdir(nameFolder_NOM_save);
 end
 
-if isempty(dir(nameFolder_Figures_perSubj))
+if ~strcmp(str_envir, 'HPC') && isempty(dir(nameFolder_Figures_perSubj))
     mkdir(nameFolder_Figures_perSubj);
 end
 
@@ -577,12 +577,12 @@ template_tmpl_ave_A1 = squeeze(mean(template_tmpl_allIter, 1, 'omitnan'));
 peak_tmpl_A1 = max(abs(template_tmpl_ave_A1(:)));
 % Rescale the true/ideal template to match the peak of the derived template
 % (apply scaling right after template_notNormed is loaded below)
-        if ~isnumeric(isubj) % for IO, you may reload 'template_true' from disk
-            load(sprintf('%s/truth.mat', nameFolder_OOD_load), 'template_true');
-            template_notNormed = template_true;
-        else
-            template_notNormed = template_ideal;
-        end
+if ~isnumeric(isubj) % for IO, you may reload 'template_true' from disk
+    load(sprintf('%s/truth.mat', nameFolder_OOD_load), 'template_true');
+    template_notNormed = template_true;
+else
+    template_notNormed = template_ideal;
+end
 
 if isfinite(peak_tmpl_A1) && peak_tmpl_A1 > 0
     peak_true = max(abs(template_notNormed(:)));
