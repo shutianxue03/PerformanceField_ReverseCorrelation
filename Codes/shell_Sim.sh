@@ -31,7 +31,7 @@ nTrials="$3"
 Nmul_true="$4"
 Nadd_true="$5"
 Nshared_true="$6"
-Cz_true="$7"
+cSDT_true="$7"
 lambda_whiten="$8"
 flag_regressType="$9"
 flag_incluCrit="${10}"
@@ -55,7 +55,7 @@ try
     Nmul_true = $Nmul_true;
     Nadd_true = $Nadd_true;
     Nshared_true = $Nshared_true;
-    Cz_true = $Cz_true;
+    cSDT_true = $cSDT_true;
     lambda_whiten = $lambda_whiten;
     flag_regressType = $flag_regressType;
     flag_incluCrit = $flag_incluCrit;
@@ -71,7 +71,7 @@ try
     fprintf('Nmul_true        = %g\\n', Nmul_true);
     fprintf('Nadd_true        = %g\\n', Nadd_true);
     fprintf('Nshared_true     = %g\\n', Nshared_true);
-    fprintf('Cz_true          = %g\\n', Cz_true);
+    fprintf('cSDT_true        = %g\\n', cSDT_true);
     fprintf('lambda_whiten    = %g\\n', lambda_whiten);
     fprintf('flag_regressType = %g\\n', flag_regressType);
     fprintf('flag_incluCrit   = %g\\n', flag_incluCrit);
@@ -88,7 +88,7 @@ try
         Nmul_true, ...
         Nadd_true, ...
         Nshared_true, ...
-        Cz_true, ...
+        cSDT_true, ...
         lambda_whiten, ...
         flag_regressType, ...
         flag_incluCrit, ...

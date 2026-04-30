@@ -7,6 +7,7 @@ histogram(DVnoisy_sim_allT(iPRS_allT == 1), 'FaceColor', 'r', 'DisplayName', 'Si
 histogram(DVnoisy_sim_allT(iPRS_allT == 0), 'FaceColor', 'b', 'DisplayName', 'Signal Absent', 'normalization', 'probability');
 xline(criterion_DV_true, 'LineWidth', 2, 'DisplayName', 'True criterion');
 xlim([min(DVnoisy_sim_allT), max(DVnoisy_sim_allT)]);
+xlabel(sprintf('Decision Variable of %d trials', length(DVclean_sim_allT))); ylabel('pYES');
 ylabel('Proportion');
 legend('show', 'location', 'best');
 
@@ -15,13 +16,13 @@ subplot(2,2,3); hold on;
 plot(DVclean_sim_allT, resp_allT, 'ro', 'DisplayName', 'Binary response');
 plot(DVclean_sim_allT, pYES_pred_allT, 'k+', 'DisplayName', 'Pred pYES');
 xline(criterion_DV_true, 'LineWidth', 2, 'DisplayName', 'True criterion');
-xlabel('IV'); ylabel('pYES');
+xlabel(sprintf('Decision Variable of %d trials', length(DVclean_sim_allT))); ylabel('pYES');
 yline(0.5, 'k--');
 xlim([min(DVnoisy_sim_allT), max(DVnoisy_sim_allT)]);
 metrics_sim_ = metrics_sim; metrics_sim_(3:end) = metrics_sim_(3:end)*100;
 
 % 3. Correlation between DV
-subplot(2,2,2), hold on 
+subplot(2,2,2), hold on
 xPRS = DVnoisy_sim_allT(iPass_allT==1 & iPRS_allT==1);
 yPRS = DVnoisy_sim_allT(iPass_allT==2 & iPRS_allT==1);
 scatter(xPRS, yPRS, 'ro')

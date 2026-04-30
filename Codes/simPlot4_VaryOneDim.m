@@ -1837,6 +1837,123 @@ else
     close(h);
 end
 
+%% Figure 9: Correlate template RMSE with each parameter's RMSE across simulating conditions
+
+fprintf('\n%s: Fig 9: Template RMSE vs parameter RMSE correlations\n', string(datetime('now')))
+
+% Use matched pairs (Bsim == Bfit) only, so each row is a consistent condition.
+% For each panel: scatter template_rmse (x) vs that parameter's RMSE (y) and annotate r.
+% Panels 1-4: RMSE of fitted noise params + DV criterion (never excluded).
+% Panel 5:    True SDT criterion |Cz_true| — shows if criterion bias predicts template error.
+
+% --- RMSE-based panels (one per fitted parameter) ---
+rmseParamNames_fig9  = {'Nmul',       'Nadd',       'Nshared',       'criterion_DV'};
+rmseParamLabels_fig9 = {'N_{mul}',    'N_{add}',    'N_{shared}',    'Criterion DV'};
+
+% Keep only those with at least one finite value; criterion_DV is always kept.
+Rmatch_fig9 = R([R.iModelB_sim] == [R.iModelB_fit]);
+keepRmse_fig9 = false(1, numel(rmseParamNames_fig9));
+for iP9 = 1:numel(rmseParamNames_fig9)
+    fld = sprintf('%s_rmse', rmseParamNames_fig9{iP9});
+    if strcmp(rmseParamNames_fig9{iP9}, 'criterion_DV')
+        keepRmse_fig9(iP9) = true;   % never exclude criterion DV
+    elseif isfield(Rmatch_fig9, fld) && any(isfinite([Rmatch_fig9.(fld)]))
+        keepRmse_fig9(iP9) = true;
+    end
+end
+rmseParamNames_fig9  = rmseParamNames_fig9(keepRmse_fig9);
+rmseParamLabels_fig9 = rmseParamLabels_fig9(keepRmse_fig9);
+
+nPanels_fig9 = numel(rmseParamNames_fig9) + 1;   % +1 for SDT criterion panel
+nCols_fig9   = min(nPanels_fig9, 3);
+nRows_fig9   = ceil(nPanels_fig9 / nCols_fig9);
+cmap_fig9    = lines(numel(Bfit_unik));
+
+h = figure('Position', [100 100 380*nCols_fig9 320*nRows_fig9]);
+tiledlayout(nRows_fig9, nCols_fig9, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+% --- Panels: template RMSE vs each parameter RMSE ---
+for iP9 = 1:numel(rmseParamNames_fig9)
+    pName9    = rmseParamNames_fig9{iP9};
+    pLabel9   = rmseParamLabels_fig9{iP9};
+    rmseField = sprintf('%s_rmse', pName9);
+
+    nexttile; hold on;
+
+    hLines_fig9 = gobjects(numel(Bfit_unik), 1);
+    for iBfit9 = 1:numel(Bfit_unik)
+        fitModel9 = Bfit_unik(iBfit9);
+        Rsub9 = R([R.iModelB_sim] == fitModel9 & [R.iModelB_fit] == fitModel9);
+        if isempty(Rsub9) || ~isfield(Rsub9, rmseField), continue; end
+
+        x9 = [Rsub9.template_rmse]';
+        y9 = [Rsub9.(rmseField)]';
+        good9 = isfinite(x9) & isfinite(y9);
+        if sum(good9) < 2, continue; end
+
+        col9 = cmap_fig9(iBfit9, :);
+        hLines_fig9(iBfit9) = scatter(x9(good9), y9(good9), 28, col9, ...
+            'filled', 'MarkerFaceAlpha', 0.65, 'DisplayName', sprintf('B%d', fitModel9));
+
+        [r9, p9] = corr(x9(good9), y9(good9));
+        sigStr9 = '';
+        if p9 < 0.001, sigStr9 = '***'; elseif p9 < 0.01, sigStr9 = '**'; elseif p9 < 0.05, sigStr9 = '*'; end
+        text(min(x9(good9)), max(y9(good9)), ...
+            sprintf('  B%d: r=%.2f%s', fitModel9, r9, sigStr9), ...
+            'Color', col9, 'FontSize', max(setting.fontSize - 1, 7), ...
+            'VerticalAlignment', 'top', 'HorizontalAlignment', 'left');
+    end % iBfit9
+
+    xlabel('Template RMSE');
+    ylabel(sprintf('%s RMSE', pLabel9));
+    title(sprintf('Template RMSE vs %s RMSE', pLabel9));
+    fxn_style_ax(gca, setting);
+    axis square;
+    validH9 = hLines_fig9(isgraphics(hLines_fig9));
+    if ~isempty(validH9)
+        legend(validH9, 'Location', 'best', 'Box', 'off', 'FontSize', max(setting.fontSize-1,7));
+    end
+end % iP9
+
+% --- Final panel: template RMSE vs true SDT criterion |Cz_true| ---
+nexttile; hold on;
+hLines_sdt = gobjects(numel(Bfit_unik), 1);
+for iBfit9 = 1:numel(Bfit_unik)
+    fitModel9 = Bfit_unik(iBfit9);
+    Rsub9 = R([R.iModelB_sim] == fitModel9 & [R.iModelB_fit] == fitModel9);
+    if isempty(Rsub9) || ~isfield(Rsub9, 'Cz_true'), continue; end
+
+    x9   = [Rsub9.template_rmse]';
+    y9   = abs([Rsub9.Cz_true]');
+    good9 = isfinite(x9) & isfinite(y9);
+    if sum(good9) < 2, continue; end
+
+    col9 = cmap_fig9(iBfit9, :);
+    hLines_sdt(iBfit9) = scatter(x9(good9), y9(good9), 28, col9, ...
+        'filled', 'MarkerFaceAlpha', 0.65, 'DisplayName', sprintf('B%d', fitModel9));
+
+    [r9, p9] = corr(x9(good9), y9(good9));
+    sigStr9 = '';
+    if p9 < 0.001, sigStr9 = '***'; elseif p9 < 0.01, sigStr9 = '**'; elseif p9 < 0.05, sigStr9 = '*'; end
+    text(min(x9(good9)), max(y9(good9)), ...
+        sprintf('  B%d: r=%.2f%s', fitModel9, r9, sigStr9), ...
+        'Color', col9, 'FontSize', max(setting.fontSize - 1, 7), ...
+        'VerticalAlignment', 'top', 'HorizontalAlignment', 'left');
+end
+xlabel('Template RMSE');
+ylabel('|SDT criterion| (|Cz_{true}|)');
+title('Template RMSE vs SDT criterion');
+fxn_style_ax(gca, setting);
+axis square;
+validH_sdt = hLines_sdt(isgraphics(hLines_sdt));
+if ~isempty(validH_sdt)
+    legend(validH_sdt, 'Location', 'best', 'Box', 'off', 'FontSize', max(setting.fontSize-1,7));
+end
+
+    sgtitle('Fig 9: Template RMSE vs Parameter RMSE & SDT Criterion | Matched Bsim=Bfit', 'FontWeight', 'bold');
+saveas(h, fullfile(nameFolder_Figures_part4, 'FigS9_Corr_tempRMSE_paramRMSE.png'));
+close(h);
+
 %% Local helpers  (only functions used 2+ times)
 
 function info = fxn_parse_nameIO(nameIO)
