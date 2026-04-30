@@ -1,4 +1,4 @@
-function OOD_NOM_Trialwise_fitNOM(nBasisORI, nBasisSF, isubj, iLocComb, flag_incluCrit, C_contribution, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
+function OOD_NOM_Trialwise_fitNOM(nBasisORI, nBasisSF, flag_whitenDV, isubj, iLocComb, flag_incluCrit, C_contribution, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
 %==========================================================================%
 % OOD_NOM_Trialwise_fitNOM.m
 %--------------------------------------------------------------------------
@@ -42,7 +42,6 @@ addpath(genpath('SX_toolbox/bads-master'));
 %--------------%
 SX_RC1_setting; % defines nORI, nSF, namesLocComb, namesModelA, namesModelB, nBins, etc.
 %--------------%
-
 flag_fittingStep = 1; % one vs. two step fitting (one step is more standard)
 flag_fminconORbads = 2; % 1 = use fmincon (faster, local); 2 = use BADS (slower, more robust)
 flag_plot_allIter = 1; % 1 = make summary plots across iterations
@@ -121,35 +120,40 @@ switch flag_incluCrit
                 params_lb = [NOMp1_lb, NOMp2_lb, NOMp3_lb, NOMc_lb];
                 params_ub = [NOMp1_ub, NOMp2_ub, NOMp3_ub, NOMc_ub];
 
-            case 2  % No Nshared: multi. + additive (no shared noise)
-                params0   = [NOMp1_0,   NOMp2_0, NOMc_0];
-                params_lb = [NOMp1_lb, NOMp2_lb, NOMc_lb];
-                params_ub = [NOMp1_ub, NOMp2_ub, NOMc_ub];
-
-            case 3  % No Nmulti: additive + shared (no multi. noise)
+            case 2  % No Nmul: additive + shared (no multiplicative noise)
                 params0   = [NOMp2_0,   NOMp3_0, NOMc_0];
                 params_lb = [NOMp2_lb, NOMp3_lb, NOMc_lb];
                 params_ub = [NOMp2_ub, NOMp3_ub, NOMc_ub];
 
-            case 4  % No Nadd: multi. + shared (no additive noise)
+            case 3  % No Nadd: multi. + shared (no additive noise)
                 params0   = [NOMp1_0,   NOMp3_0, NOMc_0];
                 params_lb = [NOMp1_lb, NOMp3_lb, NOMc_lb];
                 params_ub = [NOMp1_ub, NOMp3_ub, NOMc_ub];
 
-                % case 5  % Just Nadd: additive only
-                %     params0   = [NOMp2_0, NOMc_0];
-                %     params_lb = [NOMp2_lb, NOMc_lb];
-                %     params_ub = [NOMp2_ub, NOMc_ub];
+            case 4  % No Nshared: multi. + additive (no shared noise)
+                params0   = [NOMp1_0,   NOMp2_0, NOMc_0];
+                params_lb = [NOMp1_lb, NOMp2_lb, NOMc_lb];
+                params_ub = [NOMp1_ub, NOMp2_ub, NOMc_ub];
 
-                % case 6  % Just Nmul: multi. only
-                %     params0   = [NOMp1_0, NOMc_0];
-                %     params_lb = [NOMp1_lb, NOMc_lb];
-                %     params_ub = [NOMp1_ub, NOMc_ub];
+            case 5  % Just Nmul: multi. only
+                params0   = [NOMp1_0, NOMc_0];
+                params_lb = [NOMp1_lb, NOMc_lb];
+                params_ub = [NOMp1_ub, NOMc_ub];
 
-                % case 7  % Just Nshared: shared only
-                %     params0   = [NOMp3_0, NOMc_0];
-                %     params_lb = [NOMp3_lb, NOMc_lb];
-                %     params_ub = [NOMp3_ub, NOMc_ub];
+            case 6  % Just Nadd: additive only
+                params0   = [NOMp2_0, NOMc_0];
+                params_lb = [NOMp2_lb, NOMc_lb];
+                params_ub = [NOMp2_ub, NOMc_ub];
+
+            case 7  % Just Nshared: shared only
+                params0   = [NOMp3_0, NOMc_0];
+                params_lb = [NOMp3_lb, NOMc_lb];
+                params_ub = [NOMp3_ub, NOMc_ub];
+
+            case 8  % Just criterion: ideal observer (no internal noise)
+                params0   = [NOMc_0];
+                params_lb = [NOMc_lb];
+                params_ub = [NOMc_ub];
 
             otherwise
                 error('OOD_NOM_Trialwise_fitNOM: Unknown iModelB_fit = %d', iModelB_fit);
@@ -204,7 +208,7 @@ for iIter = 1:nIter
             end
 
         case 2 % Two-stage fitting: stabilize models that include a shared component across two passes
-            if any(iModelB_fit == [1,3,4,7])
+            if any(iModelB_fit == [1,2,3,7])
 
                 % ==== Step 1: fit the "base" noise terms (excluding the shared term) ====
                 iStep = 1;
@@ -232,9 +236,9 @@ for iIter = 1:nIter
                     case 1
                         switch iModelB_fit
                             case 1, indStep1=[1,2,4]; % params0=[Nmul,Nadd,Nshared,criterion] -> pick [Nmul,Nadd,criterion]
-                            case 2, indStep1=[1,3]; % params0=[Nmul,Nadd,criterion] -> pick [Nmul,criterion]
-                            case 3, indStep1=[1,3]; % params0=[Nadd,Nshared,criterion] -> pick [Nadd,criterion]
-                            case 4, indStep1=[1,3]; % params0=[Nmul,Nshared,criterion] -> pick [Nmul,criterion]
+                            case 2, indStep1=[1,3]; % params0=[Nadd,Nshared,criterion] -> pick [Nadd,criterion]
+                            case 3, indStep1=[1,3]; % params0=[Nmul,Nshared,criterion] -> pick [Nmul,criterion]
+                            case 4, indStep1=[1,3]; % params0=[Nmul,Nadd,criterion] -> pick [Nmul,criterion] (unused in two-step)
                         end
                 end
 
@@ -274,9 +278,9 @@ for iIter = 1:nIter
                     case 1
                         switch iModelB_fit
                             case 1, indStep2=3; % params0=[Nmul,Nadd,Nshared,criterion] -> pick Nshared
-                                % case 2, indStep2=nan; % This line is muted because iModelB_fit won't be 2 in "if any(iModelB_fit == [1,3,4,7])" --- IGNORE ---
-                            case 3, indStep2=2; % params0=[Nadd,Nshared,criterion] -> pick Nshared
-                            case 4, indStep2=2; % params0=[Nmul,Nshared,criterion] -> pick Nshared
+                            case 2, indStep2=2; % params0=[Nadd,Nshared,criterion] -> pick Nshared
+                            case 3, indStep2=2; % params0=[Nmul,Nshared,criterion] -> pick Nshared
+                                % case 4, indStep2=nan; % iModelB=4 has no shared term, so not in two-step set
                         end
                 end
 
@@ -303,14 +307,13 @@ for iIter = 1:nIter
                     case 1
                         switch iModelB_fit
                             case 1, params_est = [params_est_fromStep1([1,2]), params_est_step2, params_est_fromStep1(3)]; % [Nmul, Nadd, Nshared, criterion]
-                                % case 2, params_est = [params_est_fromStep1(1), params_est_step2, params_est_fromStep1(2)]; % This line is muted because iModelB_fit won't be 2 in "if any(iModelB_fit == [1,3,4,7])" --- IGNORE ---
-                            case 3, params_est = [params_est_fromStep1(1), params_est_step2, params_est_fromStep1(2)]; % [Nadd, Nshared, criterion]
-                            case 4, params_est = [params_est_fromStep1(1), params_est_step2, params_est_fromStep1(2)]; % [Nmul, Nshared, criterion]
+                            case 2, params_est = [params_est_fromStep1(1), params_est_step2, params_est_fromStep1(2)]; % [Nadd, Nshared, criterion]
+                            case 3, params_est = [params_est_fromStep1(1), params_est_step2, params_est_fromStep1(2)]; % [Nmul, Nshared, criterion]
                         end
                 end
                 nLL_train = nLL_step1 + nLL_step2;
 
-            else % For NoShared (B=2), fit all params together (the same as one-step fitting)
+            else % For models without shared term (e.g., B=4), fit all params together
                 iStep = 0;
                 switch flag_incluCrit
                     % case 0

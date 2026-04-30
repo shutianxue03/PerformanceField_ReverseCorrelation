@@ -39,7 +39,7 @@ end
 
 % fprintf('\n *** Compiling DONE, READY to plot ***\n ')
 
-%% 1. pYES/pC/pA as a fxn of binned DV
+%% Figure 1: pYES/pC/pA as a fxn of binned DV
 [DV_allBins_med] = getCI(DV_allBins_all, 1, 1);
 [nData_allB_med] = getCI(nData_allBins, 1, 1);
 % Obtain median and CI of data across iteractions (dot+errorbars)
@@ -123,7 +123,7 @@ sgtitle(sprintf('Figure 1. Metrics vs. binned DV\n%s\nModelA%dB%d %s, L%d, nIter
 
 saveas(gcf, sprintf('%s/21Metrics_L%d_A%dB%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit, iModelB_fit))
 
-%% 2. Plot estimated parameters across iterations
+%% Figure 2: Plot estimated parameters across iterations
 nParams_full = 5; % Nmul, Nadd, Nshared, criterion_DV, Empirical Criterion SDT
 params_est_allIter = [params_est_allIter, Cz_emp_allIter];
 
@@ -135,11 +135,12 @@ end
 
 % Define fixed 5-column layout
 % Columns: 1=Nmul, 2=Nadd, 3=Nshared, 4=criterion_DV, 5=Empirical Criterion SDT
+NOMc_ub = 20;
 switch iModelB_fit
     case 1 % Full: Nmul, Nadd, Nshared, criterion_DV
         col_idx      = [1 2 3 4 5];
         param_labels = {'Nmul', 'Nadd', 'Nshared', 'Empirical criterion DV', 'Empirical criterion SDT'};
-        ylim_list    = {[NOMp1_lb NOMp1_ub], [NOMp2_lb NOMp2_ub], [NOMp3_lb NOMp3_ub], [0 10], [-1 1]};
+        ylim_list    = {[NOMp1_lb NOMp1_ub], [NOMp2_lb NOMp2_ub], [NOMp3_lb NOMp3_ub], [0 NOMc_ub], [-1 1]};
         true_vals    = nan(1, 5);
         if hasTruth
             if isfield(S_truth, 'Nmul_true'), true_vals(1) = S_truth.Nmul_true; end
@@ -149,22 +150,10 @@ switch iModelB_fit
             if isfield(S_truth, 'cSDT_true'), true_vals(5) = S_truth.cSDT_true; end
         end
 
-    case 2 % No Nshared: Nmul, Nadd, criterion_DV
-        col_idx      = [1 2 4 5];
-        param_labels = {'Nmul', 'Nadd', 'Empirical Criterion DV', 'Empirical Criterion SDT'};
-        ylim_list    = {[NOMp1_lb NOMp1_ub], [NOMp2_lb NOMp2_ub], [0 10], [-1 1]};
-        true_vals    = nan(1, 4);
-        if hasTruth
-            if isfield(S_truth, 'Nmul_true'), true_vals(1) = S_truth.Nmul_true; end
-            if isfield(S_truth, 'Nadd_true'), true_vals(2) = S_truth.Nadd_true; end
-            if isfield(S_truth, 'criterion_DV_true'), true_vals(3) = S_truth.criterion_DV_true; end
-            if isfield(S_truth, 'cSDT_true'), true_vals(4) = S_truth.cSDT_true; end
-        end
-
-    case 3 % No Nmul: Nadd, Nshared, criterion_DV
+    case 2 % No Nmul: Nadd, Nshared, criterion_DV
         col_idx      = [2 3 4 5];
         param_labels = {'Nadd', 'Nshared', 'Empirical Criterion DV', 'Empirical Criterion SDT'};
-        ylim_list    = {[NOMp2_lb NOMp2_ub], [NOMp3_lb NOMp3_ub], [0 10], [-1 1]};
+        ylim_list    = {[NOMp2_lb NOMp2_ub], [NOMp3_lb NOMp3_ub], [0 NOMc_ub], [-1 1]};
         true_vals    = nan(1, 4);
         if hasTruth
             if isfield(S_truth, 'Nadd_true'), true_vals(1) = S_truth.Nadd_true; end
@@ -173,16 +162,71 @@ switch iModelB_fit
             if isfield(S_truth, 'cSDT_true'), true_vals(4) = S_truth.cSDT_true; end
         end
 
-    case 4 % No Nadd: Nmul, Nshared, criterion_DV
+    case 3 % No Nadd: Nmul, Nshared, criterion_DV
         col_idx      = [1 3 4 5];
         param_labels = {'Nmul', 'Nshared', 'Empirical Criterion DV', 'Empirical Criterion SDT'};
-        ylim_list    = {[NOMp1_lb NOMp1_ub], [NOMp3_lb NOMp3_ub], [0 10], [-1 1]};
+        ylim_list    = {[NOMp1_lb NOMp1_ub], [NOMp3_lb NOMp3_ub], [0 NOMc_ub], [-1 1]};
         true_vals    = nan(1, 4);
         if hasTruth
             if isfield(S_truth, 'Nmul_true'), true_vals(1) = S_truth.Nmul_true; end
             if isfield(S_truth, 'Nshared_true'), true_vals(2) = S_truth.Nshared_true; end
             if isfield(S_truth, 'criterion_DV_true'), true_vals(3) = S_truth.criterion_DV_true; end
             if isfield(S_truth, 'cSDT_true'), true_vals(4) = S_truth.cSDT_true; end
+        end
+
+    case 4 % No Nshared: Nmul, Nadd, criterion_DV
+        col_idx      = [1 2 4 5];
+        param_labels = {'Nmul', 'Nadd', 'Empirical Criterion DV', 'Empirical Criterion SDT'};
+        ylim_list    = {[NOMp1_lb NOMp1_ub], [NOMp2_lb NOMp2_ub], [0 NOMc_ub], [-1 1]};
+        true_vals    = nan(1, 4);
+        if hasTruth
+            if isfield(S_truth, 'Nmul_true'), true_vals(1) = S_truth.Nmul_true; end
+            if isfield(S_truth, 'Nadd_true'), true_vals(2) = S_truth.Nadd_true; end
+            if isfield(S_truth, 'criterion_DV_true'), true_vals(3) = S_truth.criterion_DV_true; end
+            if isfield(S_truth, 'cSDT_true'), true_vals(4) = S_truth.cSDT_true; end
+        end
+
+    case 5 % Nmul only: Nmul, criterion_DV
+        col_idx      = [1 4 5];
+        param_labels = {'Nmul', 'Empirical Criterion DV', 'Empirical Criterion SDT'};
+        ylim_list    = {[NOMp1_lb NOMp1_ub], [0 NOMc_ub], [-1 1]};
+        true_vals    = nan(1, 3);
+        if hasTruth
+            if isfield(S_truth, 'Nmul_true'), true_vals(1) = S_truth.Nmul_true; end
+            if isfield(S_truth, 'criterion_DV_true'), true_vals(2) = S_truth.criterion_DV_true; end
+            if isfield(S_truth, 'cSDT_true'), true_vals(3) = S_truth.cSDT_true; end
+        end
+
+    case 6 % Nadd only: Nadd, criterion_DV
+        col_idx      = [2 4 5];
+        param_labels = {'Nadd', 'Empirical Criterion DV', 'Empirical Criterion SDT'};
+        ylim_list    = {[NOMp2_lb NOMp2_ub], [0 NOMc_ub], [-1 1]};
+        true_vals    = nan(1, 3);
+        if hasTruth
+            if isfield(S_truth, 'Nadd_true'), true_vals(1) = S_truth.Nadd_true; end
+            if isfield(S_truth, 'criterion_DV_true'), true_vals(2) = S_truth.criterion_DV_true; end
+            if isfield(S_truth, 'cSDT_true'), true_vals(3) = S_truth.cSDT_true; end
+        end
+
+    case 7 % Nshared only: Nshared, criterion_DV
+        col_idx      = [3 4 5];
+        param_labels = {'Nshared', 'Empirical Criterion DV', 'Empirical Criterion SDT'};
+        ylim_list    = {[NOMp3_lb NOMp3_ub], [0 NOMc_ub], [-1 1]};
+        true_vals    = nan(1, 3);
+        if hasTruth
+            if isfield(S_truth, 'Nshared_true'), true_vals(1) = S_truth.Nshared_true; end
+            if isfield(S_truth, 'criterion_DV_true'), true_vals(2) = S_truth.criterion_DV_true; end
+            if isfield(S_truth, 'cSDT_true'), true_vals(3) = S_truth.cSDT_true; end
+        end
+
+    case 8 % Criterion only: criterion_DV
+        col_idx      = [4 5];
+        param_labels = {'Empirical Criterion DV', 'Empirical Criterion SDT'};
+        ylim_list    = {[0 NOMc_ub], [-1 1]};
+        true_vals    = nan(1, 2);
+        if hasTruth
+            if isfield(S_truth, 'criterion_DV_true'), true_vals(1) = S_truth.criterion_DV_true; end
+            if isfield(S_truth, 'cSDT_true'), true_vals(2) = S_truth.cSDT_true; end
         end
 
     otherwise
@@ -202,7 +246,7 @@ for iParam = 1:size(params_est_allIter, 2)
 
     % Plot true value if available
     if hasTruth && ~isnan(true_vals(iParam))
-        yline(true_vals(iParam), 'r-', 'LineWidth', 1.2, 'DisplayName', 'True value');
+        yline(true_vals(iParam), 'r--', 'LineWidth', 2, 'DisplayName', 'True value');
     end
 
     % Plot estimate per iteration
@@ -216,7 +260,11 @@ for iParam = 1:size(params_est_allIter, 2)
     ylim(thisYLim);
     xlabel('Iteration');
     ylabel(thisLabel);
-    title(sprintf('Parameter: %s\n%.2f (SD=%.2f)', thisLabel, medVal, SDVal));
+    if hasTruth && ~isnan(true_vals(iParam))
+        title(sprintf('Parameter: %s \nTrue: %.2f\nEst.: %.2f (SD=%.2f)', thisLabel, true_vals(iParam), medVal, SDVal));
+    else
+        title(sprintf('Parameter: %s\nEst.: %.2f (SD=%.2f)', thisLabel, medVal, SDVal));
+    end
     box on;
 
     if iParam==1
@@ -230,7 +278,7 @@ sgtitle(sprintf('Figure 2. Estimated parameters across iterations\n%s (ModelA%dB
 saveas(gcf, sprintf('%s/22Params_L%d_A%dB%d.jpg', ...
     nameFolder_Figures_perSubj, iLocComb, iModelA_fit, iModelB_fit));
 
-%% 3. Correlation between paired parameters across iterations
+%% Figure 3: Correlation between paired parameters across iterations
 params_plot = params_est_allIter(:, 1:numel(param_labels));
 nParams_plot = size(params_plot, 2);
 

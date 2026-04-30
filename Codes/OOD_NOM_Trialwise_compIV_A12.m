@@ -44,12 +44,18 @@ RandStream.setGlobalStream(stream);
 % fprintf('%s: seed determined.\n\n', datetime('now'))
 
 %% General parameters 
-
 IVType = 1; % 1=sum of the dot product/convolution; 2=max; 3=normalized
 templateType = 1; % (1) raw (2) reconstructed kernel (3) mirrored template
 itype_template = 2; % 1=estimate template from PRS trials, ABS trials, or BOTH trials
 flag_PatchMode = 1; % if flag_PatchMode == 1, patchMode = 'T'; else, patchMode = 'N'; end
 flag_plot_template = 0;
+
+% Class weighting for template estimation (signal-absent emphasized)
+wABS = 0.5;
+wPRS = 1 - wABS;
+weightScale_RC = 10; % integer replication scale for weighted regression
+assert(wABS >= 0 && wABS <= 1, 'wABS must be in [0,1].');
+assert(abs(wABS + wPRS - 1) < 1e-10, 'wABS + wPRS must equal 1.');
 
 ratio_split = [.8, .15, .05]; % proportion of trials in template set (for RC), training set (for estimating parameters) and test set (for metric predictions)
 assert(abs(sum(ratio_split)-1)<1e-10)
@@ -64,15 +70,16 @@ if flag_regressType == 2
     opts = struct();
     % candidateORI = 3:9;
     % candidateSF = 3:9;
-    candidateORI = 3:8;
-    candidateSF = 3:8;
+    candidateORI = 3:6;
+    candidateSF = 3:6;
+    % candidateSF = 6:8;
     candidateBasisFamilyORI = {'circ_gaussian', 'vonmises'};
     candidateBasisFamilyORI = {'vonmises'};
     candidateBasisFamilySF  = {'gaussianLog2', 'asymGaussianLog2', 'LogParabola', 'asymLogParabola'};
     % candidateBasisFamilySF  = {'asymGaussianLog2', 'asymLogParabola'};
-    candidateRidge  = [0, 10.^(-3:2)];
+    candidateRidge  = [0, 10.^(-2:3)];
     % candidateRidge  = 100;
-    opts.basisWidthScale = .8;
+    opts.basisWidthScale = .6; % higher → wider basis functions → stronger smoothing; lower → narrower basis functions → weaker smoothing
     opts. asymSF_rightLeftRatio = 1.2;
     opts.nFolds = 5;
     opts.link = 'probit';
@@ -168,6 +175,7 @@ fprintf(['\nSubject/IO name: %s ' ...
     '\n - Number of blocks = %d', ...
     '\n - nORI=%d | nSF=%d', ...
     '\n - Template derived from %s trials', ...
+    '\n - RC class weights: wABS=%.2f, wPRS=%.2f (scale=%d)', ...
     '\n - Energy source: %d (1=TARGET, 2=NOISE)', ...
     '\n - Convolve type: %s', ...
     '\n - IV type: %s\n\n'], ...
@@ -175,7 +183,7 @@ fprintf(['\nSubject/IO name: %s ' ...
     iLocComb, namesLocComb{iLocComb}, ...
     nIter, ...
     nblocks, nORI, nSF, ...
-    namesType{itype_template}, flag_PatchMode, ...
+    namesType{itype_template}, wABS, wPRS, weightScale_RC, flag_PatchMode, ...
     namesConvolveType{convolveType}, namesIVType{IVType});
 
 %% Choose energy source for NOM 
@@ -370,15 +378,19 @@ for iIter = 1:nIter
         basisFxnSF_tmpl = '';
         ridge_tmpl = nan;
 
+        % Apply class weighting before template estimation (ABS emphasized).
+        [e3D_tmpl_forRC, resp_tmpl_forRC] = applyClassWeightsForRC(e3D_tmpl_use, resp_tmpl_rand_sel, iPRS_tmpl_rand_sel, wABS, wPRS, weightScale_RC);
+        [e3D_full_forRC, resp_full_forRC] = applyClassWeightsForRC(e3D_full_use, resp_full_rand_sel, iPRS_full_rand_sel, wABS, wPRS, weightScale_RC);
+
         % Estimate template in whitened feature space
         switch flag_regressType
             case 1  % Univariate
-                template_tmpl_raw = SX_sim07_RC(e3D_tmpl_use, resp_tmpl_rand_sel);
-                template_full_raw = SX_sim07_RC(e3D_full_use, resp_full_rand_sel);
+                template_tmpl_raw = SX_sim07_RC(e3D_tmpl_forRC, resp_tmpl_forRC);
+                template_full_raw = SX_sim07_RC(e3D_full_forRC, resp_full_forRC);
 
             case 2  % Multivariate + smoothing
                 opts.template_ideal = template_ideal;
-                out = SX_RC_selectBasis_cv(e3D_tmpl_use, resp_tmpl_rand_sel, axis_tuning{1}, axis_tuning{2}, candidateORI, candidateSF, candidateBasisFamilyORI, candidateBasisFamilySF, candidateRidge, opts);
+                out = SX_RC_selectBasis_cv(e3D_tmpl_forRC, resp_tmpl_forRC, axis_tuning{1}, axis_tuning{2}, candidateORI, candidateSF, candidateBasisFamilyORI, candidateBasisFamilySF, candidateRidge, opts);
                 template_tmpl_raw = out.template2D;
                 nBasisORI_tmpl = out.nBasisORI;
                 nBasisSF_tmpl = out.nBasisSF;
@@ -386,7 +398,7 @@ for iIter = 1:nIter
                 basisFxnSF_tmpl = out.basisFamilySF;
                 ridge_tmpl = out.ridge;
 
-                out = SX_RC_selectBasis_cv(e3D_full_use, resp_full_rand_sel, axis_tuning{1}, axis_tuning{2}, candidateORI, candidateSF, candidateBasisFamilyORI, candidateBasisFamilySF, candidateRidge, opts);
+                out = SX_RC_selectBasis_cv(e3D_full_forRC, resp_full_forRC, axis_tuning{1}, axis_tuning{2}, candidateORI, candidateSF, candidateBasisFamilyORI, candidateBasisFamilySF, candidateRidge, opts);
                 template_full_raw = out.template2D;
 
         end % switch
@@ -778,4 +790,17 @@ function kernel_corr = invcov_kernel(kernel_raw, W_inv, nOri, nSf)
 k_raw = kernel_raw(:);
 k_corr = W_inv * k_raw;
 kernel_corr = reshape(k_corr, [nOri, nSf]);
+end
+
+function [e3D_out, resp_out] = applyClassWeightsForRC(e3D_in, resp_in, iPRS_in, wABS, wPRS, weightScale)
+% Replicate trials to approximate class weights for regression-based template estimation.
+%   ABS trials (iPRS==0) are replicated round(wABS*weightScale) times.
+%   PRS trials (iPRS==1) are replicated round(wPRS*weightScale) times.
+nABS = round(wABS * weightScale);
+nPRS = round(wPRS * weightScale);
+idxABS = find(iPRS_in == 0);
+idxPRS = find(iPRS_in == 1);
+idx_rep = [repmat(idxABS, nABS, 1); repmat(idxPRS, nPRS, 1)];
+e3D_out = e3D_in(idx_rep, :, :);
+resp_out = resp_in(idx_rep);
 end

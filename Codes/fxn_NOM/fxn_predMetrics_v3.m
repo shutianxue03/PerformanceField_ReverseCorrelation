@@ -38,23 +38,37 @@ switch iModelB
         sigmaShared = params_est(3);
         criterion = params_est(4);
 
-    case 2 % NoSharedN: Multi + Additive (no shared var)
+    case 2 % NoMultiN: Additive + Shared (no multiplicative var)
+        sigmaAdd = params_est(1);
+        sigmaShared = params_est(2);
+        criterion = params_est(3);
+
+    case 3 % NoAddN: Multi + Shared (no additive var)
+        M = params_est(1);
+        % sigmaAdd = 0;
+        sigmaShared = params_est(2);
+        criterion = params_est(3);
+
+    case 4 % NoSharedN: Multi + Additive (no shared var)
         M = params_est(1);
         sigmaAdd = params_est(2);
         % sigmaShared = 0;
         criterion = params_est(3);
 
-    case 3 % NoMultiN: Additive + Shared (no Multi var)
-        % Nmul = 0;
-        sigmaAdd = params_est(1);
-        sigmaShared = params_est(2);
-        criterion = params_est(3);
-
-    case 4 % NoPrivN: Multi + Shared (no private var)
+    case 5 % JustMultiN: Multiplicative only
         M = params_est(1);
-        % sigmaAdd = 0;
-        sigmaShared = params_est(2);
-        criterion = params_est(3);
+        criterion = params_est(2);
+
+    case 6 % JustAddN: Additive only
+        sigmaAdd = params_est(1);
+        criterion = params_est(2);
+
+    case 7 % JustSharedN: Shared only
+        sigmaShared = params_est(1);
+        criterion = params_est(2);
+
+    case 8 % JustCriterion: Ideal observer (no internal noise)
+        criterion = params_est(1);
 
     otherwise
         error('fxn_predMetrics_v3: Unknown iModelB = %d', iModelB);

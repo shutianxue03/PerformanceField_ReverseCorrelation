@@ -18,18 +18,18 @@ nSF = nORI;
 
 %% Define environment
 % if run on HPC OOD
-nameFolder_server = '/scratch/sx712/PF_RC'; str_envir = 'HPC'; 
+nameFolder_server = '/scratch/sx712/PF_RC'; str_envir = 'HPC';
 
 % if run on server (mute if run on OOD)
 nameFolder_server = '/Volumes/server/Users/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC'; str_envir = 'Server';
 
 % if run on local for model simulation (my laptop or iMac)
-nameFolder_server = '/Users/xueshutian/GitHubHomeMac/PF_RC'; str_envir = 'Local'; 
+nameFolder_server = '/Users/xueshutian/GitHubHomeMac/PF_RC'; str_envir = 'Local';
 
 % if run on local for model simulation (the lab iMac)
-nameFolder_server = '/Users/sx712/GitHubLabMac/PF_RC'; str_envir = 'Local'; 
+% nameFolder_server = '/Users/sx712/GitHubLabMac/PF_RC'; str_envir = 'Local';
 
-%% Define names of folders to load/save data 
+%% Define names of folders to load/save data
 nameFolder_Data = sprintf('%s/Data', nameFolder_server) ;
 nameFolder_Data_OOD = sprintf('%s/Data_OOD_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
 nameFolder_Data_NOM_Trialwise = sprintf('%s/Data_NOM_Trialwise_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
@@ -98,9 +98,9 @@ params.noise=noise;
 %% Settings for ORI/SF filter
 % ORI filter
 % switch nORI
-%     case 29, 
+%     case 29,
 % fOri = [5:5:50, 60:10:90]; % nORI=29
-%     case 19, 
+%     case 19,
 % fOri = [5:10:45, 60:10:90]; % nORI=19
 % end
 fOri = linspace(0, 90, (nORI+1)/2); fOri = fOri(2:end);
@@ -111,8 +111,8 @@ assert(nORI == length(filtersOri_all));
 nSF = nORI; % could generate 0.5: 17, 29, 37
 noise.SF_low = 1;
 % noise.SF_low = 1.1869;
-noise.SF_high = 2/noise.SF_low*2; 
-noise.filtersSF_all_log = linspace(log2(noise.SF_low), log2(noise.SF_high), nSF); 
+noise.SF_high = 2/noise.SF_low*2;
+noise.filtersSF_all_log = linspace(log2(noise.SF_low), log2(noise.SF_high), nSF);
 noise.filtersSF_all = 2.^noise.filtersSF_all_log;
 % cut_ORI = 1:nORI; cut_SF = 1:nSF;
 % nORI = length(cut_ORI);
@@ -148,18 +148,22 @@ ncomb8 = 8;
 
 %% NOM fitting
 % Parameter bounds and initial values
-% Internal noise parameters
+NOMp1_lb = 0;
+NOMp2_lb = 0;
+NOMp3_lb  = 0;
 
-% Old model: full model has induced and constant noise and rho (correlation between passes)
-% NOMp1_lb = 1e-5;  NOMp1_ub = 1;     % multiplicative noise
-% NOMp2_lb = 1e-5; NOMp2_ub = 30;   % Constant noise (20–30 range from simulations)
-% NOMp3_lb  = 1e-5;  NOMp3_ub = 1 - NOMp3_lb; % Correlation parameter (rhoDV)
-
-% New model: induced noise (indpt), idpdt constant noise, and shared constant noise
-NOMp1_lb = 1e-5;  NOMp1_ub = 3;     % induced noise 
-NOMp2_lb = 1e-5; NOMp2_ub = 3;   % idpdt constant noise
-NOMp3_lb  = 1e-5;  NOMp3_ub = 3; %  shared constant noise
-% NOMc_lb = 0; NOMc_ub = 500; % criterion; subject to change
+if exist("flag_whitenDV", "var")
+    switch flag_whitenDV
+        case 0 % when DV is not whitened, the noise parameters are in the same scale as the energy, which can be >1; so we set a higher upper bound
+            NOMp1_ub = 1.5;     % multi noise
+            NOMp2_ub = 20;   % (private) additive noise
+            NOMp3_ub = 20; % (shared) additive noise
+        case 1 % when DV is whitened, the noise parameters are in the same scale as dprime, which is usually <1, so we set a lower upper bound
+            NOMp1_ub = 3;     % multi noise
+            NOMp2_ub = 3;   % (private) additive noise
+            NOMp3_ub = 3; % (shared) additive noise
+    end
+end
 
 % Midpoint initial guesses
 NOMp1_0 = mean([NOMp1_lb,  NOMp1_ub]);
@@ -178,36 +182,39 @@ options_fmin = optimoptions('fmincon', 'MaxIterations', 1e4, 'Display', 'off');
 % Noisy observer model names
 namesModelA = {'RC', 'IO', 'RandTemp'};
 
-namesModelB = {'FullModel', 'NoSharedN', 'NoMultiN', 'NoAddN', 'JustAddN', 'JustMultiN', 'JustSharedN'};
+namesModelB = {'FullModel', 'NoMultiN', 'NoAddN', 'NoSharedN', 'JustMultiN', 'JustAddN', 'JustSharedN', 'JustCriterion'};
 if ~exist('flag_incluCrit', 'var'), flag_incluCrit = 1; end
 switch flag_incluCrit
     case 0
         namesModelBparams = {...
             {'Multiplicative variability', 'Additive variability', 'Shared variability'}, ... %1
-            {'Multiplicative variability', 'Additive variability'                                       }, ... %2
-            {                                         'Additive variability', 'Shared variability'}, ... %3
-            {'Multiplicative variability',                                'Shared variability'}, ... %4
-            {                                         'Additive variability',                                      }, ... %5
-            {'Multiplicative variability',                                                                           }, ... %6
-            {                                                                        'Shared variability'}};    %7
+            {                                         'Additive variability', 'Shared variability'}, ... %2
+            {'Multiplicative variability',                                'Shared variability'}, ... %3
+            {'Multiplicative variability', 'Additive variability'                                       }, ... %4
+            {'Multiplicative variability',                                                                           }, ... %5
+            {                                         'Additive variability',                                      }, ... %6
+            {                                                                        'Shared variability'}, ... %7
+            {                                                                                                  }}; %8
     case 1
         namesModelBparams = {...
             {'Multiplicative variability', 'Additive variability', 'Shared variability', 'CriterionNOM'}, ... %1
-            {'Multiplicative variability', 'Additive variability'                                , 'CriterionNOM'}, ... %2
-            {                                         'Additive variability', 'Shared variability',  'CriterionNOM'}, ... %3
-            {'Multiplicative variability',                                'Shared variability',    'CriterionNOM'}, ... %4
-            {                                         'Additive variability',                                 'CriterionNOM'}, ... %5
-            {'Multiplicative variability',                                                                  'CriterionNOM'}, ... %6
-            {                                                                        'Shared variability',    'CriterionNOM'}};    %7
+            {                                         'Additive variability', 'Shared variability',  'CriterionNOM'}, ... %2
+            {'Multiplicative variability',                                'Shared variability',    'CriterionNOM'}, ... %3
+            {'Multiplicative variability', 'Additive variability'                                , 'CriterionNOM'}, ... %4
+            {'Multiplicative variability',                                                                  'CriterionNOM'}, ... %5
+            {                                         'Additive variability',                                 'CriterionNOM'}, ... %6
+            {                                                                        'Shared variability',    'CriterionNOM'}, ... %7
+            {                                                                                                  'CriterionNOM'}}; %8
 
         namesModelBparams_short = {...
             {'Nmul', 'Nadd', 'Nshared', 'criterion_DV'}, ... %1
-            {'Nmul', 'Nadd'                  , 'criterion_DV'}, ... %2
-            {            'Nadd', 'Nshared',  'criterion_DV'}, ... %3
-            {'Nmul',             'Nshared',  'criterion_DV'}, ... %4
-            {             'Nadd',                  'criterion_DV'}, ... %5
-            {'Nmul',                               'criterion_DV'}, ... %6
-            {                       'Nshared',    'criterion_DV'}};    %7
+            {            'Nadd', 'Nshared',  'criterion_DV'}, ... %2
+            {'Nmul',             'Nshared',  'criterion_DV'}, ... %3
+            {'Nmul', 'Nadd'                  , 'criterion_DV'}, ... %4
+            {'Nmul',                               'criterion_DV'}, ... %5
+            {             'Nadd',                  'criterion_DV'}, ... %6
+            {                       'Nshared',    'criterion_DV'}, ... %7
+            {                                    'criterion_DV'}}; %8
 end
 namesConvolveType = {'dot product', 'convolution'}; nConvolveType = length(namesConvolveType);
 namesIVType = {'sum all channels', 'channel with max IV'}; nIVType = length(namesIVType);
@@ -311,7 +318,7 @@ namesIC = {'AIC', 'AICc', 'BIC'}; nICs = length(namesIC);
 publishOptions = struct('format','pdf','outputDir','publishedPDFs/', 'showCode', 0);
 % namesDataset = {'TrainingSet', 'FullSet'};
 % namesDataset = {'TempSet', 'FullSet'}; % template set, full set (all data)
-namesDataset_full = {'FullSet', 'TmplSet', 'TrainSet', 'TestSet'}; nDatasets_full = length(namesDataset_full); 
+namesDataset_full = {'FullSet', 'TmplSet', 'TrainSet', 'TestSet'}; nDatasets_full = length(namesDataset_full);
 namesDataset = {'TmplSet', 'FullSet'}; nDatasets = length(namesDataset); % needs to matchOOD_xx_compIV ("for iDataset = 1:2")
 
 % Model comparison names

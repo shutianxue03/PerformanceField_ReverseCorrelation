@@ -1,5 +1,4 @@
-% function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, cSDT_true, ...
-%     lambda_whiten, flag_regressType, flag_incluCrit, C_contribution, iModelB_sim, nIter, nBasisORI, nBasisSF)
+function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, cSDT_true, lambda_whiten, flag_regressType, flag_incluCrit, C_contribution, iModelB_sim, nIter, nBasisORI, nBasisSF)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Script name: OOD_sim.m
@@ -16,33 +15,42 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Simulation input parameters
-noiseCST = .2;
-gaborCST = .5;
-nTrials = 2e3;
-Nmul_true = 1;
-Nadd_true = 1;
-Nshared_true = 1;
-cSDT_true = 0;
-lambda_whiten = 0;
-flag_regressType = 2;
-flag_incluCrit = 1;
-C_contribution = 0;
-iModelB_sim = 1;
-nIter = 2;
-nBasisORI = 6;
-nBasisSF = 5;
+% noiseCST = .2;
+% gaborCST = .5;
+% nTrials = 8e3;
+% Nmul_true = .9; % Nmul=.9 gives pC~=0.7
+% Nadd_true = 9; % Nadd=9 gives pC~=0.7
+% Nshared_true = 9; % Nshared=9 gives pC~=0.7
+% cSDT_true = 0;
+% iModelB_sim = 5; % 1=full, 2=No Nmul, 3=No Nadd, 4=No Nshared, 5=Nmul-only, 6=Nadd-only, 7=Nshared-only, 8=criterion-only
+% nIter = 10;
+% lambda_whiten = 0;
+% flag_regressType = 2; % redundant
+% flag_incluCrit = 1; % redundant
+% C_contribution = 0; % this parameter does not matter
+% nBasisORI = 6; % redundant
+% nBasisSF = 5; % redundant
 
+flag_whitenDV = 0; % 1=compute DV from whitened energy; 0=use raw energy
 % Enforce reduced-model ground truth by zeroing excluded IN terms.
 switch iModelB_sim
     case 1  % Full: Nmul + Nadd + Nshared
         % keep all as provided
-    case 2  % No Nshared
-        Nshared_true = 0;
-    case 3  % No Nmul
+    case 2  % No Nmul
         Nmul_true = 0;
-    case 4  % No Nadd
+    case 3  % No Nadd
         Nadd_true = 0;
-
+    case 4  % No Nshared
+        Nshared_true = 0;
+    case 5  % Nmul only
+        Nadd_true = 0;
+        Nshared_true = 0;
+    case 6  % Nadd only
+        Nmul_true = 0;
+        Nshared_true = 0;
+    case 7  % Nshared only
+        Nmul_true = 0;
+        Nadd_true = 0;
     otherwise
         error('Unknown iModelB_sim = %d', iModelB_sim);
 end
@@ -78,15 +86,14 @@ iJob = 1;
 
 % Model A/B indices for fitting
 iModelA_fit_all = [1,2]; % DO NOT CHANGE! 1 = RC-derived template (Model A), 2=ideal template; 3=permuted template
-iModelB_fit_all = 1:4;
-pC_filter = [.6, .8];
+iModelB_fit_all = iModelB_sim; %1=full, 2=No Nmul, 3=No Nadd, 4=No Nshared, 5=Nmul-only, 6=Nadd-only, 7=Nshared-only, 8=criterion-only
+pC_filter = [.6, .8]; % Only proceed with compIV/fitNOM if simulated pC falls within this range; otherwise, discard this simulation and try again with different random seed or parameters.
 
 templateType_true = 1; % 1 = raw;
 IVType_true = 1; % 1 = sum of dot product;
 convolveType_true = 1; % 1 = dot product; 2 = convolution (for fxn_getIV_v3)
 flag_permT = 0; %1=permute the input template per trial
 eps_whiten = 1e-3; % floor for whitening eigenvalues
-flag_whitenDV = 1; % 1=compute DV from whitened energy; 0=use raw energy
 flag_plotDist = 1;
 if strcmp(str_envir, 'HPC'), flag_plotDist = 0; end % don't plot when running on HPC
 iLocComb = 1; % use single-location index (e.g., fovea) for IO
@@ -100,7 +107,7 @@ fprintf(' - nTrials = %d\n', nTrials);
 fprintf(' - Simulated with ModelB = %d \n', iModelB_sim);
 fprintf(' - True IN params: Nmul=%.3g, Nadd=%.3g, Nshared=%.3g\n', Nmul_true, Nadd_true, Nshared_true);
 fprintf(' - Fitted with ModelA = %s (1=Data-derived template; 2=ideal template)\n', strjoin(string(iModelA_fit_all), ' '));
-fprintf(' - Fitted with ModelB = %s (1=full, 2=No Nshared; 3=No Nmul; 4=No Nadd)\n', strjoin(string(iModelB_fit_all), ' '));
+fprintf(' - Fitted with ModelB = %s (1=full, 2=No Nmul, 3=No Nadd, 4=No Nshared, 5=Nmul-only, 6=Nadd-only, 7=Nshared-only, 8=criterion-only)\n', strjoin(string(iModelB_fit_all), ' '));
 fprintf(' - SDT Criterion=%.1f \n', cSDT_true);
 fprintf(' - Contribution of criterion loss =%.1f \n', C_contribution);
 fprintf(' - Whitening strength (lambda): %.1f \n', lambda_whiten);
@@ -108,9 +115,9 @@ fprintf(' - Regression type (1=Univariate; 2=Multi+smoothing): %d \n\n', flag_re
 
 % Define IO name & folders %
 % Define the IO name
-nameIO = sprintf('IO_cN%.0f_cG%.0f_nT%s_Nm%s_Na%s_Ns%s_cSDT%.1f_cont%.1f_whiten%.1f_R%d_%d%d_B%d', ...
+nameIO = sprintf('IO_cN%.0f_cG%.0f_nT%s_Nm%.1f_Na%.1f_Ns%.1f_cSDT%.1f_cont%.1f_whiten%.1f_R%d_%d%d_B%d', ...
     noiseCST*100, gaborCST*100, format_num2exp(nTrials), ...
-    format_num2exp(Nmul_true), format_num2exp(Nadd_true), format_num2exp(Nshared_true), ...
+    Nmul_true, Nadd_true, Nshared_true, ...
     cSDT_true, C_contribution, lambda_whiten, flag_regressType, nORI, nSF, iModelB_sim);
 
 % Folder to save IO data (energy + behav)
@@ -176,7 +183,6 @@ end
 
 %% Create Gabor filters used for energy computation
 [filter_sin, filter_cos] = SX_sim02_setFilters(stim, noise.filtersSF_all, filtersOri_all, fxn_getSigma_SPdomain, 0);
-
 fprintf('%s: Filter banks (nORI=%d, nSF=%d) created and saved.\n\n', datetime('now'), length(filtersOri_all), length(noise.filtersSF_all))
 
 %% True 2D template (ORI×SF)
@@ -385,7 +391,7 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
         
         for iModelB_fit = iModelB_fit_all
             %----------------------------%
-            OOD_NOM_Trialwise_fitNOM(nBasisORI, nBasisSF, {nameIO, criterion_DV_true}, iLocComb, flag_incluCrit, C_contribution, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
+            OOD_NOM_Trialwise_fitNOM(nBasisORI, nBasisSF, flag_whitenDV, {nameIO, criterion_DV_true}, iLocComb, flag_incluCrit, C_contribution, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
             %----------------------------%
 
             if iModelB_fit == iModelB_sim
@@ -435,7 +441,7 @@ fprintf('%s: Simulation done.\n\n', time_end)
 elapsed = time_end - time_start;
 fprintf('Time used: %s\n\n\n\n', char(elapsed));
 
-% end % end of the OOD_sim function
+end % end of the OOD_sim function
 
 %% helper
 function plot_fit_model_comparison(nameFolder_Data_NOM_IO, nameFolder_Figures_perSubj, nameIO, ...

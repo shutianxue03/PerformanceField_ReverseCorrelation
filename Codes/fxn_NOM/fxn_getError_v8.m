@@ -45,9 +45,8 @@ switch iStep
         % Step 1: fit private-noise params (Nshared forced to 0)
         switch iModelB
             case 1, params_est = [params_est([1,2]), 0, params_est(3)]; % input=[Nmul,Nadd,criterion]  → full=[Nmul,Nadd,Nshared=0,criterion]
-            % case 2, params_est = [params_est(1), 0, params_est(2)];    % muted because iModelB can't be 2 in two-step fitting --- IGNORE ---
-            case 3, params_est = [params_est(1), 0, params_est(2)];    % input=[Nadd,criterion] → full=[Nmul,Nadd,Nshared=0,criterion]
-            case 4, params_est = [params_est(1), 0, params_est(2)];    % input=[Nmul,criterion] → full=[Nmul,Nadd,Nshared=0,criterion]
+            case 2, params_est = [params_est(1), 0, params_est(2)];    % input=[Nadd,criterion] → model2=[Nadd,Nshared=0,criterion]
+            case 3, params_est = [params_est(1), 0, params_est(2)];    % input=[Nmul,criterion] → model3=[Nmul,Nshared=0,criterion]
         end
         %---------------------------%
         [pYES_pred_allT, ~, ~, Cz_fit] = fxn_predMetrics_v3(iModelB, params_est, data);
@@ -73,7 +72,6 @@ switch iStep
             case 1, params_est = [params_fromStep1([1,2]), params_est, params_fromStep1(3)];
             case 2, params_est = [params_fromStep1(1), params_est, params_fromStep1(2)]; 
             case 3, params_est = [params_fromStep1(1), params_est, params_fromStep1(2)]; 
-            case 4, params_est = [params_fromStep1(1), params_est, params_fromStep1(2)]; 
         end
         %---------------------------%
         [~, pA_pred_allPairs, consistency_allPairs] = fxn_predMetrics_v3(iModelB, params_est, data);
