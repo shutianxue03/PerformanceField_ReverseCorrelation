@@ -27,6 +27,10 @@ if ischar(candidateBasisFamilySF) || isstring(candidateBasisFamilySF)
     candidateBasisFamilySF = cellstr(candidateBasisFamilySF);
 end
 
+% candidate basis-width scales (allow scalar or vector); keep backward compatibility
+candidateBasisWidthScaleORI = get_candidate_basis_width(opts, 'basisWidthScaleORI');
+candidateBasisWidthScaleSF  = get_candidate_basis_width(opts, 'basisWidthScaleSF');
+
 % ---------------- create CV folds ----------------
 if isfield(opts, 'foldID') && ~isempty(opts.foldID)
     foldID = opts.foldID(:);
@@ -55,11 +59,17 @@ for iFamORI = 1:numel(candidateBasisFamilyORI)
     for iFamSF = 1:numel(candidateBasisFamilySF)
         for iORIcand = 1:numel(candidateORI)
             for iSFcand = 1:numel(candidateSF)
-                iComb = iComb + 1;
-                comb(iComb).nBasisORI = candidateORI(iORIcand);
-                comb(iComb).nBasisSF  = candidateSF(iSFcand);
-                comb(iComb).basisFamilyORI = char(candidateBasisFamilyORI{iFamORI});
-                comb(iComb).basisFamilySF  = char(candidateBasisFamilySF{iFamSF});
+                for iBWori = 1:numel(candidateBasisWidthScaleORI)
+                    for iBWsf = 1:numel(candidateBasisWidthScaleSF)
+                        iComb = iComb + 1;
+                        comb(iComb).nBasisORI = candidateORI(iORIcand);
+                        comb(iComb).nBasisSF  = candidateSF(iSFcand);
+                        comb(iComb).basisFamilyORI = char(candidateBasisFamilyORI{iFamORI});
+                        comb(iComb).basisFamilySF  = char(candidateBasisFamilySF{iFamSF});
+                        comb(iComb).basisWidthScaleORI = candidateBasisWidthScaleORI(iBWori);
+                        comb(iComb).basisWidthScaleSF  = candidateBasisWidthScaleSF(iBWsf);
+                    end
+                end
             end
         end
     end
@@ -75,6 +85,8 @@ res(nRes) = struct( ...
     'nBasisSF', [], ...
     'basisFamilyORI', '', ...
     'basisFamilySF', '', ...
+    'basisWidthScaleORI', [], ...
+    'basisWidthScaleSF', [], ...
     'ridge', [], ...
     'nLL_mean', [], ...
     'nLL_se', [] );
@@ -89,6 +101,8 @@ for iComb = 1:nCombBase
     opts_basis.nBasisSF  = comb(iComb).nBasisSF;
     opts_basis.basisFamilyORI = comb(iComb).basisFamilyORI;
     opts_basis.basisFamilySF  = comb(iComb).basisFamilySF;
+    opts_basis.basisWidthScaleORI = comb(iComb).basisWidthScaleORI;
+    opts_basis.basisWidthScaleSF  = comb(iComb).basisWidthScaleSF;
 
     % build basis once
     Bori = make_basis_ori(axis_ori_deg, opts_basis);
@@ -141,6 +155,8 @@ for iComb = 1:nCombBase
         res(iRes).nBasisSF  = comb(iComb).nBasisSF;
         res(iRes).basisFamilyORI = comb(iComb).basisFamilyORI;
         res(iRes).basisFamilySF  = comb(iComb).basisFamilySF;
+        res(iRes).basisWidthScaleORI = comb(iComb).basisWidthScaleORI;
+        res(iRes).basisWidthScaleSF  = comb(iComb).basisWidthScaleSF;
         res(iRes).ridge = ridge;
         res(iRes).nLL_mean = mean(nLL_test_allFolds, 'omitnan');
         res(iRes).nLL_se   = std(nLL_test_allFolds, 'omitnan') / sqrt(sum(isfinite(nLL_test_allFolds)));
@@ -157,6 +173,8 @@ opts_best.nBasisORI = bestRes.nBasisORI;
 opts_best.nBasisSF  = bestRes.nBasisSF;
 opts_best.basisFamilyORI = bestRes.basisFamilyORI;
 opts_best.basisFamilySF  = bestRes.basisFamilySF;
+opts_best.basisWidthScaleORI = bestRes.basisWidthScaleORI;
+opts_best.basisWidthScaleSF  = bestRes.basisWidthScaleSF;
 opts_best.ridge = bestRes.ridge;
 
 out_best = SX_RC_fit_smoothBasis(e3D_allT, resp_allT, axis_ori_deg, axis_sf_log2, opts_best);
@@ -167,6 +185,8 @@ output.nBasisORI = opts_best.nBasisORI;
 output.nBasisSF = opts_best.nBasisSF;
 output.basisFamilyORI = opts_best.basisFamilyORI;
 output.basisFamilySF = opts_best.basisFamilySF;
+output.basisWidthScaleORI = opts_best.basisWidthScaleORI;
+output.basisWidthScaleSF = opts_best.basisWidthScaleSF;
 output.ridge = opts_best.ridge;
 output.bestRes = bestRes;
 % output.res = res; % enable only if needed for diagnostics
@@ -174,11 +194,11 @@ output.bestRes = bestRes;
 %% Visualize GoF
 % set(0, 'DefaultFigureVisible', 'on')
 % bestPerFam = plot_basis_cv_heatmap(res);
-% 
+%
 % % Recovered template
 % % Ideal template is projected into selected basis functions
 % plot_best_template_marginalized(out_best.template2D, axis_ori_deg, axis_sf_log2, opts.template_ideal, bestRes);
-% 
+%
 % % close all
 %%
 end
@@ -598,6 +618,8 @@ if ~isfield(opts, 'basisFamilyORI') || isempty(opts.basisFamilyORI), opts.basisF
 if ~isfield(opts, 'basisFamilySF') || isempty(opts.basisFamilySF), opts.basisFamilySF = 'gaussianLog2'; end
 if ~isfield(opts, 'kappaORI'), opts.kappaORI = []; end
 if ~isfield(opts, 'basisWidthScale') || isempty(opts.basisWidthScale), opts.basisWidthScale = 0.8; end
+if ~isfield(opts, 'basisWidthScaleORI') || isempty(opts.basisWidthScaleORI), opts.basisWidthScaleORI = opts.basisWidthScale; end
+if ~isfield(opts, 'basisWidthScaleSF') || isempty(opts.basisWidthScaleSF), opts.basisWidthScaleSF = opts.basisWidthScale; end
 if ~isfield(opts, 'asymSF_rightLeftRatio') || isempty(opts.asymSF_rightLeftRatio), opts.asymSF_rightLeftRatio = 1.5; end
 if ~isfield(opts, 'widthSF_logParabola'), opts.widthSF_logParabola = []; end
 if ~isfield(opts, 'widthSF_logParabola_left'),  opts.widthSF_logParabola_left  = []; end
@@ -612,6 +634,13 @@ axis_ori_deg = axis_ori_deg(:);
 if ~isfield(opts, 'basisFamilyORI') || isempty(opts.basisFamilyORI)
     opts.basisFamilyORI = 'circ_gaussian';
 end
+if ~isfield(opts, 'basisWidthScaleORI') || isempty(opts.basisWidthScaleORI)
+    if isfield(opts, 'basisWidthScale') && ~isempty(opts.basisWidthScale)
+        opts.basisWidthScaleORI = opts.basisWidthScale;
+    else
+        opts.basisWidthScaleORI = 0.8;
+    end
+end
 
 centersORI_deg = linspace(0, opts.oriPeriod_deg, opts.nBasisORI + 1);
 centersORI_deg(end) = [];  % remove duplicate endpoint
@@ -622,7 +651,7 @@ switch lower(opts.basisFamilyORI)
         if isempty(opts.sigmaORI_deg)
             if opts.nBasisORI > 1
                 d = opts.oriPeriod_deg / opts.nBasisORI;
-                sigmaORI_deg = d * opts.basisWidthScale;
+                sigmaORI_deg = d * opts.basisWidthScaleORI;
             else
                 sigmaORI_deg = opts.oriPeriod_deg / 4;
             end
@@ -638,7 +667,7 @@ switch lower(opts.basisFamilyORI)
         if ~isfield(opts, 'kappaORI') || isempty(opts.kappaORI)
             if opts.nBasisORI > 1
                 d_deg = opts.oriPeriod_deg / opts.nBasisORI;
-                sigma_rad = deg2rad(d_deg * opts.basisWidthScale);
+                sigma_rad = deg2rad(d_deg * opts.basisWidthScaleORI);
                 % crude mapping from Gaussian sigma to von Mises kappa
                 kappaORI = 1 / max(sigma_rad.^2, 1e-6);
             else
@@ -702,6 +731,13 @@ axis_sf_cpd = 2 .^ axis_sf_log2;
 if ~isfield(opts, 'basisFamilySF') || isempty(opts.basisFamilySF)
     opts.basisFamilySF = 'gaussianLog2';
 end
+if ~isfield(opts, 'basisWidthScaleSF') || isempty(opts.basisWidthScaleSF)
+    if isfield(opts, 'basisWidthScale') && ~isempty(opts.basisWidthScale)
+        opts.basisWidthScaleSF = opts.basisWidthScale;
+    else
+        opts.basisWidthScaleSF = 0.8;
+    end
+end
 
 switch lower(opts.basisFamilySF)
 
@@ -711,7 +747,7 @@ switch lower(opts.basisFamilySF)
         if isempty(opts.sigmaSF_log2)
             if opts.nBasisSF > 1
                 d = mean(diff(centersSF_log2));
-                sigmaSF_log2 = d * opts.basisWidthScale;
+                sigmaSF_log2 = d * opts.basisWidthScaleSF;
             else
                 sigmaSF_log2 = range(axis_sf_log2) / 4 + eps;
             end
@@ -770,7 +806,7 @@ switch lower(opts.basisFamilySF)
         if ~isfield(opts, 'sigmaSF_log2_left') || isempty(opts.sigmaSF_log2_left)
             if opts.nBasisSF > 1
                 d = mean(diff(centersSF_log2));
-                sigma_left = d * opts.basisWidthScale;
+                sigma_left = d * opts.basisWidthScaleSF;
             else
                 sigma_left = range(axis_sf_log2) / 4 + eps;
             end
@@ -842,6 +878,20 @@ function B = normalize_columns(B)
 nrm = sqrt(sum(B.^2, 1));
 nrm(nrm == 0) = 1;
 B = bsxfun(@rdivide, B, nrm);
+end
+
+%% Helper: normalize candidate basis-width option
+function vals = get_candidate_basis_width(opts, fieldName)
+
+if isfield(opts, fieldName) && ~isempty(opts.(fieldName))
+    vals = opts.(fieldName);
+elseif isfield(opts, 'basisWidthScale') && ~isempty(opts.basisWidthScale)
+    vals = opts.basisWidthScale;
+else
+    vals = 0.8;
+end
+
+vals = vals(:)';
 end
 
 %% Check helper: plot nLL

@@ -23,7 +23,7 @@ function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true
 % Nshared_true = 9; % Nshared=9 gives pC~=0.7
 % cSDT_true = 0;
 % iModelB_sim = 5; % 1=full, 2=No Nmul, 3=No Nadd, 4=No Nshared, 5=Nmul-only, 6=Nadd-only, 7=Nshared-only, 8=criterion-only
-% nIter = 10;
+% nIter = 20;
 % lambda_whiten = 0;
 % flag_regressType = 2; % redundant
 % flag_incluCrit = 1; % redundant
@@ -388,7 +388,7 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
 
     %% Step 2: fit NOM parameters and predict metrics
     for iModelA_fit=1:2
-        
+
         for iModelB_fit = iModelB_fit_all
             %----------------------------%
             OOD_NOM_Trialwise_fitNOM(nBasisORI, nBasisSF, flag_whitenDV, {nameIO, criterion_DV_true}, iLocComb, flag_incluCrit, C_contribution, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
@@ -396,14 +396,14 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
 
             if iModelB_fit == iModelB_sim
                 % For the simulated model, also plot IV vs DV scatter and parameter recovery
-                
+
                 plot_CorrBasisSetting(nameFolder_Data_NOM_IO, nameFolder_Figures_perSubj, nameIO, ...
                     nIter, iJob, iLocComb, iModelA_fit, iModelB_fit_all, namesModelBparams_short, ...
                     Nmul_true, Nadd_true, Nshared_true, criterion_DV_true, template_true);
-                
+
             end % if iModelB_fit == iModelB_sim
         end % for iModelB_fit
-        
+
     end % for iModelA_fit
 %%
     % Summarize model comparison after all A/B fits finish.
@@ -435,7 +435,7 @@ clear *allT e2D* e3D* dataMatrix;
 delete(sprintf('%s/energy_T_%d_%d.mat', nameFolder_Data_OOD_IO, nORI, nSF));
 fprintf('%s: Energy file removed to save space.\n\n', datetime('now'))
 
-%%  End timing 
+%%  End timing
 time_end = datetime('now');
 fprintf('%s: Simulation done.\n\n', time_end)
 elapsed = time_end - time_start;

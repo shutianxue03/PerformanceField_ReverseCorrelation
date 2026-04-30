@@ -34,7 +34,7 @@ SX_RC1_setting; % defines nameFolder_*, nORI, nSF, namesLocComb, namesModelA, et
 % nameFolder_Data_OOD = sprintf('%s/Data_OOD_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
 % nameFolder_Data_NOM_Trialwise = sprintf('%s/Data_NOM_Trialwise_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
 
-%% Deterministic RNG (grand seed + per-iteration substreams) 
+%% Deterministic RNG (grand seed + per-iteration substreams)
 S_seed = GetGrandSeed(nIter, iJob, nJob, nameFolder_Data);
 
 % One RNG stream for the whole job; each iteration uses its own Substream
@@ -43,7 +43,7 @@ RandStream.setGlobalStream(stream);
 
 % fprintf('%s: seed determined.\n\n', datetime('now'))
 
-%% General parameters 
+%% General parameters
 IVType = 1; % 1=sum of the dot product/convolution; 2=max; 3=normalized
 templateType = 1; % (1) raw (2) reconstructed kernel (3) mirrored template
 itype_template = 2; % 1=estimate template from PRS trials, ABS trials, or BOTH trials
@@ -79,7 +79,8 @@ if flag_regressType == 2
     % candidateBasisFamilySF  = {'asymGaussianLog2', 'asymLogParabola'};
     candidateRidge  = [0, 10.^(-2:3)];
     % candidateRidge  = 100;
-    opts.basisWidthScale = .6; % higher → wider basis functions → stronger smoothing; lower → narrower basis functions → weaker smoothing
+    opts.basisWidthScaleORI = [.5:.2:.9]; % set vector to search ORI width scales
+    opts.basisWidthScaleSF  = [.5:.2:.9]; % set vector to search SF width scales
     opts. asymSF_rightLeftRatio = 1.2;
     opts.nFolds = 5;
     opts.link = 'probit';
@@ -113,7 +114,7 @@ else
     namePatchMode = 'N'; % noise patch
 end
 
-%% Subject / IO and paths 
+%% Subject / IO and paths
 if isnumeric(isubj)
     % Human subjects
     subjList = {'YK','SP','SX','LS','RE','MD','AS','HL','FH','HA','CS','DT','DU','RC','SR'};
@@ -186,7 +187,7 @@ fprintf(['\nSubject/IO name: %s ' ...
     namesType{itype_template}, wABS, wPRS, weightScale_RC, flag_PatchMode, ...
     namesConvolveType{convolveType}, namesIVType{IVType});
 
-%% Choose energy source for NOM 
+%% Choose energy source for NOM
 switch flag_PatchMode
     case 1 % target patch energy
         e3D_allT = e3D_target_allT;
@@ -196,7 +197,7 @@ switch flag_PatchMode
         error('flag_PatchMode must be 1 (target) or 2 (noise).');
 end
 
-%% Sanity check: iPRS consistent within pairs 
+%% Sanity check: iPRS consistent within pairs
 % Col#1 = itrial_allT; Col#6 = iPRS; Col#8 = iPair;
 for iPair = 1:max(dataMatrix(:, 8))
     iIter = find(dataMatrix(:, 8) == iPair);
@@ -207,7 +208,7 @@ for iPair = 1:max(dataMatrix(:, 8))
     end
 end
 
-%% Session and location selection 
+%% Session and location selection
 nSess = length(unique(dataMatrix(:, 2)));
 
 % Sessions included (can be subsetted here)
@@ -278,7 +279,7 @@ fprintf('%s: Ideal template created.\n\n', datetime('now'))
 iModelA_fit = 1;
 nameFile_compIV_A1 = sprintf('%s/n%d_J%d_A%d_compIV', nameFolder_NOM_save, nIter, iJob, iModelA_fit);
 
-%% A1—Main loop over iterations 
+%% A1—Main loop over iterations
 % fprintf('%s: Creating empty placeholders for running iterations.\n\n', datetime('now'))
 data_metrics_allIter = nan(nIter, nDatasets_full, nMetrics); % see fxn_getMetrics for all 11 metrics
 data_train_allIter = cell(nIter, 1);
@@ -290,6 +291,8 @@ nBasisSF_tmpl_allIter = nan(nIter, 1);
 basisFxnORI_tmpl_allIter = data_train_allIter;
 basisFxnSF_tmpl_allIter = data_train_allIter;
 ridge_tmpl_allIter = nBasisSF_tmpl_allIter;
+basisWidthScaleORI_tmpl_allIter = nBasisSF_tmpl_allIter;
+basisWidthScaleSF_tmpl_allIter  = nBasisSF_tmpl_allIter;
 
 sep_allIter = nan(nIter, 2); % 1=template set, 2=full set
 margORI_allIter = nan(nIter, 2, nORI);
@@ -376,6 +379,8 @@ for iIter = 1:nIter
         nBasisSF_tmpl = nan;
         basisFxnORI_tmpl = '';
         basisFxnSF_tmpl = '';
+        basisWidthScaleORI_tmpl = nan;
+        basisWidthScaleSF_tmpl = nan;
         ridge_tmpl = nan;
 
         % Apply class weighting before template estimation (ABS emphasized).
@@ -396,6 +401,8 @@ for iIter = 1:nIter
                 nBasisSF_tmpl = out.nBasisSF;
                 basisFxnORI_tmpl = out.basisFamilyORI;
                 basisFxnSF_tmpl = out.basisFamilySF;
+                basisWidthScaleORI_tmpl = out.basisWidthScaleORI;
+                basisWidthScaleSF_tmpl = out.basisWidthScaleSF;
                 ridge_tmpl = out.ridge;
 
                 out = SX_RC_selectBasis_cv(e3D_full_forRC, resp_full_forRC, axis_tuning{1}, axis_tuning{2}, candidateORI, candidateSF, candidateBasisFamilyORI, candidateBasisFamilySF, candidateRidge, opts);
@@ -408,7 +415,7 @@ for iIter = 1:nIter
         % whitened feature spaces and should stay there for subsequent DV computation.
     end % isnan()
 
-    %% Regularize the derived template 
+    %% Regularize the derived template
     template_full = fxn_getTemplate(template_full_raw, templateType, flag_plot_template);
     template_tmpl = fxn_getTemplate(template_tmpl_raw, templateType, flag_plot_template);
 
@@ -512,6 +519,8 @@ for iIter = 1:nIter
     nBasisSF_tmpl_allIter(iIter, :) = nBasisSF_tmpl;
     basisFxnORI_tmpl_allIter{iIter} = basisFxnORI_tmpl;
     basisFxnSF_tmpl_allIter{iIter} = basisFxnSF_tmpl;
+    basisWidthScaleORI_tmpl_allIter(iIter) = basisWidthScaleORI_tmpl;
+    basisWidthScaleSF_tmpl_allIter(iIter) = basisWidthScaleSF_tmpl;
     ridge_tmpl_allIter(iIter) = ridge_tmpl;
 
     %% Save a progress report in the folder to indicate the finished iteration and time spent
@@ -539,7 +548,7 @@ end
 
 fprintf('\n\n%s: A1 Outputs saved.\n\n', datetime('now'))
 
-%% Plot A1 (optional) 
+%% Plot A1 (optional)
 if flag_plot_compIV
     %-------------------%
     NOMplot_compIV;
@@ -578,7 +587,7 @@ if isfinite(peak_tmpl_A1) && peak_tmpl_A1 > 0
     end
 end
 
-%% A2: Main loop over iterations 
+%% A2: Main loop over iterations
 % fprintf('%s: Creating empty placeholders for running iterations.\n\n', datetime('now'))
 data_metrics_allIter = nan(nIter, nDatasets_full, nMetrics); % see fxn_getMetrics for all 11 metrics
 data_train_allIter = cell(nIter, 1);
@@ -669,7 +678,7 @@ function [data_train, data_test, metrics] = fxn_compDV_packData( ...
     e3D_train_rand, e3D_test_rand, ...
     flag_whitenDV, lambda_whiten, mu_cov_full, W_white_full, ...
     template_notNormed, convolveType, IVType, ORI_bound, nBins)
-    
+
 % Sections 5-8 shared by A1 and A2 loops:
 %   behavioral metrics, DV from raw/whitened energy, bin IV, compile data structs.
 % d_full/tmpl : struct with fields resp, iPRS, respC, cst, RT
