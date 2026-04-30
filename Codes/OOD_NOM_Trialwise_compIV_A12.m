@@ -76,13 +76,13 @@ if flag_regressType == 2
     candidateBasisFamilyORI = {'circ_gaussian', 'vonmises'};
     candidateBasisFamilyORI = {'vonmises'};
     candidateBasisFamilySF  = {'gaussianLog2', 'asymGaussianLog2', 'LogParabola', 'asymLogParabola'};
-    % candidateBasisFamilySF  = {'asymGaussianLog2', 'asymLogParabola'};
-    candidateRidge  = [0, 10.^(-2:3)];
-    % candidateRidge  = 100;
-    opts.basisWidthScaleORI = [.5:.2:.9]; % set vector to search ORI width scales
-    opts.basisWidthScaleSF  = [.5:.2:.9]; % set vector to search SF width scales
-    opts. asymSF_rightLeftRatio = 1.2;
-    opts.nFolds = 5;
+    candidateBasisFamilySF  = {'asymGaussianLog2', 'asymLogParabola'};
+    % candidateRidge  = [0, 10.^(-2:3)];
+    candidateRidge  = 100;
+    opts.basisWidthScaleORI = [0.5:.2:0.9]; % set vector to search ORI width scales; typical range: [0.5, 0.9]
+    opts.basisWidthScaleSF  = [0.5:.2:0.9]; % set vector to search SF width scales; typical range: [0.5, 0.9]
+    opts. asymSF_rightLeftRatio = [1.1:.2: 1.5]; % typical range: [1.1, 1.5]
+    opts.nFolds = 5; % number of folds for cross-validation (CV) to select the best model
     opts.link = 'probit';
     opts.nBasisORI = nBasisORI;
     opts.nBasisSF = nBasisSF;
@@ -293,6 +293,7 @@ basisFxnSF_tmpl_allIter = data_train_allIter;
 ridge_tmpl_allIter = nBasisSF_tmpl_allIter;
 basisWidthScaleORI_tmpl_allIter = nBasisSF_tmpl_allIter;
 basisWidthScaleSF_tmpl_allIter  = nBasisSF_tmpl_allIter;
+asymSF_rightLeftRatio_tmpl_allIter = nBasisSF_tmpl_allIter;
 
 sep_allIter = nan(nIter, 2); % 1=template set, 2=full set
 margORI_allIter = nan(nIter, 2, nORI);
@@ -381,6 +382,7 @@ for iIter = 1:nIter
         basisFxnSF_tmpl = '';
         basisWidthScaleORI_tmpl = nan;
         basisWidthScaleSF_tmpl = nan;
+        asymSF_rightLeftRatio_tmpl = nan;
         ridge_tmpl = nan;
 
         % Apply class weighting before template estimation (ABS emphasized).
@@ -403,6 +405,7 @@ for iIter = 1:nIter
                 basisFxnSF_tmpl = out.basisFamilySF;
                 basisWidthScaleORI_tmpl = out.basisWidthScaleORI;
                 basisWidthScaleSF_tmpl = out.basisWidthScaleSF;
+                asymSF_rightLeftRatio_tmpl = out.asymSF_rightLeftRatio;
                 ridge_tmpl = out.ridge;
 
                 out = SX_RC_selectBasis_cv(e3D_full_forRC, resp_full_forRC, axis_tuning{1}, axis_tuning{2}, candidateORI, candidateSF, candidateBasisFamilyORI, candidateBasisFamilySF, candidateRidge, opts);
@@ -521,6 +524,7 @@ for iIter = 1:nIter
     basisFxnSF_tmpl_allIter{iIter} = basisFxnSF_tmpl;
     basisWidthScaleORI_tmpl_allIter(iIter) = basisWidthScaleORI_tmpl;
     basisWidthScaleSF_tmpl_allIter(iIter) = basisWidthScaleSF_tmpl;
+    asymSF_rightLeftRatio_tmpl_allIter(iIter) = asymSF_rightLeftRatio_tmpl;
     ridge_tmpl_allIter(iIter) = ridge_tmpl;
 
     %% Save a progress report in the folder to indicate the finished iteration and time spent

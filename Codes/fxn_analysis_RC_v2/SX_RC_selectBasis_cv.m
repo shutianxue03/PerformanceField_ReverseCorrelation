@@ -30,6 +30,7 @@ end
 % candidate basis-width scales (allow scalar or vector); keep backward compatibility
 candidateBasisWidthScaleORI = get_candidate_basis_width(opts, 'basisWidthScaleORI');
 candidateBasisWidthScaleSF  = get_candidate_basis_width(opts, 'basisWidthScaleSF');
+candidateAsymSF_rightLeftRatio = get_candidate_asym_sf_ratio(opts);
 
 % ---------------- create CV folds ----------------
 if isfield(opts, 'foldID') && ~isempty(opts.foldID)
@@ -61,13 +62,16 @@ for iFamORI = 1:numel(candidateBasisFamilyORI)
             for iSFcand = 1:numel(candidateSF)
                 for iBWori = 1:numel(candidateBasisWidthScaleORI)
                     for iBWsf = 1:numel(candidateBasisWidthScaleSF)
-                        iComb = iComb + 1;
-                        comb(iComb).nBasisORI = candidateORI(iORIcand);
-                        comb(iComb).nBasisSF  = candidateSF(iSFcand);
-                        comb(iComb).basisFamilyORI = char(candidateBasisFamilyORI{iFamORI});
-                        comb(iComb).basisFamilySF  = char(candidateBasisFamilySF{iFamSF});
-                        comb(iComb).basisWidthScaleORI = candidateBasisWidthScaleORI(iBWori);
-                        comb(iComb).basisWidthScaleSF  = candidateBasisWidthScaleSF(iBWsf);
+                        for iAsym = 1:numel(candidateAsymSF_rightLeftRatio)
+                            iComb = iComb + 1;
+                            comb(iComb).nBasisORI = candidateORI(iORIcand);
+                            comb(iComb).nBasisSF  = candidateSF(iSFcand);
+                            comb(iComb).basisFamilyORI = char(candidateBasisFamilyORI{iFamORI});
+                            comb(iComb).basisFamilySF  = char(candidateBasisFamilySF{iFamSF});
+                            comb(iComb).basisWidthScaleORI = candidateBasisWidthScaleORI(iBWori);
+                            comb(iComb).basisWidthScaleSF  = candidateBasisWidthScaleSF(iBWsf);
+                            comb(iComb).asymSF_rightLeftRatio = candidateAsymSF_rightLeftRatio(iAsym);
+                        end
                     end
                 end
             end
@@ -87,6 +91,7 @@ res(nRes) = struct( ...
     'basisFamilySF', '', ...
     'basisWidthScaleORI', [], ...
     'basisWidthScaleSF', [], ...
+    'asymSF_rightLeftRatio', [], ...
     'ridge', [], ...
     'nLL_mean', [], ...
     'nLL_se', [] );
@@ -103,6 +108,7 @@ for iComb = 1:nCombBase
     opts_basis.basisFamilySF  = comb(iComb).basisFamilySF;
     opts_basis.basisWidthScaleORI = comb(iComb).basisWidthScaleORI;
     opts_basis.basisWidthScaleSF  = comb(iComb).basisWidthScaleSF;
+    opts_basis.asymSF_rightLeftRatio = comb(iComb).asymSF_rightLeftRatio;
 
     % build basis once
     Bori = make_basis_ori(axis_ori_deg, opts_basis);
@@ -157,6 +163,7 @@ for iComb = 1:nCombBase
         res(iRes).basisFamilySF  = comb(iComb).basisFamilySF;
         res(iRes).basisWidthScaleORI = comb(iComb).basisWidthScaleORI;
         res(iRes).basisWidthScaleSF  = comb(iComb).basisWidthScaleSF;
+        res(iRes).asymSF_rightLeftRatio = comb(iComb).asymSF_rightLeftRatio;
         res(iRes).ridge = ridge;
         res(iRes).nLL_mean = mean(nLL_test_allFolds, 'omitnan');
         res(iRes).nLL_se   = std(nLL_test_allFolds, 'omitnan') / sqrt(sum(isfinite(nLL_test_allFolds)));
@@ -175,6 +182,7 @@ opts_best.basisFamilyORI = bestRes.basisFamilyORI;
 opts_best.basisFamilySF  = bestRes.basisFamilySF;
 opts_best.basisWidthScaleORI = bestRes.basisWidthScaleORI;
 opts_best.basisWidthScaleSF  = bestRes.basisWidthScaleSF;
+opts_best.asymSF_rightLeftRatio = bestRes.asymSF_rightLeftRatio;
 opts_best.ridge = bestRes.ridge;
 
 out_best = SX_RC_fit_smoothBasis(e3D_allT, resp_allT, axis_ori_deg, axis_sf_log2, opts_best);
@@ -187,6 +195,7 @@ output.basisFamilyORI = opts_best.basisFamilyORI;
 output.basisFamilySF = opts_best.basisFamilySF;
 output.basisWidthScaleORI = opts_best.basisWidthScaleORI;
 output.basisWidthScaleSF = opts_best.basisWidthScaleSF;
+output.asymSF_rightLeftRatio = opts_best.asymSF_rightLeftRatio;
 output.ridge = opts_best.ridge;
 output.bestRes = bestRes;
 % output.res = res; % enable only if needed for diagnostics
@@ -889,6 +898,18 @@ elseif isfield(opts, 'basisWidthScale') && ~isempty(opts.basisWidthScale)
     vals = opts.basisWidthScale;
 else
     vals = 0.8;
+end
+
+vals = vals(:)';
+end
+
+%% Helper: normalize candidate asymmetry ratio option
+function vals = get_candidate_asym_sf_ratio(opts)
+
+if isfield(opts, 'asymSF_rightLeftRatio') && ~isempty(opts.asymSF_rightLeftRatio)
+    vals = opts.asymSF_rightLeftRatio;
+else
+    vals = 1.5;
 end
 
 vals = vals(:)';

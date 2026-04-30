@@ -17,20 +17,17 @@ nORI = 19;
 nSF = nORI;
 
 %% Define environment
-% if run on HPC OOD
-nameFolder_server = '/scratch/sx712/PF_RC'; str_envir = 'HPC';
+nameFolder_server = pwd;
 
-% if run on server (mute if run on OOD)
-nameFolder_server = '/Volumes/server/Users/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC'; str_envir = 'Server';
-
-% if run on local for model simulation (my home iMac)
-nameFolder_server = '/Users/xueshutian/GitHubHomeMac/PF_RC'; str_envir = 'Local';
-
-% if run on local for model simulation (my laptop)
-nameFolder_server = '/Users/shutianxue/GitHubMacBook/PF_RC'; str_envir = 'Local';
-
-% if run on local for model simulation (the lab iMac)
-nameFolder_server = '/Users/sx712/GitHubLabMac/PF_RC'; str_envir = 'Local';
+% Infer environment name from the current path.
+nameFolder_server_lower = lower(nameFolder_server);
+if contains(nameFolder_server_lower, 'scratch')
+    str_envir = 'HPC';
+elseif contains(nameFolder_server_lower, 'server')
+    str_envir = 'Server';
+else
+    str_envir = 'Local';
+end
 
 %% Define names of folders to load/save data
 nameFolder_Data = sprintf('%s/Data', nameFolder_server) ;

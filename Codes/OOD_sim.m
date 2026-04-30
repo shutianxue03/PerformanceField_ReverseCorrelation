@@ -17,13 +17,13 @@ function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true
 % Simulation input parameters
 % noiseCST = .2;
 % gaborCST = .5;
-% nTrials = 8e3;
+% nTrials = 4e3;
 % Nmul_true = .9; % Nmul=.9 gives pC~=0.7
 % Nadd_true = 9; % Nadd=9 gives pC~=0.7
 % Nshared_true = 9; % Nshared=9 gives pC~=0.7
 % cSDT_true = 0;
 % iModelB_sim = 5; % 1=full, 2=No Nmul, 3=No Nadd, 4=No Nshared, 5=Nmul-only, 6=Nadd-only, 7=Nshared-only, 8=criterion-only
-% nIter = 20;
+% nIter = 5;
 % lambda_whiten = 0;
 % flag_regressType = 2; % redundant
 % flag_incluCrit = 1; % redundant
