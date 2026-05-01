@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================
 # Created by Shutian Xue on 07/16/2025
-# Last modified on 04/21/2026
+# Last modified on 05/01/2026
 #
 # Description:
 # Submit simulation jobs across parameter combinations.
@@ -16,9 +16,25 @@
 
 set -euo pipefail
 
-# Resolve paths from this script location so submission works from any cwd.
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-project_root="$(cd "${script_dir}/.." && pwd)"
+# Resolve paths robustly under Slurm.
+# Note: when this launcher itself is submitted via sbatch, BASH_SOURCE may
+# point to a temporary copy under /opt/slurm/... . Prefer SLURM_SUBMIT_DIR.
+if [[ -n "${SLURM_SUBMIT_DIR:-}" && -f "${SLURM_SUBMIT_DIR}/shell_Sim.sh" ]]; then
+  script_dir="${SLURM_SUBMIT_DIR}"
+  project_root="$(cd "${script_dir}/.." && pwd)"
+elif [[ -n "${SLURM_SUBMIT_DIR:-}" && -f "${SLURM_SUBMIT_DIR}/Codes/shell_Sim.sh" ]]; then
+  script_dir="${SLURM_SUBMIT_DIR}/Codes"
+  project_root="${SLURM_SUBMIT_DIR}"
+else
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  project_root="$(cd "${script_dir}/.." && pwd)"
+fi
+
+if [[ ! -f "${script_dir}/shell_Sim.sh" ]]; then
+  echo "Error: cannot find ${script_dir}/shell_Sim.sh" >&2
+  echo "Hint: submit from PF_RC root (sbatch Codes/shell_launch_Sim.sh) or from Codes (sbatch shell_launch_Sim.sh)." >&2
+  exit 1
+fi
 
 for gaborCST in 0.5; do
   for Nmul_true in 0.9; do

@@ -19,8 +19,8 @@ function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true
 % gaborCST = .5;
 % nTrials = 4e3;
 % Nmul_true = .8; % Nmul=.8 gives pC~=0.7
-% Nadd_true = 9; % Nadd=9 gives pC~=0.7
-% Nshared_true = 9; % Nshared=9 gives pC~=0.7
+% Nadd_true = 8; % Nadd=8 gives pC~=0.7
+% Nshared_true = 8; % Nshared=8 gives pC~=0.7
 % cSDT_true = 0;
 % iModelB_sim = 5; % 1=full, 2=No Nmul, 3=No Nadd, 4=No Nshared, 5=Nmul-only, 6=Nadd-only, 7=Nshared-only, 8=criterion-only
 % nIter = 5;

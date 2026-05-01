@@ -70,18 +70,18 @@ if flag_regressType == 2
     opts = struct();
     % candidateORI = 3:9;
     % candidateSF = 3:9;
-    candidateORI = 3:6;
-    candidateSF = 3:6;
+    candidateORI = 4;
+    candidateSF = 6;
     % candidateSF = 6:8;
     % candidateBasisFamilyORI = {'circ_gaussian', 'vonmises'};
     candidateBasisFamilyORI = {'vonmises'};
     % candidateBasisFamilySF  = {'gaussianLog2', 'asymGaussianLog2', 'LogParabola', 'asymLogParabola'};
-    candidateBasisFamilySF  = {'asymGaussianLog2', 'asymLogParabola'};
+    candidateBasisFamilySF  = {'asymGaussianLog2'};
     % candidateRidge  = [0, 10.^(-2:3)];
     candidateRidge  = 100;
-    opts.basisWidthScaleORI = [0.5:.2:0.9]; % set vector to search ORI width scales; typical range: [0.5, 0.9]
-    opts.basisWidthScaleSF  = [0.5:.2:0.9]; % set vector to search SF width scales; typical range: [0.5, 0.9]
-    opts. asymSF_rightLeftRatio = [1.1:.2: 1.5]; % typical range: [1.1, 1.5]
+    opts.basisWidthScaleORI = [0.9]; % set vector to search ORI width scales; typical range: [0.5, 0.9]; higher values = wider basis functions = stronger smoothing
+    opts.basisWidthScaleSF  = [0.6]; % set vector to search SF width scales; typical range: [0.5, 0.9]
+    opts. asymSF_rightLeftRatio = [1.2]; % typical range: [1.1, 1.5]
     opts.nFolds = 5; % number of folds for cross-validation (CV) to select the best model
     opts.link = 'probit';
     opts.nBasisORI = nBasisORI;
