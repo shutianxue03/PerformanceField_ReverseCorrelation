@@ -1,3 +1,6 @@
 {
-    "github.copilot.chat.copilotMemory.enabled": false
+    "github.copilot.chat.copilotMemory.enabled": false,
+    "breadcrumbs.enabled": true,
+    "breadcrumbs.filePath": "on",
+    "breadcrumbs.symbolPath": "on"
 }

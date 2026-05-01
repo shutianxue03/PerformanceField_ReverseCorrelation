@@ -18,16 +18,16 @@
 
 clear; clc; close all;
 set(0, 'DefaultFigureVisible', 'off');
-
+flag_whitenDV=0;
 %--------------%
 SX_RC1_setting;
 %--------------%
 
 %% settings
-str_part = ''; % <-- change if needed
+str_part = 'OOD'; % <-- change if needed
 iModelA_fit = 1; %1=use data-derived template; 2=use true template
 mask_pC = [.6, .8]; % [min, max] range of median fraction correct (pC); conditions outside are excluded
-nBfit = 1;          % number of B-model variants to evaluate (each uses a different internal-noise structure)
+nBfit = 7;          % number of B-model variants to evaluate (each uses a different internal-noise structure)
 nBins_Part4 = 3; % define bins for collapsing parameter recovery points; use 3 for main text, 5 for Supp
 
 nameFolder_Data = sprintf('%s/Data_%s', nameFolder_server, str_part);
@@ -155,6 +155,12 @@ for iFile = 1:nFiles
     fileBase.basisFxnSF_mode_pct = nan;
     fileBase.ridge_mode = "";
     fileBase.ridge_mode_pct = nan;
+    fileBase.basisWidthScaleORI_mode = "";
+    fileBase.basisWidthScaleORI_mode_pct = nan;
+    fileBase.basisWidthScaleSF_mode = "";
+    fileBase.basisWidthScaleSF_mode_pct = nan;
+    fileBase.asymSF_rightLeftRatio_mode = "";
+    fileBase.asymSF_rightLeftRatio_mode_pct = nan;
 
     % ---------- tuning-related values ----------
     fileBase.margORI_true = nan(1, nORI);
@@ -281,6 +287,54 @@ for iFile = 1:nFiles
     [~, idxMax] = max(counts);
     fileBase.ridge_mode     = uniqueVals(idxMax);
     fileBase.ridge_mode_pct = counts(idxMax) / numel(strVec);
+
+    % Modal ORI width-scale setting across iterations.
+    if isfield(data_compIV, 'basisWidthScaleORI_tmpl_allIter') && ~isempty(data_compIV.basisWidthScaleORI_tmpl_allIter)
+        vals = data_compIV.basisWidthScaleORI_tmpl_allIter(:);
+        if isnumeric(vals)
+            vals = vals(isfinite(vals));
+        end
+        if ~isempty(vals)
+            strVec = string(vals);
+            [uniqueVals, ~, groupIdx] = unique(strVec);
+            counts = accumarray(groupIdx, 1);
+            [~, idxMax] = max(counts);
+            fileBase.basisWidthScaleORI_mode     = uniqueVals(idxMax);
+            fileBase.basisWidthScaleORI_mode_pct = counts(idxMax) / numel(strVec);
+        end
+    end
+
+    % Modal SF width-scale setting across iterations.
+    if isfield(data_compIV, 'basisWidthScaleSF_tmpl_allIter') && ~isempty(data_compIV.basisWidthScaleSF_tmpl_allIter)
+        vals = data_compIV.basisWidthScaleSF_tmpl_allIter(:);
+        if isnumeric(vals)
+            vals = vals(isfinite(vals));
+        end
+        if ~isempty(vals)
+            strVec = string(vals);
+            [uniqueVals, ~, groupIdx] = unique(strVec);
+            counts = accumarray(groupIdx, 1);
+            [~, idxMax] = max(counts);
+            fileBase.basisWidthScaleSF_mode     = uniqueVals(idxMax);
+            fileBase.basisWidthScaleSF_mode_pct = counts(idxMax) / numel(strVec);
+        end
+    end
+
+    % Modal SF asymmetry setting across iterations.
+    if isfield(data_compIV, 'asymSF_rightLeftRatio_tmpl_allIter') && ~isempty(data_compIV.asymSF_rightLeftRatio_tmpl_allIter)
+        vals = data_compIV.asymSF_rightLeftRatio_tmpl_allIter(:);
+        if isnumeric(vals)
+            vals = vals(isfinite(vals));
+        end
+        if ~isempty(vals)
+            strVec = string(vals);
+            [uniqueVals, ~, groupIdx] = unique(strVec);
+            counts = accumarray(groupIdx, 1);
+            [~, idxMax] = max(counts);
+            fileBase.asymSF_rightLeftRatio_mode     = uniqueVals(idxMax);
+            fileBase.asymSF_rightLeftRatio_mode_pct = counts(idxMax) / numel(strVec);
+        end
+    end
 
     % =========================================================
     % 3. Metrics-related values
@@ -591,11 +645,15 @@ setting.fig12_Bsim = 1;
 setting.fig12_Bfit = 1;
 
 % ---------- field names ----------
-setting.fig1_mode_fields = {'nBasisORI_mode', 'nBasisSF_mode', 'basisFxnORI_mode', 'basisFxnSF_mode', 'ridge_mode'};
-setting.fig1_mode_labels = {'ORI basis mode', 'SF basis mode', 'ORI basis family mode', 'SF basis family mode', 'Ridge mode'};
+setting.fig1_mode_fields = {'nBasisORI_mode', 'nBasisSF_mode', 'basisFxnORI_mode', 'basisFxnSF_mode', ...
+    'basisWidthScaleORI_mode', 'basisWidthScaleSF_mode', 'ridge_mode', 'asymSF_rightLeftRatio_mode'};
+setting.fig1_mode_labels = {'ORI basis mode', 'SF basis mode', 'ORI basis family mode', 'SF basis family mode', ...
+    'ORI width-scale mode', 'SF width-scale mode', 'Ridge mode', 'SF asymmetry mode'};
 
-setting.fig1_pct_fields = {'nBasisORI_mode_pct', 'nBasisSF_mode_pct', 'basisFxnORI_mode_pct', 'basisFxnSF_mode_pct', 'ridge_mode_pct'};
-setting.fig1_pct_labels = {'ORI mode selection rate', 'SF mode selection rate', 'ORI basis family mode selection rate', 'SF basis family mode selection rate', 'Ridge mode selection rate'};
+setting.fig1_pct_fields = {'nBasisORI_mode_pct', 'nBasisSF_mode_pct', 'basisFxnORI_mode_pct', 'basisFxnSF_mode_pct', ...
+    'basisWidthScaleORI_mode_pct', 'basisWidthScaleSF_mode_pct', 'ridge_mode_pct', 'asymSF_rightLeftRatio_mode_pct'};
+setting.fig1_pct_labels = {'ORI mode selection rate', 'SF mode selection rate', 'ORI basis family mode selection rate', 'SF basis family mode selection rate', ...
+    'ORI width-scale mode selection rate', 'SF width-scale mode selection rate', 'Ridge mode selection rate', 'SF asymmetry mode selection rate'};
 
 setting.varFields = {'Nmul_true', 'Nadd_true', 'Nshared_true', 'gaborCST', 'cSDT_true', 'lambda_whiten', 'C_contribution'};
 setting.varNames  = {'Nmul', 'Nadd', 'Nshared', 'signalCST', 'Cz', 'lambda_white', 'C_contribution'};
@@ -654,57 +712,26 @@ grpLabels_fig1 = arrayfun(@(r) sprintf('sig=%.3g', r.gaborCST), ...
 uGrp_fig1    = unique(grpLabels_fig1);
 grpCmap_fig1 = setting.palette(1:numel(uGrp_fig1), :);
 
-h = figure('Position', [100 100 1600 800]);
+h = figure('Position', [100 100 1800 820]);
 
-subplot(2,3,1); hold on;
-%=====================%
-plot_ranked_categorical({R_fig1.(setting.fig1_mode_fields{1})}, 'nBasisORI', grpLabels_fig1, grpCmap_fig1, true);
-%=====================%
-ylabel('% iterations selected');
-xlabel('# ORI basis functions');
-%=====================%
-fxn_style_ax(gca, setting);
-%=====================%
+panel_order = [1, 5, 2, 6, 3, 7, 4, 8];
+panel_xlabel = {'# ORI basis functions', '# SF basis functions', ...
+    'ORI basis family', 'SF basis family', ...
+    'ORI width scale', 'SF width scale', ...
+    'Ridge penalty', 'asymSF_rightLeftRatio'};
+panel_title = {'nBasisORI', 'nBasisSF', ...
+    'basisFxnORI', 'basisFxnSF', ...
+    'basisWidthScaleORI', 'basisWidthScaleSF', ...
+    'ridge', 'asymSF_rightLeftRatio'};
 
-subplot(2,3,2); hold on;
-%=====================%
-plot_ranked_categorical({R_fig1.(setting.fig1_mode_fields{2})}, 'nBasisSF', grpLabels_fig1, grpCmap_fig1, false);
-%=====================%
-ylabel('% iterations selected');
-xlabel('# SF basis functions');
-%=====================%
-fxn_style_ax(gca, setting);
-%=====================%
-
-subplot(2,3,6); hold on;
-%=====================%
-plot_ranked_categorical({R_fig1.(setting.fig1_mode_fields{5})}, 'ridge', grpLabels_fig1, grpCmap_fig1, false);
-%=====================%
-ylabel('% iterations selected');
-xlabel('Ridge penalty');
-%=====================%
-fxn_style_ax(gca, setting);
-%=====================%
-
-subplot(2,3,4); hold on;
-%=====================%
-plot_ranked_categorical({R_fig1.(setting.fig1_mode_fields{3})}, 'basisFxnORI', grpLabels_fig1, grpCmap_fig1, false);
-%=====================%
-ylabel('% iterations selected');
-xlabel('ORI basis family');
-%=====================%
-fxn_style_ax(gca, setting);
-%=====================%
-
-subplot(2,3,5); hold on;
-%=====================%
-plot_ranked_categorical({R_fig1.(setting.fig1_mode_fields{4})}, 'basisFxnSF', grpLabels_fig1, grpCmap_fig1, false);
-%=====================%
-ylabel('% iterations selected');
-xlabel('SF basis family');
-%=====================%
-fxn_style_ax(gca, setting);
-%=====================%
+for iPanel = 1:numel(setting.fig1_mode_fields)
+    subplot(2,4,panel_order(iPanel)); hold on;
+    plot_ranked_categorical({R_fig1.(setting.fig1_mode_fields{iPanel})}, panel_title{iPanel}, grpLabels_fig1, grpCmap_fig1, iPanel == 1);
+    ylabel('% iterations selected');
+    xlabel(panel_xlabel{iPanel});
+    title(panel_title{iPanel});
+    fxn_style_ax(gca, setting);
+end
 
 sgtitle('Fig 1: rank of selected basis settings across iterations', 'FontWeight', 'bold');
 

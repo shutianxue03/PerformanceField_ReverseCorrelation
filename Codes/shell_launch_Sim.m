@@ -12,9 +12,9 @@ lambda_whiten = 0;
 nBasisORI = 6;
 nBasisSF = 5;
 
-for Nmul_true = .6
-    for Nadd_true = 6
-        for Nshared_true = 6
+for Nmul_true = [.6 .9]
+    for Nadd_true = [6,9]
+        for Nshared_true = [6,9]
             for iModelB_sim = 1:7
                 OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, cSDT_true, ...
                     lambda_whiten, flag_regressType, flag_incluCrit, C_contribution, iModelB_sim, nIter, nBasisORI, nBasisSF)
