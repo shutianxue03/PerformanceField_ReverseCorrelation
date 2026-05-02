@@ -1767,12 +1767,12 @@ else
 
         yline(0, 'k--', 'LineWidth', 1.2);
         xlim([0.5 1.8]); xticks([]);
-        ylabel('\DeltanLL (B_r \minus B_1) per condition median');
-        title(sprintf('B%d \minus B1', Br));
+        ylabel('\Delta nLL (B_r - B_1) per condition median');
+        title(sprintf('B%d - B1', Br));
         fxn_style_ax(gca, setting);
     end
 
-    sgtitle('Fig 7: \DeltanLL distributions | Bsim=B1', 'FontWeight', 'bold');
+    sgtitle('Fig 7: \Delta nLL distributions | Bsim=B1', 'FontWeight', 'bold');
     saveas(h, fullfile(nameFolder_Figures_part4, 'FigS7_dnLL_distributions.png'));
     close(h);
 end
@@ -1854,12 +1854,12 @@ else
 
         yline(0, 'k--', 'LineWidth', 1.2);
         xlabel(sprintf('True %s', pLabel));
-        ylabel(sprintf('\\DeltanLL median (B%d \\minus B1)', Br));
+        ylabel(sprintf('\\Delta nLL median (B%d - B1)', Br));
         title(sprintf('B%d vs B1 | omitted: %s', Br, pLabel));
         fxn_style_ax(gca, setting);
     end
 
-    sgtitle('Fig 8: \DeltanLL vs true omitted parameter | Bsim=B1', 'FontWeight', 'bold');
+    sgtitle('Fig 8: \Delta nLL vs true omitted parameter | Bsim=B1', 'FontWeight', 'bold');
     saveas(h, fullfile(nameFolder_Figures_part4, 'FigS8_dnLL_vs_trueParam.png'));
     close(h);
 end
@@ -1920,21 +1920,24 @@ for iP9 = 1:numel(rmseParamNames_fig9)
 
         col9 = cmap_fig9(iBfit9, :);
         hLines_fig9(iBfit9) = scatter(x9(good9), y9(good9), 28, col9, ...
-            'filled', 'MarkerFaceAlpha', 0.65, 'DisplayName', sprintf('B%d', fitModel9));
+            'filled', 'MarkerFaceAlpha', 0.65);
 
-        [r9, p9] = corr(x9(good9), y9(good9));
-        sigStr9 = '';
-        if p9 < 0.001, sigStr9 = '***'; elseif p9 < 0.01, sigStr9 = '**'; elseif p9 < 0.05, sigStr9 = '*'; end
-        text(min(x9(good9)), max(y9(good9)), ...
-            sprintf('  B%d: r=%.2f%s', fitModel9, r9, sigStr9), ...
-            'Color', col9, 'FontSize', max(setting.fontSize - 1, 7), ...
-            'VerticalAlignment', 'top', 'HorizontalAlignment', 'left');
+        if numel(unique(x9(good9))) >= 2
+            pCoef9 = polyfit(x9(good9), y9(good9), 1);
+            xFit9  = linspace(min(x9(good9)), max(x9(good9)), 80);
+            plot(xFit9, polyval(pCoef9, xFit9), '-', 'Color', col9, ...
+                'LineWidth', 1.6, 'HandleVisibility', 'off');
+        end
+
+        [r9, ~] = corr(x9(good9), y9(good9));
+        hLines_fig9(iBfit9).DisplayName = sprintf('B%d: r = %.2f', fitModel9, r9);
     end % iBfit9
 
     xlabel('Template RMSE');
     ylabel(sprintf('%s RMSE', pLabel9));
     title(sprintf('Template RMSE vs %s RMSE', pLabel9));
     fxn_style_ax(gca, setting);
+    set(gca, 'YGrid', 'off');
     axis square;
     validH9 = hLines_fig9(isgraphics(hLines_fig9));
     if ~isempty(validH9)
@@ -1957,27 +1960,30 @@ for iBfit9 = 1:numel(Bfit_unik)
 
     col9 = cmap_fig9(iBfit9, :);
     hLines_sdt(iBfit9) = scatter(x9(good9), y9(good9), 28, col9, ...
-        'filled', 'MarkerFaceAlpha', 0.65, 'DisplayName', sprintf('B%d', fitModel9));
+        'filled', 'MarkerFaceAlpha', 0.65);
 
-    [r9, p9] = corr(x9(good9), y9(good9));
-    sigStr9 = '';
-    if p9 < 0.001, sigStr9 = '***'; elseif p9 < 0.01, sigStr9 = '**'; elseif p9 < 0.05, sigStr9 = '*'; end
-    text(min(x9(good9)), max(y9(good9)), ...
-        sprintf('  B%d: r=%.2f%s', fitModel9, r9, sigStr9), ...
-        'Color', col9, 'FontSize', max(setting.fontSize - 1, 7), ...
-        'VerticalAlignment', 'top', 'HorizontalAlignment', 'left');
+    if numel(unique(x9(good9))) >= 2
+        pCoef9 = polyfit(x9(good9), y9(good9), 1);
+        xFit9  = linspace(min(x9(good9)), max(x9(good9)), 80);
+        plot(xFit9, polyval(pCoef9, xFit9), '-', 'Color', col9, ...
+            'LineWidth', 1.6, 'HandleVisibility', 'off');
+    end
+
+    [r9, ~] = corr(x9(good9), y9(good9));
+    hLines_sdt(iBfit9).DisplayName = sprintf('B%d r=%.2f', fitModel9, r9);
 end
 xlabel('Template RMSE');
 ylabel('|SDT criterion| (|Cz_{true}|)');
 title('Template RMSE vs SDT criterion');
 fxn_style_ax(gca, setting);
+set(gca, 'YGrid', 'off');
 axis square;
 validH_sdt = hLines_sdt(isgraphics(hLines_sdt));
 if ~isempty(validH_sdt)
     legend(validH_sdt, 'Location', 'best', 'Box', 'off', 'FontSize', max(setting.fontSize-1,7));
 end
 
-sgtitle('Fig 9: Template RMSE vs Parameter RMSE & SDT Criterion | Matched Bsim=Bfit', 'FontWeight', 'bold');
+sgtitle('Fig 9: Template RMSE vs Parameter RMSE | Matched Bsim=Bfit', 'FontWeight', 'bold');
 saveas(h, fullfile(nameFolder_Figures_part4, 'FigS9_Corr_tempRMSE_paramRMSE.png'));
 close(h);
 
