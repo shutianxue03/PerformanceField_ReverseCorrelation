@@ -84,7 +84,6 @@ if strcmp(str_envir, 'HPC'), flag_plotDist = 0; end % don't plot when running on
 iLocComb = 1; % use single-location index (e.g., fovea) for IO
 
 % Print info --%
-
 fprintf(' - nIter (for compIV/fitNOM) = %d\n', nIter);
 fprintf(' - noiseCST = %.2f\n', noiseCST);
 fprintf(' - gaborCST = %.2f\n', gaborCST);
@@ -403,7 +402,7 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
     end
 else
     fprintf('\n\n ** Simulated pC=%.2f, OUT OF the range [%.2f, %.2f] ** \n\n', pC_sim, pC_filter)
-end % if
+end % if 
 
 % Play sound to indicate end of analysis
 fs = 44100;              % sampling rate

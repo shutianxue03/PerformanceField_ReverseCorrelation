@@ -1,10 +1,24 @@
 #!/usr/bin/env bash
+#SBATCH --job-name=OODsim
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=12
+#SBATCH --mem=32G
+#SBATCH --time=1:00:00
+#SBATCH --output=Logs/OODsim_%A_%a.out
+#SBATCH --error=Logs/OODsim_%A_%a.err
+#SBATCH --mail-type=FAIL
+#SBATCH --mail-user=vivanxuest@gmail.com
+
 # ============================================================
 # Created by Shutian Xue on 07/16/2025
-# Last modified on 04/21/2026
+# Last modified on 05/02/2026
 #
 # Description:
-# Submit simulation jobs across parameter combinations.
+# Slurm array script for simulation jobs across parameter combinations.
+#
+# Each array task reads one row from:
+#   Data_job_params/OOD_sim_params.tsv
 #
 # OOD_sim signature:
 #   OOD_sim(noiseCST, gaborCST, nTrials, ...
@@ -14,86 +28,126 @@
 #           iModelB_sim, nIter, nBasisORI, nBasisSF)
 # ============================================================
 
-
 set -euo pipefail
 
-# Resolve paths robustly under Slurm.
-# Note: when this launcher itself is submitted via sbatch, BASH_SOURCE may
-# point to a temporary copy under /opt/slurm/... . Prefer SLURM_SUBMIT_DIR.
-if [[ -n "${SLURM_SUBMIT_DIR:-}" && -f "${SLURM_SUBMIT_DIR}/shell_Sim.sh" ]]; then
-  script_dir="${SLURM_SUBMIT_DIR}"
-  project_root="$(cd "${script_dir}/.." && pwd)"
-elif [[ -n "${SLURM_SUBMIT_DIR:-}" && -f "${SLURM_SUBMIT_DIR}/Codes/shell_Sim.sh" ]]; then
-  script_dir="${SLURM_SUBMIT_DIR}/Codes"
+# -----------------------------
+# Resolve project paths
+# -----------------------------
+
+if [[ -n "${SLURM_SUBMIT_DIR:-}" && -d "${SLURM_SUBMIT_DIR}/Codes" ]]; then
   project_root="${SLURM_SUBMIT_DIR}"
+  script_dir="${project_root}/Codes"
 else
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   project_root="$(cd "${script_dir}/.." && pwd)"
 fi
 
-if [[ ! -f "${script_dir}/shell_Sim.sh" ]]; then
-  echo "Error: cannot find ${script_dir}/shell_Sim.sh" >&2
-  echo "Hint: submit from PF_RC root (sbatch Codes/shell_launch_Sim.sh) or from Codes (sbatch shell_launch_Sim.sh)." >&2
+param_file="${project_root}/Data_job_params/OOD_sim_params.tsv"
+log_dir="${project_root}/Logs"
+
+mkdir -p "${log_dir}"
+
+# -----------------------------
+# Safety checks
+# -----------------------------
+
+if [[ -z "${SLURM_ARRAY_TASK_ID:-}" ]]; then
+  echo "Error: SLURM_ARRAY_TASK_ID is not set." >&2
+  echo "Submit this script using sbatch --array, for example:" >&2
+  echo "  sbatch --array=1-5376%50 Codes/shell_array_Sim.sh" >&2
   exit 1
 fi
 
-for gaborCST in 0.3 0.4 0.5; do
-  for Nmul_true in 0.2 0.4 0.6 0.8; do
-    for Nadd_true in 2 4 6 8; do
-      for Nshared_true in 2 4 6 8; do
-        for cSDT_true in -0.4 -0.2 0 0.2; do
-          for iModelB_sim in 1 2 3 4 5 6 7; do  # 1 = Full; 2 = No Nmul; 3 = No Nadd; 4 = No Nshared; 5 = Nmul-only; 6 = Nadd-only; 7 = Nshared-only
-            for nIter in 20; do
-              for nTrials in 10000; do
-                for noiseCST in 0.2; do
-                  for lambda_whiten in 0; do
-                    for flag_regressType in 2; do  # 1 = Univariate; 2 = Multivariate + smoothing
-                      for flag_incluCrit in 1; do  # include criterion loss term or not
-                        for C_contribution in 0; do  # weight of criterion loss
-                          for nBasisORI in 6; do
-                            for nBasisSF in 5; do
+if [[ ! -f "${param_file}" ]]; then
+  echo "Error: cannot find parameter file:" >&2
+  echo "  ${param_file}" >&2
+  echo "Run the parameter-table script first, for example:" >&2
+  echo "  bash Codes/make_param_table_Sim.sh" >&2
+  exit 1
+fi
 
-                              job_name="gCST${gaborCST}_Nm${Nmul_true}_Na${Nadd_true}_Ns${Nshared_true}_Cz${cSDT_true}_Bsim${iModelB_sim}"
+# +1 because line 1 is the header.
+line_number=$((SLURM_ARRAY_TASK_ID + 1))
+line="$(sed -n "${line_number}p" "${param_file}")"
 
-                              sbatch \
-                                --job-name="${job_name}" \
-                                --chdir="${project_root}" \
-                                "${script_dir}/shell_Sim.sh" \
-                                "${noiseCST}" \
-                                "${gaborCST}" \
-                                "${nTrials}" \
-                                "${Nmul_true}" \
-                                "${Nadd_true}" \
-                                "${Nshared_true}" \
-                                "${cSDT_true}" \
-                                "${lambda_whiten}" \
-                                "${flag_regressType}" \
-                                "${flag_incluCrit}" \
-                                "${C_contribution}" \
-                                "${iModelB_sim}" \
-                                "${nIter}" \
-                                "${nBasisORI}" \
-                                "${nBasisSF}"
+if [[ -z "${line}" ]]; then
+  echo "Error: no parameter row found for SLURM_ARRAY_TASK_ID=${SLURM_ARRAY_TASK_ID}" >&2
+  echo "Requested line number: ${line_number}" >&2
+  echo "Parameter file: ${param_file}" >&2
+  exit 1
+fi
 
-                              # Print job name for tracking
-                              echo "${job_name}"
+# -----------------------------
+# Read parameters from table
+# -----------------------------
 
-                            done
-                          done
-                        done
-                      done
-                    done
-                  done
-                done
-              done
-            done
-          done
-        done
-      done
-    done
-  done
-done
+IFS=$'\t' read -r \
+  noiseCST \
+  gaborCST \
+  nTrials \
+  Nmul_true \
+  Nadd_true \
+  Nshared_true \
+  cSDT_true \
+  lambda_whiten \
+  flag_regressType \
+  flag_incluCrit \
+  C_contribution \
+  iModelB_sim \
+  nIter \
+  nBasisORI \
+  nBasisSF <<< "${line}"
+
+job_name="gCST${gaborCST}_Nm${Nmul_true}_Na${Nadd_true}_Ns${Nshared_true}_Cz${cSDT_true}_Bsim${iModelB_sim}"
+
+# -----------------------------
+# Print metadata
+# -----------------------------
 
 echo "======================================"
-echo "All jobs submitted."
+echo "Started: $(date)"
+echo "Array job ID: ${SLURM_ARRAY_JOB_ID:-NA}"
+echo "Array task ID: ${SLURM_ARRAY_TASK_ID}"
+echo "Job ID: ${SLURM_JOB_ID:-NA}"
+echo "Job name: ${job_name}"
+echo "Node: ${SLURMD_NODENAME:-NA}"
+echo "Project root: ${project_root}"
+echo "Script dir: ${script_dir}"
+echo "Parameter file: ${param_file}"
+echo "Parameter row:"
+echo "${line}"
+echo "======================================"
+
+echo "Parameters:"
+echo "  noiseCST         = ${noiseCST}"
+echo "  gaborCST         = ${gaborCST}"
+echo "  nTrials          = ${nTrials}"
+echo "  Nmul_true        = ${Nmul_true}"
+echo "  Nadd_true        = ${Nadd_true}"
+echo "  Nshared_true     = ${Nshared_true}"
+echo "  cSDT_true        = ${cSDT_true}"
+echo "  lambda_whiten    = ${lambda_whiten}"
+echo "  flag_regressType = ${flag_regressType}"
+echo "  flag_incluCrit   = ${flag_incluCrit}"
+echo "  C_contribution   = ${C_contribution}"
+echo "  iModelB_sim      = ${iModelB_sim}"
+echo "  nIter            = ${nIter}"
+echo "  nBasisORI        = ${nBasisORI}"
+echo "  nBasisSF         = ${nBasisSF}"
+echo "======================================"
+
+# -----------------------------
+# Run MATLAB
+# -----------------------------
+
+cd "${project_root}"
+
+module purge
+module load matlab/2025b common
+
+matlab -batch "try, OOD_sim(${noiseCST}, ${gaborCST}, ${nTrials}, ${Nmul_true}, ${Nadd_true}, ${Nshared_true}, ${cSDT_true}, ${lambda_whiten}, ${flag_regressType}, ${flag_incluCrit}, ${C_contribution}, ${iModelB_sim}, ${nIter}, ${nBasisORI}, ${nBasisSF}); catch ME, disp(getReport(ME,'extended')); exit(1); end; exit(0);"
+
+echo "======================================"
+echo "Finished: $(date)"
+echo "Array task ${SLURM_ARRAY_TASK_ID} completed."
 echo "======================================"

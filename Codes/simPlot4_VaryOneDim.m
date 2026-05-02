@@ -26,7 +26,6 @@ SX_RC1_setting;
 %% settings
 str_part = 'OOD'; % <-- change if needed
 iModelA_fit = 1; %1=use data-derived template; 2=use true template
-mask_pC = [.6, .8]; % [min, max] range of median fraction correct (pC); conditions outside are excluded
 nBfit = 7;          % number of B-model variants to evaluate (each uses a different internal-noise structure)
 nBins_Part4 = 3; % define bins for collapsing parameter recovery points; use 3 for main text, 5 for Supp
 
@@ -85,9 +84,8 @@ fprintf('%s\n', datetime('now'))
 fprintf('Compiling all fitted models\n');
 fprintf('============================================\n');
 
-nCondPass = 0; % number of simulation conditions whose median pC falls within mask_pC
 for iFile = 1:nFiles
-    fprintf('\n%d/%d', iFile, nFiles)
+    fprintf('\n%d/%d: ', iFile, nFiles)
     info = info_all{iFile};
 
     % =========================================================
@@ -140,9 +138,8 @@ for iFile = 1:nFiles
     fileBase.C_contribution = nan;
 
     % ---------- template-related values ----------
-    fileBase.template_rmse = nan;
-    fileBase.template_R2 = nan;
     fileBase.template_rmse_iter = [];
+    fileBase.template_R2_iter = [];
 
     % ---------- Basis-setting-related values ----------
     fileBase.nBasisORI_mode = nan;
@@ -165,25 +162,22 @@ for iFile = 1:nFiles
     % ---------- tuning-related values ----------
     fileBase.margORI_true = nan(1, nORI);
     fileBase.margSF_true = nan(1, nSF);
-    fileBase.margORI_est_med = nan(1, nORI);
-    fileBase.margSF_est_med = nan(1, nSF);
     fileBase.margORI_est_iter_norm = [];
     fileBase.margSF_est_iter_norm = [];
 
     % ---------- metric-related values ----------
-    fileBase.pYES_data_med = nan; fileBase.pYES_data_lb = nan; fileBase.pYES_data_ub = nan;
-    fileBase.pC_data_med = nan; fileBase.pC_data_lb = nan; fileBase.pC_data_ub = nan;
-    fileBase.pA_data_med = nan; fileBase.pA_data_lb = nan; fileBase.pA_data_ub = nan;
+    fileBase.pYES_data_iter = [];
+    fileBase.pC_data_iter = [];
+    fileBase.pA_data_iter = [];
 
-    fileBase.DV_allBins_med = [];
-    fileBase.nTrials_allBins_med = [];
-    fileBase.pYES_data_curve_med = [];
-    fileBase.pC_data_curve_med = [];
-    fileBase.pA_data_curve_med = [];
+    fileBase.DV_allBins_iter = [];
+    fileBase.nTrials_allBins_iter = [];
+    fileBase.pYES_data_curve_iter = [];
+    fileBase.pC_data_curve_iter = [];
+    fileBase.pA_data_curve_iter = [];
 
     % ---------- criterion-related values ----------
     fileBase.criterion_DV_true = nan;
-    fileBase.keep_pC = false;
 
     fileBase.lambda_whiten = truth.lambda_whiten;
     fileBase.C_contribution = truth.C_contribution;
@@ -194,9 +188,8 @@ for iFile = 1:nFiles
     [template_rmse_iter, template_R2_iter] = fxn_templateRecovery_simPlot2Style_iter( ...
         truth, data_compIV, nIter);
 
-    [fileBase.template_rmse, ~, ~] = getCI(template_rmse_iter, 1, 1);
-    [fileBase.template_R2, ~, ~] = getCI(template_R2_iter, 1, 1);
     fileBase.template_rmse_iter = template_rmse_iter(:)';
+    fileBase.template_R2_iter = template_R2_iter(:)';
 
     % ---------- marginalized templates ----------
     template_true_vec = truth.template_true(:)';
@@ -241,13 +234,7 @@ for iFile = 1:nFiles
         end
     end
 
-    % Take median across iterations
-    margORI_est_med = getCI(margORI_est_iter_norm, 1, 1);
-    margSF_est_med = getCI(margSF_est_iter_norm, 1, 1);
-
-    % Store
-    fileBase.margORI_est_med = margORI_est_med;
-    fileBase.margSF_est_med = margSF_est_med;
+    % Store full per-iteration normalized marginals; summary stats are computed later.
     fileBase.margORI_est_iter_norm = margORI_est_iter_norm;
     fileBase.margSF_est_iter_norm = margSF_est_iter_norm;
 
@@ -378,23 +365,14 @@ for iFile = 1:nFiles
             pA_data_curve_iter(iIter, :) = pred_metrics_allIter_probe{iIter}.metrics.pA_data_allBins;
         end %iIter
 
-        [fileBase.pYES_data_med, fileBase.pYES_data_lb, fileBase.pYES_data_ub] = getCI(pYES_data_iter, 1, 1);
-        [fileBase.pC_data_med, fileBase.pC_data_lb, fileBase.pC_data_ub] = getCI(pC_data_iter, 1, 1);
-        [fileBase.pA_data_med, fileBase.pA_data_lb, fileBase.pA_data_ub] = getCI(pA_data_iter, 1, 1);
-
-        fileBase.DV_allBins_med = nan(1, nBins_curve);
-        fileBase.nTrials_allBins_med = nan(1, nBins_curve);
-        fileBase.pYES_data_curve_med = nan(1, nBins_curve);
-        fileBase.pC_data_curve_med = nan(1, nBins_curve);
-        fileBase.pA_data_curve_med = nan(1, nBins_curve);
-
-        for iMetricBin = 1:nBins_curve
-            [fileBase.DV_allBins_med(iMetricBin), ~, ~] = getCI(DV_allBins_iter(:, iMetricBin), 1, 1);
-            [fileBase.nTrials_allBins_med(iMetricBin), ~, ~] = getCI(nTrials_allBins_iter(:, iMetricBin), 1, 1);
-            [fileBase.pYES_data_curve_med(iMetricBin), ~, ~] = getCI(pYES_data_curve_iter(:, iMetricBin), 1, 1);
-            [fileBase.pC_data_curve_med(iMetricBin), ~, ~] = getCI(pC_data_curve_iter(:, iMetricBin), 1, 1);
-            [fileBase.pA_data_curve_med(iMetricBin), ~, ~] = getCI(pA_data_curve_iter(:, iMetricBin), 1, 1);
-        end %iMetricBin
+        fileBase.pYES_data_iter = pYES_data_iter(:)';
+        fileBase.pC_data_iter = pC_data_iter(:)';
+        fileBase.pA_data_iter = pA_data_iter(:)';
+        fileBase.DV_allBins_iter = DV_allBins_iter;
+        fileBase.nTrials_allBins_iter = nTrials_allBins_iter;
+        fileBase.pYES_data_curve_iter = pYES_data_curve_iter;
+        fileBase.pC_data_curve_iter = pC_data_curve_iter;
+        fileBase.pA_data_curve_iter = pA_data_curve_iter;
 
         found_fit_for_data = true;
         break
@@ -409,11 +387,6 @@ for iFile = 1:nFiles
     if isfield(truth, 'criterion_DV_true')
         fileBase.criterion_DV_true = truth.criterion_DV_true;
     end
-
-    % ---------- filtering rule: simulated pC median only ----------
-    fileBase.keep_pC = (fileBase.pC_data_med >= mask_pC(1)) && (fileBase.pC_data_med <= mask_pC(2));
-    if fileBase.keep_pC, nCondPass = nCondPass + 1; end
-    fprintf(': med sim pC=%.2f, keep? %d', fileBase.pC_data_med, fileBase.keep_pC)
 
     % =========================================================
     % 4. Fitted-model-related values
@@ -447,35 +420,31 @@ for iFile = 1:nFiles
         % inherited from fileBase
 
         % ---------- metric-related values ----------
-        Ri.pYES_rmse = nan; Ri.pYES_R2 = nan;
-        Ri.pC_rmse = nan; Ri.pC_R2 = nan;
-        Ri.pA_rmse = nan; Ri.pA_R2 = nan;
+        Ri.pYES_rmse_allIter = []; Ri.pYES_R2_allIter = [];
+        Ri.pC_rmse_allIter = []; Ri.pC_R2_allIter = [];
+        Ri.pA_rmse_allIter = []; Ri.pA_R2_allIter = [];
 
-        Ri.pYES_pred_med = nan; Ri.pYES_pred_lb = nan; Ri.pYES_pred_ub = nan;
-        Ri.pC_pred_med = nan; Ri.pC_pred_lb = nan; Ri.pC_pred_ub = nan;
-        Ri.pA_pred_med = nan; Ri.pA_pred_lb = nan; Ri.pA_pred_ub = nan;
+        Ri.pYES_pred_iter = [];
+        Ri.pC_pred_iter = [];
+        Ri.pA_pred_iter = [];
 
-        Ri.pYES_pred_curve_med = [];
-        Ri.pC_pred_curve_med = [];
-        Ri.pA_pred_curve_med = [];
+        Ri.pYES_pred_curve_iter = [];
+        Ri.pC_pred_curve_iter = [];
+        Ri.pA_pred_curve_iter = [];
 
-        Ri.nLL_med = nan; Ri.nLL_lb = nan; Ri.nLL_ub = nan;
         Ri.nLL_test_allIter = []; % full per-iteration test nLL vector (for iteration-level win rate)
 
         % ---------- parameter-related values ----------
-        Ri.Nmul_rmse    = nan; Ri.Nmul_est_med    = nan; Ri.Nmul_est_lb    = nan; Ri.Nmul_est_ub    = nan;
-        Ri.Nadd_rmse    = nan; Ri.Nadd_est_med    = nan; Ri.Nadd_est_lb    = nan; Ri.Nadd_est_ub    = nan;
-        Ri.Nshared_rmse = nan; Ri.Nshared_est_med = nan; Ri.Nshared_est_lb = nan; Ri.Nshared_est_ub = nan;
+        Ri.Nmul_rmse_allIter = []; Ri.Nmul_est_allIter = [];
+        Ri.Nadd_rmse_allIter = []; Ri.Nadd_est_allIter = [];
+        Ri.Nshared_rmse_allIter = []; Ri.Nshared_est_allIter = [];
 
         % ---------- criterion-related values ----------
-        Ri.criterion_DV_rmse = nan;
-        Ri.criterion_DV_est_med = nan;
-        Ri.criterion_DV_est_lb = nan;
-        Ri.criterion_DV_est_ub = nan;
+        Ri.criterion_DV_rmse_allIter = [];
+        Ri.criterion_DV_est_allIter = [];
 
         % ---------- NLL ----------
         if isfield(data_fitNOM, 'nLL_test_allIter')
-            [Ri.nLL_med, Ri.nLL_lb, Ri.nLL_ub] = getCI(data_fitNOM.nLL_test_allIter(:), 1, 1);
             Ri.nLL_test_allIter = data_fitNOM.nLL_test_allIter(:)'; % store full iter vector
         end
 
@@ -487,8 +456,8 @@ for iFile = 1:nFiles
             m = namesMetrics_behav{iMetric};
             [rmse_iter, R2_iter] = fxn_metricRecovery_iter(pred_metrics_allIter, m);
 
-            [Ri.(sprintf('%s_rmse', m)), ~, ~] = getCI(rmse_iter, 1, 1);
-            [Ri.(sprintf('%s_R2', m)), ~, ~] = getCI(R2_iter, 1, 1);
+            Ri.(sprintf('%s_rmse_allIter', m)) = rmse_iter(:)';
+            Ri.(sprintf('%s_R2_allIter', m)) = R2_iter(:)';
         end
 
         % ---------- Predicted metrics ----------
@@ -511,19 +480,13 @@ for iFile = 1:nFiles
             pA_pred_curve_iter(iIter, :) = pred_metrics_allIter{iIter}.metrics.pA_pred_allBins;
         end % iIter
 
-        [Ri.pYES_pred_med, Ri.pYES_pred_lb, Ri.pYES_pred_ub] = getCI(pYES_pred_iter, 1, 1);
-        [Ri.pC_pred_med, Ri.pC_pred_lb, Ri.pC_pred_ub] = getCI(pC_pred_iter, 1, 1);
-        [Ri.pA_pred_med, Ri.pA_pred_lb, Ri.pA_pred_ub] = getCI(pA_pred_iter, 1, 1);
+        Ri.pYES_pred_iter = pYES_pred_iter(:)';
+        Ri.pC_pred_iter = pC_pred_iter(:)';
+        Ri.pA_pred_iter = pA_pred_iter(:)';
 
-        Ri.pYES_pred_curve_med = nan(1, nBins_curve);
-        Ri.pC_pred_curve_med = nan(1, nBins_curve);
-        Ri.pA_pred_curve_med = nan(1, nBins_curve);
-
-        for iBin = 1:nBins_curve
-            [Ri.pYES_pred_curve_med(iBin), ~, ~] = getCI(pYES_pred_curve_iter(:, iBin), 1, 1);
-            [Ri.pC_pred_curve_med(iBin), ~, ~] = getCI(pC_pred_curve_iter(:, iBin), 1, 1);
-            [Ri.pA_pred_curve_med(iBin), ~, ~] = getCI(pA_pred_curve_iter(:, iBin), 1, 1);
-        end % iBin
+        Ri.pYES_pred_curve_iter = pYES_pred_curve_iter;
+        Ri.pC_pred_curve_iter = pC_pred_curve_iter;
+        Ri.pA_pred_curve_iter = pA_pred_curve_iter;
 
         % ---------- Parameter estimates ----------
         % params_mat: [nIter × nParams] matrix of fitted parameter values.
@@ -538,8 +501,8 @@ for iFile = 1:nFiles
         criterion_est_iter  = params_mat(:, end);   % last column = decision criterion
         criterion_rmse_iter = abs(criterion_est_iter - fileBase.criterion_DV_true);
 
-        [Ri.criterion_DV_rmse, ~, ~] = getCI(criterion_rmse_iter, 1, 1);
-        [Ri.criterion_DV_est_med, Ri.criterion_DV_est_lb, Ri.criterion_DV_est_ub] = getCI(criterion_est_iter, 1, 1);
+        Ri.criterion_DV_rmse_allIter = criterion_rmse_iter(:)';
+        Ri.criterion_DV_est_allIter = criterion_est_iter(:)';
 
         % param_names_all: all parameter names for this B-model (IN noise params + criterion).
         % param_names_IN:  all except the last (criterion), i.e. only the internal-noise parameters.
@@ -553,8 +516,8 @@ for iFile = 1:nFiles
             est_iter = params_mat(:, iParamIN);
             err_iter = abs(est_iter - trueVal);
 
-            [Ri.(sprintf('%s_rmse', pName)), ~, ~] = getCI(err_iter, 1, 1);
-            [Ri.(sprintf('%s_est_med', pName)), Ri.(sprintf('%s_est_lb', pName)), Ri.(sprintf('%s_est_ub', pName))] = getCI(est_iter, 1, 1);
+            Ri.(sprintf('%s_rmse_allIter', pName)) = err_iter(:)';
+            Ri.(sprintf('%s_est_allIter', pName)) = est_iter(:)';
         end
 
         R = [R; Ri];
@@ -565,11 +528,8 @@ end % iFile
 fprintf('\n\n%s: All files compiled. \n\n', datetime('now'))
 
 % Post-processing
-% Apply filter on simulated pC
-R_unfiltered = R;
-% R = R_unfiltered([R_unfiltered.keep_pC]); % keep only rows whose condition passed the pC filter
-% assert(nCondPass == numel(R)/nBfit)
-fprintf('\nFiltering by simulated pC in [%.2f, %.2f]: kept %d / %d conditions.\n', mask_pC(1), mask_pC(2), nCondPass, nFiles);
+% Summarize all per-iteration fields once before plotting/saving.
+R = fxn_attach_medians_from_iter(R, namesMetrics_behav);
 
 % ---------- unique levels ----------
 gaborCST_unik = unique([R.gaborCST]);
@@ -584,16 +544,13 @@ C_contribution_unik = unique([R.C_contribution]);
 
 % Save the compiled record to /Output
 nameFile_R = sprintf('%s/Outputs/R_A%d.mat', nameFolder_server, iModelA_fit);
-save(nameFile_R, 'R', 'R_unfiltered', 'lambda_whiten_unik', 'C_contribution_unik')
+save(nameFile_R, 'R', 'lambda_whiten_unik', 'C_contribution_unik')
 
 %% Shared plotting formats
 
 % Load data
 load(sprintf('%s/Outputs/R_A%d.mat', nameFolder_server, iModelA_fit), 'R')
 setting = struct();
-
-% ---------- filtering ----------
-setting.flag_use_filtered = true;
 
 % ---------- output ----------
 nameFolder_Figures_part4 = fullfile(nameFolder_Figures, sprintf('IO_%s_A%d', str_part, iModelA_fit));
@@ -636,7 +593,7 @@ hues = mod((0:nPal-1)' / phi, 1);
 setting.palette = hsv2rgb([hues, repmat(0.60, nPal, 1), repmat(0.72, nPal, 1)]);
 
 % ---------- collapse rules ----------
-setting.scalarCollapseFcn = @mean;   % mean across rows after filtering
+setting.scalarCollapseFcn = @mean;   % mean across rows
 setting.curveCollapseFcn  = @mean;   % mean across rows after collapsing
 setting.curveNGrid = 9;              % redefine bins after collapsing
 
@@ -655,8 +612,8 @@ setting.fig1_pct_fields = {'nBasisORI_mode_pct', 'nBasisSF_mode_pct', 'basisFxnO
 setting.fig1_pct_labels = {'ORI mode selection rate', 'SF mode selection rate', 'ORI basis family mode selection rate', 'SF basis family mode selection rate', ...
     'ORI width-scale mode selection rate', 'SF width-scale mode selection rate', 'Ridge mode selection rate', 'SF asymmetry mode selection rate'};
 
-setting.varFields = {'Nmul_true', 'Nadd_true', 'Nshared_true', 'gaborCST', 'cSDT_true', 'lambda_whiten', 'C_contribution'};
-setting.varNames  = {'Nmul', 'Nadd', 'Nshared', 'signalCST', 'Cz', 'lambda_white', 'C_contribution'};
+setting.varFields = {'Nmul_true', 'Nadd_true', 'Nshared_true', 'gaborCST', 'cSDT_true'};
+setting.varNames  = {'Nmul', 'Nadd', 'Nshared', 'signalCST', 'Cz'};
 
 setting.fig1_varFields = setting.varFields;
 setting.fig1_varNames  = setting.varNames;
@@ -693,6 +650,11 @@ if numel(Bfit_unik) > numel(base_lineStyles_fit)
     setting.lineStyles_fit = repmat(base_lineStyles_fit, 1, nRep);
 end
 setting.lineStyles_fit = setting.lineStyles_fit(1:numel(Bfit_unik));
+
+%% Prepare summary fields for plotting
+% Recompute all *_med/*_lb/*_ub fields from per-iteration values so each
+% figure section can be run independently after this point.
+R = fxn_attach_medians_from_iter(R, namesMetrics_behav);
 
 %% Figure 1: Basis selection
 fprintf('\n%s: Fig 1: Basis selection rates\n', string(datetime('now')))
@@ -828,7 +790,7 @@ for iCol = 1:nVars
         end
         xlim([xMin_al - buf_al, xMax_al + buf_al]);
     end
-    xlabel(vName); ylabel('Template RMSE'); ylim([0.1 0.2]); title(vName);
+    xlabel(vName); ylabel('Template RMSE'); ylim([0 0.2]); title(vName);
 
     % ------ Rows 2 & 3: ORI then SF tuning ------
     for iRow = 1:2
@@ -889,22 +851,22 @@ close(h);
 
 fprintf('\n%s: Fig 3: Metric recovery\n', string(datetime('now')))
 
-h = figure('Position', [100 100 1300 900]);
-tiledlayout(numel(Bsim_unik), numel(setting.metricFields), 'TileSpacing', 'loose', 'Padding', 'loose');
+h = figure('Position', [100 100 2e3 1e3]);
+tiledlayout(numel(setting.metricFields), numel(Bsim_unik), 'TileSpacing', 'loose', 'Padding', 'loose');
 
-for iCol_Bsim = 1:numel(Bsim_unik)
-    simModel = Bsim_unik(iCol_Bsim);
+for iRow_metric = 1:numel(setting.metricFields)
+    mName = setting.metricFields{iRow_metric};
+    dataField = setting.metricCurveDataFields{iRow_metric};
+    predField = setting.metricCurvePredFields{iRow_metric};
+
+    for iCol_Bsim = 1:numel(Bsim_unik)
+        simModel = Bsim_unik(iCol_Bsim);
 
     % simulated data are duplicated across Bfit; use Bfit = 1
     R_data = R([R.iModelB_sim] == simModel & [R.iModelB_fit] == 1);
 
-    for iCol_metric = 1:numel(setting.metricFields)
-        mName = setting.metricFields{iCol_metric};
-        dataField = setting.metricCurveDataFields{iCol_metric};
-        predField = setting.metricCurvePredFields{iCol_metric};
-
         nexttile; hold on;
-        isFirstPanel = (iCol_Bsim == 1) && (iCol_metric == 1);
+        isFirstPanel = (iCol_Bsim == 1) && (iRow_metric == 1);
 
         % collapsed simulated curve
         [Cdata, nDataBins] = fxn_collapse_curve_with_counts( ...
@@ -977,6 +939,7 @@ for iCol_Bsim = 1:numel(Bsim_unik)
 
             if ~isempty(Cdata.x)
                 [r2, ~] = fxn_curve_fit_metrics(Cdata.x, Cdata.y, Cpred.x, Cpred.y, nDataBins);
+                r2 = max(r2, 0);
                 rmse = fxn_curve_rmse(Cdata.x, Cdata.y, Cpred.x, Cpred.y, nDataBins);
 
                 if isFirstPanel
@@ -1000,7 +963,7 @@ for iCol_Bsim = 1:numel(Bsim_unik)
         set(gca, 'YGrid', 'off');
         %=====================%
         % Print x label
-        if iCol_Bsim == numel(Bsim_unik)
+        if iRow_metric == numel(setting.metricFields)
             xlabel('Collapsed DV bins');
         end
         % Print y label
@@ -1053,10 +1016,10 @@ for iCol_Bsim = 1:numel(Bsim_unik)
                 'Location', 'northwest', 'FontSize', setting.fontSize-2, 'Box', 'off');
             title(legDot, 'Dot size');
         end
-    end % iCol_metric
-end % iCol_Bsim
+    end % iCol_Bsim
+end % iRow_metric
 
-sgtitle('Fig 3: metric recovery | filtered', 'FontWeight', 'bold');
+sgtitle('Fig 3: metric recovery', 'FontWeight', 'bold');
 saveas(h, fullfile(nameFolder_Figures_part4, 'FigS3_metricRecovery.png'));
 close(h);
 
@@ -1470,14 +1433,7 @@ for iTile = 1:4
     fxn_style_ax(gca, setting);
     axis square;
 
-    % Increase spacing by shrinking each axes box within its tile.
-    axPos = get(gca, 'Position');
-    shrink = 0.86;
-    newW = axPos(3) * shrink;
-    newH = axPos(4) * shrink;
-    newX = axPos(1) + (axPos(3) - newW) / 2;
-    newY = axPos(2) + (axPos(4) - newH) / 2;
-    set(gca, 'Position', [newX, newY, newW, newH]);
+    % Keep tile sizing under TiledChartLayout control to avoid Position warnings.
 
     % color axis
     finVals = M_plot(isfinite(M_plot));
@@ -1534,37 +1490,32 @@ for iFit = 1:numel(Bfit_unik)
     if isempty(Rsub), continue; end
 
     pNames_all = namesModelBparams_short{fitModel};
-    estFields = cell(size(pNames_all));
+    % Use per-iteration estimate arrays as source for dots
+    iterFields = cell(size(pNames_all));
     for iP = 1:numel(pNames_all)
         if strcmp(pNames_all{iP}, 'criterion_DV')
-            estFields{iP} = 'criterion_DV_est_med';
+            iterFields{iP} = 'criterion_DV_est_allIter';
         else
-            estFields{iP} = sprintf('%s_est_med', pNames_all{iP});
+            iterFields{iP} = sprintf('%s_est_allIter', pNames_all{iP});
         end
     end
 
     keepParam = false(size(pNames_all));
     for iP = 1:numel(pNames_all)
-        if ~isfield(Rsub, estFields{iP}), continue; end
-        vals = [Rsub.(estFields{iP})]';
-        keepParam(iP) = any(isfinite(vals));
+        if ~isfield(Rsub, iterFields{iP}), continue; end
+        vals = vertcat(Rsub.(iterFields{iP}));
+        keepParam(iP) = any(isfinite(vals(:)));
     end
 
     pNames = pNames_all(keepParam);
-    estFields = estFields(keepParam);
+    iterFields = iterFields(keepParam);
     nParam = numel(pNames);
     if nParam < 2, continue; end
 
-    nObs = numel(Rsub);
-    paramVals = nan(nObs, nParam);
-    for iP = 1:nParam
-        paramVals(:, iP) = [Rsub.(estFields{iP})]';
-    end
-
     sigVals_all = [Rsub.gaborCST]';
-    czVals_all = [Rsub.cSDT_true]';
+    czVals_all  = [Rsub.cSDT_true]';
     [isSig, sigIdx_all] = ismember(sigVals_all, gaborCST_unik);
-    [isCz, czIdx_all] = ismember(czVals_all, cSDT_unik);
+    [isCz,  czIdx_all]  = ismember(czVals_all,  cSDT_unik);
     validGroupBase = isfinite(sigVals_all) & isfinite(czVals_all) & isSig & isCz;
 
     groupRows = cell(numel(gaborCST_unik), numel(cSDT_unik));
@@ -1574,12 +1525,32 @@ for iFit = 1:numel(Bfit_unik)
         end
     end
 
+    % Grayscale color per condition based on sumsqr(Nmul_true, Nadd_true, Nshared_true).
+    % Black = highest sumsqr, light gray = lowest.
+    inFields_gray = {'Nmul_true', 'Nadd_true', 'Nshared_true'};
+    sumsqr_cond = zeros(numel(Rsub), 1);
+    for iGF = 1:numel(inFields_gray)
+        if isfield(Rsub, inFields_gray{iGF})
+            v = [Rsub.(inFields_gray{iGF})]';
+            v(~isfinite(v)) = 0;
+            sumsqr_cond = sumsqr_cond + v .^ 2;
+        end
+    end
+    sq_min = min(sumsqr_cond);
+    sq_max = max(sumsqr_cond);
+    if sq_max > sq_min
+        sq_norm = (sumsqr_cond - sq_min) / (sq_max - sq_min);
+    else
+        sq_norm = zeros(size(sumsqr_cond));
+    end
+    lightGrayVal = 0.78;
+    % normVal=1 → black (0), normVal=0 → light gray (lightGrayVal)
+    condGrayColor = (1 - sq_norm) * lightGrayVal .* ones(numel(Rsub), 3);
+
     pairIdx = nchoosek(1:nParam, 2);
-    nPairs = size(pairIdx, 1);
-    nCols = min(3, nPairs);
-    nRows = ceil(nPairs / nCols);
-    czLineStyles = {'-', '--', ':', '-.'};
-    markerIsCircle = contains(setting.marker_signal, 'o');
+    nPairs  = size(pairIdx, 1);
+    nCols   = min(3, nPairs);
+    nRows   = ceil(nPairs / nCols);
 
     h = figure('Position', [100 100 420*nCols 320*nRows]);
     tiledlayout(nRows, nCols, 'TileSpacing', 'compact', 'Padding', 'compact');
@@ -1588,62 +1559,54 @@ for iFit = 1:numel(Bfit_unik)
         iP1 = pairIdx(iPair, 1);
         iP2 = pairIdx(iPair, 2);
 
-        xAll = paramVals(:, iP1);
-        yAll = paramVals(:, iP2);
-        good = validGroupBase & isfinite(xAll) & isfinite(yAll);
-        x = xAll(good);
-        y = yAll(good);
-
         nexttile; hold on;
-        if isempty(x)
-            text(0.5, 0.5, 'No data', 'HorizontalAlignment', 'center');
-            xlim([0 1]); ylim([0 1]);
-            title(sprintf('%s vs %s', pNames{iP1}, pNames{iP2}));
-            fxn_style_ax(gca, setting);
-            continue;
-        end
+
+        % Collect all iter values pooled across conditions for overall r
+        xPool = [];
+        yPool = [];
 
         for iSig = 1:numel(gaborCST_unik)
             for iCz = 1:numel(cSDT_unik)
                 idxRows = groupRows{iSig, iCz};
                 if isempty(idxRows), continue; end
 
-                idxRows = idxRows(isfinite(xAll(idxRows)) & isfinite(yAll(idxRows)));
-                if isempty(idxRows), continue; end
+                mkr = setting.marker_signal{iSig};
 
-                xGrp = xAll(idxRows);
-                yGrp = yAll(idxRows);
+                for iRow = 1:numel(idxRows)
+                    rIdx = idxRows(iRow);
+                    col  = condGrayColor(rIdx, :);
+                    xIter = Rsub(rIdx).(iterFields{iP1})(:);
+                    yIter = Rsub(rIdx).(iterFields{iP2})(:);
+                    goodIt = isfinite(xIter) & isfinite(yIter);
+                    if sum(goodIt) < 1, continue; end
 
-                % Plot individual data points
-                plot(xGrp, yGrp, setting.marker_signal{iSig}, ...
-                    'LineStyle', 'none', ...
-                    'MarkerSize', max(setting.markerSize, 6), ...
-                    'MarkerFaceColor', setting.cmap_Cz(iCz,:), ...
-                    'MarkerEdgeColor', 'w', ...
-                    'LineWidth', 1.0);
+                    xi = xIter(goodIt);
+                    yi = yIter(goodIt);
+                    xPool = [xPool; xi]; %#ok<AGROW>
+                    yPool = [yPool; yi]; %#ok<AGROW>
 
-                % Fit and plot a linear regression line for the group
-                if numel(xGrp) >= 2
-                    pfit_grp = polyfit(xGrp, yGrp, 1);
-                    xfit_grp = linspace(min(xGrp), max(xGrp), 60);
-                    yfit_grp = polyval(pfit_grp, xfit_grp);
-                    lineStyle_grp = czLineStyles{mod(iCz-1, numel(czLineStyles)) + 1};
-                    if markerIsCircle(iSig)
-                        lineStyle_grp = '-';
-                    else
-                        lineStyle_grp = '--';
+                    % dots: one per iteration
+                    plot(xi, yi, mkr, ...
+                        'LineStyle', 'none', ...
+                        'MarkerSize', max(setting.markerSize - 2, 4), ...
+                        'MarkerFaceColor', col, ...
+                        'MarkerEdgeColor', 'w', ...
+                        'LineWidth', 0.5);
+
+                    % regression line per condition
+                    if sum(goodIt) >= 2 && numel(unique(xi)) >= 2
+                        pfit_cond = polyfit(xi, yi, 1);
+                        xfit_cond = linspace(min(xi), max(xi), 60);
+                        plot(xfit_cond, polyval(pfit_cond, xfit_cond), '-', ...
+                            'Color', col, 'LineWidth', 1.4);
                     end
-                    plot(xfit_grp, yfit_grp, ...
-                        'Color', setting.cmap_Cz(iCz,:), ...
-                        'LineStyle', lineStyle_grp, ...
-                        'LineWidth', 1.4);
                 end
             end
         end
 
-        if numel(x) >= 2
-            [r, p] = corr(x, y);
-            title(sprintf('%s vs %s | r=%.2f, p=%.3g', pNames{iP1}, pNames{iP2}, r, p));
+        if numel(xPool) >= 2
+            [r_val, p_val] = corr(xPool, yPool);
+            title(sprintf('%s vs %s | r=%.2f, p=%.3g', pNames{iP1}, pNames{iP2}, r_val, p_val));
         else
             title(sprintf('%s vs %s', pNames{iP1}, pNames{iP2}));
         end
@@ -1654,25 +1617,33 @@ for iFit = 1:numel(Bfit_unik)
         fxn_style_ax(gca, setting);
     end
 
-    % Figure-level legends (color=cSDT, marker=signalCST)
+    % Figure-level legends: grayscale = sumsqr(IN params), marker = signalCST
     axBase = gca;
     pos = axBase.Position;
 
+    % Build a few representative grayscale legend entries
     axColor = axes('Position', pos, 'Color', 'none', 'Visible', 'off', ...
         'HitTest', 'off', 'HandleVisibility', 'off');
     hold(axColor, 'on');
-    hCz = gobjects(numel(cSDT_unik), 1);
-    for iCz = 1:numel(cSDT_unik)
-        hCz(iCz) = plot(axColor, nan, nan, 'o', ...
+    sq_unik_sorted = unique(sumsqr_cond);
+    nGrayLeg = min(numel(sq_unik_sorted), 5);
+    legIdxGray = round(linspace(1, numel(sq_unik_sorted), nGrayLeg));
+    hGray = gobjects(nGrayLeg, 1);
+    grayLegLabels = cell(nGrayLeg, 1);
+    for iGL = 1:nGrayLeg
+        sqVal = sq_unik_sorted(legIdxGray(iGL));
+        normGL = (sq_max > sq_min) * (sqVal - sq_min) / max(sq_max - sq_min, eps);
+        grayGL = (1 - normGL) * lightGrayVal;
+        hGray(iGL) = plot(axColor, nan, nan, 'o', ...
             'LineStyle', 'none', ...
-            'MarkerFaceColor', setting.cmap_Cz(iCz,:), ...
-            'MarkerEdgeColor', setting.cmap_Cz(iCz,:), ...
+            'MarkerFaceColor', grayGL * [1 1 1], ...
+            'MarkerEdgeColor', grayGL * [1 1 1], ...
             'MarkerSize', 7);
+        grayLegLabels{iGL} = sprintf('%.3g', sqVal);
     end
-    leg1 = legend(axColor, hCz, ...
-        arrayfun(@(x) sprintf('%g', x), cSDT_unik, 'UniformOutput', false), ...
+    leg1 = legend(axColor, hGray, grayLegLabels, ...
         'Location', 'northeast', 'Box', 'on', 'FontSize', max(setting.fontSize - 1, 8));
-    title(leg1, 'cSDT');
+    title(leg1, 'Total internal var.');
 
     axSig = axes('Position', pos, 'Color', 'none', 'Visible', 'off', ...
         'HitTest', 'off', 'HandleVisibility', 'off');
@@ -1696,7 +1667,7 @@ for iFit = 1:numel(Bfit_unik)
     close(h);
 end % iModelB_fit
 
-%% Figure 7: Iteration-level ΔnLL distributions (Generating model is the full model B1)
+%% Figure 7: Full vs. reduced models—Iteration-level ΔnLL distributions (Generating model is the full model B1)
 %    For each reduced model Br, shows the per-iteration distribution of
 %    ΔnLL(Br − B1) aggregated across conditions.
 %    A positive ΔnLL means B1 fits the held-out data better on that iteration.
@@ -1772,7 +1743,7 @@ else
         fxn_style_ax(gca, setting);
     end
 
-    sgtitle('Fig 7: \Delta nLL distributions | Bsim=B1', 'FontWeight', 'bold');
+    sgtitle('Fig 7: Full vs. reduced models\Delta nLL distributions | Bsim=Full model', 'FontWeight', 'bold');
     saveas(h, fullfile(nameFolder_Figures_part4, 'FigS7_dnLL_distributions.png'));
     close(h);
 end
@@ -1785,9 +1756,9 @@ end
 
 fprintf('\n%s: Fig 8: delta-nLL vs true omitted parameter\n', string(datetime('now')))
 
-omitB_fig8      = [2,          3,        4       ];
-omitParam_fig8  = {'Nshared',  'Nmul',   'Nadd'  };
-trueField_fig8  = {'Nshared_true', 'Nmul_true', 'Nadd_true'};
+omitB_fig8      = [2,              3,            4,          5,          5,              6,          6,              7,          7        ];
+omitParam_fig8  = {'Nshared',     'Nmul',       'Nadd',     'Nadd',     'Nshared',      'Nmul',     'Nshared',      'Nmul',     'Nadd'   };
+trueField_fig8  = {'Nshared_true','Nmul_true',  'Nadd_true','Nadd_true','Nshared_true', 'Nmul_true','Nshared_true', 'Nmul_true','Nadd_true'};
 
 keepPair = ismember(omitB_fig8, Bfit_unik);
 omitB_fig8     = omitB_fig8(keepPair);
@@ -1843,10 +1814,10 @@ else
         scatter(xvals(good), yvals(good), 40, paletteSrc(iP, :), ...
             'filled', 'MarkerFaceAlpha', 0.75);
 
-        if sum(good) >= 3
-            pCoef = polyfit(xvals(good), yvals(good), 1);
+        if sum(good) >= 3 && range(xvals(good)) > eps(max(abs(xvals(good)))) * numel(xvals(good))
+            pCoef = polyfit(xvals(good) - mean(xvals(good)), yvals(good), 1);
             xFit  = linspace(min(xvals(good)), max(xvals(good)), 60);
-            plot(xFit, polyval(pCoef, xFit), '-', 'Color', paletteSrc(iP,:), 'LineWidth', 1.8);
+            plot(xFit, polyval(pCoef, xFit - mean(xvals(good))), '-', 'Color', paletteSrc(iP,:), 'LineWidth', 1.8);
             [rho_f8, ~] = corr(xvals(good), yvals(good));
             text(0.05, 0.92, sprintf('r = %.2f', rho_f8), 'Units', 'normalized', ...
                 'FontSize', setting.fontSize, 'Color', paletteSrc(iP,:));
@@ -2295,6 +2266,170 @@ end
 
 if ~any(isfinite(nGridCounts) & nGridCounts > 0)
     nGridCounts = [];
+end
+end
+
+function Rout = fxn_attach_medians_from_iter(Rin, namesMetrics_behav)
+% Reconstruct summary fields used by plotting from per-iteration values.
+Rout = Rin;
+if isempty(Rout)
+    return
+end
+
+paramNames_IN = {'Nmul', 'Nadd', 'Nshared'};
+
+for iR = 1:numel(Rout)
+    % Template-level summaries
+    if isfield(Rout, 'template_rmse_iter') && ~isempty(Rout(iR).template_rmse_iter)
+        [Rout(iR).template_rmse, ~, ~] = getCI(Rout(iR).template_rmse_iter(:), 1, 1);
+    else
+        Rout(iR).template_rmse = nan;
+    end
+    if isfield(Rout, 'template_R2_iter') && ~isempty(Rout(iR).template_R2_iter)
+        [Rout(iR).template_R2, ~, ~] = getCI(Rout(iR).template_R2_iter(:), 1, 1);
+    else
+        Rout(iR).template_R2 = nan;
+    end
+
+    if isfield(Rout, 'margORI_est_iter_norm') && ~isempty(Rout(iR).margORI_est_iter_norm)
+        [Rout(iR).margORI_est_med, Rout(iR).margORI_est_lb, Rout(iR).margORI_est_ub] = getCI(Rout(iR).margORI_est_iter_norm, 1, 1);
+    else
+        Rout(iR).margORI_est_med = nan(1, numel(Rout(iR).margORI_true));
+        Rout(iR).margORI_est_lb = nan(1, numel(Rout(iR).margORI_true));
+        Rout(iR).margORI_est_ub = nan(1, numel(Rout(iR).margORI_true));
+    end
+    if isfield(Rout, 'margSF_est_iter_norm') && ~isempty(Rout(iR).margSF_est_iter_norm)
+        [Rout(iR).margSF_est_med, Rout(iR).margSF_est_lb, Rout(iR).margSF_est_ub] = getCI(Rout(iR).margSF_est_iter_norm, 1, 1);
+    else
+        Rout(iR).margSF_est_med = nan(1, numel(Rout(iR).margSF_true));
+        Rout(iR).margSF_est_lb = nan(1, numel(Rout(iR).margSF_true));
+        Rout(iR).margSF_est_ub = nan(1, numel(Rout(iR).margSF_true));
+    end
+
+    % Data metric summaries
+    [Rout(iR).pYES_data_med, Rout(iR).pYES_data_lb, Rout(iR).pYES_data_ub] = getCI(Rout(iR).pYES_data_iter(:), 1, 1);
+    [Rout(iR).pC_data_med, Rout(iR).pC_data_lb, Rout(iR).pC_data_ub] = getCI(Rout(iR).pC_data_iter(:), 1, 1);
+    [Rout(iR).pA_data_med, Rout(iR).pA_data_lb, Rout(iR).pA_data_ub] = getCI(Rout(iR).pA_data_iter(:), 1, 1);
+
+    [Rout(iR).DV_allBins_med, Rout(iR).DV_allBins_lb, Rout(iR).DV_allBins_ub] = fxn_ci_cols_triplet(Rout(iR).DV_allBins_iter);
+    [Rout(iR).nTrials_allBins_med, Rout(iR).nTrials_allBins_lb, Rout(iR).nTrials_allBins_ub] = fxn_ci_cols_triplet(Rout(iR).nTrials_allBins_iter);
+    [Rout(iR).pYES_data_curve_med, Rout(iR).pYES_data_curve_lb, Rout(iR).pYES_data_curve_ub] = fxn_ci_cols_triplet(Rout(iR).pYES_data_curve_iter);
+    [Rout(iR).pC_data_curve_med, Rout(iR).pC_data_curve_lb, Rout(iR).pC_data_curve_ub] = fxn_ci_cols_triplet(Rout(iR).pC_data_curve_iter);
+    [Rout(iR).pA_data_curve_med, Rout(iR).pA_data_curve_lb, Rout(iR).pA_data_curve_ub] = fxn_ci_cols_triplet(Rout(iR).pA_data_curve_iter);
+
+    % Fit metric summaries
+    for iMetric = 1:numel(namesMetrics_behav)
+        m = namesMetrics_behav{iMetric};
+        rmseIterField = sprintf('%s_rmse_allIter', m);
+        R2IterField = sprintf('%s_R2_allIter', m);
+
+        if isfield(Rout, rmseIterField) && ~isempty(Rout(iR).(rmseIterField))
+            [Rout(iR).(sprintf('%s_rmse', m)), ~, ~] = getCI(Rout(iR).(rmseIterField)(:), 1, 1);
+        else
+            Rout(iR).(sprintf('%s_rmse', m)) = nan;
+        end
+
+        if isfield(Rout, R2IterField) && ~isempty(Rout(iR).(R2IterField))
+            [Rout(iR).(sprintf('%s_R2', m)), ~, ~] = getCI(Rout(iR).(R2IterField)(:), 1, 1);
+        else
+            Rout(iR).(sprintf('%s_R2', m)) = nan;
+        end
+    end
+
+    [Rout(iR).pYES_pred_med, Rout(iR).pYES_pred_lb, Rout(iR).pYES_pred_ub] = getCI(Rout(iR).pYES_pred_iter(:), 1, 1);
+    [Rout(iR).pC_pred_med, Rout(iR).pC_pred_lb, Rout(iR).pC_pred_ub] = getCI(Rout(iR).pC_pred_iter(:), 1, 1);
+    [Rout(iR).pA_pred_med, Rout(iR).pA_pred_lb, Rout(iR).pA_pred_ub] = getCI(Rout(iR).pA_pred_iter(:), 1, 1);
+
+    [Rout(iR).pYES_pred_curve_med, Rout(iR).pYES_pred_curve_lb, Rout(iR).pYES_pred_curve_ub] = fxn_ci_cols_triplet(Rout(iR).pYES_pred_curve_iter);
+    [Rout(iR).pC_pred_curve_med, Rout(iR).pC_pred_curve_lb, Rout(iR).pC_pred_curve_ub] = fxn_ci_cols_triplet(Rout(iR).pC_pred_curve_iter);
+    [Rout(iR).pA_pred_curve_med, Rout(iR).pA_pred_curve_lb, Rout(iR).pA_pred_curve_ub] = fxn_ci_cols_triplet(Rout(iR).pA_pred_curve_iter);
+
+    if isfield(Rout, 'nLL_test_allIter') && ~isempty(Rout(iR).nLL_test_allIter)
+        [Rout(iR).nLL_med, Rout(iR).nLL_lb, Rout(iR).nLL_ub] = getCI(Rout(iR).nLL_test_allIter(:), 1, 1);
+    else
+        Rout(iR).nLL_med = nan;
+        Rout(iR).nLL_lb = nan;
+        Rout(iR).nLL_ub = nan;
+    end
+
+    % Criterion summaries
+    if isfield(Rout, 'criterion_DV_rmse_allIter') && ~isempty(Rout(iR).criterion_DV_rmse_allIter)
+        [Rout(iR).criterion_DV_rmse, ~, ~] = getCI(Rout(iR).criterion_DV_rmse_allIter(:), 1, 1);
+    else
+        Rout(iR).criterion_DV_rmse = nan;
+    end
+    if isfield(Rout, 'criterion_DV_est_allIter') && ~isempty(Rout(iR).criterion_DV_est_allIter)
+        [Rout(iR).criterion_DV_est_med, Rout(iR).criterion_DV_est_lb, Rout(iR).criterion_DV_est_ub] = getCI(Rout(iR).criterion_DV_est_allIter(:), 1, 1);
+    else
+        Rout(iR).criterion_DV_est_med = nan;
+        Rout(iR).criterion_DV_est_lb = nan;
+        Rout(iR).criterion_DV_est_ub = nan;
+    end
+
+    % Internal-noise parameter summaries
+    for iP = 1:numel(paramNames_IN)
+        pName = paramNames_IN{iP};
+        rmseIterField = sprintf('%s_rmse_allIter', pName);
+        estIterField = sprintf('%s_est_allIter', pName);
+
+        if isfield(Rout, rmseIterField) && ~isempty(Rout(iR).(rmseIterField))
+            [Rout(iR).(sprintf('%s_rmse', pName)), ~, ~] = getCI(Rout(iR).(rmseIterField)(:), 1, 1);
+        else
+            Rout(iR).(sprintf('%s_rmse', pName)) = nan;
+        end
+
+        if isfield(Rout, estIterField) && ~isempty(Rout(iR).(estIterField))
+            [Rout(iR).(sprintf('%s_est_med', pName)), Rout(iR).(sprintf('%s_est_lb', pName)), Rout(iR).(sprintf('%s_est_ub', pName))] = getCI(Rout(iR).(estIterField)(:), 1, 1);
+        else
+            Rout(iR).(sprintf('%s_est_med', pName)) = nan;
+            Rout(iR).(sprintf('%s_est_lb', pName)) = nan;
+            Rout(iR).(sprintf('%s_est_ub', pName)) = nan;
+        end
+    end
+end
+end
+
+function medRow = fxn_ci_cols(vals)
+if isempty(vals)
+    medRow = [];
+    return
+end
+
+if isvector(vals)
+    medRow = getCI(vals(:), 1, 1);
+    medRow = medRow(:)';
+    return
+end
+
+nCol = size(vals, 2);
+medRow = nan(1, nCol);
+for iCol = 1:nCol
+    [medRow(iCol), ~, ~] = getCI(vals(:, iCol), 1, 1);
+end
+end
+
+function [medRow, lbRow, ubRow] = fxn_ci_cols_triplet(vals)
+if isempty(vals)
+    medRow = [];
+    lbRow = [];
+    ubRow = [];
+    return
+end
+
+if isvector(vals)
+    [medTmp, lbTmp, ubTmp] = getCI(vals(:), 1, 1);
+    medRow = medTmp(:)';
+    lbRow = lbTmp(:)';
+    ubRow = ubTmp(:)';
+    return
+end
+
+nCol = size(vals, 2);
+medRow = nan(1, nCol);
+lbRow = nan(1, nCol);
+ubRow = nan(1, nCol);
+for iCol = 1:nCol
+    [medRow(iCol), lbRow(iCol), ubRow(iCol)] = getCI(vals(:, iCol), 1, 1);
 end
 end
 
