@@ -67,7 +67,8 @@ nlines = 2;
 CI_ratio = .68;
 
 threshPerf = .7;
-dprime_theo = norminv(threshPerf)-norminv(1-threshPerf); % corresponding to 75% accuracy
+norminv_local = @(p) sqrt(2) * erfinv(2*p - 1);   % inverse standard-normal CDF (no toolbox required)
+dprime_theo = norminv_local(threshPerf)-norminv_local(1-threshPerf); % corresponding to 75% accuracy
 
 %% Stimulus and noise parameters
 ppd = 32;  % Pixels per degree
