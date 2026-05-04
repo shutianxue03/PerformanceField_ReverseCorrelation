@@ -30,12 +30,15 @@ nBfit = 7;          % number of B-model variants to evaluate (each uses a differ
 nBins_Part4 = 3; % define bins for collapsing parameter recovery points; use 3 for main text, 5 for Supp
 
 nameFolder_Data = sprintf('%s/Data_%s', nameFolder_server, str_part);
+nameFile_R = sprintf('%s/Outputs/R_A%d.mat', nameFolder_server, iModelA_fit);
 nameFolder_Data_OOD = sprintf('%s/Data_OOD_%d%d', nameFolder_Data, nORI, nSF);
 nameFolder_Data_NOM_Trialwise = sprintf('%s/Data_NOM_Trialwise_%d%d', nameFolder_Data, nORI, nSF);
 
 namesMetrics_behav = {'pYES','pC','pA'};
 
 %% find IO folders
+if ~exist(nameFile_R, 'file')
+
 nameDir = dir(nameFolder_Data_NOM_Trialwise);
 nameDir = nameDir([nameDir.isdir]);
 nameDir = nameDir(~ismember({nameDir.name}, {'.', '..'}));
@@ -531,7 +534,17 @@ fprintf('\n\n%s: All files compiled. \n\n', datetime('now'))
 % Summarize all per-iteration fields once before plotting/saving.
 R = fxn_attach_medians_from_iter(R, namesMetrics_behav);
 
-% ---------- unique levels ----------
+% Save the compiled record to /Output
+save(nameFile_R, 'R', 'lambda_whiten_unik', 'C_contribution_unik')
+
+else
+    % fprintf('Output file already exists, skipping compilation: %s\n', nameFile_R);
+    % Load output file
+    load(nameFile_R, 'R')
+    fprintf('\n\n%s: Loaded compiled record R with %d entries.\n\n', datetime('now'), numel(R));
+end % if ~exist(nameFile_R)
+
+%% ---------- unique levels ----------
 gaborCST_unik = unique([R.gaborCST]);
 cSDT_unik = unique([R.cSDT_true]);
 Nmul_unik = unique([R.Nmul_true]);
@@ -542,16 +555,8 @@ Bfit_unik = unique([R.iModelB_fit]);
 lambda_whiten_unik = unique([R.lambda_whiten]);
 C_contribution_unik = unique([R.C_contribution]);
 
-% Save the compiled record to /Output
-nameFile_R = sprintf('%s/Outputs/R_A%d.mat', nameFolder_server, iModelA_fit);
-save(nameFile_R, 'R', 'lambda_whiten_unik', 'C_contribution_unik')
-
 %% Shared plotting formats
-
-% Load data
-load(sprintf('%s/Outputs/R_A%d.mat', nameFolder_server, iModelA_fit), 'R')
 setting = struct();
-
 % ---------- output ----------
 nameFolder_Figures_part4 = fullfile(nameFolder_Figures, sprintf('IO_%s_A%d', str_part, iModelA_fit));
 if ~exist(nameFolder_Figures_part4, 'dir')
@@ -655,6 +660,7 @@ setting.lineStyles_fit = setting.lineStyles_fit(1:numel(Bfit_unik));
 % Recompute all *_med/*_lb/*_ub fields from per-iteration values so each
 % figure section can be run independently after this point.
 R = fxn_attach_medians_from_iter(R, namesMetrics_behav);
+fprintf('\n%s: Median/CI fields extracted for all metrics.\n', string(datetime('now')))
 
 %% Figure 1: Basis selection
 fprintf('\n%s: Fig 1: Basis selection rates\n', string(datetime('now')))
@@ -799,8 +805,18 @@ for iCol = 1:nVars
         yTrue = fig2Cache(iCol).tuning(iRow).yTrue;
         curves = fig2Cache(iCol).tuning(iRow).curves;
         if ~isempty(yTrue)
-            hTrue = plot(axis_tuning{iRow}, yTrue, 'r-', 'LineWidth', setting.trueWidth);
-            yTrueNorm = yTrue / max(yTrue);
+            yTrueFinite = yTrue(isfinite(yTrue));
+            if ~isempty(yTrueFinite)
+                yTrueScale = max(yTrueFinite);
+            else
+                yTrueScale = nan;
+            end
+            if isfinite(yTrueScale) && yTrueScale ~= 0
+                yTrueNorm = yTrue / yTrueScale;
+            else
+                yTrueNorm = yTrue;
+            end
+            hTrue = plot(axis_tuning{iRow}, yTrueNorm, 'r-', 'LineWidth', setting.trueWidth);
             xIdx = 1:numel(yTrueNorm);
 
             nLev = numel(curves);
@@ -819,8 +835,20 @@ for iCol = 1:nVars
                 if isempty(curves(iLev).y), continue; end
                 nLeg = nLeg + 1;
                 cLev = repmat(grayVals(iLev), 1, 3);
-                legH(nLeg) = plot(axis_tuning{iRow}, curves(iLev).y, 'LineWidth', setting.lineWidth, 'Color', cLev);
-                rmse = fxn_curve_rmse(xIdx, yTrueNorm, xIdx, curves(iLev).y);
+                yLev = curves(iLev).y;
+                yLevFinite = yLev(isfinite(yLev));
+                if ~isempty(yLevFinite)
+                    yLevScale = max(yLevFinite);
+                else
+                    yLevScale = nan;
+                end
+                if isfinite(yLevScale) && yLevScale ~= 0
+                    yLevNorm = yLev / yLevScale;
+                else
+                    yLevNorm = yLev;
+                end
+                legH(nLeg) = plot(axis_tuning{iRow}, yLevNorm, 'LineWidth', setting.lineWidth, 'Color', cLev);
+                rmse = fxn_curve_rmse(xIdx, yTrueNorm, xIdx, yLevNorm);
                 legStr{nLeg} = sprintf('%g  RMSE=%.3f', curves(iLev).level, rmse);
             end
             legend(legH(1:nLeg), legStr(1:nLeg), 'Location', 'south', 'FontSize', setting_fig2.fontSize, 'Box', 'off');
@@ -1031,14 +1059,23 @@ fprintf('\n%s: Fig 4: Parameter recovery\n', string(datetime('now')))
 setting_fig4 = setting;
 setting_fig4.fontSize = setting.fontSize;
 
-% Condition coding in Fig 4: color = C_contribution, marker = lambda_white.
-cmap_cont_fig4 = setting.palette(1:numel(C_contribution_unik), :);
-marker_lambda_fig4 = {'o', 's', '^', 'd', 'v', '>', '<', 'p', 'h', 'x', '+'};
-if numel(lambda_whiten_unik) > numel(marker_lambda_fig4)
-    nRep_mk = ceil(numel(lambda_whiten_unik) / numel(marker_lambda_fig4));
-    marker_lambda_fig4 = repmat(marker_lambda_fig4, 1, nRep_mk);
+% Condition coding in Fig 4:
+%   marker shape                    = cSDT_true
+%   marker face shade (light→black) = signalCST low→high
+
+% Marker shapes for cSDT levels
+markers_cz_fig4 = {'o', 's', '^', 'd', 'v', '>', '<', 'p', 'h'};
+nCz_fig4  = numel(cSDT_unik);
+if nCz_fig4 > numel(markers_cz_fig4)
+    markers_cz_fig4 = repmat(markers_cz_fig4, 1, ceil(nCz_fig4 / numel(markers_cz_fig4)));
 end
-marker_lambda_fig4 = marker_lambda_fig4(1:numel(lambda_whiten_unik));
+markers_cz_fig4 = markers_cz_fig4(1:nCz_fig4);
+
+% Grayscale ramp for signalCST: index 1 = lightest (0.78), last = black (0)
+nSig_fig4 = numel(gaborCST_unik);
+faceShadeVals_fig4 = linspace(0.78, 0.0, max(nSig_fig4, 2));
+if nSig_fig4 == 1, faceShadeVals_fig4 = 0.0; end
+% [sorted low→high so index matches sorted gaborCST_unik]
 
 h = figure('Position', [100 100 1300 900]);
 tiledlayout(numel(setting.fig4_paramNames), numel(Bfit_unik), 'TileSpacing', 'compact', 'Padding', 'compact');
@@ -1067,19 +1104,23 @@ for iRow_param = 1:numel(setting.fig4_paramNames)
             axis off; continue
         end
 
-        % one series per lambda_white x C_contribution, preserving parameter levels
-        for iLW = 1:numel(lambda_whiten_unik)
-            for iCont = 1:numel(C_contribution_unik)
-
-                S = fxn_collapse_param_byLevel(Rsub, pName, lambda_whiten_unik(iLW), C_contribution_unik(iCont), setting.scalarCollapseFcn, nBins_Part4);
+        % one series per (signalCST x cSDT_true), pooling across lambda_whiten
+        for iSig = 1:numel(gaborCST_unik)
+            for iCz = 1:numel(cSDT_unik)
+                S = fxn_collapse_param_byLevel( ...
+                    Rsub, pName, ...
+                    setting.scalarCollapseFcn, nBins_Part4, gaborCST_unik(iSig), cSDT_unik(iCz));
 
                 if isempty(S.x), continue; end
 
-                % optional: connect points from the same signalCST × Cz group
+                % marker shape = cSDT, face shade = signalCST
+                mkrCz   = markers_cz_fig4{iCz};
+                faceClr = repmat(faceShadeVals_fig4(iSig), 1, 3);
+
                 good = isfinite(S.x) & isfinite(S.y);
                 if any(good)
                     plot(S.x(good), S.y(good), '-', ...
-                        'Color', cmap_cont_fig4(iCont,:), ...
+                        'Color', faceClr, ...
                         'LineWidth', 1);
                 end
 
@@ -1093,19 +1134,18 @@ for iRow_param = 1:numel(setting.fig4_paramNames)
                     if strcmp(pName, 'criterion_DV')
                         nCt = max(S.n(iPt), 1);
                         sc  = nCt ^ setting.fig4_markerSizeExp;
-                        Pplot.markerSize = setting.fig4_markerSizeMin + ...
-                            (setting.fig4_markerSizeMax - setting.fig4_markerSizeMin) * (sc - 1) / max(sc, 1);
-                        Pplot.markerSize = min(max(Pplot.markerSize, setting.fig4_markerSizeMin), setting.fig4_markerSizeMax);
+                        szMin = setting.fig4_markerSizeMin * 0.5;
+                        szMax = setting.fig4_markerSizeMax * 0.5;
+                        Pplot.markerSize = szMin + (szMax - szMin) * (sc - 1) / max(sc, 1);
+                        Pplot.markerSize = min(max(Pplot.markerSize, szMin), szMax);
                     end
 
                     %=====================%
                     line([S.x(iPt) S.x(iPt)], [S.lb(iPt) S.ub(iPt)], ...
-                        'Color', cmap_cont_fig4(iCont,:), 'LineWidth', Pplot.errLineWidth);
-                    plot(S.x(iPt), S.y(iPt), marker_lambda_fig4{iLW}, ...
-                        'MarkerSize', Pplot.markerSize, ...
-                        'MarkerFaceColor', 'w', ...
-                        'MarkerEdgeColor', cmap_cont_fig4(iCont,:), ...
-                        'LineStyle', 'none', ...
+                        'Color', faceClr, 'LineWidth', Pplot.errLineWidth);
+                    scatter(S.x(iPt), S.y(iPt), Pplot.markerSize^2, faceClr, mkrCz, ...
+                        'MarkerEdgeColor', 'k', ...
+                        'MarkerFaceAlpha', 0.5, ...
                         'LineWidth', Pplot.lineWidth);
                     %=====================%
                 end
@@ -1149,7 +1189,8 @@ for iRow_param = 1:numel(setting.fig4_paramNames)
         if iCol_Bsimfit == 1
             ylabel(pTitle);
         end
-        Ppanel = fxn_collect_fig4_panel_points(Rsub, pName, lambda_whiten_unik, C_contribution_unik, setting.scalarCollapseFcn, nBins_Part4);
+        Ppanel = fxn_collect_fig4_panel_points( ...
+            Rsub, pName, gaborCST_unik, cSDT_unik, setting.scalarCollapseFcn, nBins_Part4);
         [rho_panel, ~, ~, rmse_panel] = fxn_param_recovery_stats(Ppanel.x, Ppanel.y);
         title(sprintf('Bfit=Bsim=%d \nr=%.2f | RMSE=%.3f', Bsimfit, rho_panel, rmse_panel));
         ax_fig4_last = gca;
@@ -1160,34 +1201,42 @@ sgtitle('Fig 4: Parameter recovery | Matched model pairs', 'FontWeight', 'bold')
 
 if isgraphics(ax_fig4_last)
     pos_fig4leg = ax_fig4_last.Position;
-    axColor_fig4 = axes('Position', pos_fig4leg, 'Color', 'none', 'Visible', 'off', ...
+    legFontSz = max(ax_fig4_last.FontSize - 1, 7);
+
+    % Legend 1: marker shape = cSDT_true
+    axShape_fig4 = axes('Position', pos_fig4leg, 'Color', 'none', 'Visible', 'off', ...
         'HitTest', 'off', 'HandleVisibility', 'off');
-    hold(axColor_fig4, 'on');
-    hCont_fig4 = gobjects(numel(C_contribution_unik), 1);
-    for i_leg = 1:numel(C_contribution_unik)
-        hCont_fig4(i_leg) = plot(axColor_fig4, nan, nan, '-', 'Color', cmap_cont_fig4(i_leg,:), 'LineWidth', 2);
+    hold(axShape_fig4, 'on');
+    hShape_fig4 = gobjects(nCz_fig4, 1);
+    for i_leg = 1:nCz_fig4
+        hShape_fig4(i_leg) = plot(axShape_fig4, nan, nan, ...
+            'LineStyle', 'none', 'Marker', markers_cz_fig4{i_leg}, ...
+            'MarkerFaceColor', [0.5 0.5 0.5], 'MarkerEdgeColor', 'k', ...
+            'MarkerSize', 7, 'LineWidth', 1.5);
     end
-    leg1_fig4 = legend(axColor_fig4, hCont_fig4, ...
-        arrayfun(@(x) sprintf('%g', x), C_contribution_unik, 'UniformOutput', false), ...
-        'Location', 'northeast', 'Orientation', 'vertical', 'Box', 'on', ...
-        'FontSize', max(ax_fig4_last.FontSize - 1, 7));
-    title(leg1_fig4, 'C_contribution');
-    axSig_fig4 = axes('Position', pos_fig4leg, 'Color', 'none', 'Visible', 'off', ...
-        'HitTest', 'off', 'HandleVisibility', 'off');
-    hold(axSig_fig4, 'on');
-    hSig_fig4 = gobjects(numel(lambda_whiten_unik), 1);
-    for i_leg = 1:numel(lambda_whiten_unik)
-        hSig_fig4(i_leg) = plot(axSig_fig4, nan, nan, ...
-            'LineStyle', 'none', ...
-            'Marker', marker_lambda_fig4{i_leg}, ...
-            'MarkerFaceColor', 'w', ...
-            'MarkerEdgeColor', 'k');
-    end
-    leg2_fig4 = legend(axSig_fig4, hSig_fig4, ...
-        arrayfun(@(x) sprintf('%g', x), lambda_whiten_unik, 'UniformOutput', false), ...
+    leg1_fig4 = legend(axShape_fig4, hShape_fig4, ...
+        arrayfun(@(x) sprintf('%g', x), cSDT_unik, 'UniformOutput', false), ...
         'Location', 'southeast', 'Orientation', 'vertical', 'Box', 'on', ...
-        'FontSize', max(ax_fig4_last.FontSize - 1, 7));
-    title(leg2_fig4, 'lambda_white');
+        'FontSize', legFontSz);
+    title(leg1_fig4, 'cSDT (shape)', 'Interpreter', 'none');
+
+    % Legend 2: face shade = signalCST (light grey → black)
+    axFace_fig4 = axes('Position', pos_fig4leg, 'Color', 'none', 'Visible', 'off', ...
+        'HitTest', 'off', 'HandleVisibility', 'off');
+    hold(axFace_fig4, 'on');
+    hFace_fig4 = gobjects(nSig_fig4, 1);
+    for i_leg = 1:nSig_fig4
+        fc = repmat(faceShadeVals_fig4(i_leg), 1, 3);
+        hFace_fig4(i_leg) = plot(axFace_fig4, nan, nan, ...
+            'LineStyle', 'none', 'Marker', 'o', ...
+            'MarkerFaceColor', fc, 'MarkerEdgeColor', 'k', ...
+            'MarkerSize', 7, 'LineWidth', 1.5);
+    end
+    leg2_fig4 = legend(axFace_fig4, hFace_fig4, ...
+        arrayfun(@(x) sprintf('%g', x), gaborCST_unik, 'UniformOutput', false), ...
+        'Location', 'northwest', 'Orientation', 'vertical', 'Box', 'on', ...
+        'FontSize', legFontSz);
+    title(leg2_fig4, 'signalCST (face shade)', 'Interpreter', 'none');
 end
 saveas(h, fullfile(nameFolder_Figures_part4, 'FigS4_paramRecovery.png'));
 close(h);
@@ -1435,18 +1484,17 @@ for iTile = 1:4
 
     % Keep tile sizing under TiledChartLayout control to avoid Position warnings.
 
-    % color axis
+    % color axis — use each panel's own data range for full color spectrum
     finVals = M_plot(isfinite(M_plot));
-    if ~isempty(clim_fix) && numel(clim_fix) == 2
-        cLo = clim_fix(1); cHi = clim_fix(2);
-    elseif ~isempty(finVals)
+    if ~isempty(finVals)
         cLo = min(finVals); cHi = max(finVals);
         if cLo == cHi, cLo = cLo - eps; cHi = cHi + eps; end
     else
         cLo = 0; cHi = 1;
     end
     clim([cLo cHi]);
-    % colorbar hidden for cleaner Figure 5 panels
+    % show colorbar
+    colorbar('Location', 'eastoutside');
 
     % annotate values with adaptive font color (low → white, high → black)
     for iFit_ann = 1:numel(Bfit_unik)
@@ -1667,6 +1715,208 @@ for iFit = 1:numel(Bfit_unik)
     close(h);
 end % iModelB_fit
 
+%% Figure 6B: parameter-pair correlation summary by signalCST x cSDT
+fprintf('\n%s: Fig 6B: Parameter-pair correlation summary\n', string(datetime('now')))
+
+% Fixed 6 parameter-pair columns from the canonical set used in Fig 6.
+pairParams_fig6b = {'Nmul', 'Nadd', 'Nshared', 'criterion_DV'};
+pairLabels_fig6b = {'N_{mul}', 'N_{add}', 'N_{shared}', 'Criterion DV'};
+pairIdx_fig6b = nchoosek(1:numel(pairParams_fig6b), 2);
+pairIdx_fig6b = pairIdx_fig6b([1, 2, 4, 3, 5, 6], :); % rearrange so all xx-cDV pairs are last
+nCols_fig6b = size(pairIdx_fig6b, 1); % expected = 6
+
+% One row per matched model (Bfit = Bsim), expected 7 rows.
+Bdiag_fig6b = intersect(Bfit_unik(:)', Bsim_unik(:)');
+nRows_fig6b = numel(Bdiag_fig6b);
+
+if nRows_fig6b == 0
+    fprintf('Skipping Fig 6B: no matched Bfit=Bsim models found.\n');
+else
+    nSig_fig6b = numel(gaborCST_unik);
+    nCz_fig6b = numel(cSDT_unik);
+    nBars_fig6b = nSig_fig6b * nCz_fig6b;
+    xBar_fig6b = 1:nBars_fig6b;
+
+    barLabels_fig6b = cell(1, nBars_fig6b);
+    barSigIdx_fig6b = nan(1, nBars_fig6b);
+    barCzIdx_fig6b = nan(1, nBars_fig6b);
+    iBar_fig6b = 0;
+    for iCz = 1:nCz_fig6b
+        for iSig = 1:nSig_fig6b
+            iBar_fig6b = iBar_fig6b + 1;
+            barSigIdx_fig6b(iBar_fig6b) = iSig;
+            barCzIdx_fig6b(iBar_fig6b) = iCz;
+            barLabels_fig6b{iBar_fig6b} = sprintf('G%g|C%g', gaborCST_unik(iSig), cSDT_unik(iCz));
+        end
+    end
+
+    h = figure('Position', [80 80 330*nCols_fig6b 210*nRows_fig6b]);
+    tiledlayout(nRows_fig6b, nCols_fig6b, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+    for iRow = 1:nRows_fig6b
+        fitModel = Bdiag_fig6b(iRow);
+        Rsub = R([R.iModelB_sim] == fitModel & [R.iModelB_fit] == fitModel);
+
+        for iCol = 1:nCols_fig6b
+            nexttile((iRow-1)*nCols_fig6b + iCol); hold on;
+
+            iP1 = pairIdx_fig6b(iCol, 1);
+            iP2 = pairIdx_fig6b(iCol, 2);
+            p1 = pairParams_fig6b{iP1};
+            p2 = pairParams_fig6b{iP2};
+
+            if strcmp(p1, 'criterion_DV')
+                f1 = 'criterion_DV_est_allIter';
+            else
+                f1 = sprintf('%s_est_allIter', p1);
+            end
+            if strcmp(p2, 'criterion_DV')
+                f2 = 'criterion_DV_est_allIter';
+            else
+                f2 = sprintf('%s_est_allIter', p2);
+            end
+
+            yMean = nan(nBars_fig6b, 1);
+            ySem  = nan(nBars_fig6b, 1);
+            nRep  = zeros(nBars_fig6b, 1);
+
+            for iB = 1:nBars_fig6b
+                iSig = barSigIdx_fig6b(iB);
+                iCz = barCzIdx_fig6b(iB);
+
+                idxRows = find([Rsub.gaborCST] == gaborCST_unik(iSig) & [Rsub.cSDT_true] == cSDT_unik(iCz));
+                if isempty(idxRows)
+                    continue;
+                end
+
+                rVals = nan(numel(idxRows), 1);
+                for iRR = 1:numel(idxRows)
+                    rIdx = idxRows(iRR);
+
+                    xTmp = Rsub(rIdx).(f1);
+                    yTmp = Rsub(rIdx).(f2);
+                    xIter = xTmp(:);
+                    yIter = yTmp(:);
+
+                    nItCommon = min(numel(xIter), numel(yIter));
+                    if nItCommon < 2
+                        continue;
+                    end
+                    xIter = xIter(1:nItCommon);
+                    yIter = yIter(1:nItCommon);
+
+                    good = isfinite(xIter) & isfinite(yIter);
+                    if sum(good) < 2
+                        continue;
+                    end
+
+                    xi = xIter(good);
+                    yi = yIter(good);
+                    if numel(unique(xi)) < 2 || numel(unique(yi)) < 2
+                        continue;
+                    end
+
+                    rVals(iRR) = corr(xi, yi);
+                end
+
+                goodR = isfinite(rVals);
+                if any(goodR)
+                    yMean(iB) = mean(rVals(goodR));
+                    nRep(iB) = sum(goodR);
+                    if nRep(iB) >= 2
+                        ySem(iB) = std(rVals(goodR), 0) / sqrt(nRep(iB));
+                    else
+                        ySem(iB) = 0;
+                    end
+                end
+            end
+
+            if all(~isfinite(yMean))
+                text(0.5, 0.5, 'N/A', 'Units', 'normalized', ...
+                    'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle');
+                axis off;
+                continue;
+            end
+
+            b = bar(xBar_fig6b, yMean, 0.85, 'FaceColor', 'flat', 'EdgeColor', 'none');
+
+            % cSDT -> hue: more negative = bluer, more positive = redder.
+            czMin = min(cSDT_unik);
+            czMax = max(cSDT_unik);
+
+            % signalCST -> contrast/vividness: low = lighter/paler, high = more vivid.
+            sigMin = min(gaborCST_unik);
+            sigMax = max(gaborCST_unik);
+
+            for iB = 1:nBars_fig6b
+                if ~isfinite(yMean(iB))
+                    continue;
+                end
+
+                czVal = cSDT_unik(barCzIdx_fig6b(iB));
+                sigVal = gaborCST_unik(barSigIdx_fig6b(iB));
+
+                if czMax > czMin
+                    czNorm = (czVal - czMin) / (czMax - czMin);
+                else
+                    czNorm = 0.5;
+                end
+
+                if sigMax > sigMin
+                    sigNorm = (sigVal - sigMin) / (sigMax - sigMin);
+                else
+                    sigNorm = 0.5;
+                end
+
+                % Hue: blue (2/3) -> red (0) as cSDT goes negative -> positive.
+                hCol = (1 - czNorm) * (2 / 3);
+
+                % Saturation/Value: low signal = pale/light, high signal = vivid.
+                sCol = 0.25 + 0.70 * sigNorm;   % 0.25 .. 0.95
+                vCol = 0.98 - 0.13 * sigNorm;   % 0.98 .. 0.85
+
+                b.CData(iB, :) = hsv2rgb([hCol, sCol, vCol]);
+            end
+
+            goodErr = isfinite(yMean) & isfinite(ySem);
+            if any(goodErr)
+                errorbar(xBar_fig6b(goodErr), yMean(goodErr), ySem(goodErr), 'k.', ...
+                    'LineWidth', 1.0, 'CapSize', 0);
+            end
+
+            yline(0, 'k-', 'LineWidth', 0.8);
+            xlim([0.4, nBars_fig6b + 0.6]);
+            ylim([-1, 1]);
+
+            % Visual separators between cSDT groups (each group has nSig_fig6b bars).
+            for iSep = 1:max(nCz_fig6b - 1, 0)
+                xline(iSep * nSig_fig6b + 0.5, '-', 'Color', [0.7 0.7 0.7], 'LineWidth', 0.9);
+            end
+
+            xticks(xBar_fig6b);
+            if iRow == nRows_fig6b
+                xticklabels(barLabels_fig6b);
+                xtickangle(45);
+            else
+                xticklabels({});
+            end
+
+            if iCol == 1
+                ylabel({sprintf('B%d', fitModel), 'r mean +/- 1sem'});
+            end
+            if iRow == 1
+                title(sprintf('%s vs %s', pairLabels_fig6b{iP1}, pairLabels_fig6b{iP2}));
+            end
+
+            fxn_style_ax(gca, setting);
+        end
+    end
+
+    sgtitle('Fig 6B: r by signalCST x cSDT | rows: Bfit=Bsim, cols: param pair', 'FontWeight', 'bold');
+    saveas(h, fullfile(nameFolder_Figures_part4, 'FigS6B_paramCorr_summaryBars.png'));
+    close(h);
+end
+
 %% Figure 7: Full vs. reduced models—Iteration-level ΔnLL distributions (Generating model is the full model B1)
 %    For each reduced model Br, shows the per-iteration distribution of
 %    ΔnLL(Br − B1) aggregated across conditions.
@@ -1730,7 +1980,7 @@ else
             scatter(xJit, condMeds(good), 28, [0.5 0.5 0.5], 'filled', 'MarkerFaceAlpha', 0.5);
             [gMed, gLb, gUb] = getCI(condMeds(good), 1, 1);
             errorbar(1, gMed, gMed - gLb, gUb - gMed, 'ko', ...
-                'MarkerFaceColor', 'k', 'MarkerSize', 7, 'LineWidth', 1.8, 'CapSize', 8);
+                'MarkerFaceColor', 'k', 'MarkerSize', 7, 'LineWidth', 1.8, 'CapSize', 0);
             winRate_f7 = mean(condMeds(good) > 0);
             text(1.35, gMed, sprintf('win=%.0f%%', winRate_f7*100), ...
                 'FontSize', setting.fontSize, 'VerticalAlignment', 'middle');
@@ -2022,7 +2272,6 @@ for iIter = 1:nIter
     sse = sum((yTrue - yEst).^2);
     sst = sum((yTrue - mean(yTrue)).^2);
     template_R2_iter(iIter) = 1 - sse / sst;
-    % template_R2_iter(iIter) = corr(yTrue, yEst);
 end
 end
 
@@ -2600,11 +2849,13 @@ else
 end
 end
 
-function P = fxn_collect_fig4_panel_points(Rsub, pName, lambda_whiten_unik, C_contribution_unik, collapseFcn, nBins_Part4)
+function P = fxn_collect_fig4_panel_points(Rsub, pName, gaborCST_unik, cSDT_unik, collapseFcn, nBins_Part4)
 P = struct('x', [], 'y', [], 'lb', [], 'ub', [], 'n', []);
-for iLW = 1:numel(lambda_whiten_unik)
-    for iCont = 1:numel(C_contribution_unik)
-        S = fxn_collapse_param_byLevel(Rsub, pName, lambda_whiten_unik(iLW), C_contribution_unik(iCont), collapseFcn, nBins_Part4);
+for iSig = 1:numel(gaborCST_unik)
+    for iCz = 1:numel(cSDT_unik)
+        S = fxn_collapse_param_byLevel( ...
+            Rsub, pName, ...
+            collapseFcn, nBins_Part4, gaborCST_unik(iSig), cSDT_unik(iCz));
         if isempty(S.x), continue; end
         P.x = [P.x; S.x(:)]; %#ok<AGROW>
         P.y = [P.y; S.y(:)]; %#ok<AGROW>
@@ -2630,15 +2881,19 @@ bias = mean(y(:) - x(:), 'omitnan');
 rmse = sqrt(mean((y(:) - x(:)).^2, 'omitnan'));
 end
 
-function S = fxn_collapse_param_byLevel(Rin, pName, lambdaVal, contributionVal, collapseFcn, nBins_Part4)
+function S = fxn_collapse_param_byLevel(Rin, pName, collapseFcn, nBins_Part4, signalVal, czVal)
 % Keep the examined parameter levels separate.
 % Collapse only across the other parameters.
+% Filter by signalCST x cSDT_true when signalVal/czVal are supplied.
 
 S = struct('x', [], 'y', [], 'lb', [], 'ub', [], 'n', []);
 
-% restrict to one lambda_whiten x C_contribution combination
-idx = [Rin.lambda_whiten] == lambdaVal & [Rin.C_contribution] == contributionVal;
-Rsub = Rin(idx);
+if nargin >= 6
+    idx = [Rin.gaborCST] == signalVal & [Rin.cSDT_true] == czVal;
+    Rsub = Rin(idx);
+else
+    Rsub = Rin;
+end
 if isempty(Rsub), return; end
 
 switch pName

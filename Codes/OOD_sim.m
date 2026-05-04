@@ -16,7 +16,7 @@ function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true
 
 % Simulation input parameters
 
-flag_whitenDV = 0; % 1=compute DV from whitened energy; 0=use raw energy
+flag_whitenDV = 1; % 1=compute DV from whitened energy; 0=use raw energy
 % Enforce reduced-model ground truth by zeroing excluded IN terms.
 switch iModelB_sim
     case 1  % Full: Nmul + Nadd + Nshared
@@ -298,16 +298,16 @@ fprintf('%s: Internal noise sampled and added.\n\n', datetime('now'))
 %% Set a true criterion given the true SDT criterion
 % Candidate criteria in DV space:
 DV_sorted = sort(unique(DVnoisy_sim_allT(:)));
-criterion_grid = [-Inf; (DV_sorted(1:end-1) + DV_sorted(2:end))/2; Inf];
-loss_grid = nan(size(criterion_grid));
-c_z_grid = nan(size(criterion_grid));
-for iC = 1:numel(criterion_grid)
-    c_try = criterion_grid(iC);
-    [loss_grid(iC), c_z_grid(iC)] = fxn_loss_cSDT(c_try, DVnoisy_sim_allT, iPRS_allT, cSDT_true);
+cDV_grid = [-Inf; (DV_sorted(1:end-1) + DV_sorted(2:end))/2; Inf];
+loss_grid = nan(size(cDV_grid));
+cSDT_grid = nan(size(cDV_grid));
+for iC = 1:numel(cDV_grid)
+    c_try = cDV_grid(iC);
+    [loss_grid(iC), cSDT_grid(iC)] = fxn_loss_cSDT(c_try, DVnoisy_sim_allT, iPRS_allT, cSDT_true);
 end
 % Choose the criterion in DV unit
 [~, idx_best] = min(loss_grid);
-criterion_DV_true = criterion_grid(idx_best);
+criterion_DV_true = cDV_grid(idx_best);
 
 save(sprintf('%s/truth.mat', nameFolder_Data_OOD_IO), 'criterion_DV_true', '-append');
 
@@ -402,7 +402,7 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
     end
 else
     fprintf('\n\n ** Simulated pC=%.2f, OUT OF the range [%.2f, %.2f] ** \n\n', pC_sim, pC_filter)
-end % if 
+end % if
 
 % Play sound to indicate end of analysis
 fs = 44100;              % sampling rate

@@ -226,6 +226,8 @@ switch flag_incluCrit
             {             'Nadd',                  'criterion_DV'}, ... %6
             {                       'Nshared',    'criterion_DV'}, ... %7
             {                                    'criterion_DV'}}; %8
+otherwise
+        error('Invalid value for flag_incluCrit. Must be 0 or 1.');
 end
 namesConvolveType = {'dot product', 'convolution'}; nConvolveType = length(namesConvolveType);
 namesIVType = {'sum all channels', 'channel with max IV'}; nIVType = length(namesIVType);
