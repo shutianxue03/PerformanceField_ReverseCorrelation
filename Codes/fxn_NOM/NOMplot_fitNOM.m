@@ -53,6 +53,9 @@ end
 
 sz_scale = 80;
 
+% Get xlim based on DV range across all bins (with some padding)
+xlim_DV = [min(DV_allBins_med), max(DV_allBins_med)];  % <-- add this
+
 figure('Position', [0 200 300 800])
 subplot(3,1,1), hold on
 
@@ -67,7 +70,7 @@ patch([DV_allBins_med, fliplr(DV_allBins_med)], [pYES_pred_lb, fliplr(pYES_pred_
 
 yline(.5, 'k--');
 ylim([0,1])
-xlim([0, 30])
+xlim(xlim_DV + [-1, 1]) % <-- use xlim_DV here with some padding
 xlabel('Binned DV')
 ylabel('pYES')
 % add r and R-squared
@@ -88,7 +91,7 @@ patch([DV_allBins_med, fliplr(DV_allBins_med)], [pC_pred_lb, fliplr(pC_pred_ub)]
 yline(.5, 'k--');
 yline(mean(pC_data_med), 'k-');
 ylim([0,1])
-xlim([0, 30])
+xlim(xlim_DV + [-1, 1]) % <-- use xlim_DV here with some padding
 xlabel('Binned DV')
 ylabel('pC')
 % add r and R-squared
@@ -109,7 +112,7 @@ plot(DV_allBins_med, pA_pred_med, 'k-');
 patch([DV_allBins_med, fliplr(DV_allBins_med)], [pA_pred_lb, fliplr(pA_pred_ub)], 'k', 'FaceAlpha', .2, 'EdgeColor', 'none');
 
 ylim([.5,1])
-xlim([0, 30])
+xlim(xlim_DV + [-1, 1]) % <-- use xlim_DV here with some padding
 xlabel('Binned DV')
 ylabel('pA')
 % add r and R-squared
