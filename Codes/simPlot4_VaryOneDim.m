@@ -39,498 +39,498 @@ namesMetrics_behav = {'pYES','pC','pA'};
 %% find IO folders
 if ~exist(nameFile_R, 'file')
 
-nameDir = dir(nameFolder_Data_NOM_Trialwise);
-nameDir = nameDir([nameDir.isdir]);
-nameDir = nameDir(~ismember({nameDir.name}, {'.', '..'}));
-nFiles = numel(nameDir);
+    nameDir = dir(nameFolder_Data_NOM_Trialwise);
+    nameDir = nameDir([nameDir.isdir]);
+    nameDir = nameDir(~ismember({nameDir.name}, {'.', '..'}));
+    nFiles = numel(nameDir);
 
-if nFiles == 0
-    error('No IO folders found in %s', nameFolder_Data_NOM_Trialwise);
-end
-
-fprintf('\nFound %d IO folders.\n', nFiles);
-
-%% Parse all conditions once
-info_all = cell(nFiles, 1);
-keepParse = false(nFiles, 1);
-
-for iFile = 1:nFiles
-    nameIO = nameDir(iFile).name;
-    info = fxn_parse_nameIO(nameIO);
-
-    if isempty(fieldnames(info))
-        fprintf('Could not parse: %s\n', nameIO);
-        continue
+    if nFiles == 0
+        error('No IO folders found in %s', nameFolder_Data_NOM_Trialwise);
     end
 
-    info.nameIO = nameIO;
-    info.folder_OOD = fullfile(nameFolder_Data_OOD, nameIO);
-    info.folder_NOM = fullfile(nameFolder_Data_NOM_Trialwise, nameIO);
+    fprintf('\nFound %d IO folders.\n', nFiles);
 
-    info_all{iFile} = info;
-    keepParse(iFile) = true;
-end
+    %% Parse all conditions once
+    info_all = cell(nFiles, 1);
+    keepParse = false(nFiles, 1);
 
-info_all = info_all(keepParse);
-nFiles = numel(info_all);
+    for iFile = 1:nFiles
+        nameIO = nameDir(iFile).name;
+        info = fxn_parse_nameIO(nameIO);
 
-fprintf('Parsed %d valid IO folders.\n', nFiles);
-
-%% Compile all fitted models
-% R: growing struct array; one row per (simulation condition × fitted B-model) pair.
-% Fields are appended inside the loop below and the array grows via R = [R; Ri].
-
-R = struct([]);
-
-fprintf('\n============================================\n');
-fprintf('%s\n', datetime('now'))
-fprintf('Compiling all fitted models\n');
-fprintf('============================================\n');
-
-for iFile = 1:nFiles
-    fprintf('\n%d/%d: ', iFile, nFiles)
-    info = info_all{iFile};
-
-    % =========================================================
-    % 1. Load data once
-    % =========================================================
-    nameFile_truth = fullfile(info.folder_OOD, 'truth.mat');
-    if ~exist(nameFile_truth, 'file')
-        fprintf('Missing truth.mat: %s\n', nameFile_truth);
-        continue
-    end
-    truth = load(nameFile_truth);
-
-    str_loadCompIV = sprintf('n*_A%d_compIV.mat', iModelA_fit);
-    nameDir_compIV = dir(fullfile(info.folder_NOM, str_loadCompIV));
-    nameDir_compIV = nameDir_compIV(~contains({nameDir_compIV.name}, 'min'));
-    if isempty(nameDir_compIV)
-        fprintf('No compIV file found in %s\n', info.folder_NOM);
-        continue
-    end
-    data_compIV = load(fullfile(nameDir_compIV(1).folder, nameDir_compIV(1).name));
-
-    % =========================================================
-    % 2. Condition-level base record
-    %    fileBase inherits parsed condition metadata from info, then is
-    %    augmented with compiled statistics (template recovery, behavioral
-    %    metrics, basis settings).  It is copied into Ri (one row per fitted
-    %    B-model) and each Ri is appended to R.
-    % =========================================================
-    fileBase = info;
-
-    if isfield(truth, 'nIter')
-        nIter = truth.nIter;
-    else
-        template_est_tmp = data_compIV.template_tmpl_allIter;
-        % if ndims(template_est_tmp) == 3
-        nIter = size(template_est_tmp, 1);
-        % else
-        % nIter = size(template_est_tmp, 1);
-        % end
-    end
-
-    % =========================================================
-    % 0. Create empty placeholders for all fields
-    % =========================================================
-    % true values -> template-related values -> tuning-related values ->
-    % metric-related values -> parameter-related values -> criterion-related values
-
-    % ---------- true values ----------
-
-    % ---------- template-related values ----------
-    fileBase.template_rmse_iter = [];
-    fileBase.template_R2_iter = [];
-
-    % ---------- Basis-setting-related values ----------
-    fileBase.nBasisORI_mode = nan;
-    fileBase.nBasisORI_mode_pct = nan;
-    fileBase.nBasisSF_mode = nan;
-    fileBase.nBasisSF_mode_pct = nan;
-    fileBase.basisFxnORI_mode = "";
-    fileBase.basisFxnORI_mode_pct = nan;
-    fileBase.basisFxnSF_mode = "";
-    fileBase.basisFxnSF_mode_pct = nan;
-    fileBase.ridge_mode = "";
-    fileBase.ridge_mode_pct = nan;
-    fileBase.basisWidthScaleORI_mode = "";
-    fileBase.basisWidthScaleORI_mode_pct = nan;
-    fileBase.basisWidthScaleSF_mode = "";
-    fileBase.basisWidthScaleSF_mode_pct = nan;
-    fileBase.asymSF_rightLeftRatio_mode = "";
-    fileBase.asymSF_rightLeftRatio_mode_pct = nan;
-
-    % ---------- tuning-related values ----------
-    fileBase.margORI_true = nan(1, nORI);
-    fileBase.margSF_true = nan(1, nSF);
-    fileBase.margORI_est_iter_norm = [];
-    fileBase.margSF_est_iter_norm = [];
-
-    % ---------- metric-related values ----------
-    fileBase.pYES_data_iter = [];
-    fileBase.pC_data_iter = [];
-    fileBase.pA_data_iter = [];
-
-    fileBase.DV_allBins_iter = [];
-    fileBase.nTrials_allBins_iter = [];
-    fileBase.pYES_data_curve_iter = [];
-    fileBase.pC_data_curve_iter = [];
-    fileBase.pA_data_curve_iter = [];
-
-    % ---------- criterion-related values ----------
-    fileBase.criterion_DV_true = nan;
-
-    % =========================================================
-    % 1. template recovery
-    % =========================================================
-    [template_rmse_iter, template_R2_iter] = fxn_templateRecovery_simPlot2Style_iter( ...
-        truth, data_compIV, nIter);
-
-    fileBase.template_rmse_iter = template_rmse_iter(:)';
-    fileBase.template_R2_iter = template_R2_iter(:)';
-
-    % ---------- marginalized templates ----------
-    template_true_vec = truth.template_true(:)';
-    template_true_2D = reshape(template_true_vec, [nORI, nSF]);
-
-    margORI_true = mean(template_true_2D, 2)';
-    margSF_true = mean(template_true_2D, 1);
-
-    % Make peak = 1
-    margORI_true = margORI_true ./ max(margORI_true);
-    margSF_true = margSF_true ./ max(margSF_true);
-
-    fileBase.margORI_true = margORI_true;
-    fileBase.margSF_true = margSF_true;
-
-    template_est = data_compIV.template_tmpl_allIter;
-    if ndims(template_est) == 3
-        template_est = reshape(template_est, size(template_est,1), []);
-    end
-
-    nIter_est = size(template_est, 1);
-    margORI_est_iter = nan(nIter_est, nORI);
-    margSF_est_iter = nan(nIter_est, nSF);
-
-    for iIter = 1:nIter_est
-        tmp2D = reshape(template_est(iIter,:), [nORI, nSF]);
-        margORI_est_iter(iIter, :) = mean(tmp2D, 2)';
-        margSF_est_iter(iIter, :) = mean(tmp2D, 1);
-    end
-
-    % Normalize each iteration separately so iteration CI reflects tuning-shape variability.
-    margORI_est_iter_norm = margORI_est_iter;
-    margSF_est_iter_norm = margSF_est_iter;
-    for iIter = 1:nIter_est
-        mxORI = max(margORI_est_iter_norm(iIter, :), [], 2);
-        mxSF = max(margSF_est_iter_norm(iIter, :), [], 2);
-        if isfinite(mxORI) && mxORI ~= 0
-            margORI_est_iter_norm(iIter, :) = margORI_est_iter_norm(iIter, :) ./ mxORI;
-        end
-        if isfinite(mxSF) && mxSF ~= 0
-            margSF_est_iter_norm(iIter, :) = margSF_est_iter_norm(iIter, :) ./ mxSF;
-        end
-    end
-
-    % Store full per-iteration normalized marginals; summary stats are computed later.
-    fileBase.margORI_est_iter_norm = margORI_est_iter_norm;
-    fileBase.margSF_est_iter_norm = margSF_est_iter_norm;
-
-    % =========================================================
-    % 2. Basis-settings-related values
-    % =========================================================
-    nBasisORI_allIter = data_compIV.nBasisORI_tmpl_allIter;
-    nBasisSF_allIter = data_compIV.nBasisSF_tmpl_allIter;
-
-    fileBase.nBasisORI_mode = mode(nBasisORI_allIter);
-    fileBase.nBasisORI_mode_pct = mean(nBasisORI_allIter == mode(nBasisORI_allIter));
-
-    fileBase.nBasisSF_mode = mode(nBasisSF_allIter);
-    fileBase.nBasisSF_mode_pct = mean(nBasisSF_allIter == mode(nBasisSF_allIter));
-
-    % Find the most frequently selected basis family across iterations
-    % For ORI
-    strVec = string(data_compIV.basisFxnORI_tmpl_allIter(:));
-    [uniqueVals, ~, groupIdx] = unique(strVec);
-    counts = accumarray(groupIdx, 1);
-    [~, idxMax] = max(counts);
-    fileBase.basisFxnORI_mode     = uniqueVals(idxMax);
-    fileBase.basisFxnORI_mode_pct = counts(idxMax) / numel(strVec);
-
-    % For SF
-    strVec = string(data_compIV.basisFxnSF_tmpl_allIter(:));
-    [uniqueVals, ~, groupIdx] = unique(strVec);
-    counts = accumarray(groupIdx, 1);
-    [~, idxMax] = max(counts);
-    fileBase.basisFxnSF_mode     = uniqueVals(idxMax);
-    fileBase.basisFxnSF_mode_pct = counts(idxMax) / numel(strVec);
-
-    % Modal L2 ridge regularization setting across iterations.
-    strVec = string(data_compIV.ridge_tmpl_allIter(:));
-    [uniqueVals, ~, groupIdx] = unique(strVec);
-    counts = accumarray(groupIdx, 1);
-    [~, idxMax] = max(counts);
-    fileBase.ridge_mode     = uniqueVals(idxMax);
-    fileBase.ridge_mode_pct = counts(idxMax) / numel(strVec);
-
-    % Modal ORI width-scale setting across iterations.
-    if isfield(data_compIV, 'basisWidthScaleORI_tmpl_allIter') && ~isempty(data_compIV.basisWidthScaleORI_tmpl_allIter)
-        vals = data_compIV.basisWidthScaleORI_tmpl_allIter(:);
-        if isnumeric(vals)
-            vals = vals(isfinite(vals));
-        end
-        if ~isempty(vals)
-            strVec = string(vals);
-            [uniqueVals, ~, groupIdx] = unique(strVec);
-            counts = accumarray(groupIdx, 1);
-            [~, idxMax] = max(counts);
-            fileBase.basisWidthScaleORI_mode     = uniqueVals(idxMax);
-            fileBase.basisWidthScaleORI_mode_pct = counts(idxMax) / numel(strVec);
-        end
-    end
-
-    % Modal SF width-scale setting across iterations.
-    if isfield(data_compIV, 'basisWidthScaleSF_tmpl_allIter') && ~isempty(data_compIV.basisWidthScaleSF_tmpl_allIter)
-        vals = data_compIV.basisWidthScaleSF_tmpl_allIter(:);
-        if isnumeric(vals)
-            vals = vals(isfinite(vals));
-        end
-        if ~isempty(vals)
-            strVec = string(vals);
-            [uniqueVals, ~, groupIdx] = unique(strVec);
-            counts = accumarray(groupIdx, 1);
-            [~, idxMax] = max(counts);
-            fileBase.basisWidthScaleSF_mode     = uniqueVals(idxMax);
-            fileBase.basisWidthScaleSF_mode_pct = counts(idxMax) / numel(strVec);
-        end
-    end
-
-    % Modal SF asymmetry setting across iterations.
-    if isfield(data_compIV, 'asymSF_rightLeftRatio_tmpl_allIter') && ~isempty(data_compIV.asymSF_rightLeftRatio_tmpl_allIter)
-        vals = data_compIV.asymSF_rightLeftRatio_tmpl_allIter(:);
-        if isnumeric(vals)
-            vals = vals(isfinite(vals));
-        end
-        if ~isempty(vals)
-            strVec = string(vals);
-            [uniqueVals, ~, groupIdx] = unique(strVec);
-            counts = accumarray(groupIdx, 1);
-            [~, idxMax] = max(counts);
-            fileBase.asymSF_rightLeftRatio_mode     = uniqueVals(idxMax);
-            fileBase.asymSF_rightLeftRatio_mode_pct = counts(idxMax) / numel(strVec);
-        end
-    end
-
-    % =========================================================
-    % 3. Metrics-related values
-    %    Simulated data metrics are identical regardless of which B-model is fitted,
-    % =========================================================
-    found_fit_for_data = false;
-
-    for iModelB_fit_probe = 1:nBfit
-        str_loadfitNOM = sprintf('n*_A%dB%d.mat', iModelA_fit, iModelB_fit_probe);
-        nameDir_fitNOM_probe = dir(fullfile(info.folder_NOM, str_loadfitNOM));
-        nameDir_fitNOM_probe = nameDir_fitNOM_probe(~contains({nameDir_fitNOM_probe.name}, 'min'));
-
-        if isempty(nameDir_fitNOM_probe)
+        if isempty(fieldnames(info))
+            fprintf('Could not parse: %s\n', nameIO);
             continue
         end
 
-        data_fitNOM_probe = load(fullfile(nameDir_fitNOM_probe(1).folder, nameDir_fitNOM_probe(1).name));
-        pred_metrics_allIter_probe = data_fitNOM_probe.pred_metrics_allIter;
-        nIter_probe = numel(pred_metrics_allIter_probe);
+        info.nameIO = nameIO;
+        info.folder_OOD = fullfile(nameFolder_Data_OOD, nameIO);
+        info.folder_NOM = fullfile(nameFolder_Data_NOM_Trialwise, nameIO);
 
-        pYES_data_iter = nan(nIter_probe,1);
-        pC_data_iter = nan(nIter_probe,1);
-        pA_data_iter = nan(nIter_probe,1);
-
-        nBins_curve = numel(pred_metrics_allIter_probe{1}.metrics.IV_allBins);
-        DV_allBins_iter = nan(nIter_probe, nBins_curve);
-        nTrials_allBins_iter = nan(nIter_probe, nBins_curve);
-        pYES_data_curve_iter = nan(nIter_probe, nBins_curve);
-        pC_data_curve_iter = nan(nIter_probe, nBins_curve);
-        pA_data_curve_iter = nan(nIter_probe, nBins_curve);
-
-        for iIter = 1:nIter_probe
-            pYES_data_iter(iIter) = mean(pred_metrics_allIter_probe{iIter}.metrics.pYES_data_allBins, 'omitnan');
-            pC_data_iter(iIter) = mean(pred_metrics_allIter_probe{iIter}.metrics.pC_data_allBins, 'omitnan');
-            pA_data_iter(iIter) = mean(pred_metrics_allIter_probe{iIter}.metrics.pA_data_allBins, 'omitnan');
-
-            DV_allBins_iter(iIter, :) = pred_metrics_allIter_probe{iIter}.metrics.IV_allBins;
-            nTrials_allBins_iter(iIter, :) = pred_metrics_allIter_probe{iIter}.metrics.nTrials_allBins;
-            pYES_data_curve_iter(iIter, :) = pred_metrics_allIter_probe{iIter}.metrics.pYES_data_allBins;
-            pC_data_curve_iter(iIter, :) = pred_metrics_allIter_probe{iIter}.metrics.pC_data_allBins;
-            pA_data_curve_iter(iIter, :) = pred_metrics_allIter_probe{iIter}.metrics.pA_data_allBins;
-        end %iIter
-
-        fileBase.pYES_data_iter = pYES_data_iter(:)';
-        fileBase.pC_data_iter = pC_data_iter(:)';
-        fileBase.pA_data_iter = pA_data_iter(:)';
-        fileBase.DV_allBins_iter = DV_allBins_iter;
-        fileBase.nTrials_allBins_iter = nTrials_allBins_iter;
-        fileBase.pYES_data_curve_iter = pYES_data_curve_iter;
-        fileBase.pC_data_curve_iter = pC_data_curve_iter;
-        fileBase.pA_data_curve_iter = pA_data_curve_iter;
-
-        found_fit_for_data = true;
-        break
-    end % iModelB_fit_probe
-
-    if ~found_fit_for_data
-        fprintf('No fitNOM file found in %s for any Bfit\n', info.folder_NOM);
-        continue
+        info_all{iFile} = info;
+        keepParse(iFile) = true;
     end
 
-    % ---------- criterion true ----------
-    if isfield(truth, 'criterion_DV_true')
-        fileBase.criterion_DV_true = truth.criterion_DV_true;
-    end
+    info_all = info_all(keepParse);
+    nFiles = numel(info_all);
 
-    % =========================================================
-    % 4. Fitted-model-related values
-    % =========================================================
-    for iModelB_fit = 1:nBfit
+    fprintf('Parsed %d valid IO folders.\n', nFiles);
 
-        str_loadfitNOM = sprintf('n*_A%dB%d.mat', iModelA_fit, iModelB_fit);
-        nameDir_fitNOM = dir(fullfile(info.folder_NOM, str_loadfitNOM));
-        nameDir_fitNOM = nameDir_fitNOM(~contains({nameDir_fitNOM.name}, 'min'));
-        if isempty(nameDir_fitNOM)
-            fprintf('No fitNOM file found in %s for Bfit=%d\n', info.folder_NOM, iModelB_fit);
+    %% Compile all fitted models
+    % R: growing struct array; one row per (simulation condition × fitted B-model) pair.
+    % Fields are appended inside the loop below and the array grows via R = [R; Ri].
+
+    R = struct([]);
+
+    fprintf('\n============================================\n');
+    fprintf('%s\n', datetime('now'))
+    fprintf('Compiling all fitted models\n');
+    fprintf('============================================\n');
+
+    for iFile = 1:nFiles
+        fprintf('\n%d/%d: ', iFile, nFiles)
+        info = info_all{iFile};
+
+        % =========================================================
+        % 1. Load data once
+        % =========================================================
+        nameFile_truth = fullfile(info.folder_OOD, 'truth.mat');
+        if ~exist(nameFile_truth, 'file')
+            fprintf('Missing truth.mat: %s\n', nameFile_truth);
             continue
         end
-        data_fitNOM = load(fullfile(nameDir_fitNOM(1).folder, nameDir_fitNOM(1).name));
+        truth = load(nameFile_truth);
 
-        % Ri: one record destined for R, for this (simulation condition × B-fit model) pair.
-        % It inherits all condition-level fields from fileBase, then adds fit-specific fields.
-        Ri = fileBase;
-        Ri.iModelB_fit = iModelB_fit;
+        str_loadCompIV = sprintf('n*_A%d_compIV.mat', iModelA_fit);
+        nameDir_compIV = dir(fullfile(info.folder_NOM, str_loadCompIV));
+        nameDir_compIV = nameDir_compIV(~contains({nameDir_compIV.name}, 'min'));
+        if isempty(nameDir_compIV)
+            fprintf('No compIV file found in %s\n', info.folder_NOM);
+            continue
+        end
+        data_compIV = load(fullfile(nameDir_compIV(1).folder, nameDir_compIV(1).name));
 
-        % initialize fit-level fields
+        % =========================================================
+        % 2. Condition-level base record
+        %    fileBase inherits parsed condition metadata from info, then is
+        %    augmented with compiled statistics (template recovery, behavioral
+        %    metrics, basis settings).  It is copied into Ri (one row per fitted
+        %    B-model) and each Ri is appended to R.
+        % =========================================================
+        fileBase = info;
+
+        if isfield(truth, 'nIter')
+            nIter = truth.nIter;
+        else
+            template_est_tmp = data_compIV.template_tmpl_allIter;
+            % if ndims(template_est_tmp) == 3
+            nIter = size(template_est_tmp, 1);
+            % else
+            % nIter = size(template_est_tmp, 1);
+            % end
+        end
+
+        % =========================================================
+        % 0. Create empty placeholders for all fields
+        % =========================================================
         % true values -> template-related values -> tuning-related values ->
         % metric-related values -> parameter-related values -> criterion-related values
 
         % ---------- true values ----------
 
         % ---------- template-related values ----------
-        % inherited from fileBase
+        fileBase.template_rmse_iter = [];
+        fileBase.template_R2_iter = [];
+
+        % ---------- Basis-setting-related values ----------
+        fileBase.nBasisORI_mode = nan;
+        fileBase.nBasisORI_mode_pct = nan;
+        fileBase.nBasisSF_mode = nan;
+        fileBase.nBasisSF_mode_pct = nan;
+        fileBase.basisFxnORI_mode = "";
+        fileBase.basisFxnORI_mode_pct = nan;
+        fileBase.basisFxnSF_mode = "";
+        fileBase.basisFxnSF_mode_pct = nan;
+        fileBase.ridge_mode = "";
+        fileBase.ridge_mode_pct = nan;
+        fileBase.basisWidthScaleORI_mode = "";
+        fileBase.basisWidthScaleORI_mode_pct = nan;
+        fileBase.basisWidthScaleSF_mode = "";
+        fileBase.basisWidthScaleSF_mode_pct = nan;
+        fileBase.asymSF_rightLeftRatio_mode = "";
+        fileBase.asymSF_rightLeftRatio_mode_pct = nan;
 
         % ---------- tuning-related values ----------
-        % inherited from fileBase
+        fileBase.margORI_true = nan(1, nORI);
+        fileBase.margSF_true = nan(1, nSF);
+        fileBase.margORI_est_iter_norm = [];
+        fileBase.margSF_est_iter_norm = [];
 
         % ---------- metric-related values ----------
-        Ri.pYES_rmse_allIter = []; Ri.pYES_R2_allIter = [];
-        Ri.pC_rmse_allIter = []; Ri.pC_R2_allIter = [];
-        Ri.pA_rmse_allIter = []; Ri.pA_R2_allIter = [];
+        fileBase.pYES_data_iter = [];
+        fileBase.pC_data_iter = [];
+        fileBase.pA_data_iter = [];
 
-        Ri.pYES_pred_iter = [];
-        Ri.pC_pred_iter = [];
-        Ri.pA_pred_iter = [];
-
-        Ri.pYES_pred_curve_iter = [];
-        Ri.pC_pred_curve_iter = [];
-        Ri.pA_pred_curve_iter = [];
-
-        Ri.nLL_test_allIter = []; % full per-iteration test nLL vector (for iteration-level win rate)
-
-        % ---------- parameter-related values ----------
-        Ri.Nmul_rmse_allIter = []; Ri.Nmul_est_allIter = [];
-        Ri.Nadd_rmse_allIter = []; Ri.Nadd_est_allIter = [];
-        Ri.Nshared_rmse_allIter = []; Ri.Nshared_est_allIter = [];
+        fileBase.DV_allBins_iter = [];
+        fileBase.nTrials_allBins_iter = [];
+        fileBase.pYES_data_curve_iter = [];
+        fileBase.pC_data_curve_iter = [];
+        fileBase.pA_data_curve_iter = [];
 
         % ---------- criterion-related values ----------
-        Ri.criterion_DV_rmse_allIter = [];
-        Ri.criterion_DV_est_allIter = [];
+        fileBase.criterion_DV_true = nan;
 
-        % ---------- NLL ----------
-        if isfield(data_fitNOM, 'nLL_test_allIter')
-            Ri.nLL_test_allIter = data_fitNOM.nLL_test_allIter(:)'; % store full iter vector
+        % =========================================================
+        % 1. template recovery
+        % =========================================================
+        [template_rmse_iter, template_R2_iter] = fxn_templateRecovery_simPlot2Style_iter( ...
+            truth, data_compIV, nIter);
+
+        fileBase.template_rmse_iter = template_rmse_iter(:)';
+        fileBase.template_R2_iter = template_R2_iter(:)';
+
+        % ---------- marginalized templates ----------
+        template_true_vec = truth.template_true(:)';
+        template_true_2D = reshape(template_true_vec, [nORI, nSF]);
+
+        margORI_true = mean(template_true_2D, 2)';
+        margSF_true = mean(template_true_2D, 1);
+
+        % Make peak = 1
+        margORI_true = margORI_true ./ max(margORI_true);
+        margSF_true = margSF_true ./ max(margSF_true);
+
+        fileBase.margORI_true = margORI_true;
+        fileBase.margSF_true = margSF_true;
+
+        template_est = data_compIV.template_tmpl_allIter;
+        if ndims(template_est) == 3
+            template_est = reshape(template_est, size(template_est,1), []);
         end
 
-        pred_metrics_allIter = data_fitNOM.pred_metrics_allIter;
-        nIter_fit = numel(pred_metrics_allIter);
+        nIter_est = size(template_est, 1);
+        margORI_est_iter = nan(nIter_est, nORI);
+        margSF_est_iter = nan(nIter_est, nSF);
 
-        % ---------- Metric recovery ----------
-        for iMetric = 1:numel(namesMetrics_behav)
-            m = namesMetrics_behav{iMetric};
-            [rmse_iter, R2_iter] = fxn_metricRecovery_iter(pred_metrics_allIter, m);
-
-            Ri.(sprintf('%s_rmse_allIter', m)) = rmse_iter(:)';
-            Ri.(sprintf('%s_R2_allIter', m)) = R2_iter(:)';
+        for iIter = 1:nIter_est
+            tmp2D = reshape(template_est(iIter,:), [nORI, nSF]);
+            margORI_est_iter(iIter, :) = mean(tmp2D, 2)';
+            margSF_est_iter(iIter, :) = mean(tmp2D, 1);
         end
 
-        % ---------- Predicted metrics ----------
-        pYES_pred_iter = nan(nIter_fit,1);
-        pC_pred_iter = nan(nIter_fit,1);
-        pA_pred_iter = nan(nIter_fit,1);
-
-        nBins_curve = numel(pred_metrics_allIter{1}.metrics.IV_allBins);
-        pYES_pred_curve_iter = nan(nIter_fit, nBins_curve);
-        pC_pred_curve_iter = nan(nIter_fit, nBins_curve);
-        pA_pred_curve_iter = nan(nIter_fit, nBins_curve);
-
-        for iIter = 1:nIter_fit
-            pYES_pred_iter(iIter) = getCI(pred_metrics_allIter{iIter}.metrics.pYES_pred_allBins, 2, 1);
-            pC_pred_iter(iIter) = getCI(pred_metrics_allIter{iIter}.metrics.pC_pred_allBins, 2, 1);
-            pA_pred_iter(iIter) = getCI(pred_metrics_allIter{iIter}.metrics.pA_pred_allBins, 2, 1);
-
-            pYES_pred_curve_iter(iIter, :) = pred_metrics_allIter{iIter}.metrics.pYES_pred_allBins;
-            pC_pred_curve_iter(iIter, :) = pred_metrics_allIter{iIter}.metrics.pC_pred_allBins;
-            pA_pred_curve_iter(iIter, :) = pred_metrics_allIter{iIter}.metrics.pA_pred_allBins;
-        end % iIter
-
-        Ri.pYES_pred_iter = pYES_pred_iter(:)';
-        Ri.pC_pred_iter = pC_pred_iter(:)';
-        Ri.pA_pred_iter = pA_pred_iter(:)';
-
-        Ri.pYES_pred_curve_iter = pYES_pred_curve_iter;
-        Ri.pC_pred_curve_iter = pC_pred_curve_iter;
-        Ri.pA_pred_curve_iter = pA_pred_curve_iter;
-
-        % ---------- Parameter estimates ----------
-        % params_mat: [nIter × nParams] matrix of fitted parameter values.
-        % Columns 1:(end-1) are the internal-noise parameters (Nmul, Nadd, Nshared);
-        % the last column is always the decision criterion.
-        if iscell(data_fitNOM.params_est_allIter)
-            params_mat = cell2mat(cellfun(@(x) x(:)', data_fitNOM.params_est_allIter, 'UniformOutput', false));
-        else
-            params_mat = data_fitNOM.params_est_allIter;
+        % Normalize each iteration separately so iteration CI reflects tuning-shape variability.
+        margORI_est_iter_norm = margORI_est_iter;
+        margSF_est_iter_norm = margSF_est_iter;
+        for iIter = 1:nIter_est
+            mxORI = max(margORI_est_iter_norm(iIter, :), [], 2);
+            mxSF = max(margSF_est_iter_norm(iIter, :), [], 2);
+            if isfinite(mxORI) && mxORI ~= 0
+                margORI_est_iter_norm(iIter, :) = margORI_est_iter_norm(iIter, :) ./ mxORI;
+            end
+            if isfinite(mxSF) && mxSF ~= 0
+                margSF_est_iter_norm(iIter, :) = margSF_est_iter_norm(iIter, :) ./ mxSF;
+            end
         end
 
-        criterion_est_iter  = params_mat(:, end);   % last column = decision criterion
-        criterion_rmse_iter = abs(criterion_est_iter - fileBase.criterion_DV_true);
+        % Store full per-iteration normalized marginals; summary stats are computed later.
+        fileBase.margORI_est_iter_norm = margORI_est_iter_norm;
+        fileBase.margSF_est_iter_norm = margSF_est_iter_norm;
 
-        Ri.criterion_DV_rmse_allIter = criterion_rmse_iter(:)';
-        Ri.criterion_DV_est_allIter = criterion_est_iter(:)';
+        % =========================================================
+        % 2. Basis-settings-related values
+        % =========================================================
+        nBasisORI_allIter = data_compIV.nBasisORI_tmpl_allIter;
+        nBasisSF_allIter = data_compIV.nBasisSF_tmpl_allIter;
 
-        % param_names_all: all parameter names for this B-model (IN noise params + criterion).
-        % param_names_IN:  all except the last (criterion), i.e. only the internal-noise parameters.
-        param_names_all = namesModelBparams_short{iModelB_fit};
-        param_names_IN  = param_names_all(1:end-1);
+        fileBase.nBasisORI_mode = mode(nBasisORI_allIter);
+        fileBase.nBasisORI_mode_pct = mean(nBasisORI_allIter == mode(nBasisORI_allIter));
 
-        for iParamIN = 1:numel(param_names_IN)
-            pName   = param_names_IN{iParamIN};
-            trueVal = info.(sprintf('%s_true', pName)); % ground-truth value for this parameter
+        fileBase.nBasisSF_mode = mode(nBasisSF_allIter);
+        fileBase.nBasisSF_mode_pct = mean(nBasisSF_allIter == mode(nBasisSF_allIter));
 
-            est_iter = params_mat(:, iParamIN);
-            err_iter = abs(est_iter - trueVal);
+        % Find the most frequently selected basis family across iterations
+        % For ORI
+        strVec = string(data_compIV.basisFxnORI_tmpl_allIter(:));
+        [uniqueVals, ~, groupIdx] = unique(strVec);
+        counts = accumarray(groupIdx, 1);
+        [~, idxMax] = max(counts);
+        fileBase.basisFxnORI_mode     = uniqueVals(idxMax);
+        fileBase.basisFxnORI_mode_pct = counts(idxMax) / numel(strVec);
 
-            Ri.(sprintf('%s_rmse_allIter', pName)) = err_iter(:)';
-            Ri.(sprintf('%s_est_allIter', pName)) = est_iter(:)';
+        % For SF
+        strVec = string(data_compIV.basisFxnSF_tmpl_allIter(:));
+        [uniqueVals, ~, groupIdx] = unique(strVec);
+        counts = accumarray(groupIdx, 1);
+        [~, idxMax] = max(counts);
+        fileBase.basisFxnSF_mode     = uniqueVals(idxMax);
+        fileBase.basisFxnSF_mode_pct = counts(idxMax) / numel(strVec);
+
+        % Modal L2 ridge regularization setting across iterations.
+        strVec = string(data_compIV.ridge_tmpl_allIter(:));
+        [uniqueVals, ~, groupIdx] = unique(strVec);
+        counts = accumarray(groupIdx, 1);
+        [~, idxMax] = max(counts);
+        fileBase.ridge_mode     = uniqueVals(idxMax);
+        fileBase.ridge_mode_pct = counts(idxMax) / numel(strVec);
+
+        % Modal ORI width-scale setting across iterations.
+        if isfield(data_compIV, 'basisWidthScaleORI_tmpl_allIter') && ~isempty(data_compIV.basisWidthScaleORI_tmpl_allIter)
+            vals = data_compIV.basisWidthScaleORI_tmpl_allIter(:);
+            if isnumeric(vals)
+                vals = vals(isfinite(vals));
+            end
+            if ~isempty(vals)
+                strVec = string(vals);
+                [uniqueVals, ~, groupIdx] = unique(strVec);
+                counts = accumarray(groupIdx, 1);
+                [~, idxMax] = max(counts);
+                fileBase.basisWidthScaleORI_mode     = uniqueVals(idxMax);
+                fileBase.basisWidthScaleORI_mode_pct = counts(idxMax) / numel(strVec);
+            end
         end
 
-        R = [R; Ri];
-    end % iModelB_fit
+        % Modal SF width-scale setting across iterations.
+        if isfield(data_compIV, 'basisWidthScaleSF_tmpl_allIter') && ~isempty(data_compIV.basisWidthScaleSF_tmpl_allIter)
+            vals = data_compIV.basisWidthScaleSF_tmpl_allIter(:);
+            if isnumeric(vals)
+                vals = vals(isfinite(vals));
+            end
+            if ~isempty(vals)
+                strVec = string(vals);
+                [uniqueVals, ~, groupIdx] = unique(strVec);
+                counts = accumarray(groupIdx, 1);
+                [~, idxMax] = max(counts);
+                fileBase.basisWidthScaleSF_mode     = uniqueVals(idxMax);
+                fileBase.basisWidthScaleSF_mode_pct = counts(idxMax) / numel(strVec);
+            end
+        end
 
-end % iFile
+        % Modal SF asymmetry setting across iterations.
+        if isfield(data_compIV, 'asymSF_rightLeftRatio_tmpl_allIter') && ~isempty(data_compIV.asymSF_rightLeftRatio_tmpl_allIter)
+            vals = data_compIV.asymSF_rightLeftRatio_tmpl_allIter(:);
+            if isnumeric(vals)
+                vals = vals(isfinite(vals));
+            end
+            if ~isempty(vals)
+                strVec = string(vals);
+                [uniqueVals, ~, groupIdx] = unique(strVec);
+                counts = accumarray(groupIdx, 1);
+                [~, idxMax] = max(counts);
+                fileBase.asymSF_rightLeftRatio_mode     = uniqueVals(idxMax);
+                fileBase.asymSF_rightLeftRatio_mode_pct = counts(idxMax) / numel(strVec);
+            end
+        end
 
-fprintf('\n\n%s: All files compiled. \n\n', datetime('now'))
+        % =========================================================
+        % 3. Metrics-related values
+        %    Simulated data metrics are identical regardless of which B-model is fitted,
+        % =========================================================
+        found_fit_for_data = false;
 
-% Post-processing
-% Summarize all per-iteration fields once before plotting/saving.
-R = fxn_attach_medians_from_iter(R, namesMetrics_behav);
+        for iModelB_fit_probe = 1:nBfit
+            str_loadfitNOM = sprintf('n*_A%dB%d.mat', iModelA_fit, iModelB_fit_probe);
+            nameDir_fitNOM_probe = dir(fullfile(info.folder_NOM, str_loadfitNOM));
+            nameDir_fitNOM_probe = nameDir_fitNOM_probe(~contains({nameDir_fitNOM_probe.name}, 'min'));
 
-% Save the compiled record to /Output
-save(nameFile_R, 'R')
+            if isempty(nameDir_fitNOM_probe)
+                continue
+            end
+
+            data_fitNOM_probe = load(fullfile(nameDir_fitNOM_probe(1).folder, nameDir_fitNOM_probe(1).name));
+            pred_metrics_allIter_probe = data_fitNOM_probe.pred_metrics_allIter;
+            nIter_probe = numel(pred_metrics_allIter_probe);
+
+            pYES_data_iter = nan(nIter_probe,1);
+            pC_data_iter = nan(nIter_probe,1);
+            pA_data_iter = nan(nIter_probe,1);
+
+            nBins_curve = numel(pred_metrics_allIter_probe{1}.metrics.IV_allBins);
+            DV_allBins_iter = nan(nIter_probe, nBins_curve);
+            nTrials_allBins_iter = nan(nIter_probe, nBins_curve);
+            pYES_data_curve_iter = nan(nIter_probe, nBins_curve);
+            pC_data_curve_iter = nan(nIter_probe, nBins_curve);
+            pA_data_curve_iter = nan(nIter_probe, nBins_curve);
+
+            for iIter = 1:nIter_probe
+                pYES_data_iter(iIter) = mean(pred_metrics_allIter_probe{iIter}.metrics.pYES_data_allBins, 'omitnan');
+                pC_data_iter(iIter) = mean(pred_metrics_allIter_probe{iIter}.metrics.pC_data_allBins, 'omitnan');
+                pA_data_iter(iIter) = mean(pred_metrics_allIter_probe{iIter}.metrics.pA_data_allBins, 'omitnan');
+
+                DV_allBins_iter(iIter, :) = pred_metrics_allIter_probe{iIter}.metrics.IV_allBins;
+                nTrials_allBins_iter(iIter, :) = pred_metrics_allIter_probe{iIter}.metrics.nTrials_allBins;
+                pYES_data_curve_iter(iIter, :) = pred_metrics_allIter_probe{iIter}.metrics.pYES_data_allBins;
+                pC_data_curve_iter(iIter, :) = pred_metrics_allIter_probe{iIter}.metrics.pC_data_allBins;
+                pA_data_curve_iter(iIter, :) = pred_metrics_allIter_probe{iIter}.metrics.pA_data_allBins;
+            end %iIter
+
+            fileBase.pYES_data_iter = pYES_data_iter(:)';
+            fileBase.pC_data_iter = pC_data_iter(:)';
+            fileBase.pA_data_iter = pA_data_iter(:)';
+            fileBase.DV_allBins_iter = DV_allBins_iter;
+            fileBase.nTrials_allBins_iter = nTrials_allBins_iter;
+            fileBase.pYES_data_curve_iter = pYES_data_curve_iter;
+            fileBase.pC_data_curve_iter = pC_data_curve_iter;
+            fileBase.pA_data_curve_iter = pA_data_curve_iter;
+
+            found_fit_for_data = true;
+            break
+        end % iModelB_fit_probe
+
+        if ~found_fit_for_data
+            fprintf('No fitNOM file found in %s for any Bfit\n', info.folder_NOM);
+            continue
+        end
+
+        % ---------- criterion true ----------
+        if isfield(truth, 'criterion_DV_true')
+            fileBase.criterion_DV_true = truth.criterion_DV_true;
+        end
+
+        % =========================================================
+        % 4. Fitted-model-related values
+        % =========================================================
+        for iModelB_fit = 1:nBfit
+
+            str_loadfitNOM = sprintf('n*_A%dB%d.mat', iModelA_fit, iModelB_fit);
+            nameDir_fitNOM = dir(fullfile(info.folder_NOM, str_loadfitNOM));
+            nameDir_fitNOM = nameDir_fitNOM(~contains({nameDir_fitNOM.name}, 'min'));
+            if isempty(nameDir_fitNOM)
+                fprintf('No fitNOM file found in %s for Bfit=%d\n', info.folder_NOM, iModelB_fit);
+                continue
+            end
+            data_fitNOM = load(fullfile(nameDir_fitNOM(1).folder, nameDir_fitNOM(1).name));
+
+            % Ri: one record destined for R, for this (simulation condition × B-fit model) pair.
+            % It inherits all condition-level fields from fileBase, then adds fit-specific fields.
+            Ri = fileBase;
+            Ri.iModelB_fit = iModelB_fit;
+
+            % initialize fit-level fields
+            % true values -> template-related values -> tuning-related values ->
+            % metric-related values -> parameter-related values -> criterion-related values
+
+            % ---------- true values ----------
+
+            % ---------- template-related values ----------
+            % inherited from fileBase
+
+            % ---------- tuning-related values ----------
+            % inherited from fileBase
+
+            % ---------- metric-related values ----------
+            Ri.pYES_rmse_allIter = []; Ri.pYES_R2_allIter = [];
+            Ri.pC_rmse_allIter = []; Ri.pC_R2_allIter = [];
+            Ri.pA_rmse_allIter = []; Ri.pA_R2_allIter = [];
+
+            Ri.pYES_pred_iter = [];
+            Ri.pC_pred_iter = [];
+            Ri.pA_pred_iter = [];
+
+            Ri.pYES_pred_curve_iter = [];
+            Ri.pC_pred_curve_iter = [];
+            Ri.pA_pred_curve_iter = [];
+
+            Ri.nLL_test_allIter = []; % full per-iteration test nLL vector (for iteration-level win rate)
+
+            % ---------- parameter-related values ----------
+            Ri.Nmul_rmse_allIter = []; Ri.Nmul_est_allIter = [];
+            Ri.Nadd_rmse_allIter = []; Ri.Nadd_est_allIter = [];
+            Ri.Nshared_rmse_allIter = []; Ri.Nshared_est_allIter = [];
+
+            % ---------- criterion-related values ----------
+            Ri.criterion_DV_rmse_allIter = [];
+            Ri.criterion_DV_est_allIter = [];
+
+            % ---------- NLL ----------
+            if isfield(data_fitNOM, 'nLL_test_allIter')
+                Ri.nLL_test_allIter = data_fitNOM.nLL_test_allIter(:)'; % store full iter vector
+            end
+
+            pred_metrics_allIter = data_fitNOM.pred_metrics_allIter;
+            nIter_fit = numel(pred_metrics_allIter);
+
+            % ---------- Metric recovery ----------
+            for iMetric = 1:numel(namesMetrics_behav)
+                m = namesMetrics_behav{iMetric};
+                [rmse_iter, R2_iter] = fxn_metricRecovery_iter(pred_metrics_allIter, m);
+
+                Ri.(sprintf('%s_rmse_allIter', m)) = rmse_iter(:)';
+                Ri.(sprintf('%s_R2_allIter', m)) = R2_iter(:)';
+            end
+
+            % ---------- Predicted metrics ----------
+            pYES_pred_iter = nan(nIter_fit,1);
+            pC_pred_iter = nan(nIter_fit,1);
+            pA_pred_iter = nan(nIter_fit,1);
+
+            nBins_curve = numel(pred_metrics_allIter{1}.metrics.IV_allBins);
+            pYES_pred_curve_iter = nan(nIter_fit, nBins_curve);
+            pC_pred_curve_iter = nan(nIter_fit, nBins_curve);
+            pA_pred_curve_iter = nan(nIter_fit, nBins_curve);
+
+            for iIter = 1:nIter_fit
+                pYES_pred_iter(iIter) = getCI(pred_metrics_allIter{iIter}.metrics.pYES_pred_allBins, 2, 1);
+                pC_pred_iter(iIter) = getCI(pred_metrics_allIter{iIter}.metrics.pC_pred_allBins, 2, 1);
+                pA_pred_iter(iIter) = getCI(pred_metrics_allIter{iIter}.metrics.pA_pred_allBins, 2, 1);
+
+                pYES_pred_curve_iter(iIter, :) = pred_metrics_allIter{iIter}.metrics.pYES_pred_allBins;
+                pC_pred_curve_iter(iIter, :) = pred_metrics_allIter{iIter}.metrics.pC_pred_allBins;
+                pA_pred_curve_iter(iIter, :) = pred_metrics_allIter{iIter}.metrics.pA_pred_allBins;
+            end % iIter
+
+            Ri.pYES_pred_iter = pYES_pred_iter(:)';
+            Ri.pC_pred_iter = pC_pred_iter(:)';
+            Ri.pA_pred_iter = pA_pred_iter(:)';
+
+            Ri.pYES_pred_curve_iter = pYES_pred_curve_iter;
+            Ri.pC_pred_curve_iter = pC_pred_curve_iter;
+            Ri.pA_pred_curve_iter = pA_pred_curve_iter;
+
+            % ---------- Parameter estimates ----------
+            % params_mat: [nIter × nParams] matrix of fitted parameter values.
+            % Columns 1:(end-1) are the internal-noise parameters (Nmul, Nadd, Nshared);
+            % the last column is always the decision criterion.
+            if iscell(data_fitNOM.params_est_allIter)
+                params_mat = cell2mat(cellfun(@(x) x(:)', data_fitNOM.params_est_allIter, 'UniformOutput', false));
+            else
+                params_mat = data_fitNOM.params_est_allIter;
+            end
+
+            criterion_est_iter  = params_mat(:, end);   % last column = decision criterion
+            criterion_rmse_iter = abs(criterion_est_iter - fileBase.criterion_DV_true);
+
+            Ri.criterion_DV_rmse_allIter = criterion_rmse_iter(:)';
+            Ri.criterion_DV_est_allIter = criterion_est_iter(:)';
+
+            % param_names_all: all parameter names for this B-model (IN noise params + criterion).
+            % param_names_IN:  all except the last (criterion), i.e. only the internal-noise parameters.
+            param_names_all = namesModelBparams_short{iModelB_fit};
+            param_names_IN  = param_names_all(1:end-1);
+
+            for iParamIN = 1:numel(param_names_IN)
+                pName   = param_names_IN{iParamIN};
+                trueVal = info.(sprintf('%s_true', pName)); % ground-truth value for this parameter
+
+                est_iter = params_mat(:, iParamIN);
+                err_iter = abs(est_iter - trueVal);
+
+                Ri.(sprintf('%s_rmse_allIter', pName)) = err_iter(:)';
+                Ri.(sprintf('%s_est_allIter', pName)) = est_iter(:)';
+            end
+
+            R = [R; Ri];
+        end % iModelB_fit
+
+    end % iFile
+
+    fprintf('\n\n%s: All files compiled. \n\n', datetime('now'))
+
+    % Post-processing
+    % Summarize all per-iteration fields once before plotting/saving.
+    R = fxn_attach_medians_from_iter(R, namesMetrics_behav);
+
+    % Save the compiled record to /Output
+    save(nameFile_R, 'R')
 
 else
     % fprintf('Output file already exists, skipping compilation: %s\n', nameFile_R);
@@ -743,8 +743,8 @@ for iPanel = 1:numel(fig0Fields)
     xlabel(sprintf('True %s', fig0Labels{iPanel}));
     box off;
 
-    
-        % Add legend to panel C (3rd panel) directly
+
+    % Add legend to panel C (3rd panel) directly
     if iPanel == 3
         hLeg = gobjects(nBsim_all, 1);
         for ib = 1:nBsim_all
@@ -804,7 +804,7 @@ for iPanel = 1:numel(setting.fig1_mode_fields)
 end
 
 sgtitle('Fig 1: rank of selected basis settings across iterations', 'FontWeight', 'bold');
-% Set all font size in this figure 
+% Set all font size in this figure
 set(findall(gcf,'-property','FontSize'), 'FontSize', 12);
 
 saveas(h, fullfile(nameFolder_Figures_part4, 'FigS1_selectedBasisRank.png'));
@@ -961,8 +961,8 @@ for iRow_metric = 1:numel(setting.metricFields)
     for iCol_Bsim = 1:numel(Bsim_unik)
         simModel = Bsim_unik(iCol_Bsim);
 
-    % simulated data are duplicated across Bfit; use Bfit = 1
-    R_data = R([R.iModelB_sim] == simModel & [R.iModelB_fit] == 1);
+        % simulated data are duplicated across Bfit; use Bfit = 1
+        R_data = R([R.iModelB_sim] == simModel & [R.iModelB_fit] == 1);
 
         nexttile; hold on;
         isFirstPanel = (iCol_Bsim == 1) && (iRow_metric == 1);
@@ -1800,193 +1800,354 @@ nCols_fig6b = size(pairIdx_fig6b, 1); % expected = 6
 Bdiag_fig6b = intersect(Bfit_unik(:)', Bsim_unik(:)');
 nRows_fig6b = numel(Bdiag_fig6b);
 
-if nRows_fig6b == 0
-    fprintf('Skipping Fig 6B: no matched Bfit=Bsim models found.\n');
-else
-    nSig_fig6b = numel(gaborCST_unik);
-    nCz_fig6b = numel(cSDT_unik);
-    nBars_fig6b = nSig_fig6b * nCz_fig6b;
-    xBar_fig6b = 1:nBars_fig6b;
+nSig_fig6b = numel(gaborCST_unik);
+nCz_fig6b = numel(cSDT_unik);
+nBars_fig6b = nSig_fig6b * nCz_fig6b;
+xBar_fig6b = 1:nBars_fig6b;
+nPerm_fig6b = 5000;
 
-    barLabels_fig6b = cell(1, nBars_fig6b);
-    barSigIdx_fig6b = nan(1, nBars_fig6b);
-    barCzIdx_fig6b = nan(1, nBars_fig6b);
-    iBar_fig6b = 0;
-    for iCz = 1:nCz_fig6b
-        for iSig = 1:nSig_fig6b
-            iBar_fig6b = iBar_fig6b + 1;
-            barSigIdx_fig6b(iBar_fig6b) = iSig;
-            barCzIdx_fig6b(iBar_fig6b) = iCz;
-            barLabels_fig6b{iBar_fig6b} = sprintf('G%g|C%g', gaborCST_unik(iSig), cSDT_unik(iCz));
-        end
+% For labeling and indexing bars: one per signalCST x cSDT combination
+barLabels_fig6b = cell(1, nBars_fig6b);
+barSigIdx_fig6b = nan(1, nBars_fig6b);
+barCzIdx_fig6b = nan(1, nBars_fig6b);
+iBar_fig6b = 0;
+for iCz = 1:nCz_fig6b
+    for iSig = 1:nSig_fig6b
+        iBar_fig6b = iBar_fig6b + 1;
+        barSigIdx_fig6b(iBar_fig6b) = iSig;
+        barCzIdx_fig6b(iBar_fig6b) = iCz;
+        barLabels_fig6b{iBar_fig6b} = sprintf('G%g|C%g', gaborCST_unik(iSig), cSDT_unik(iCz));
+    end
+end
+
+permFile_fig6b = fullfile(nameFolder_Figures_part4, 'FigS6B_paramCorr_summaryBars_permNull.mat');
+if exist(permFile_fig6b, 'file')
+    fprintf('Loading cached permStats_fig6b from %s\n', permFile_fig6b);
+    load(permFile_fig6b, 'permStats_fig6b');
+else
+
+% Store all permutation info
+permStats_fig6b = struct();
+permStats_fig6b.nPerm = nPerm_fig6b;
+permStats_fig6b.fitModels = Bdiag_fig6b;
+permStats_fig6b.pairIdx = pairIdx_fig6b;
+permStats_fig6b.pairParams = {pairParams_fig6b};
+permStats_fig6b.barSigIdx = barSigIdx_fig6b;
+permStats_fig6b.barCzIdx = barCzIdx_fig6b;
+permStats_fig6b.barSigVal = gaborCST_unik(barSigIdx_fig6b);
+permStats_fig6b.barCzVal = cSDT_unik(barCzIdx_fig6b);
+permStats_fig6b.observedMean = nan(nCols_fig6b, nRows_fig6b, nBars_fig6b);
+permStats_fig6b.observedSem = nan(nCols_fig6b, nRows_fig6b, nBars_fig6b);
+permStats_fig6b.nRep = nan(nCols_fig6b, nRows_fig6b, nBars_fig6b);
+permStats_fig6b.null68 = nan(nCols_fig6b, nRows_fig6b, nBars_fig6b, 2);
+permStats_fig6b.null95 = nan(nCols_fig6b, nRows_fig6b, nBars_fig6b, 2);
+permStats_fig6b.permP = nan(nCols_fig6b, nRows_fig6b, nBars_fig6b);
+permStats_fig6b.sig95 = false(nCols_fig6b, nRows_fig6b, nBars_fig6b);
+
+% Precompute matched-model subsets and bar membership once because they do not depend on parameter pair.
+Rdiag_fig6b = cell(1, nRows_fig6b);
+rowGroups_fig6b = cell(nRows_fig6b, nBars_fig6b);
+for iModel = 1:nRows_fig6b
+    fitModel = Bdiag_fig6b(iModel);
+    Rdiag_fig6b{iModel} = R([R.iModelB_sim] == fitModel & [R.iModelB_fit] == fitModel);
+    if isempty(Rdiag_fig6b{iModel})
+        continue;
+    end
+    gaborVals_fig6b = [Rdiag_fig6b{iModel}.gaborCST];
+    cSDTVals_fig6b = [Rdiag_fig6b{iModel}.cSDT_true];
+    for iB = 1:nBars_fig6b
+        rowGroups_fig6b{iModel, iB} = find(gaborVals_fig6b == gaborCST_unik(barSigIdx_fig6b(iB)) & ...
+            cSDTVals_fig6b == cSDT_unik(barCzIdx_fig6b(iB)));
+    end
+end
+
+% Precompute bar colors once because they only depend on signalCST and cSDT level.
+czMin_fig6b = min(cSDT_unik);
+czMax_fig6b = max(cSDT_unik);
+sigMin_fig6b = min(gaborCST_unik);
+sigMax_fig6b = max(gaborCST_unik);
+barColors_fig6b = nan(nBars_fig6b, 3);
+for iB = 1:nBars_fig6b
+    czVal = cSDT_unik(barCzIdx_fig6b(iB));
+    sigVal = gaborCST_unik(barSigIdx_fig6b(iB));
+
+    if czMax_fig6b > czMin_fig6b
+        czNorm = (czVal - czMin_fig6b) / (czMax_fig6b - czMin_fig6b);
+    else
+        czNorm = 0.5;
     end
 
-    h = figure('Position', [80 80 330*nCols_fig6b 210*nRows_fig6b]);
-    tiledlayout(nRows_fig6b, nCols_fig6b, 'TileSpacing', 'compact', 'Padding', 'compact');
+    % For signalCST, use a colormap from light yellow (low) to dark red (high).
+    if sigMax_fig6b > sigMin_fig6b
+        sigNorm = (sigVal - sigMin_fig6b) / (sigMax_fig6b - sigMin_fig6b);
+    else
+        sigNorm = 0.5;
+    end
 
-    for iRow = 1:nRows_fig6b
-        fitModel = Bdiag_fig6b(iRow);
-        Rsub = R([R.iModelB_sim] == fitModel & [R.iModelB_fit] == fitModel);
+    hCol = (1 - czNorm) * (2 / 3);
+    sCol = 0.25 + 0.70 * sigNorm;
+    vCol = 0.98 - 0.13 * sigNorm;
+    barColors_fig6b(iB, :) = hsv2rgb([hCol, sCol, vCol]);
+end
 
-        for iCol = 1:nCols_fig6b
-            nexttile((iRow-1)*nCols_fig6b + iCol); hold on;
+% Layout: 6 rows (param pairs) x nRows_fig6b cols (model variants)
+h = figure('Position', [80 80 330*nRows_fig6b 210*nCols_fig6b]);
+tiledlayout(nCols_fig6b, nRows_fig6b, 'TileSpacing', 'compact', 'Padding', 'compact');
 
-            iP1 = pairIdx_fig6b(iCol, 1);
-            iP2 = pairIdx_fig6b(iCol, 2);
-            p1 = pairParams_fig6b{iP1};
-            p2 = pairParams_fig6b{iP2};
+for iPair = 1:nCols_fig6b   % row = param pair
+    iP1 = pairIdx_fig6b(iPair, 1);
+    iP2 = pairIdx_fig6b(iPair, 2);
+    p1 = pairParams_fig6b{iP1};
+    p2 = pairParams_fig6b{iP2};
 
-            if strcmp(p1, 'criterion_DV')
-                f1 = 'criterion_DV_est_allIter';
-            else
-                f1 = sprintf('%s_est_allIter', p1);
-            end
-            if strcmp(p2, 'criterion_DV')
-                f2 = 'criterion_DV_est_allIter';
-            else
-                f2 = sprintf('%s_est_allIter', p2);
-            end
+    if strcmp(p1, 'criterion_DV')
+        f1 = 'criterion_DV_est_allIter';
+    else
+        f1 = sprintf('%s_est_allIter', p1);
+    end
+    if strcmp(p2, 'criterion_DV')
+        f2 = 'criterion_DV_est_allIter';
+    else
+        f2 = sprintf('%s_est_allIter', p2);
+    end
 
-            yMean = nan(nBars_fig6b, 1);
-            ySem  = nan(nBars_fig6b, 1);
-            nRep  = zeros(nBars_fig6b, 1);
+    for iModel = 1:nRows_fig6b   % col = model variant
+        fprintf('Processing pair %d/%d, model %d/%d...\n', iPair, nCols_fig6b, iModel, nRows_fig6b);
+        fitModel = Bdiag_fig6b(iModel);
+        Rsub = Rdiag_fig6b{iModel};
 
-            for iB = 1:nBars_fig6b
-                iSig = barSigIdx_fig6b(iB);
-                iCz = barCzIdx_fig6b(iB);
+        nexttile((iPair-1)*nRows_fig6b + iModel); hold on;
 
-                idxRows = find([Rsub.gaborCST] == gaborCST_unik(iSig) & [Rsub.cSDT_true] == cSDT_unik(iCz));
-                if isempty(idxRows)
-                    continue;
-                end
+        yMean = nan(nBars_fig6b, 1);
+        ySem  = nan(nBars_fig6b, 1);
+        nRep  = zeros(nBars_fig6b, 1);
+        null68_fig6b = nan(nBars_fig6b, 2);
+        null95_fig6b = nan(nBars_fig6b, 2);
+        permP_fig6b = nan(nBars_fig6b, 1);
 
-                rVals = nan(numel(idxRows), 1);
-                for iRR = 1:numel(idxRows)
-                    rIdx = idxRows(iRR);
+        for iB = 1:nBars_fig6b % loop over signalCST x cSDT bars
 
-                    xTmp = Rsub(rIdx).(f1);
-                    yTmp = Rsub(rIdx).(f2);
-                    xIter = xTmp(:);
-                    yIter = yTmp(:);
-
-                    nItCommon = min(numel(xIter), numel(yIter));
-                    if nItCommon < 2
-                        continue;
-                    end
-                    xIter = xIter(1:nItCommon);
-                    yIter = yIter(1:nItCommon);
-
-                    good = isfinite(xIter) & isfinite(yIter);
-                    if sum(good) < 2
-                        continue;
-                    end
-
-                    xi = xIter(good);
-                    yi = yIter(good);
-                    if numel(unique(xi)) < 2 || numel(unique(yi)) < 2
-                        continue;
-                    end
-
-                    rVals(iRR) = corr(xi, yi);
-                end
-
-                goodR = isfinite(rVals);
-                if any(goodR)
-                    yMean(iB) = mean(rVals(goodR));
-                    nRep(iB) = sum(goodR);
-                    if nRep(iB) >= 2
-                        ySem(iB) = std(rVals(goodR), 0) / sqrt(nRep(iB));
-                    else
-                        ySem(iB) = 0;
-                    end
-                end
-            end
-
-            if all(~isfinite(yMean))
-                text(0.5, 0.5, 'N/A', 'Units', 'normalized', ...
-                    'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle');
-                axis off;
+            % Get row indices for this signalCST x cSDT condition in this model
+            idxRows = rowGroups_fig6b{iModel, iB};
+            if isempty(idxRows)
                 continue;
             end
 
-            b = bar(xBar_fig6b, yMean, 0.85, 'FaceColor', 'flat', 'EdgeColor', 'none');
+            rVals = nan(numel(idxRows), 1);
+            rNull = nan(nPerm_fig6b, numel(idxRows));
 
-            % cSDT -> hue: more negative = bluer, more positive = redder.
-            czMin = min(cSDT_unik);
-            czMax = max(cSDT_unik);
+            % Loop over rows (matched model instances) for this signalCST x cSDT condition, collect r values and null distributions.
+            parfor iRR = 1:numel(idxRows)
+                rIdx = idxRows(iRR);
 
-            % signalCST -> contrast/vividness: low = lighter/paler, high = more vivid.
-            sigMin = min(gaborCST_unik);
-            sigMax = max(gaborCST_unik);
+                xTmp = Rsub(rIdx).(f1);
+                yTmp = Rsub(rIdx).(f2);
+                xIter = xTmp(:);
+                yIter = yTmp(:);
 
-            for iB = 1:nBars_fig6b
-                if ~isfinite(yMean(iB))
+                nItCommon = min(numel(xIter), numel(yIter));
+                if nItCommon < 2
+                    continue;
+                end
+                xIter = xIter(1:nItCommon);
+                yIter = yIter(1:nItCommon);
+
+                good = isfinite(xIter) & isfinite(yIter);
+                if sum(good) < 2
                     continue;
                 end
 
-                czVal = cSDT_unik(barCzIdx_fig6b(iB));
-                sigVal = gaborCST_unik(barSigIdx_fig6b(iB));
+                xi = xIter(good);
+                yi = yIter(good);
+                if numel(unique(xi)) < 2 || numel(unique(yi)) < 2
+                    continue;
+                end
+                %---------------------%
+                Sperm_fig6b = fxn_perm_corr(xi, yi, nPerm_fig6b);
+                %---------------------%
 
-                if czMax > czMin
-                    czNorm = (czVal - czMin) / (czMax - czMin);
+                rVals(iRR) = Sperm_fig6b.rObs;
+                rNull(:, iRR) = Sperm_fig6b.rPerm;
+            end % iRR
+
+            % Compute observed mean r, SEM, and null distribution percentiles for this bar.
+            goodR = isfinite(rVals);
+            if any(goodR)
+                yMean(iB) = mean(rVals(goodR));
+                nRep(iB) = sum(goodR);
+                if nRep(iB) >= 2
+                    ySem(iB) = std(rVals(goodR), 0) / sqrt(nRep(iB));
                 else
-                    czNorm = 0.5;
+                    ySem(iB) = 0;
                 end
 
-                if sigMax > sigMin
-                    sigNorm = (sigVal - sigMin) / (sigMax - sigMin);
-                else
-                    sigNorm = 0.5;
+                nullMean_fig6b = mean(rNull(:, goodR), 2, 'omitnan');
+                nullMean_fig6b = nullMean_fig6b(isfinite(nullMean_fig6b));
+                if ~isempty(nullMean_fig6b)
+                    null68_fig6b(iB, :) = prctile(nullMean_fig6b, [16 84]);
+                    null95_fig6b(iB, :) = prctile(nullMean_fig6b, [2.5 97.5]);
+                    permP_fig6b(iB) = (sum(abs(nullMean_fig6b) >= abs(yMean(iB))) + 1) / (numel(nullMean_fig6b) + 1);
                 end
+            end % iRR
+        end % for iB
 
-                % Hue: blue (2/3) -> red (0) as cSDT goes negative -> positive.
-                hCol = (1 - czNorm) * (2 / 3);
-
-                % Saturation/Value: low signal = pale/light, high signal = vivid.
-                sCol = 0.25 + 0.70 * sigNorm;   % 0.25 .. 0.95
-                vCol = 0.98 - 0.13 * sigNorm;   % 0.98 .. 0.85
-
-                b.CData(iB, :) = hsv2rgb([hCol, sCol, vCol]);
-            end
-
-            goodErr = isfinite(yMean) & isfinite(ySem);
-            if any(goodErr)
-                errorbar(xBar_fig6b(goodErr), yMean(goodErr), ySem(goodErr), 'k.', ...
-                    'LineWidth', 1.0, 'CapSize', 0);
-            end
-
-            yline(0, 'k-', 'LineWidth', 0.8);
-            xlim([0.4, nBars_fig6b + 0.6]);
-            ylim([-1, 1]);
-
-            % Visual separators between cSDT groups (each group has nSig_fig6b bars).
-            for iSep = 1:max(nCz_fig6b - 1, 0)
-                xline(iSep * nSig_fig6b + 0.5, '-', 'Color', [0.7 0.7 0.7], 'LineWidth', 0.9);
-            end
-
-            xticks(xBar_fig6b);
-            if iRow == nRows_fig6b
-                xticklabels(barLabels_fig6b);
-                xtickangle(45);
-            else
-                xticklabels({});
-            end
-
-            if iCol == 1
-                ylabel({sprintf('B%d', fitModel), 'r mean +/- 1sem'});
-            end
-            if iRow == 1
-                title(sprintf('%s vs %s', pairLabels_fig6b{iP1}, pairLabels_fig6b{iP2}));
-            end
-
-            fxn_style_ax(gca, setting);
+        if all(~isfinite(yMean))
+            text(0.5, 0.5, 'N/A', 'Units', 'normalized', ...
+                'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle');
+            axis off;
+            continue;
         end
+
+        goodPts = isfinite(yMean);
+        nRepGood = nRep(goodPts);
+        dotSize_fig6b = nan(nBars_fig6b, 1);
+        if any(goodPts)
+            if any(nRepGood ~= nRepGood(1))
+                dotSize_fig6b(goodPts) = 80 + 240 * (nRepGood - min(nRepGood)) / max(max(nRepGood) - min(nRepGood), eps);
+            else
+                dotSize_fig6b(goodPts) = 180;
+            end
+        end
+
+        % Plotting
+        % Dots
+        goodErr = isfinite(yMean) & isfinite(ySem) & isfinite(dotSize_fig6b);
+
+        if any(goodPts)
+            scatter(xBar_fig6b(goodPts), yMean(goodPts), dotSize_fig6b(goodPts), ...
+                barColors_fig6b(goodPts, :), 'filled', ...
+                'MarkerEdgeColor', 'w', 'LineWidth', 1.1);
+        end
+% Error bars
+                for iPt = find(goodErr(:))'
+            errorbar(xBar_fig6b(iPt), yMean(iPt), ySem(iPt), 'LineStyle', 'none', 'Color', 'k', 'LineWidth', 1.2, 'CapSize', 0);
+        end
+
+        sig95_fig6b = isfinite(yMean) & isfinite(null95_fig6b(:, 1)) & isfinite(null95_fig6b(:, 2)) & ...
+            (yMean < null95_fig6b(:, 1) | yMean > null95_fig6b(:, 2));
+        for iStar = find(sig95_fig6b(:))'
+            if yMean(iStar) >= 0
+                yStar = min(0.95, yMean(iStar) + max(ySem(iStar), 0.03) + 0.05);
+                starAlign = 'bottom';
+            else
+                yStar = max(-0.95, yMean(iStar) - max(ySem(iStar), 0.03) - 0.05);
+                starAlign = 'top';
+            end
+            text(xBar_fig6b(iStar), yStar, '*', ...
+                'HorizontalAlignment', 'center', 'VerticalAlignment', starAlign, ...
+                'FontSize', 15, 'FontWeight', 'bold', 'Color', 'k');
+        end
+
+        yline(0, 'k-', 'LineWidth', 0.8);
+        xlim([0.4, nBars_fig6b + 0.6]);
+        ylim([-1, 1]);
+
+        % Visual separators between cSDT groups (each group has nSig_fig6b bars).
+        for iSep = 1:max(nCz_fig6b - 1, 0)
+            xline(iSep * nSig_fig6b + 0.5, '-', 'Color', [0.7 0.7 0.7], 'LineWidth', 0.9);
+        end
+
+        xticks([]); % hide x-ticks to avoid clutter; use legend instead
+        % if iRow == nRows_fig6b
+        %     xticklabels(barLabels_fig6b);
+        %     xtickangle(45);
+        % else
+        %     xticklabels({});
+        % end
+
+        % if iCol == 1
+        %     ylabel({sprintf('B%d', fitModel)});
+        % end
+        % if iPair == 1
+        %     title(sprintf('%s vs %s', pairLabels_fig6b{iP1}, pairLabels_fig6b{iP2}));
+        % end
+
+        permStats_fig6b.observedMean(iPair, iModel, :) = yMean;
+        permStats_fig6b.observedSem(iPair, iModel, :) = ySem;
+        permStats_fig6b.nRep(iPair, iModel, :) = nRep;
+        permStats_fig6b.null68(iPair, iModel, :, :) = reshape(null68_fig6b, [1 1 nBars_fig6b 2]);
+        permStats_fig6b.null95(iPair, iModel, :, :) = reshape(null95_fig6b, [1 1 nBars_fig6b 2]);
+        permStats_fig6b.permP(iPair, iModel, :) = permP_fig6b;
+        permStats_fig6b.sig95(iPair, iModel, :) = sig95_fig6b;
+
+        fxn_style_ax(gca, setting);
+        set(gca, 'YGrid', 'off');
+    end
+end
+
+sgtitle('Fig 6B: r by signalCST x cSDT | rows: param pair, cols: model variant (Bfit=Bsim)', 'FontWeight', 'bold');
+set(findall(h,'-property','FontSize'), 'FontSize', 18);
+saveas(h, fullfile(nameFolder_Figures_part4, 'FigS6B_paramCorr_summaryBars.png'));
+save(fullfile(nameFolder_Figures_part4, 'FigS6B_paramCorr_summaryBars_permNull.mat'), 'permStats_fig6b');
+close(h);
+
+end % if exist(permFile_fig6b)
+
+% ── Color legend: rows = signalCST, cols = cSDT ──────────────────────
+czMin_leg = min(cSDT_unik);    czMax_leg = max(cSDT_unik);
+sigMin_leg = min(gaborCST_unik); sigMax_leg = max(gaborCST_unik);
+
+sqSz  = 52;   % pixels per square
+sqGap = 0.18; % adjustable gap between squares (0 to <1, in cell units)
+marg  = 60;   % margin for axis labels
+figW  = marg + nCz_fig6b  * sqSz + marg;
+figH  = marg + nSig_fig6b * sqSz + marg;
+
+hLeg = figure('Position', [100 100 figW figH]);
+axLeg = axes('Parent', hLeg);
+hold(axLeg, 'on');
+
+for iSig = 1:nSig_fig6b
+    sigVal = gaborCST_unik(iSig);
+    if sigMax_leg > sigMin_leg
+        sigNorm = (sigVal - sigMin_leg) / (sigMax_leg - sigMin_leg);
+    else
+        sigNorm = 0.5;
     end
 
-    sgtitle('Fig 6B: r by signalCST x cSDT | rows: Bfit=Bsim, cols: param pair', 'FontWeight', 'bold');
-    saveas(h, fullfile(nameFolder_Figures_part4, 'FigS6B_paramCorr_summaryBars.png'));
-    close(h);
+    for iCz = 1:nCz_fig6b
+        czVal = cSDT_unik(iCz);
+        if czMax_leg > czMin_leg
+            czNorm = (czVal - czMin_leg) / (czMax_leg - czMin_leg);
+        else
+            czNorm = 0.5;
+        end
+
+        hCol  = (1 - czNorm) * (2/3);          % blue -> red
+        sCol  = 0.25 + 0.70 * sigNorm;
+        vCol  = 0.98 - 0.13 * sigNorm;
+        faceC = hsv2rgb([hCol, sCol, vCol]);
+
+        % iSig=1 → top row; flip y so row 1 is at top
+        yBot = nSig_fig6b - iSig + sqGap / 2;
+        yTop = nSig_fig6b - iSig + 1 - sqGap / 2;
+        xL   = iCz - 1 + sqGap / 2;
+        xR   = iCz - sqGap / 2;
+        patch(axLeg, [xL xR xR xL], [yBot yBot yTop yTop], faceC, ...
+            'EdgeColor', 'none');
+    end
 end
+
+% Show tick labels, but hide tick marks themselves.
+set(axLeg, 'XTick', (0.5 : 1 : nCz_fig6b - 0.5), ...
+    'XTickLabel', arrayfun(@num2str, cSDT_unik(:)', 'UniformOutput', false));
+set(axLeg, 'YTick', (0.5 : 1 : nSig_fig6b - 0.5), ...
+    'YTickLabel', arrayfun(@num2str, fliplr(gaborCST_unik(:)'), 'UniformOutput', false));
+xlabel(axLeg, 'SDT criterion');
+ylabel(axLeg, 'Signal contrast');
+title(axLeg, 'Color key: bar fill color');
+xlim(axLeg, [0, nCz_fig6b]);
+ylim(axLeg, [0, nSig_fig6b]);
+axis(axLeg, 'equal');
+set(axLeg, 'TickLength', [0 0]);
+axLeg.XRuler.Axle.Visible = 'off';
+axLeg.YRuler.Axle.Visible = 'off';
+box(axLeg, 'off');
+% fxn_style_ax(axLeg, setting);
+set(findall(hLeg, '-property', 'FontSize'), 'FontSize', 20);
+
+saveas(hLeg, fullfile(nameFolder_Figures_part4, 'FigS6B_paramCorr_legend.png'));
+close(hLeg);
 
 %% Figure 7: Full vs. reduced models—Iteration-level ΔnLL distributions (Generating model is the full model B1)
 %    For each reduced model Br, shows the per-iteration distribution of
@@ -2376,6 +2537,63 @@ function fxn_style_ax(ax, P)
 box(ax, 'on');
 set(ax, 'FontSize', P.fontSize, 'LineWidth', P.axisLineWidth, ...
     'YGrid', 'on', 'GridAlpha', P.gridAlpha, 'TickDir', P.tickDir);
+end
+
+function S = fxn_perm_corr(A, B, nPerm)
+% Computes the observed correlation between A and B, generates a null distribution of correlations by permuting B, and calculates confidence intervals and a two-sided p-value.
+if nargin < 3 || isempty(nPerm)
+    nPerm = 5000;
+end
+
+S = struct('rObs', nan, 'rPerm', nan(nPerm, 1), ...
+    'ci68', [nan nan], 'ci95', [nan nan], 'pTwoSided', nan);
+
+% Ensure A and B are vectors of the same length, and remove any pairs with non-finite values.
+A = A(:);
+B = B(:);
+good = isfinite(A) & isfinite(B);
+A = A(good);
+B = B(good);
+
+if numel(A) < 2 || numel(unique(A)) < 2 || numel(unique(B)) < 2
+    return;
+end
+
+% Use centered/unit-norm vectors so correlation reduces to a dot product.
+A = A - mean(A);
+B = B - mean(B);
+normA = norm(A);
+normB = norm(B);
+if normA <= eps || normB <= eps
+    return;
+end
+A = A / normA;
+B = B / normB;
+
+S.rObs = A' * B;
+
+% Compute permutation correlations in vectorized batches to avoid thousands of scalar corr calls.
+nObs = numel(A);
+batchSize = min(1000, nPerm);
+iStart = 1;
+while iStart <= nPerm
+    iEnd = min(iStart + batchSize - 1, nPerm);
+    nBatch = iEnd - iStart + 1;
+    [~, permIdx] = sort(rand(nObs, nBatch), 1);
+    Bperm = B(permIdx);
+    S.rPerm(iStart:iEnd) = A' * Bperm;
+    iStart = iEnd + 1;
+end
+
+goodPerm = isfinite(S.rPerm);
+if ~any(goodPerm)
+    return;
+end
+% Calculate confidence intervals and two-sided p-value from the null distribution.
+rPermValid = S.rPerm(goodPerm);
+S.ci68 = prctile(rPermValid, [16 84]);
+S.ci95 = prctile(rPermValid, [2.5 97.5]);
+S.pTwoSided = (sum(abs(rPermValid) >= abs(S.rObs)) + 1) / (numel(rPermValid) + 1);
 end
 
 function S = fxn_collapse_scalar_by_x_iterCI(Rin, xField, yIterField, xLevels, collapseFcn)
