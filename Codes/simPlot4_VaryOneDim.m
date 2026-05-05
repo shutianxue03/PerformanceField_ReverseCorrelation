@@ -137,8 +137,6 @@ for iFile = 1:nFiles
     % metric-related values -> parameter-related values -> criterion-related values
 
     % ---------- true values ----------
-    fileBase.lambda_whiten = nan;
-    fileBase.C_contribution = nan;
 
     % ---------- template-related values ----------
     fileBase.template_rmse_iter = [];
@@ -181,9 +179,6 @@ for iFile = 1:nFiles
 
     % ---------- criterion-related values ----------
     fileBase.criterion_DV_true = nan;
-
-    fileBase.lambda_whiten = truth.lambda_whiten;
-    fileBase.C_contribution = truth.C_contribution;
 
     % =========================================================
     % 1. template recovery
@@ -535,7 +530,7 @@ fprintf('\n\n%s: All files compiled. \n\n', datetime('now'))
 R = fxn_attach_medians_from_iter(R, namesMetrics_behav);
 
 % Save the compiled record to /Output
-save(nameFile_R, 'R', 'lambda_whiten_unik', 'C_contribution_unik')
+save(nameFile_R, 'R')
 
 else
     % fprintf('Output file already exists, skipping compilation: %s\n', nameFile_R);
@@ -552,8 +547,6 @@ Nadd_unik = unique([R.Nadd_true]);
 Nshared_unik = unique([R.Nshared_true]);
 Bsim_unik = unique([R.iModelB_sim]);
 Bfit_unik = unique([R.iModelB_fit]);
-lambda_whiten_unik = unique([R.lambda_whiten]);
-C_contribution_unik = unique([R.C_contribution]);
 
 %% Shared plotting formats
 setting = struct();
@@ -662,14 +655,123 @@ setting.lineStyles_fit = setting.lineStyles_fit(1:numel(Bfit_unik));
 R = fxn_attach_medians_from_iter(R, namesMetrics_behav);
 fprintf('\n%s: Median/CI fields extracted for all metrics.\n', string(datetime('now')))
 
+%% Figure 0: condition composition overview from compiled R
+% Keep one row per simulated condition to avoid duplication across fitted B models.
+fprintf('\n%s: Fig 0: Condition composition overview\n', string(datetime('now')))
+
+T0 = struct2table(R);
+keyVars_fig0 = {'nameIO', 'noiseCST', 'gaborCST', 'nTrials', ...
+    'Nmul_true', 'Nadd_true', 'Nshared_true', 'cSDT_true', 'iModelB_sim'};
+keyVars_fig0 = keyVars_fig0(ismember(keyVars_fig0, T0.Properties.VariableNames));
+if ~isempty(keyVars_fig0)
+    [~, ia_fig0] = unique(T0(:, keyVars_fig0), 'rows', 'stable');
+    T0 = T0(ia_fig0, :);
+end
+
+h = figure('Position', [100 100 1600 720]);
+tiledlayout(2, 3, 'Padding', 'loose', 'TileSpacing', 'loose');
+
+fig0Fields = {'gaborCST', 'cSDT_true', 'iModelB_sim', 'Nmul_true', 'Nadd_true', 'Nshared_true'};
+fig0Labels = {'signal contrast', 'SDT criterion', 'generating model', 'Mul. var.', 'Add. var.', 'Shared var.'};
+
+% B-model shading: B1 = black (0.0), B7 = light grey (0.78)
+Bsim_all = unique(T0.iModelB_sim);
+Bsim_all = Bsim_all(isfinite(Bsim_all));
+nBsim_all = numel(Bsim_all);
+Bsim_shades = [0, linspace(0.3, 0.78, max(nBsim_all-1, 2))];  % one shade per B level
+Bsim_shades = Bsim_shades(1:nBsim_all);
+bsim_color = @(b) repmat(Bsim_shades(Bsim_all == b), 1, 3);  % grey RGB for a given B index
+
+for iPanel = 1:numel(fig0Fields)
+    nexttile; hold on;
+
+    vals = T0.(fig0Fields{iPanel});
+    vals = vals(:);
+    vals = vals(isfinite(vals));
+
+    [uVals, ~, iU] = unique(vals);
+    counts = accumarray(iU, 1);
+
+    xPos = 1:numel(uVals);
+
+    if strcmp(fig0Fields{iPanel}, 'iModelB_sim')
+        % Bsim panel: one bar per B level, each with its own shade
+        b = bar(xPos, counts, 0.75);
+        b.FaceColor = 'flat';
+        b.EdgeColor = 'k';
+        b.LineWidth = 0.5;
+        for ib = 1:numel(uVals)
+            b.CData(ib, :) = bsim_color(uVals(ib));
+        end
+    else
+        % All other panels: stacked bars segmented by Bsim contribution
+        % countMat: rows = x levels, cols = Bsim levels
+        countMat = zeros(numel(uVals), nBsim_all);
+        for ib = 1:nBsim_all
+            mask_b = T0.iModelB_sim == Bsim_all(ib);
+            vals_b = T0.(fig0Fields{iPanel})(mask_b);
+            vals_b = vals_b(isfinite(vals_b));
+            for ix = 1:numel(uVals)
+                countMat(ix, ib) = sum(vals_b == uVals(ix));
+            end
+        end
+        % Draw stacked bars and color each series by Bsim shade
+        b = bar(xPos, countMat, 0.75, 'stacked');
+        for ib = 1:nBsim_all
+            b(ib).FaceColor = bsim_color(Bsim_all(ib));
+            b(ib).EdgeColor = 'w';
+            b(ib).LineWidth = 0.75;
+        end
+
+        % For zero variability bars (reduced-model conditions), add dashed outline
+        % if ismember(fig0Fields{iPanel}, {'Nmul_true', 'Nadd_true', 'Nshared_true'})
+        %     zeroIdx = find(uVals == 0);
+        %     if ~isempty(zeroIdx)
+        %         bar(xPos(zeroIdx), counts(zeroIdx), 0.75, ...
+        %             'FaceColor', 'w', 'EdgeColor', 'k', 'LineWidth', 1);
+        %     end
+        % end
+    end
+
+    ylabel('# conditions');
+    xticks(xPos);
+    if strcmp(fig0Fields{iPanel}, 'iModelB_sim')
+        xticklabels(compose('B%d', round(uVals)));
+    else
+        xticklabels(compose('%.3g', uVals));
+    end
+    xlabel(sprintf('True %s', fig0Labels{iPanel}));
+    box off;
+
+    
+        % Add legend to panel C (3rd panel) directly
+    if iPanel == 3
+        hLeg = gobjects(nBsim_all, 1);
+        for ib = 1:nBsim_all
+            clr = bsim_color(Bsim_all(ib));
+            hLeg(ib) = patch(nan, nan, clr, ...
+                'EdgeColor', 'k', ...
+                'LineWidth', 0.75, ...
+                'DisplayName', sprintf('B%d', Bsim_all(ib)));
+        end
+        legend(hLeg, compose('B%d', Bsim_all), ...
+            'Location', 'northeast', ...
+            'Box', 'off', ...
+            'FontSize', 10);
+    end
+
+end % for iPanel
+
+
+
+sgtitle('Figure 0: Number of conditions by simulation variable');
+saveas(h, fullfile(nameFolder_Figures_part4, 'FigS0_conditionComposition.png'));
+close(h);
+
 %% Figure 1: Basis selection
 fprintf('\n%s: Fig 1: Basis selection rates\n', string(datetime('now')))
 
 R_fig1 = R([R.iModelB_sim] == setting.fig12_Bsim & [R.iModelB_fit] == setting.fig12_Bfit);
-
-% group labels: signalCST × Cz, one per entry in R_fig1
-grpLabels_fig1 = arrayfun(@(r) sprintf('sig=%.3g x cSDT=%.3g', r.gaborCST, r.cSDT_true), ...
-    R_fig1, 'UniformOutput', false);
 
 grpLabels_fig1 = arrayfun(@(r) sprintf('sig=%.3g', r.gaborCST), ...
     R_fig1, 'UniformOutput', false);
@@ -680,7 +782,7 @@ grpLabels_fig1 = arrayfun(@(r) sprintf('sig=%.3g', r.gaborCST), ...
 uGrp_fig1    = unique(grpLabels_fig1);
 grpCmap_fig1 = setting.palette(1:numel(uGrp_fig1), :);
 
-h = figure('Position', [100 100 1800 820]);
+h = figure('Position', [100 100 2e3 1e3]);
 
 panel_order = [1, 5, 2, 6, 3, 7, 4, 8];
 panel_xlabel = {'# ORI basis functions', '# SF basis functions', ...
@@ -702,6 +804,8 @@ for iPanel = 1:numel(setting.fig1_mode_fields)
 end
 
 sgtitle('Fig 1: rank of selected basis settings across iterations', 'FontWeight', 'bold');
+% Set all font size in this figure 
+set(findall(gcf,'-property','FontSize'), 'FontSize', 12);
 
 saveas(h, fullfile(nameFolder_Figures_part4, 'FigS1_selectedBasisRank.png'));
 close(h);
@@ -716,16 +820,6 @@ R_fig2 = R([R.iModelB_sim] == setting.fig12_Bsim & [R.iModelB_fit] == setting.fi
 nVars = numel(setting.fig2_varFields);
 setting_fig2 = setting;
 
-% Row-1 grouping follows lambda_whiten x C_contribution combinations.
-grpLabels_lwcc = arrayfun(@(r) sprintf('lw=%.3g x cont=%.3g', r.lambda_whiten, r.C_contribution), ...
-    R_fig2, 'UniformOutput', false);
-uGrp_lwcc = unique(grpLabels_lwcc);
-grpCmap_lwcc = setting.palette(1:numel(uGrp_lwcc), :);
-grpIdx_lwcc = cell(numel(uGrp_lwcc), 1);
-for iGrp = 1:numel(uGrp_lwcc)
-    grpIdx_lwcc{iGrp} = strcmp(grpLabels_lwcc, uGrp_lwcc{iGrp});
-end
-
 fig2Cache = struct([]);
 for iCol = 1:nVars
     vField  = setting.fig2_varFields{iCol};
@@ -737,13 +831,6 @@ for iCol = 1:nVars
     fig2Cache(iCol).vLevels = vLevels;
     fig2Cache(iCol).rmse_all = fxn_collapse_scalar_by_x_iterCI( ...
         R_fig2, vField, 'template_rmse_iter', vLevels, setting.scalarCollapseFcn);
-    fig2Cache(iCol).rmse_lwcc = cell(numel(uGrp_lwcc), 1);
-
-    for iGrp = 1:numel(uGrp_lwcc)
-        Rsub = R_fig2(grpIdx_lwcc{iGrp});
-        fig2Cache(iCol).rmse_lwcc{iGrp} = fxn_collapse_scalar_by_x_iterCI( ...
-            Rsub, vField, 'template_rmse_iter', vLevels, setting.scalarCollapseFcn);
-    end
 
     [xAxisORI, yTrueORI, curvesORI] = fxn_collapse_tuning_panel(R_fig2, vField, vLevels, 'ORI');
     [xAxisSF,  yTrueSF,  curvesSF]  = fxn_collapse_tuning_panel(R_fig2, vField, vLevels, 'SF');
@@ -755,7 +842,7 @@ for iCol = 1:nVars
     fig2Cache(iCol).tuning(2).curves = curvesSF;
 end
 
-h = figure('Position', [100 100 2400 1050]);
+h = figure('Position', [100 100 2e3 1.2e3]);
 tiledlayout(3, nVars, 'TileSpacing', 'loose', 'Padding', 'loose');
 ax_rmse_last = [];
 
@@ -765,15 +852,6 @@ for iCol = 1:nVars
     % ------ Row 1: RMSE ------
     ax_rmse = nexttile(iCol); hold on;
     ax_rmse_last = ax_rmse;
-
-    % For Nmul/Nadd/Nshared/signalCST/Cz columns, plot lambda x contribution combos.
-    if iCol <= 5
-        for iGrp = 1:numel(uGrp_lwcc)
-            Ssub = fig2Cache(iCol).rmse_lwcc{iGrp};
-            if isempty(Ssub.x), continue; end
-            fxn_plot_connected_dots_with_err(Ssub.x, Ssub.y, Ssub.lb, Ssub.ub, grpCmap_lwcc(iGrp,:), setting_fig2);
-        end
-    end
 
     % Always overlay grand mean.
     S = fig2Cache(iCol).rmse_all;
@@ -796,7 +874,7 @@ for iCol = 1:nVars
         end
         xlim([xMin_al - buf_al, xMax_al + buf_al]);
     end
-    xlabel(vName); ylabel('Template RMSE'); ylim([0 0.2]); title(vName);
+    xlabel(vName); ylabel('2D Template RMSE'); ylim([0 0.2]); title(vName);
 
     % ------ Rows 2 & 3: ORI then SF tuning ------
     for iRow = 1:2
@@ -849,7 +927,7 @@ for iCol = 1:nVars
                 end
                 legH(nLeg) = plot(axis_tuning{iRow}, yLevNorm, 'LineWidth', setting.lineWidth, 'Color', cLev);
                 rmse = fxn_curve_rmse(xIdx, yTrueNorm, xIdx, yLevNorm);
-                legStr{nLeg} = sprintf('%g  RMSE=%.3f', curves(iLev).level, rmse);
+                legStr{nLeg} = sprintf('%g | %.3f', curves(iLev).level, rmse);
             end
             legend(legH(1:nLeg), legStr(1:nLeg), 'Location', 'south', 'FontSize', setting_fig2.fontSize, 'Box', 'off');
         end
@@ -861,16 +939,9 @@ for iCol = 1:nVars
     end
 end
 
-% Legend for lambda x contribution combo lines (only row 1 condition lines).
-if isgraphics(ax_rmse_last)
-    h_gl = gobjects(numel(uGrp_lwcc), 1);
-    for i_gl = 1:numel(uGrp_lwcc)
-        h_gl(i_gl) = plot(ax_rmse_last, nan, nan, '-', 'Color', grpCmap_lwcc(i_gl,:), 'LineWidth', 1.5);
-    end
-    legend(ax_rmse_last, h_gl, cellstr(uGrp_lwcc), 'Location', 'eastoutside', 'Box', 'off', 'FontSize', 7);
-end
-
 sgtitle('Fig 2: Template RMSE + tuning recovery', 'FontWeight', 'bold', 'FontSize', setting_fig2.fontSize);
+set(findall(gcf,'-property','FontSize'), 'FontSize', 12);
+
 saveas(h, fullfile(nameFolder_Figures_part4, 'FigS2_TemplateRecovery.png'));
 close(h);
 
@@ -1104,7 +1175,7 @@ for iRow_param = 1:numel(setting.fig4_paramNames)
             axis off; continue
         end
 
-        % one series per (signalCST x cSDT_true), pooling across lambda_whiten
+        % one series per (signalCST x cSDT_true)
         for iSig = 1:numel(gaborCST_unik)
             for iCz = 1:numel(cSDT_unik)
                 S = fxn_collapse_param_byLevel( ...
@@ -2215,7 +2286,7 @@ function info = fxn_parse_nameIO(nameIO)
 info = struct();
 
 tok = regexp(nameIO, ...
-    'IO_cN([-\d\.]+)_cG([-\d\.]+)_nT([A-Za-z0-9\.\-]+)_Nm([A-Za-z0-9\.\-]+)_Na([A-Za-z0-9\.\-]+)_Ns([A-Za-z0-9\.\-]+)_cSDT([-\d\.]+)_cont([-\d\.]+)_whiten([-\d\.]+)_R(\d+)_\d+\d+_B(\d+)', ...
+    'IO_cN([-\d\.]+)_cG([-\d\.]+)_nT([A-Za-z0-9\.\-]+)_Nm([A-Za-z0-9\.\-]+)_Na([A-Za-z0-9\.\-]+)_Ns([A-Za-z0-9\.\-]+)_cSDT([-\d\.]+)_R(\d+)_\d+\d+_B(\d+)', ...
     'tokens', 'once');
 
 if isempty(tok)
@@ -2229,10 +2300,8 @@ info.Nmul_true = fxn_parse_num2exp(tok{4});
 info.Nadd_true = fxn_parse_num2exp(tok{5});
 info.Nshared_true = fxn_parse_num2exp(tok{6});
 info.cSDT_true = str2double(tok{7});
-info.C_contribution = str2double(tok{8});
-info.lambda_whiten = str2double(tok{9});
-info.flag_regressType = str2double(tok{10});
-info.iModelB_sim = str2double(tok{11});
+info.flag_regressType = str2double(tok{8});
+info.iModelB_sim = str2double(tok{9});
 end
 
 function x = fxn_parse_num2exp(str_in)
