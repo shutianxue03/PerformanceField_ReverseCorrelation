@@ -1315,76 +1315,98 @@ close(h);
 %% Figure 5: model recovery
 fprintf('\n%s: Fig 5: Model recovery\n', string(datetime('now')))
 
-% REPLACE the block from "W_bestNLL = nan(..." down to the closing "end" of that if-block
+% Precompute index lookups once to avoid repeated struct filtering.
+nSim_fig5 = numel(Bsim_unik);
+nFit_fig5 = numel(Bfit_unik);
+simAll_fig5 = [R.iModelB_sim]; simAll_fig5 = simAll_fig5(:);
+fitAll_fig5 = [R.iModelB_fit]; fitAll_fig5 = fitAll_fig5(:);
 
-% Win rate: for each condition (nameIO), compute the fraction of iterations on which
-% each fitted model has the lowest test nLL.  Then average those fractions across
-% conditions (equal weight per condition).
-W_bestNLL = nan(numel(Bfit_unik), numel(Bsim_unik));
-if ~isempty(R) && isfield(R, 'nLL_test_allIter')
-    if isfield(R, 'nameIO')
-        datasetIDs_wr = string({R.nameIO});
-    else
-        datasetIDs_wr = string(arrayfun(@(r) sprintf('Nm%g_Na%g_Ns%g_G%g_cSDT%g', ...
-            r.Nmul_true, r.Nadd_true, r.Nshared_true, r.gaborCST, r.cSDT_true), R, 'UniformOutput', false));
+if isfield(R, 'nameIO')
+    datasetIDs_fig5 = string({R.nameIO})';
+else
+    datasetIDs_fig5 = string(arrayfun(@(r) sprintf('Nm%g_Na%g_Ns%g_G%g_cSDT%g', ...
+        r.Nmul_true, r.Nadd_true, r.Nshared_true, r.gaborCST, r.cSDT_true), R, 'UniformOutput', false))';
+end
+
+idsPerSim_fig5 = cell(nSim_fig5, 1);
+rowsPerSimCondFit_fig5 = cell(nSim_fig5, 1);
+rowsPerSimFit_fig5 = cell(nSim_fig5, nFit_fig5);
+
+for iSim_fig5 = 1:nSim_fig5
+    simVal_fig5 = Bsim_unik(iSim_fig5);
+    idxSimRows_fig5 = find(simAll_fig5 == simVal_fig5);
+    idsSim_fig5 = unique(datasetIDs_fig5(idxSimRows_fig5));
+    idsPerSim_fig5{iSim_fig5} = idsSim_fig5;
+
+    rowsCell_fig5 = cell(numel(idsSim_fig5), nFit_fig5);
+    for iID_fig5 = 1:numel(idsSim_fig5)
+        idxCondRows_fig5 = idxSimRows_fig5(datasetIDs_fig5(idxSimRows_fig5) == idsSim_fig5(iID_fig5));
+        fitCond_fig5 = fitAll_fig5(idxCondRows_fig5);
+        for iFit_fig5 = 1:nFit_fig5
+            rowsCell_fig5{iID_fig5, iFit_fig5} = idxCondRows_fig5(fitCond_fig5 == Bfit_unik(iFit_fig5));
+        end
     end
-    for iSim_wr = 1:numel(Bsim_unik)
-        simModel_wr = Bsim_unik(iSim_wr);
-        idxSim_wr   = [R.iModelB_sim] == simModel_wr;
-        idsSim_wr   = unique(datasetIDs_wr(idxSim_wr));
+    rowsPerSimCondFit_fig5{iSim_fig5} = rowsCell_fig5;
 
-        % winRatePerCond_wr: [nBfit x nConds] — per-condition per-model win rates
-        winRatePerCond_wr = nan(numel(Bfit_unik), numel(idsSim_wr));
+    for iFit_fig5 = 1:nFit_fig5
+        rowsPerSimFit_fig5{iSim_fig5, iFit_fig5} = idxSimRows_fig5(fitAll_fig5(idxSimRows_fig5) == Bfit_unik(iFit_fig5));
+    end
+end
 
-        for iID_wr = 1:numel(idsSim_wr)
-            idxID_wr = idxSim_wr & datasetIDs_wr == idsSim_wr(iID_wr);
-            Rsub_wr  = R(idxID_wr);
-            if isempty(Rsub_wr), continue; end
+% Win rate: for each condition, compute fraction of iterations won by each fit model,
+% then average across conditions.
+W_bestNLL = nan(nFit_fig5, nSim_fig5);
+if ~isempty(R) && isfield(R, 'nLL_test_allIter')
+    for iSim_wr = 1:nSim_fig5
+        % fprintf('Computing win rates for Bsim=%d/%d...\n', iSim_wr, nSim_fig5);
+        rowsCell_wr = rowsPerSimCondFit_fig5{iSim_wr};
+        nCond_wr = size(rowsCell_wr, 1);
+        winRatePerCond_wr = nan(nFit_fig5, nCond_wr);
 
-            % Build [nBfit x nIter] matrix of test nLL values.
-            nIter_wr = max(cellfun(@numel, {Rsub_wr.nLL_test_allIter}));
+        for iID_wr = 1:nCond_wr
+            nIter_wr = 0;
+            nllRows_wr = cell(1, nFit_fig5);
+            for iFit_wr = 1:nFit_fig5
+                rows_wr = rowsCell_wr{iID_wr, iFit_wr};
+                if isempty(rows_wr), continue; end
+                v_wr = R(rows_wr(1)).nLL_test_allIter(:)'; % preserve original first-match behavior
+                nllRows_wr{iFit_wr} = v_wr;
+                nIter_wr = max(nIter_wr, numel(v_wr));
+            end
             if nIter_wr == 0, continue; end
-            nllMat_wr = nan(numel(Bfit_unik), nIter_wr);
-            for iFit_wr = 1:numel(Bfit_unik)
-                idxFit_wr = find([Rsub_wr.iModelB_fit] == Bfit_unik(iFit_wr), 1);
-                if isempty(idxFit_wr), continue; end
-                v = Rsub_wr(idxFit_wr).nLL_test_allIter(:)';
-                nllMat_wr(iFit_wr, 1:numel(v)) = v;
+
+            nllMat_wr = nan(nFit_fig5, nIter_wr);
+            for iFit_wr = 1:nFit_fig5
+                v_wr = nllRows_wr{iFit_wr};
+                if isempty(v_wr), continue; end
+                nllMat_wr(iFit_wr, 1:numel(v_wr)) = v_wr;
             end
 
-            % Per-iteration winner vote.
-            wins_iter_wr  = zeros(numel(Bfit_unik), 1);
-            nValidIter_wr = 0;
-            for iIt = 1:nIter_wr
-                col = nllMat_wr(:, iIt);
-                if ~any(isfinite(col)), continue; end
-                [~, iBest] = min(col);
-                wins_iter_wr(iBest) = wins_iter_wr(iBest) + 1;
-                nValidIter_wr = nValidIter_wr + 1;
+            [minVals_wr, bestIdx_wr] = min(nllMat_wr, [], 1);
+            validCol_wr = isfinite(minVals_wr);
+            if any(validCol_wr)
+                wins_wr = accumarray(bestIdx_wr(validCol_wr)', 1, [nFit_fig5, 1], @sum, 0);
+                winRatePerCond_wr(:, iID_wr) = wins_wr / sum(validCol_wr);
             end
-            if nValidIter_wr > 0
-                winRatePerCond_wr(:, iID_wr) = wins_iter_wr / nValidIter_wr;
-            end
-        end % iID_wr
+        end
 
-        % Average win rate equally across conditions.
         validCols_wr = any(isfinite(winRatePerCond_wr), 1);
         if any(validCols_wr)
             W_bestNLL(:, iSim_wr) = mean(winRatePerCond_wr(:, validCols_wr), 2, 'omitnan');
         end
-    end % iSim_wr
+    end
 end
 
-M_curveRMSE = nan(numel(Bfit_unik), numel(Bsim_unik));
-M_curveR2   = nan(numel(Bfit_unik), numel(Bsim_unik));
-M_paramRMSE = nan(numel(Bfit_unik), numel(Bsim_unik));
-M_paramR2   = nan(numel(Bfit_unik), numel(Bsim_unik));
+M_curveRMSE = nan(nFit_fig5, nSim_fig5);
+M_curveR2   = nan(nFit_fig5, nSim_fig5);
+M_paramRMSE = nan(nFit_fig5, nSim_fig5);
+M_paramR2   = nan(nFit_fig5, nSim_fig5);
 
-for iSim = 1:numel(Bsim_unik)
-    simModel = Bsim_unik(iSim);
-    for iFit = 1:numel(Bfit_unik)
+for iSim = 1:nSim_fig5
+    for iFit = 1:nFit_fig5
         fitModel = Bfit_unik(iFit);
-        Rsub = R([R.iModelB_sim] == simModel & [R.iModelB_fit] == fitModel);
+        rowsSimFit_fig5 = rowsPerSimFit_fig5{iSim, iFit};
+        Rsub = R(rowsSimFit_fig5);
         if isempty(Rsub), continue; end
 
         % metric RMSE
@@ -1445,33 +1467,21 @@ for iSim = 1:numel(Bsim_unik)
 end
 
 % ---------- delta NLL matrix (median ΔnLL from best fit, aggregated across all conditions) ----------
-M_deltaNLL = nan(numel(Bfit_unik), numel(Bsim_unik));
+M_deltaNLL = nan(nFit_fig5, nSim_fig5);
 
 if ~isempty(R) && isfield(R, 'nLL_med')
-    if isfield(R, 'nameIO')
-        datasetIDs_dn = string({R.nameIO});
-    else
-        datasetIDs_dn = string(arrayfun(@(r) sprintf('Nm%g_Na%g_Ns%g_G%g_cSDT%g', ...
-            r.Nmul_true, r.Nadd_true, r.Nshared_true, r.gaborCST, r.cSDT_true), R, 'UniformOutput', false));
-    end
+    for iSim_dn = 1:nSim_fig5
+        rowsCell_dn = rowsPerSimCondFit_fig5{iSim_dn};
+        nCond_dn = size(rowsCell_dn, 1);
+        deltaVals_dn = cell(nFit_fig5, 1);
 
-    for iSim_dn = 1:numel(Bsim_unik)
-        simModel_dn = Bsim_unik(iSim_dn);
-        idxSim_dn   = [R.iModelB_sim] == simModel_dn;
-        idsSim_dn   = unique(datasetIDs_dn(idxSim_dn));
-
-        deltaVals_dn = cell(numel(Bfit_unik), 1);
-
-        for iID_dn = 1:numel(idsSim_dn)
-            idxID_dn = idxSim_dn & datasetIDs_dn == idsSim_dn(iID_dn);
-            Rkey_dn  = R(idxID_dn);
-            if isempty(Rkey_dn), continue; end
-
-            scores_dn = nan(numel(Bfit_unik), 1);
-            for iFit_dn = 1:numel(Bfit_unik)
-                idxFit_dn = [Rkey_dn.iModelB_fit] == Bfit_unik(iFit_dn);
-                vals_dn   = [Rkey_dn(idxFit_dn).nLL_med]';
-                vals_dn   = vals_dn(isfinite(vals_dn));
+        for iID_dn = 1:nCond_dn
+            scores_dn = nan(nFit_fig5, 1);
+            for iFit_dn = 1:nFit_fig5
+                rows_dn = rowsCell_dn{iID_dn, iFit_dn};
+                if isempty(rows_dn), continue; end
+                vals_dn = [R(rows_dn).nLL_med]';
+                vals_dn = vals_dn(isfinite(vals_dn));
                 if ~isempty(vals_dn)
                     scores_dn(iFit_dn) = mean(vals_dn, 'omitnan');
                 end
@@ -1480,26 +1490,20 @@ if ~isempty(R) && isfield(R, 'nLL_med')
             if ~any(isfinite(scores_dn)), continue; end
             bestScore_dn = min(scores_dn);
 
-            for iFit_dn = 1:numel(Bfit_unik)
+            for iFit_dn = 1:nFit_fig5
                 if isfinite(scores_dn(iFit_dn))
                     deltaVals_dn{iFit_dn}(end+1, 1) = scores_dn(iFit_dn) - bestScore_dn; %#ok<AGROW>
                 end
             end
         end
 
-        for iFit_dn = 1:numel(Bfit_unik)
+        for iFit_dn = 1:nFit_fig5
             if ~isempty(deltaVals_dn{iFit_dn})
                 M_deltaNLL(iFit_dn, iSim_dn) = median(deltaVals_dn{iFit_dn}, 'omitnan');
             end
         end
     end
 end
-
-% ---------- 2x3 figure ----------
-% Layout:
-%   col 1: NLL metrics      | row 1: win rate,     row 2: median delta NLL
-%   col 2: metric recovery  | row 1: RMSE,          row 2: R2
-%   col 2: metric/param RMSE | row 1: Metric RMSE,   row 2: Param RMSE
 
 % Layout: 2x2
 %   (1,1) Win rate      (1,2) Metric RMSE
@@ -1535,14 +1539,39 @@ if exist('namesModelB', 'var') && ~isempty(namesModelB)
     end
 end
 
-for iTile = 1:4
+% Loop over tiles in specified order to control color limits and annotations per panel.
+nTiltes=4;
+fprintf('Plotting %d tiles in order: %s\n', nTiltes);
+for iTile = 1:nTiltes
+    fprintf('Plotting tile %d/%d: %s...\n', iTile, nTiltes, panels_fig5{tileOrder(iTile), 2});
     iPan = tileOrder(iTile);
     M_plot   = panels_fig5{iPan, 1};
     ttl_plot = panels_fig5{iPan, 2};
     clim_fix = panels_fig5{iPan, 3};
 
+    % Use robust panel-wise clipping so outliers do not dominate colormap.
+    finVals = M_plot(isfinite(M_plot));
+    if ~isempty(finVals)
+        q = prctile(finVals, [2.5 97.5]);
+        cLo = q(1);
+        cHi = q(2);
+
+        if ~isfinite(cLo) || ~isfinite(cHi) || cLo >= cHi
+            cLo = min(finVals);
+            cHi = max(finVals);
+        end
+        if cLo == cHi
+            cLo = cLo - eps;
+            cHi = cHi + eps;
+        end
+    else
+        cLo = 0;
+        cHi = 1;
+    end
+    M_plot_disp = min(max(M_plot, cLo), cHi);
+
     nexttile; hold on;
-    imagesc(1:numel(Bsim_unik), 1:numel(Bfit_unik), M_plot);
+    imagesc(1:numel(Bsim_unik), 1:numel(Bfit_unik), M_plot_disp);
     set(gca, 'YDir', 'normal', ...
         'XTick', 1:numel(Bsim_unik), 'XTickLabel', xTickLabels_fig5, ...
         'YTick', 1:numel(Bfit_unik), 'YTickLabel', yTickLabels_fig5, ...
@@ -1550,24 +1579,16 @@ for iTile = 1:4
         'YLim', [0.5, numel(Bfit_unik)+0.5]);
     xlabel('Simulating model'); ylabel('Fitting model');
     title(ttl_plot);
-    fxn_style_ax(gca, setting);
+    % fxn_style_ax(gca, setting);
     axis square;
 
-    % Keep tile sizing under TiledChartLayout control to avoid Position warnings.
-
-    % color axis — use each panel's own data range for full color spectrum
-    finVals = M_plot(isfinite(M_plot));
-    if ~isempty(finVals)
-        cLo = min(finVals); cHi = max(finVals);
-        if cLo == cHi, cLo = cLo - eps; cHi = cHi + eps; end
-    else
-        cLo = 0; cHi = 1;
-    end
+    % Color axis uses clipped 95% interval range for this panel.
     clim([cLo cHi]);
     % show colorbar
     colorbar('Location', 'eastoutside');
 
-    % annotate values with adaptive font color (low → white, high → black)
+    % Annotate values with adaptive font color (low → white, high → black)
+    fprintf('    Annotating values for tile %d/%d...\n', iTile, nTiltes);
     for iFit_ann = 1:numel(Bfit_unik)
         for iSim_ann = 1:numel(Bsim_unik)
             v = M_plot(iFit_ann, iSim_ann);
@@ -1593,9 +1614,12 @@ for iTile = 1:4
     end
 
 end % for iTile
-
+root
 sgtitle('Fig 5: Model recovery', 'FontWeight', 'bold');
-saveas(h, fullfile(nameFolder_Figures_part4, 'FigS5_modelRecovery.png'));
+fprintf('Saving figure...\n');
+nameFile_fig5 = fullfile(nameFolder_Figures_part4, 'FigS5_modelRecovery.png');
+saveas(h, nameFile_fig5);
+fprintf('Closing figure...\n');
 close(h);
 
 %% Figure 6: parameter-pair correlations
@@ -2018,9 +2042,13 @@ for iPair = 1:nCols_fig6b   % row = param pair
                 barColors_fig6b(goodPts, :), 'filled', ...
                 'MarkerEdgeColor', 'w', 'LineWidth', 1.1);
         end
-% Error bars
-                for iPt = find(goodErr(:))'
-            errorbar(xBar_fig6b(iPt), yMean(iPt), ySem(iPt), 'LineStyle', 'none', 'Color', 'k', 'LineWidth', 1.2, 'CapSize', 0);
+
+        % Error bars
+        idxErrPts = find(goodErr(:));
+        for iErr = 1:numel(idxErrPts)
+            iPt = idxErrPts(iErr);
+            errorbar(xBar_fig6b(iPt), yMean(iPt), ySem(iPt), ...
+                'LineStyle', 'none', 'Color', 'k', 'LineWidth', 1.2, 'CapSize', 0);
         end
 
         sig95_fig6b = isfinite(yMean) & isfinite(null95_fig6b(:, 1)) & isfinite(null95_fig6b(:, 2)) & ...
