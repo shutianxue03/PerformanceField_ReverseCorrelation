@@ -193,7 +193,7 @@ options_fmin = optimoptions('fmincon', 'MaxIterations', 1e4, 'Display', 'off');
 % Noisy observer model names
 namesModelA = {'RC', 'IO', 'RandTemp'};
 
-namesModelB = {'FullModel', 'NoMultiN', 'NoAddN', 'NoSharedN', 'JustMultiN', 'JustAddN', 'JustSharedN', 'JustCriterion'};
+namesModelB = {'FullModel', 'NoMulti', 'NoAdd', 'NoShared', 'MultiOnly', 'AddOnly', 'SharedOnly', 'JustCriterion'};
 if ~exist('flag_incluCrit', 'var'), flag_incluCrit = 1; end
 switch flag_incluCrit
     case 0
