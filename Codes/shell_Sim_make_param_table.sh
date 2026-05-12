@@ -21,7 +21,7 @@ for gaborCST in 0.3; do
   for Nmul_true in 0.2 0.4 0.6 0.8; do
     for Nadd_true in 2 4 6 8; do
       for Nshared_true in 2 4 6 8; do
-        for cSDT_true in -0.4 -0.2 0 0.2; do
+        for cSDT_true in -0.2 0 0.2; do
           for iModelB_sim in 1 2 3 4 5 6 7; do
             for nIter in 20; do
               for nTrials in 10000; do

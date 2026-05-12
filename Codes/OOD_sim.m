@@ -106,11 +106,9 @@ nameIO = sprintf('IO_cN%.0f_cG%.0f_nT%s_Nm%.1f_Na%.1f_Ns%.1f_cSDT%.1f_cont%.1f_w
 
 % Folder to save IO data (energy + behav)
 nameFolder_Data_OOD_IO = sprintf('%s/%s', nameFolder_Data_OOD, nameIO);
-if isempty(dir(nameFolder_Data_OOD_IO)), mkdir(nameFolder_Data_OOD_IO); end
 
 % Folder to save NOM trial-wise fits
 nameFolder_Data_NOM_IO = sprintf('%s/%s', nameFolder_Data_NOM_Trialwise, nameIO);
-if isempty(dir(nameFolder_Data_NOM_IO)), mkdir(nameFolder_Data_NOM_IO); end
 
 % Folder to save figures
 nameFolder_Figures_perSubj = sprintf('%s/IO/%s', nameFolder_Figures, nameIO);
@@ -173,11 +171,6 @@ template_true = fxn_getTemplate(template_true, templateType_true, 0);
 
 % Normalize template (Unit L2-norm)
 template_true = template_true / norm(template_true(:));
-
-% Save "truth" (for IO template in Model A = 2)
-save(sprintf('%s/truth.mat', nameFolder_Data_OOD_IO), ...
-    'nameIO', '*_true', 'noiseCST', 'gaborCST', 'nTrials', 'lambda_whiten', 'flag_regressType', 'flag_incluCrit', 'C_contribution', 'iModelB_sim', 'iModelA_fit_all', 'iModelB_fit_all', 'nIter');
-fprintf('\n\n%s: Truth (including the ideal template) created and saved.\n\n', datetime('now'))
 
 %% Preallocate sim arrays
 nMetrics = 11;
@@ -263,13 +256,6 @@ end
 DV_target_sim_allT = fxn_getIV_v3(e3D_forDV, template_true, convolveType_true, IVType_true, flag_permT, [1, nORI]);
 assert(~any(isnan(DV_target_sim_allT)), 'IV_target contains NaN');
 
-%% Save energy for compIV
-% Use patchMode = 'T' in compIV; this file must contain both target + noise
-% energy as well as noise, filters, stim, nBins.
-save(sprintf('%s/energy_T_%d_%d.mat', nameFolder_Data_OOD_IO, nORI, nSF), 'e3D_target_allT', 'noise', 'filtersOri_all', 'stim', 'nBins');
-
-fprintf('%s: Simulated 3D energy saved (%d trials).\n\n', datetime('now'), nTrials)
-
 %% Internal noise & responses
 % For now, use DV from target-only energy to drive responses
 DVclean_sim_allT = DV_target_sim_allT;
@@ -309,8 +295,6 @@ end
 [~, idx_best] = min(loss_grid);
 criterion_DV_true = cDV_grid(idx_best);
 
-save(sprintf('%s/truth.mat', nameFolder_Data_OOD_IO), 'criterion_DV_true', '-append');
-
 %% Simulate responses and calculate pYES
 % Binary responses
 resp_allT = DVnoisy_sim_allT > criterion_DV_true;
@@ -338,6 +322,20 @@ pC_sim = mean( (iPRS_allT==1 & resp_allT==1) | (iPRS_allT==0 & resp_allT==0) );
 % Stop if simulated pC is too low or too high
 if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
     fprintf('\n\n ** Simulated pC=%.2f, withtin the range [%.2f, %.2f] ** \n\n', pC_sim, pC_filter)
+
+    % Create output folders only after the accuracy gate is passed.
+    if isempty(dir(nameFolder_Data_OOD_IO)), mkdir(nameFolder_Data_OOD_IO); end
+    if isempty(dir(nameFolder_Data_NOM_IO)), mkdir(nameFolder_Data_NOM_IO); end
+
+    % Save only variables used by simPlot4_VaryOneDim.m in one atomic write.
+    save(sprintf('%s/truth.mat', nameFolder_Data_OOD_IO), 'template_true', 'criterion_DV_true');
+    fprintf('\n\n%s: truth.mat saved (template_true, criterion_DV_true).\n\n', datetime('now'))
+
+    % Save energy for compIV after the accuracy gate.
+    % Use patchMode = ''T'' in compIV; this file must contain both target + noise
+    % energy as well as noise, filters, stim, nBins.
+    save(sprintf('%s/energy_T_%d_%d.mat', nameFolder_Data_OOD_IO, nORI, nSF), 'e3D_target_allT', 'noise', 'filtersOri_all', 'stim', 'nBins');
+    fprintf('%s: Simulated 3D energy saved (%d trials).\n\n', datetime('now'), nTrials)
 
     [dprime_sim, cSDT_sim] = SX_sim06_SDT(pHit_sim, pFA_sim);
 
@@ -419,8 +417,11 @@ silence = zeros(1, round(fs*pauseDur));
 clear *allT e2D* e3D* dataMatrix;
 
 % Remove the energy file to save space (compIV has already loaded it)
-delete(sprintf('%s/energy_T_%d_%d.mat', nameFolder_Data_OOD_IO, nORI, nSF));
-fprintf('%s: Energy file removed to save space.\n\n', datetime('now'))
+nameFile_energy = sprintf('%s/energy_T_%d_%d.mat', nameFolder_Data_OOD_IO, nORI, nSF);
+if exist(nameFile_energy, 'file')
+    delete(nameFile_energy);
+    fprintf('%s: Energy file removed to save space.\n\n', datetime('now'))
+end
 
 %%  End timing
 time_end = datetime('now');
