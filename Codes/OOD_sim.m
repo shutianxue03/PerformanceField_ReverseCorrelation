@@ -70,7 +70,7 @@ nJob = 1;
 iJob = 1;
 
 % Model A/B indices for fitting
-iModelA_fit_all = [1,2]; % DO NOT CHANGE! 1 = RC-derived template (Model A), 2=ideal template; 3=permuted template
+iModelA_fit_all = [1]; % DO NOT CHANGE! 1 = RC-derived template (Model A), 2=ideal template; 3=permuted template
 iModelB_fit_all = 1:7; %1=full, 2=No Nmul, 3=No Nadd, 4=No Nshared, 5=Nmul-only, 6=Nadd-only, 7=Nshared-only, 8=criterion-only
 pC_filter = [.6, .8]; % Only proceed with compIV/fitNOM if simulated pC falls within this range; otherwise, discard this simulation and try again with different random seed or parameters.
 
@@ -370,7 +370,7 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
     %----------------------------%
 
     %% Step 2: fit NOM parameters and predict metrics
-    for iModelA_fit=1:2
+    for iModelA_fit=iModelA_fit_all
 
         for iModelB_fit = iModelB_fit_all
             %----------------------------%

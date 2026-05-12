@@ -17,13 +17,13 @@ param_file="${param_dir}/OOD_sim_params.tsv"
 # Header
 printf "noiseCST\tgaborCST\tnTrials\tNmul_true\tNadd_true\tNshared_true\tcSDT_true\tlambda_whiten\tflag_regressType\tflag_incluCrit\tC_contribution\tiModelB_sim\tnIter\tnBasisORI\tnBasisSF\n" > "${param_file}"
 
-for gaborCST in 0.3; do
-  for Nmul_true in 0.2 0.4 0.6 0.8; do
-    for Nadd_true in 2 4 6 8; do
-      for Nshared_true in 2 4 6 8; do
+for gaborCST in 0.3 0.4 0.5; do
+  for Nmul_true in 0.5 1 1.5; do
+    for Nadd_true in 0.5 1 1.5; do
+      for Nshared_true in 0.5 1 1.5; do
         for cSDT_true in -0.2 0 0.2; do
           for iModelB_sim in 1 2 3 4 5 6 7; do
-            for nIter in 20; do
+            for nIter in 100; do
               for nTrials in 10000; do
                 for noiseCST in 0.2; do
                   for lambda_whiten in 0; do
@@ -70,5 +70,3 @@ echo "Wrote parameter table:"
 echo "${param_file}"
 echo "Number of jobs: ${n_jobs}"
 echo
-echo "Submit with:"
-echo "sbatch --array=1-${n_jobs}%100 Codes/shell_array_Sim.sh"

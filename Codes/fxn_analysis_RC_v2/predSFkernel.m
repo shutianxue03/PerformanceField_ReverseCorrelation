@@ -84,12 +84,13 @@ switch iFamily
 
         y = gain * SX_normPDF(x, peakSF, width) + base;
 
-    case 10 % von mises for OR gain = params(1);
+    case 10 % von Mises for ORI (180-deg periodic)
         gain = params(1);
         k = params(2); % concentration parameter
         base = params(3);
 
-        y = gain * v_vonmisespdf(x/180*pi, 0, k) + base;
+        theta = x / 180 * 2 * pi; % match period=180 mapping used in basis construction
+        y = gain * v_vonmisespdf(theta, 0, k) + base;
     case 11 % gaussian with mean free to vary
         peak = params(1);
         gain = params(2);
@@ -119,6 +120,19 @@ switch iFamily
         power = params(5);
         baseline = params(6);
         y = gain1*(SX_normPDF(x, 0, sigma1).^power - gain2*SX_normPDF(x, 0, sigma1*sigma_r))+ baseline;
+
+    case 14 % asymmetric Gaussian for SF
+        peakSF = params(1);
+        gain = params(2);
+        width_left = params(3);
+        width_right = params(4);
+        base = params(5);
+
+        y = zeros(size(x));
+        idxLeft = x <= peakSF;
+        idxRight = x > peakSF;
+        y(idxLeft) = gain * SX_normPDF(x(idxLeft), peakSF, width_left) + base;
+        y(idxRight) = gain * SX_normPDF(x(idxRight), peakSF, width_right) + base;
 end
 
 %% Plot
@@ -127,7 +141,7 @@ if flag_plot
     plot(x, y, 'o-')
     % ylimit = ylim;
     switch iFamily
-        case {1,8}
+        case {1,8,10,11,13}
             xline(0, 'k--');
             xlabel('Orientation (º)')
             xlim([-90, 90])

@@ -12,8 +12,8 @@ param_file="${project_root}/Data_job_params/OOD_sim_params.tsv"
 array_script="${project_root}/Codes/shell_Sim.sh"
 
 # Settings
-batch_size=500        # number of array tasks per submitted batch
-max_running=50        # Slurm array throttle: %50
+batch_size=4999        # number of array tasks per submitted batch
+max_running=250        # Slurm array throttle:
 sleep_seconds=2       # small pause between sbatch calls
 
 if [[ ! -f "${param_file}" ]]; then

@@ -3,12 +3,11 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=12
-#SBATCH --mem=32G
-#SBATCH --time=1:00:00
-#SBATCH --output=Logs/OODsim_%A_%a.out
-#SBATCH --error=Logs/OODsim_%A_%a.err
+#SBATCH --mem=24G
+#SBATCH --time=3:30:00
+#SBATCH --output=Logs/Sim_%A_%a.out
 #SBATCH --mail-type=FAIL
-#SBATCH --mail-user=vivanxuest@gmail.com
+#SBATCH --mail-user=shutianxue30@gmail.com
 
 # ============================================================
 # Created by Shutian Xue on 07/16/2025
@@ -38,18 +37,11 @@ mkdir -p "${log_dir}"
 # Safety checks
 # -----------------------------
 
-if [[ -z "${SLURM_ARRAY_TASK_ID:-}" ]]; then
-  echo "Error: SLURM_ARRAY_TASK_ID is not set." >&2
-  echo "Submit this script using sbatch --array, for example:" >&2
-  echo "  sbatch --array=1-5376%50 Codes/shell_array_Sim.sh" >&2
-  exit 1
-fi
-
 if [[ ! -f "${param_file}" ]]; then
   echo "Error: cannot find parameter file:" >&2
   echo "  ${param_file}" >&2
   echo "Run the parameter-table script first, for example:" >&2
-  echo "  bash Codes/make_param_table_Sim.sh" >&2
+  echo "  bash Codes/shell_Sim_make_param_table.sh" >&2
   exit 1
 fi
 
@@ -103,24 +95,6 @@ echo "Script dir: ${script_dir}"
 echo "Parameter file: ${param_file}"
 echo "Parameter row:"
 echo "${line}"
-echo "======================================"
-
-echo "Parameters:"
-echo "  noiseCST         = ${noiseCST}"
-echo "  gaborCST         = ${gaborCST}"
-echo "  nTrials          = ${nTrials}"
-echo "  Nmul_true        = ${Nmul_true}"
-echo "  Nadd_true        = ${Nadd_true}"
-echo "  Nshared_true     = ${Nshared_true}"
-echo "  cSDT_true        = ${cSDT_true}"
-echo "  lambda_whiten    = ${lambda_whiten}"
-echo "  flag_regressType = ${flag_regressType}"
-echo "  flag_incluCrit   = ${flag_incluCrit}"
-echo "  C_contribution   = ${C_contribution}"
-echo "  iModelB_sim      = ${iModelB_sim}"
-echo "  nIter            = ${nIter}"
-echo "  nBasisORI        = ${nBasisORI}"
-echo "  nBasisSF         = ${nBasisSF}"
 echo "======================================"
 
 # -----------------------------

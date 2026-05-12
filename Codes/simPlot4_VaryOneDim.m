@@ -18,17 +18,17 @@
 
 clear; clc; close all;
 set(0, 'DefaultFigureVisible', 'off');
-flag_whitenDV=0;
-%--------------%
-SX_RC1_setting;
-%--------------%
 
 %% settings
+flag_whitenDV=0; % NEEDED for SX_RC1_setting!!
 str_part = 'OOD'; % <-- change if needed
-iModelA_fit = 1; %1=use data-derived template; 2=use true template
+iModelA_fit = [1]; %1=use data-derived template; 2=use true template
 nBfit = 7;          % number of B-model variants to evaluate (each uses a different internal-noise structure)
 nBins_Part4 = 3; % define bins for collapsing parameter recovery points; use 3 for main text, 5 for Supp
 
+%--------------%
+SX_RC1_setting;
+%--------------%
 nameFolder_Data = sprintf('%s/Data_%s', nameFolder_server, str_part);
 nameFile_R = sprintf('%s/Outputs/R_A%d.mat', nameFolder_server, iModelA_fit);
 nameFolder_Data_OOD = sprintf('%s/Data_OOD_%d%d', nameFolder_Data, nORI, nSF);
@@ -442,10 +442,10 @@ if ~exist(nameFile_R, 'file')
             pC_pred_curve_iter = nan(nIter_fit, nBins_curve);
             pA_pred_curve_iter = nan(nIter_fit, nBins_curve);
 
-            for iIter = 1:nIter_fit
-                pYES_pred_iter(iIter) = getCI(pred_metrics_allIter{iIter}.metrics.pYES_pred_allBins, 2, 2);
-                pC_pred_iter(iIter) = getCI(pred_metrics_allIter{iIter}.metrics.pC_pred_allBins, 2, 2);
-                pA_pred_iter(iIter) = getCI(pred_metrics_allIter{iIter}.metrics.pA_pred_allBins, 2, 2);
+            parfor iIter = 1:nIter_fit
+                pYES_pred_iter(iIter) = getCI(pred_metrics_allIter{iIter}.metrics.pYES_pred_allBins, 2, 1);
+                pC_pred_iter(iIter) = getCI(pred_metrics_allIter{iIter}.metrics.pC_pred_allBins, 2, 1);
+                pA_pred_iter(iIter) = getCI(pred_metrics_allIter{iIter}.metrics.pA_pred_allBins, 2, 1);
 
                 pYES_pred_curve_iter(iIter, :) = pred_metrics_allIter{iIter}.metrics.pYES_pred_allBins;
                 pC_pred_curve_iter(iIter, :) = pred_metrics_allIter{iIter}.metrics.pC_pred_allBins;
@@ -1970,12 +1970,16 @@ if ~isempty(R) && isfield(R, 'nLL_med')
         nCond_dn = size(rowsCell_dn, 1);
         deltaVals_dn = cell(nFit_fig6, 1);
 
-        for iID_dn = 1:nCond_dn
+        for iICond_dn = 1:nCond_dn
             scores_dn = nan(nFit_fig6, 1);
             for iFit_dn = 1:nFit_fig6
-                rows_dn = rowsCell_dn{iID_dn, iFit_dn};
+                rows_dn = rowsCell_dn{iICond_dn, iFit_dn};
                 vals_dn = [R(rows_dn).nLL_med]';
+                if isempty(vals_dn)
+                    scores_dn(iFit_dn)=nan;
+                else
                 [scores_dn(iFit_dn), ~, ~] = getCI(vals_dn, 2, 1);
+                end
             end
 
             if ~any(isfinite(scores_dn)), continue; end
@@ -2592,7 +2596,9 @@ function info = fxn_parse_nameIO(nameIO)
 
 info = struct();
 
-tok = regexp(nameIO,  'IO_cN([-\d\.]+)_cG([-\d\.]+)_nT([A-Za-z0-9\.\-]+)_Nm([A-Za-z0-9\.\-]+)_Na([A-Za-z0-9\.\-]+)_Ns([A-Za-z0-9\.\-]+)_cSDT([-\d\.]+)_R(\d+)_\d+\d+_B(\d+)',  'tokens', 'once');
+tok = regexp(nameIO,  ['IO_cN([\d\.]+)_cG([\d\.]+)_nT([A-Za-z0-9\.]+)' ...
+    '_Nm([\d\.]+)_Na([\d\.]+)_Ns([\d\.]+)_cSDT(-?[\d\.]+)' ...
+    '_cont[\d\.]+_whiten[\d\.]+_R(\d+)_\d+\d+_B(\d+)'],  'tokens', 'once');
 
 if isempty(tok)
     return
