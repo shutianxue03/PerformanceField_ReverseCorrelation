@@ -194,7 +194,10 @@ options_fmin = optimoptions('fmincon', 'MaxIterations', 1e4, 'Display', 'off');
 namesModelA = {'RC', 'IO', 'RandTemp'};
 
 namesModelB = {'FullModel', 'NoMulti', 'NoAdd', 'NoShared', 'MultiOnly', 'AddOnly', 'SharedOnly', 'JustCriterion'};
-if ~exist('flag_incluCrit', 'var'), flag_incluCrit = 1; end
+flag_regressType = 2;  % 1=Univariate; 2=Multi+smoothing
+flag_incluCrit   = 1;  % 1=include criterion as a free parameter
+C_contribution   = 0;  % contribution of criterion loss to the objective
+
 switch flag_incluCrit
     case 0
         namesModelBparams = {...

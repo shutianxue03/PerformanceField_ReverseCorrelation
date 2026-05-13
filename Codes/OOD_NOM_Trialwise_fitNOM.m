@@ -1,4 +1,4 @@
-function OOD_NOM_Trialwise_fitNOM(nBasisORI, nBasisSF, flag_whitenDV, isubj, iLocComb, flag_incluCrit, C_contribution, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
+function OOD_NOM_Trialwise_fitNOM(isubj, iLocComb, flag_whitenDV, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
 %==========================================================================%
 % OOD_NOM_Trialwise_fitNOM.m
 %--------------------------------------------------------------------------
@@ -39,9 +39,18 @@ addpath(genpath('fxn_analysis_RC_v2'));
 addpath(genpath('SX_toolbox/bads-master'));
 
 %% General settings (from master config)
+% flag_whitenDV is needed for SX_RC1_setting
 %--------------%
 SX_RC1_setting; % defines nORI, nSF, namesLocComb, namesModelA, namesModelB, nBins, etc.
 %--------------%
+
+% Defensive fallbacks for environments/workers using an older SX_RC1_setting.
+nBins=nBins;
+flag_incluCrit = flag_incluCrit;
+C_contribution = C_contribution;
+options_fmin = options_fmin;
+options_bads = options_bads;
+
 flag_fittingStep = 1; % one vs. two step fitting (one step is more standard)
 flag_fminconORbads = 2; % 1 = use fmincon (faster, local); 2 = use BADS (slower, more robust)
 flag_plot_allIter = 1; % 1 = make summary plots across iterations
@@ -51,7 +60,7 @@ if strcmp('HPC', str_envir), flag_plot_allIter = 0; end % don't plot when runnin
 %% -------------------- Deterministic RNG (grand seed + per-iteration substreams) -------------------- %%
 S_seed = GetGrandSeed(nIter, iJob, nJob, nameFolder_Data);
 
-% One RNG stream for the whole job; each iteration uses its own Substream
+% Use the grand seed as the reproducible base, then set one local stream per iteration.
 stream = RandStream('Threefry', 'Seed', S_seed.grandSeed);
 RandStream.setGlobalStream(stream);
 
@@ -105,7 +114,9 @@ fprintf(['\nSubject/IO name: %s ' ...
     nIter);
 
 %% Load trial-wise data and criterion from xx_compIV.mat file
-load(nameFile_compIV, 'data_*allIter');
+S_data = load(nameFile_compIV, 'data_train_allIter', 'data_test_allIter');
+data_train_allIter = S_data.data_train_allIter;
+data_test_allIter = S_data.data_test_allIter;
 fprintf('%s: Loaded xx_compIV.mat for "data_allIter" .\n\n', datetime('now'))
 
 %% Parameter vectors per Model B
@@ -169,17 +180,17 @@ nLL_train_allIter = nan(nIter, 1);
 nLL_test_allIter = nLL_train_allIter;
 pred_metrics_allIter = cell(nIter, 1);
 
-nameFile_progress = [nameFile_fitNOM, '.mat'];
-
 %% Main estimation loop across iterations
 fprintf('%s: Started running %d iterations.\n\n', datetime('now'), nIter)
 
-for iIter = 1:nIter
+parfor iIter = 1:nIter
 
     fprintf('%d... ', iIter);
 
     % Deterministic randomness for THIS iteration (global index across jobs)
-    stream.Substream = S_seed.iterIdxList(iIter);
+    iterStream = RandStream('Threefry', 'Seed', S_seed.grandSeed);
+    iterStream.Substream = S_seed.iterIdxList(iIter);
+    RandStream.setGlobalStream(iterStream);
 
     % Extract the training and test set
     data_train = data_train_allIter{iIter}; % (for estimating params)
@@ -205,7 +216,9 @@ for iIter = 1:nIter
             if flag_fminconORbads == 1 % Faster, local search
                 [params_est, nLL_train] = fmincon(fxn_estParams, params0, [], [], [], [], params_lb, params_ub, [], options_fmin);
             else % BADS: more robust global + local search
-                [params_est, nLL_train] = bads(fxn_estParams, params0, params_lb, params_ub, [], [], [], options_bads);
+                plb = params_lb + 0.2 .* (params_ub - params_lb);
+                pub = params_lb + 0.8 .* (params_ub - params_lb);
+                [params_est, nLL_train] = bads(fxn_estParams, params0, params_lb, params_ub, plb, pub, [], options_bads);
             end
 
         case 2 % Two-stage fitting: stabilize models that include a shared component across two passes
@@ -252,7 +265,9 @@ for iIter = 1:nIter
                 if flag_fminconORbads == 1 % Faster, local search
                     [params_est_fromStep1, nLL_step1] = fmincon(fxn_estParams, params0_step1, [], [], [], [], params_lb_step1, params_ub_step1, [], options_fmin);
                 else % BADS: more robust global + local search
-                    [params_est_fromStep1, nLL_step1] = bads(fxn_estParams, params0_step1, params_lb_step1, params_ub_step1, [], [], [], options_bads);
+                    plb_step1 = params_lb_step1 + 0.2 .* (params_ub_step1 - params_lb_step1);
+                    pub_step1 = params_lb_step1 + 0.8 .* (params_ub_step1 - params_lb_step1);
+                    [params_est_fromStep1, nLL_step1] = bads(fxn_estParams, params0_step1, params_lb_step1, params_ub_step1, plb_step1, pub_step1, [], options_bads);
                 end
 
                 % ==== Step 2. Fix the Step-1 estimates and fit the shared term ====
@@ -294,7 +309,9 @@ for iIter = 1:nIter
                 if flag_fminconORbads == 1 % Faster, local search
                     [params_est_step2, nLL_step2] = fmincon(fxn_estParams, params0_step2, [], [], [], [], params_lb_step2, params_ub_step2, [], options_fmin);
                 else % BADS: more robust global + local search
-                    [params_est_step2, nLL_step2] = bads(fxn_estParams, params0_step2, params_lb_step2, params_ub_step2, [], [], [], options_bads);
+                    plb_step2 = params_lb_step2 + 0.2 .* (params_ub_step2 - params_lb_step2);
+                    pub_step2 = params_lb_step2 + 0.8 .* (params_ub_step2 - params_lb_step2);
+                    [params_est_step2, nLL_step2] = bads(fxn_estParams, params0_step2, params_lb_step2, params_ub_step2, plb_step2, pub_step2, [], options_bads);
                 end
 
                 % Combine est. params of two steps
@@ -330,7 +347,9 @@ for iIter = 1:nIter
                 if flag_fminconORbads == 1 % Faster, local search
                     [params_est, nLL_train] = fmincon(fxn_estParams, params0, [], [], [], [], params_lb, params_ub, [], options_fmin);
                 else % BADS: more robust global + local search
-                    [params_est, nLL_train] = bads(fxn_estParams, params0, params_lb, params_ub, [], [], [], options_bads);
+                    plb = params_lb + 0.2 .* (params_ub - params_lb);
+                    pub = params_lb + 0.8 .* (params_ub - params_lb);
+                    [params_est, nLL_train] = bads(fxn_estParams, params0, params_lb, params_ub, plb, pub, [], options_bads);
                 end
             end
     end
@@ -376,25 +395,12 @@ for iIter = 1:nIter
     params_est_allIter(iIter, :) = params_est(:).';
     pred_metrics_allIter{iIter} = pred_test;
 
-    %% Save a progress report in the folder to indicate the finished iteration and time spent
-    time_progress = ceil(minutes(datetime('now')-time_start)); % round up to minutes
-    save(nameFile_progress, 'iIter')
-    % rename (to avoid saving one file for each iteration)
-    nameFile_progress_new = sprintf('%s_%d_%dmin.mat', nameFile_fitNOM, iIter, time_progress);
-    movefile(nameFile_progress, nameFile_progress_new);
-    nameFile_progress = nameFile_progress_new;
-
 end % end of iIter
 
 fprintf('\n\n%s: All iterations done.\n\n', datetime('now'))
 
 %% Save results (append onto *_compIV.mat)
-save(nameFile_fitNOM, '*_allIter', 'time_progress');
-
-% Delete the progress report
-if exist(nameFile_progress_new, 'file')
-    delete(nameFile_progress_new);
-end
+save(nameFile_fitNOM, 'params_est_allIter', 'nLL_train_allIter', 'nLL_test_allIter', 'pred_metrics_allIter');
 
 fprintf('%s: Outputs saved.\n\n', datetime('now'))
 

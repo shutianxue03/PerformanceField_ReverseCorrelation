@@ -8,7 +8,7 @@
 # 1. Runs a small performance evaluation script (optional monitoring)
 # 2. Launches MATLAB and calls:
 # loops over iModelB_fit=1:7, calling:
-# OOD_NOM_Trialwise_fitNOM(nBasisORI, nBasisSF, flag_whitenDV, isubj, iLocComb, flag_incluCrit, C_contribution, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
+# OOD_NOM_Trialwise_fitNOM(isubj, iLocComb, flag_whitenDV, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
 # ============================================================
 
 #SBATCH --nodes=1
@@ -56,15 +56,11 @@ nIter = $4;
 nJob = $5;
 iJob = $6;
 
-nBasisORI = 6; % hard-coded, not used in this function
-nBasisSF = 6; % hard-coded, not used in this function
 flag_whitenDV = 1; % hard-coded; used
-flag_incluCrit = 1; % hard-coded; used; 1=include criterion as a free parameter
-C_contribution = 0.5; % hard-coded; used; contribution of criterion to the model
 
 for iModelB_fit = 1:7
     fprintf('\n--- ModelB=%d ---\n', iModelB_fit);
-    OOD_NOM_Trialwise_fitNOM(nBasisORI, nBasisSF, flag_whitenDV, isubj, iLocComb, flag_incluCrit, C_contribution, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
+    OOD_NOM_Trialwise_fitNOM(isubj, iLocComb, flag_whitenDV, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
 end
 
 disp('====================================');

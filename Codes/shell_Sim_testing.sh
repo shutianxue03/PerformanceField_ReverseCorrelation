@@ -35,14 +35,9 @@ for((i=${start}; i<${end}; i++)); do
        Nshared_true \
        cSDT_true \
        lambda_whiten \
-       flag_regressType \
-       flag_incluCrit \
-       C_contribution \
        iModelB_sim \
-       nIter \
-       nBasisORI \
-       nBasisSF <<< "${line}"
-    matlab -batch "try, OOD_sim(${noiseCST}, ${gaborCST}, ${nTrials}, ${Nmul_true}, ${Nadd_true}, ${Nshared_true}, ${cSDT_true}, ${lambda_whiten}, ${flag_regressType}, ${flag_incluCrit}, ${C_contribution}, ${iModelB_sim}, ${nIter}, ${nBasisORI}, ${nBasisSF}); catch ME, disp(getReport(ME,'extended')); exit(1); end; exit(0);"
+       nIter <<< "${line}"
+    matlab -batch "try, OOD_sim(${noiseCST}, ${gaborCST}, ${nTrials}, ${Nmul_true}, ${Nadd_true}, ${Nshared_true}, ${cSDT_true}, ${lambda_whiten}, ${iModelB_sim}, ${nIter}); catch ME, disp(getReport(ME,'extended')); exit(1); end; exit(0);"
 done
 
 

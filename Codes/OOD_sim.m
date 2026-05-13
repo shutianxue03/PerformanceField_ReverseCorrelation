@@ -1,4 +1,4 @@
-function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, cSDT_true, lambda_whiten, flag_regressType, flag_incluCrit, C_contribution, iModelB_sim, nIter, nBasisORI, nBasisSF)
+function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, cSDT_true, lambda_whiten, iModelB_sim, nIter)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Script name: OOD_sim.m
@@ -366,7 +366,7 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
     %% Run compIV and fitNOM on this IO
     % Step 1: compute IVs, templates, and test-set metrics
     %----------------------------%
-    OOD_NOM_Trialwise_compIV_A12(nBasisORI, nBasisSF, {nameIO, criterion_DV_true}, iLocComb, lambda_whiten, flag_regressType, flag_whitenDV, nIter, nJob, iJob)
+    OOD_NOM_Trialwise_compIV_A12({nameIO, criterion_DV_true}, iLocComb, lambda_whiten, flag_whitenDV, nIter, nJob, iJob)
     %----------------------------%
 
     %% Step 2: fit NOM parameters and predict metrics
@@ -374,7 +374,7 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
 
         for iModelB_fit = iModelB_fit_all
             %----------------------------%
-            OOD_NOM_Trialwise_fitNOM(nBasisORI, nBasisSF, flag_whitenDV, {nameIO, criterion_DV_true}, iLocComb, flag_incluCrit, C_contribution, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
+            OOD_NOM_Trialwise_fitNOM({nameIO, criterion_DV_true}, iLocComb, flag_whitenDV, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
             %----------------------------%
 
             if iModelB_fit == iModelB_sim

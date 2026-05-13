@@ -69,13 +69,8 @@ IFS=$'\t' read -r \
   Nshared_true \
   cSDT_true \
   lambda_whiten \
-  flag_regressType \
-  flag_incluCrit \
-  C_contribution \
   iModelB_sim \
-  nIter \
-  nBasisORI \
-  nBasisSF <<< "${line}"
+  nIter <<< "${line}"
 
 job_name="gCST${gaborCST}_Nm${Nmul_true}_Na${Nadd_true}_Ns${Nshared_true}_Cz${cSDT_true}_Bsim${iModelB_sim}"
 
@@ -105,7 +100,7 @@ cd "${script_dir}"
 
 module load matlab/2025b
 
-matlab -batch "try, OOD_sim(${noiseCST}, ${gaborCST}, ${nTrials}, ${Nmul_true}, ${Nadd_true}, ${Nshared_true}, ${cSDT_true}, ${lambda_whiten}, ${flag_regressType}, ${flag_incluCrit}, ${C_contribution}, ${iModelB_sim}, ${nIter}, ${nBasisORI}, ${nBasisSF}); catch ME, disp(getReport(ME,'extended')); exit(1); end; exit(0);"
+matlab -batch "try, OOD_sim(${noiseCST}, ${gaborCST}, ${nTrials}, ${Nmul_true}, ${Nadd_true}, ${Nshared_true}, ${cSDT_true}, ${lambda_whiten}, ${iModelB_sim}, ${nIter}); catch ME, disp(getReport(ME,'extended')); exit(1); end; exit(0);"
 
 echo "======================================"
 echo "Finished: $(date)"

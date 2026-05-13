@@ -17,8 +17,8 @@
 set -euo pipefail
 
 flag_stage=1
-nIter=200
-nJob=5
+nIter=100
+nJob=1
 
 isubjList=($(seq 1 2))
 iLocCombList=($(seq 1 2))

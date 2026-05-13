@@ -1,4 +1,4 @@
-function OOD_NOM_Trialwise_compIV_A12(nBasisORI, nBasisSF, isubj, iLocComb, lambda_whiten, flag_regressType, flag_whitenDV, nIter, nJob, iJob)
+function OOD_NOM_Trialwise_compIV_A12(isubj, iLocComb, lambda_whiten, flag_whitenDV, nIter, nJob, iJob)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % OOD_NOM_Trialwise_compIV.m
 %
@@ -26,9 +26,16 @@ addpath(genpath('SX_toolbox/bads-master'));
 
 %% Global settings
 % Define directories
+nORI=19;
+
 % --------------%
 SX_RC1_setting; % defines nameFolder_*, nORI, nSF, namesLocComb, namesModelA, etc.
 % --------------%
+flag_regressType = flag_regressType;
+
+% Make tuning axes explicit variables (avoid brace-index parsing issues).
+axisORI = filtersOri_all - 90;
+axisSF = filtersSF_all_log;
 
 % nameFolder_Data = sprintf('%s/Data_Part2_nBasis%d%d_noMirror', nameFolder_server, nBasisORI, nBasisSF) ;
 % nameFolder_Data_OOD = sprintf('%s/Data_OOD_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
@@ -84,8 +91,6 @@ if flag_regressType == 2
     opts. asymSF_rightLeftRatio = [1.2]; % typical range: [1.1, 1.5]
     opts.nFolds = 5; % number of folds for cross-validation (CV) to select the best model
     opts.link = 'probit';
-    opts.nBasisORI = nBasisORI;
-    opts.nBasisSF = nBasisSF;
     opts.sigmaORI_deg = [];
     opts.sigmaSF_log2 = [];
     opts.oriPeriod_deg = 180;
@@ -99,6 +104,19 @@ nRep = 20;
 iFamily_ORI = 1; % 1=scaled gaussian, 8=DoG
 iFamily_SF = 2; % 2=log parabola
 problem_setting = MultiStart('StartPointsToRun', 'bounds','UseParallel', 1, 'Display', 'off');
+
+% Local fmincon options used by runMultistartFmincon (parfor-safe path).
+if exist('optimoptions', 'file')
+    options_fmin = optimoptions('fmincon', 'Display', 'off');
+else
+    options_fmin = optimset('Display', 'off');
+end
+
+% Cache bounds as plain numeric vectors (avoid brace indexing in loop expressions).
+ubORI = ub_full_all{iFamily_ORI};
+lbORI = lb_full_all{iFamily_ORI};
+ubSF = ub_full_all{iFamily_SF};
+lbSF = lb_full_all{iFamily_SF};
 
 flag_plot_tuning = 0;
 
@@ -305,20 +323,46 @@ margPred_SF_allIter = nan(nIter, 2, nSF);
 margParams_SF_allIter = nan(nIter, 2, length(namesParams_all{iFamily_SF}));
 margR2_SF_allIter = nan(nIter, 2);
 
-nameFile_progress = [nameFile_compIV_A1, '.mat'];
-
 fprintf('%s: A1 Started running %d iterations.\n\n', datetime('now'), nIter)
 
-for iIter = 1:nIter
+parfor iIter = 1:nIter
     fprintf('\n%s: %d...', datetime('now'), iIter);
 
     % Deterministic randomness for THIS iteration (global index across jobs)
-    stream.Substream = S_seed.iterIdxList(iIter);
+    iterStream = RandStream('Threefry', 'Seed', S_seed.grandSeed);
+    iterStream.Substream = S_seed.iterIdxList(iIter);
+    RandStream.setGlobalStream(iterStream);
 
     %% 1. Resample trials into FULL or TEMPLATE/TRAIN / TEST
-    %----------------%
-    fxn_resampleTrials;
-    %----------------%
+    R = fxn_resampleTrials(dataMatrix, e3D_allT, iSess_select, iLoc_all, ratio_split);
+    e3D_full_rand = R.e3D_full_rand;
+    iPRS_full_rand = R.iPRS_full_rand;
+    resp_full_rand = R.resp_full_rand;
+    cst_full_rand = R.cst_full_rand;
+    respC_full_rand = R.respC_full_rand;
+    iPair_full_rand = R.iPair_full_rand;
+    RT_full_rand = R.RT_full_rand;
+    e3D_tmpl_rand = R.e3D_tmpl_rand;
+    iPRS_tmpl_rand = R.iPRS_tmpl_rand;
+    resp_tmpl_rand = R.resp_tmpl_rand;
+    cst_tmpl_rand = R.cst_tmpl_rand;
+    respC_tmpl_rand = R.respC_tmpl_rand;
+    iPair_tmpl_rand = R.iPair_tmpl_rand;
+    RT_tmpl_rand = R.RT_tmpl_rand;
+    e3D_train_rand = R.e3D_train_rand;
+    iPRS_train_rand = R.iPRS_train_rand;
+    resp_train_rand = R.resp_train_rand;
+    cst_train_rand = R.cst_train_rand;
+    respC_train_rand = R.respC_train_rand;
+    iPair_train_rand = R.iPair_train_rand;
+    RT_train_rand = R.RT_train_rand;
+    e3D_test_rand = R.e3D_test_rand;
+    iPRS_test_rand = R.iPRS_test_rand;
+    resp_test_rand = R.resp_test_rand;
+    cst_test_rand = R.cst_test_rand;
+    respC_test_rand = R.respC_test_rand;
+    iPair_test_rand = R.iPair_test_rand;
+    RT_test_rand = R.RT_test_rand;
 
     %% 2. Select which trials to use to estimate the template (TEMPLATE set)
     [useIdx_full, useIdx_tmpl] = selectTemplateIndices(itype_template, iPRS_full_rand, iPRS_tmpl_rand);
@@ -396,8 +440,9 @@ for iIter = 1:nIter
                 template_full_raw = SX_sim07_RC(e3D_full_forRC, resp_full_forRC);
 
             case 2  % Multivariate + smoothing
-                opts.template_ideal = template_ideal;
-                out = SX_RC_selectBasis_cv(e3D_tmpl_forRC, resp_tmpl_forRC, axis_tuning{1}, axis_tuning{2}, candidateORI, candidateSF, candidateBasisFamilyORI, candidateBasisFamilySF, candidateRidge, opts);
+                opts_local = opts;
+                opts_local.template_ideal = template_ideal;
+                out = SX_RC_selectBasis_cv(e3D_tmpl_forRC, resp_tmpl_forRC, axisORI, axisSF, candidateORI, candidateSF, candidateBasisFamilyORI, candidateBasisFamilySF, candidateRidge, opts_local);
                 template_tmpl_raw = out.template2D;
                 nBasisORI_tmpl = out.nBasisORI;
                 nBasisSF_tmpl = out.nBasisSF;
@@ -408,7 +453,7 @@ for iIter = 1:nIter
                 asymSF_rightLeftRatio_tmpl = out.asymSF_rightLeftRatio;
                 ridge_tmpl = out.ridge;
 
-                out = SX_RC_selectBasis_cv(e3D_full_forRC, resp_full_forRC, axis_tuning{1}, axis_tuning{2}, candidateORI, candidateSF, candidateBasisFamilyORI, candidateBasisFamilySF, candidateRidge, opts);
+                out = SX_RC_selectBasis_cv(e3D_full_forRC, resp_full_forRC, axisORI, axisSF, candidateORI, candidateSF, candidateBasisFamilyORI, candidateBasisFamilySF, candidateRidge, opts_local);
                 template_full_raw = out.template2D;
 
         end % switch
@@ -468,20 +513,18 @@ for iIter = 1:nIter
         % Fitting
         if any(isnan(margORI)), error('ALERT: NaN in margORI!'), end
 
-        xORI = axis_tuning{1};
+        xORI = axisORI;
         fxn_tuningLoss_ORI = @(param_est) sum((margORI - predSFkernel(xORI, iFamily_ORI, param_est, flag_plot_tuning)).^2);
-        problem_ORI = createOptimProblem('fmincon','objective', fxn_tuningLoss_ORI,'x0', (ub_full_all{iFamily_ORI}+lb_full_all{iFamily_ORI})/2,'lb',lb_full_all{iFamily_ORI},'ub',ub_full_all{iFamily_ORI},'options',options_fmin);
-        margParams_ORI = run(problem_setting, problem_ORI, nRep);
+        margParams_ORI = runMultistartFmincon(fxn_tuningLoss_ORI, (ubORI+lbORI)/2, lbORI, ubORI, nRep, options_fmin);
         %--------------------------------------------%
         margPred_ORI = predSFkernel(xORI, iFamily_ORI, margParams_ORI, flag_plot_tuning);
         %--------------------------------------------%
         margR2_ORI = 1-sumsqr(margORI-margPred_ORI)/sumsqr(margORI-mean(margORI));
 
-        xSF = axis_tuning{2};
+        xSF = axisSF;
         xSF_ln = 2.^xSF; % fit in linear SF space
         fxn_tuningLoss_SF = @(param_est) sum((margSF - predSFkernel(xSF_ln, iFamily_SF, param_est, flag_plot_tuning)).^2);
-        problem_SF = createOptimProblem('fmincon','objective', fxn_tuningLoss_SF,'x0', (ub_full_all{iFamily_SF}+lb_full_all{iFamily_SF})/2,'lb',lb_full_all{iFamily_SF},'ub',ub_full_all{iFamily_SF},'options',options_fmin);
-        margParams_SF = run(problem_setting, problem_SF, nRep);
+        margParams_SF = runMultistartFmincon(fxn_tuningLoss_SF, (ubSF+lbSF)/2, lbSF, ubSF, nRep, options_fmin);
         %--------------------------------------------%
         margPred_SF = predSFkernel(xSF_ln, iFamily_SF, margParams_SF, flag_plot_tuning);
         %--------------------------------------------%
@@ -527,28 +570,15 @@ for iIter = 1:nIter
     asymSF_rightLeftRatio_tmpl_allIter(iIter) = asymSF_rightLeftRatio_tmpl;
     ridge_tmpl_allIter(iIter) = ridge_tmpl;
 
-    %% Save a progress report in the folder to indicate the finished iteration and time spent
-    time_progress = datetime('now');
-    time_progress = ceil(minutes(time_progress-time_start)); % round up to minutes
-    save(nameFile_progress, 'iIter')
-
-    % rename (to avoid saving one file for each iteration)
-    nameFile_progress_new = sprintf('%s_%d_%dmin.mat', nameFile_compIV_A1, iIter, time_progress);
-    movefile(nameFile_progress, nameFile_progress_new);
-    nameFile_progress = nameFile_progress_new;
-
 end % end for iIter
 
 fprintf('\n\n%s: A1 All iterations done.\n\n', datetime('now'))
 
+time_progress = ceil(minutes(datetime('now')-time_start)); % round up to minutes
+
 %% SAVE  A1
 % save(nameFile_compIV_A1, 'time_progress', 'template_ideal', 'criterion_z*', '*_allIter', 'names*', 'flag*', 'ratio_split', 'ORI_bound', '*Type');
 save(nameFile_compIV_A1, 'time_progress', 'template_ideal', '*_allIter', 'names*', 'flag*', 'ratio_split', 'ORI_bound', '*Type');
-
-% Delete the progress report
-if exist(nameFile_progress_new, 'file')
-    delete(nameFile_progress_new);
-end
 
 fprintf('\n\n%s: A1 Outputs saved.\n\n', datetime('now'))
 
@@ -598,20 +628,46 @@ data_train_allIter = cell(nIter, 1);
 data_test_allIter = data_train_allIter;
 template_tmpl_allIter = nan(nIter, nORI, nSF);
 template_full_allIter = template_tmpl_allIter;
-nameFile_progress = [nameFile_compIV_A2, '.mat'];
-
 fprintf('%s: A2 Started running %d iterations.\n\n', datetime('now'), nIter)
 
-for iIter = 1:nIter
+parfor iIter = 1:nIter
     fprintf('\n%s: %d...', datetime('now'), iIter);
 
     % Deterministic randomness for THIS iteration (global index across jobs)
-    stream.Substream = S_seed.iterIdxList(iIter);
+    iterStream = RandStream('Threefry', 'Seed', S_seed.grandSeed);
+    iterStream.Substream = S_seed.iterIdxList(iIter);
+    RandStream.setGlobalStream(iterStream);
 
     %% 1. Resample trials into FULL or TEMPLATE/TRAIN / TEST
-    %----------------%
-    fxn_resampleTrials;
-    %----------------%
+    R = fxn_resampleTrials(dataMatrix, e3D_allT, iSess_select, iLoc_all, ratio_split);
+    e3D_full_rand = R.e3D_full_rand;
+    iPRS_full_rand = R.iPRS_full_rand;
+    resp_full_rand = R.resp_full_rand;
+    cst_full_rand = R.cst_full_rand;
+    respC_full_rand = R.respC_full_rand;
+    iPair_full_rand = R.iPair_full_rand;
+    RT_full_rand = R.RT_full_rand;
+    e3D_tmpl_rand = R.e3D_tmpl_rand;
+    iPRS_tmpl_rand = R.iPRS_tmpl_rand;
+    resp_tmpl_rand = R.resp_tmpl_rand;
+    cst_tmpl_rand = R.cst_tmpl_rand;
+    respC_tmpl_rand = R.respC_tmpl_rand;
+    iPair_tmpl_rand = R.iPair_tmpl_rand;
+    RT_tmpl_rand = R.RT_tmpl_rand;
+    e3D_train_rand = R.e3D_train_rand;
+    iPRS_train_rand = R.iPRS_train_rand;
+    resp_train_rand = R.resp_train_rand;
+    cst_train_rand = R.cst_train_rand;
+    respC_train_rand = R.respC_train_rand;
+    iPair_train_rand = R.iPair_train_rand;
+    RT_train_rand = R.RT_train_rand;
+    e3D_test_rand = R.e3D_test_rand;
+    iPRS_test_rand = R.iPRS_test_rand;
+    resp_test_rand = R.resp_test_rand;
+    cst_test_rand = R.cst_test_rand;
+    respC_test_rand = R.respC_test_rand;
+    iPair_test_rand = R.iPair_test_rand;
+    RT_test_rand = R.RT_test_rand;
 
     %% 2. Select which trials to use to estimate the template (TEMPLATE set)
     [useIdx_full, useIdx_tmpl] = selectTemplateIndices(itype_template, iPRS_full_rand, iPRS_tmpl_rand);
@@ -651,27 +707,14 @@ for iIter = 1:nIter
     template_tmpl_allIter(iIter, :, :) = template_notNormed_tmpl;
     template_full_allIter(iIter, :, :) = template_notNormed_full;
 
-    %% A2: Save a progress report in the folder to indicate the finished iteration and time spent
-    time_progress = datetime('now');
-    time_progress = ceil(minutes(time_progress-time_start)); % round up to minutes
-    save(nameFile_progress, 'iIter')
-
-    % rename (to avoid saving one file for each iteration)
-    nameFile_progress_new = sprintf('%s_%d_%dmin.mat', nameFile_compIV_A2, iIter, time_progress);
-    movefile(nameFile_progress, nameFile_progress_new);
-    nameFile_progress = nameFile_progress_new;
-
 end % end for iIter
 
 fprintf('\n\n%s: A2 All iterations done.\n\n', datetime('now'))
 
+time_progress = ceil(minutes(datetime('now')-time_start)); % round up to minutes
+
 %% SAVE for A2
 save(nameFile_compIV_A2, 'time_progress', 'template_ideal', '*_allIter', 'names*', 'flag*', 'ratio_split', 'ORI_bound', '*Type');
-
-% Delete the progress report
-if exist(nameFile_progress_new, 'file')
-    delete(nameFile_progress_new);
-end
 
 fprintf('\n\n%s: A2 Outputs saved.\n\n', datetime('now'))
 end
@@ -816,4 +859,25 @@ idxPRS = find(iPRS_in == 1);
 idx_rep = [repmat(idxABS, nABS, 1); repmat(idxPRS, nPRS, 1)];
 e3D_out = e3D_in(idx_rep, :, :);
 resp_out = resp_in(idx_rep);
+end
+
+function bestX = runMultistartFmincon(objFun, x0, lb, ub, nRep, options_fmin)
+% Parfor-safe replacement for MultiStart.run.
+nRep = max(1, round(nRep));
+bestX = x0;
+bestF = inf;
+
+for iRep = 1:nRep
+    if iRep == 1
+        xStart = x0;
+    else
+        xStart = lb + rand(size(x0)) .* (ub - lb);
+    end
+
+    [xCand, fCand] = fmincon(objFun, xStart, [], [], [], [], lb, ub, [], options_fmin);
+    if isfinite(fCand) && fCand < bestF
+        bestF = fCand;
+        bestX = xCand;
+    end
+end
 end

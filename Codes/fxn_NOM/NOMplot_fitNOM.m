@@ -4,8 +4,6 @@
 %% Compile data and pred for all iterations and bins
 set(0, 'DefaultFigureVisible', 'off') % avoid printing figures on the desktop
 
-pred = pred_test;
-
 pYES_data_allBins = nan(nIter, nBins);
 pYES_pred_allBins = pYES_data_allBins;
 pC_data_allBins = pYES_data_allBins;
@@ -18,7 +16,7 @@ Cz_emp_allIter = nan(nIter, 1);
 
 for iIter = 1:nIter
 
-    DV_allBins_all(iIter, :) = pred.metrics.IV_allBins;
+    DV_allBins_all(iIter, :) = pred_metrics_allIter{iIter}.metrics.IV_allBins;
 
     % dprime_data_allB(ii, :) = pred_metrics_allIter{ii}.metrics.dprime_data_allBins;
     % dprime_pred_allB(ii, :) = pred_metrics_allIter{ii}.metrics.dprime_pred_allBins;
