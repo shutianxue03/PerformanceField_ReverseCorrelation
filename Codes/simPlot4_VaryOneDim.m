@@ -21,7 +21,7 @@ set(0, 'DefaultFigureVisible', 'off');
 
 %% settings
 flag_whitenDV=0; % NEEDED for SX_RC1_setting!!
-str_part = 'OOD'; % <-- change if needed
+str_part = 'whitenDV0'; % <-- change if needed
 iModelA_fit = [1]; %1=use data-derived template; 2=use true template
 nBfit = 7;          % number of B-model variants to evaluate (each uses a different internal-noise structure)
 nBins_Part4 = 3; % define bins for collapsing parameter recovery points; use 3 for main text, 5 for Supp
@@ -30,7 +30,7 @@ nBins_Part4 = 3; % define bins for collapsing parameter recovery points; use 3 f
 SX_RC1_setting;
 %--------------%
 nameFolder_Data = sprintf('%s/Data_%s', nameFolder_server, str_part);
-nameFile_R = sprintf('%s/Outputs/R_A%d.mat', nameFolder_server, iModelA_fit);
+nameFile_R = sprintf('%s/Outputs/R_A%d_%s.mat', nameFolder_server, iModelA_fit, str_part);
 nameFolder_Data_OOD = sprintf('%s/Data_OOD_%d%d', nameFolder_Data, nORI, nSF);
 nameFolder_Data_NOM_Trialwise = sprintf('%s/Data_NOM_Trialwise_%d%d', nameFolder_Data, nORI, nSF);
 
@@ -108,7 +108,19 @@ if ~exist(nameFile_R, 'file')
             fprintf('No compIV file found in %s\n', info.folder_NOM);
             continue
         end
-        data_compIV = load(fullfile(nameDir_compIV(1).folder, nameDir_compIV(1).name));
+
+        try
+            data_compIV = load(fullfile(nameDir_compIV(1).folder, nameDir_compIV(1).name));
+        catch
+            nameDir_fitNOM_chk = dir(fullfile(info.folder_NOM, sprintf('n*_A%dB*.mat', iModelA_fit)));
+            nameDir_fitNOM_chk = nameDir_fitNOM_chk(~contains({nameDir_fitNOM_chk.name}, {'min','compIV'}));
+            if ~isempty(nameDir_fitNOM_chk)
+                fprintf('corrupted compIV file, with fitNOM files present: %s\n', info.folder_NOM);
+            else
+                fprintf('corrupted compIV file, but NO fitNOM files: %s\n', info.folder_NOM);
+            end
+            continue
+        end
 
         % =========================================================
         % 2. Condition-level base record
