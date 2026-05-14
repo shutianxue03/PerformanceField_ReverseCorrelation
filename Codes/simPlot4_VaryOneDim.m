@@ -1562,11 +1562,19 @@ for iBar = 1:nBars_fig5
 end
 
 % load the cached permutation results if they exist, otherwise compute and save them
+cacheLoaded_fig5 = false;
 if exist(permFile_fig5, 'file')
     % fprintf('\n Loading cached permStats_fig5 from %s\n', permFile_fig5);
     load(permFile_fig5, 'permStats_fig5');
-    cacheLoaded_fig5 = true;
-else
+    % Validate cache dimensions against current data
+    if size(permStats_fig5.observedMean, 3) ~= nBars_fig5
+        fprintf('\n Cache nBars mismatch (%d vs %d). Recomputing...\n', size(permStats_fig5.observedMean, 3), nBars_fig5);
+        clear permStats_fig5;
+    else
+        cacheLoaded_fig5 = true;
+    end
+end
+if ~cacheLoaded_fig5
     fprintf('\n Computing permutation nulls for Fig 5 (nPerm = %d)...\n', nPerm_fig5);
     % Create a struct to hold all permutation results
     permStats_fig5 = struct();
