@@ -30,9 +30,12 @@ nBins_Part4 = 3; % define bins for collapsing parameter recovery points; use 3 f
 SX_RC1_setting;
 %--------------%
 nameFolder_Data = sprintf('%s/Data_%s', nameFolder_server, str_part);
-nameFile_R = sprintf('%s/Outputs/R_A%d_%s.mat', nameFolder_server, iModelA_fit, str_part);
+nameFolder_Output = sprintf('%s/Outputs', nameFolder_server);
+nameFile_R = sprintf('%s/R_A%d_%s.mat', nameFolder_Output, iModelA_fit, str_part);
 nameFolder_Data_OOD = sprintf('%s/Data_OOD_%d%d', nameFolder_Data, nORI, nSF);
 nameFolder_Data_NOM_Trialwise = sprintf('%s/Data_NOM_Trialwise_%d%d', nameFolder_Data, nORI, nSF);
+
+if isempty(dir(nameFolder_Output)), mkdir(nameFolder_Output), end
 
 namesMetrics_behav = {'pYES','pC','pA'};
 
