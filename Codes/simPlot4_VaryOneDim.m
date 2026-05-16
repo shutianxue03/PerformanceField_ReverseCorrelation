@@ -20,8 +20,8 @@ clear; clc; close all;
 set(0, 'DefaultFigureVisible', 'off');
 
 %% settings
-flag_whitenDV=0; % NEEDED for SX_RC1_setting!!
-str_part = 'whitenDV0'; % <-- change if needed
+flag_whitenDV = 1; % NEEDED for SX_RC1_setting!!
+str_part = sprintf('whitenDV%d', flag_whitenDV); % <-- change if needed
 iModelA_fit = [1]; %1=use data-derived template; 2=use true template
 nBfit = 7;          % number of B-model variants to evaluate (each uses a different internal-noise structure)
 nBins_Part4 = 3; % define bins for collapsing parameter recovery points; use 3 for main text, 5 for Supp
@@ -520,7 +520,7 @@ if ~exist(nameFile_R, 'file')
 
     % Save the compiled record to /Output
     save(nameFile_R, 'R')
-
+    fprintf('\n\n%s: Outputs saved as %s. \n\n', datetime('now'), nameFile_R)
 else
     % fprintf('Output file already exists, skipping compilation: %s\n', nameFile_R);
     % Load output file
@@ -539,6 +539,8 @@ Bsim_unik = unique([R.iModelB_sim]);
 Bfit_unik = unique([R.iModelB_fit]);
 
 %% Shared plotting formats
+fprintf('\n%s: Setting shared plotting formats.\n', string(datetime('now')))
+
 setting = struct();
 % ---------- output ----------
 nameFolder_Figures_part4 = fullfile(nameFolder_Figures, sprintf('IO_%s_A%d', str_part, iModelA_fit));
@@ -1411,10 +1413,11 @@ for iRow_param = 1:numel(setting.fig4_paramNames)
             axis off; continue
         end
 
-        % Define x and y limit to draw unity line
+        % Define x/y limits and ticks from the values actually plotted.
         if strcmp(pName, 'criterion_DV')
-            S_axi = fxn_bin_criterion_values(Rsub, nBins_Part4, @mean);
-            tickVals = S_axi.x(:)';
+            P_axi = fxn_collect_fig4_panel_points(Rsub, pName, gaborCST_unik, cSDT_unik, setting.scalarCollapseFcn, nBins_Part4);
+            axisVals = [P_axi.x(:); P_axi.y(:)];
+            tickVals = unique(axisVals(isfinite(axisVals)));
         else
             tickVals = unique([Rsub.(sprintf('%s_true', pName))]);
         end
@@ -1437,6 +1440,10 @@ for iRow_param = 1:numel(setting.fig4_paramNames)
         % Define xlim and ylim
         xlim([mn mx]); ylim([mn mx]);
         if ~isempty(tickVals)
+            if strcmp(pName, 'criterion_DV')
+                tickVals = round(linspace(mn, mx, 4), 1);
+                tickVals = unique(tickVals, 'stable');
+            end
             xticks(tickVals);
             yticks(tickVals);
         end
@@ -2619,9 +2626,33 @@ function info = fxn_parse_nameIO(nameIO)
 
 info = struct();
 
-tok = regexp(nameIO,  ['IO_cN([\d\.]+)_cG([\d\.]+)_nT([A-Za-z0-9\.]+)' ...
-    '_Nm([\d\.]+)_Na([\d\.]+)_Ns([\d\.]+)_cSDT(-?[\d\.]+)' ...
-    '_cont[\d\.]+_whiten[\d\.]+_R(\d+)_\d+\d+_B(\d+)'],  'tokens', 'once');
+% New format (current):
+% IO_cN.._cG.._nT.._Nm.._Na.._Ns.._cSDT.._whiten.._wDV.._Bsim..
+tok = regexp(nameIO, ['^IO_cN([\d\.]+)_cG([\d\.]+)_nT([A-Za-z0-9\.]+)' ...
+    '_Nm(-?[\d\.]+)_Na(-?[\d\.]+)_Ns(-?[\d\.]+)_cSDT(-?[\d\.]+)' ...
+    '_whiten(-?[\d\.]+)_wDV(\d+)_Bsim(\d+)$'], 'tokens', 'once');
+
+if ~isempty(tok)
+    info.noiseCST = str2double(tok{1}) / 100;
+    info.gaborCST = str2double(tok{2}) / 100;
+    info.nTrials = fxn_parse_num2exp(tok{3});
+    info.Nmul_true = fxn_parse_num2exp(tok{4});
+    info.Nadd_true = fxn_parse_num2exp(tok{5});
+    info.Nshared_true = fxn_parse_num2exp(tok{6});
+    info.cSDT_true = str2double(tok{7});
+    info.lambda_whiten = str2double(tok{8});
+    info.flag_whitenDV = str2double(tok{9});
+    info.iModelB_sim = str2double(tok{10});
+    info.flag_regressType = nan; % not encoded in the new naming scheme
+    return
+end
+
+% Legacy format(s):
+% IO_cN.._cG.._nT.._Nm.._Na.._Ns.._cSDT.._cont.._whiten.._R.._.._B..
+% IO_cN.._cG.._nT.._Nm.._Na.._Ns.._cSDT.._cont.._whiten.._wDV.._R.._.._B..
+tok = regexp(nameIO, ['^IO_cN([\d\.]+)_cG([\d\.]+)_nT([A-Za-z0-9\.]+)' ...
+    '_Nm(-?[\d\.]+)_Na(-?[\d\.]+)_Ns(-?[\d\.]+)_cSDT(-?[\d\.]+)' ...
+    '_cont-?[\d\.]+_whiten(-?[\d\.]+)_(?:wDV(\d+)_)?R(\d+)_\d+\d+_B(\d+)$'], 'tokens', 'once');
 
 if isempty(tok)
     return
@@ -2634,8 +2665,14 @@ info.Nmul_true = fxn_parse_num2exp(tok{4});
 info.Nadd_true = fxn_parse_num2exp(tok{5});
 info.Nshared_true = fxn_parse_num2exp(tok{6});
 info.cSDT_true = str2double(tok{7});
-info.flag_regressType = str2double(tok{8});
-info.iModelB_sim = str2double(tok{9});
+info.lambda_whiten = str2double(tok{8});
+if isempty(tok{9})
+    info.flag_whitenDV = nan;
+else
+    info.flag_whitenDV = str2double(tok{9});
+end
+info.flag_regressType = str2double(tok{10});
+info.iModelB_sim = str2double(tok{11});
 end
 
 function x = fxn_parse_num2exp(str_in)

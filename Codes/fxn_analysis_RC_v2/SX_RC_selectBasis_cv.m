@@ -3,6 +3,7 @@ function output = SX_RC_selectBasis_cv(e3D_allT, resp_allT, axis_ori_deg, axis_s
 % ============================================================
 % Select ORI / SF basis counts, basis families, and ridge by
 % cross-validated held-out negative log likelihood.
+% Also conduct basis reconstruction (reversing the z-scoring of the basis predictors)
 % Cached-Z + precomputed fold-standardization version.
 % ============================================================
 
@@ -483,7 +484,7 @@ predTrain = compute_predictions_from_beta(Z, resp_allT, beta, muZ, sdZ, opts.lin
 % ---------------- reconstruct template ----------------
 beta0 = beta(1);
 theta_vec = beta(2:end);
-theta_vec_unscaled = theta_vec ./ sdZ(:);
+theta_vec_unscaled = theta_vec ./ sdZ(:); % unscale by predictor SD to get back to original basis space
 Theta = reshape(theta_vec_unscaled, [Kori, Ksf]);
 template2D = Bori * Theta * Bsf';
 

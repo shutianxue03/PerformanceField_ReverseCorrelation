@@ -1,4 +1,4 @@
-function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, cSDT_true, lambda_whiten, iModelB_sim, nIter)
+function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, cSDT_true, lambda_whiten, flag_whitenDV, iModelB_sim, nIter)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Script name: OOD_sim.m
@@ -15,7 +15,8 @@ function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Simulation input parameters
-flag_whitenDV = 1; % 1=compute DV from whitened energy; 0=use raw energy
+iModelA_fit_all = [1]; % DO NOT CHANGE! 1 = RC-derived template (Model A), 2=ideal template; 3=permuted template
+iModelB_fit_all = iModelB_sim; %1=full, 2=No Nmul, 3=No Nadd, 4=No Nshared, 5=Nmul-only, 6=Nadd-only, 7=Nshared-only, 8=criterion-only
 
 % Enforce reduced-model ground truth by zeroing excluded IN terms.
 switch iModelB_sim
@@ -68,10 +69,6 @@ nSF = nORI;
 % Number of bootstraps for compIV / fitNOM
 nJob = 1;
 iJob = 1;
-
-% Model A/B indices for fitting
-iModelA_fit_all = [1]; % DO NOT CHANGE! 1 = RC-derived template (Model A), 2=ideal template; 3=permuted template
-iModelB_fit_all = 1:7; %1=full, 2=No Nmul, 3=No Nadd, 4=No Nshared, 5=Nmul-only, 6=Nadd-only, 7=Nshared-only, 8=criterion-only
 pC_filter = [.6, .8]; % Only proceed with compIV/fitNOM if simulated pC falls within this range; otherwise, discard this simulation and try again with different random seed or parameters.
 
 templateType_true = 1; % 1 = raw;
@@ -99,10 +96,10 @@ fprintf(' - Regression type (1=Univariate; 2=Multi+smoothing): %d \n\n', flag_re
 
 % Define IO name & folders %
 % Define the IO name
-nameIO = sprintf('IO_cN%.0f_cG%.0f_nT%s_Nm%.1f_Na%.1f_Ns%.1f_cSDT%.1f_cont%.1f_whiten%.1f_R%d_%d%d_B%d', ...
+nameIO = sprintf('IO_cN%.0f_cG%.0f_nT%s_Nm%.1f_Na%.1f_Ns%.1f_cSDT%.1f_whiten%.1f_wDV%d_Bsim%d', ...
     noiseCST*100, gaborCST*100, format_num2exp(nTrials), ...
     Nmul_true, Nadd_true, Nshared_true, ...
-    cSDT_true, C_contribution, lambda_whiten, flag_regressType, nORI, nSF, iModelB_sim);
+    cSDT_true, lambda_whiten, flag_whitenDV, iModelB_sim);
 
 % Folder to save IO data (energy + behav)
 nameFolder_Data_OOD_IO = sprintf('%s/%s', nameFolder_Data_OOD, nameIO);
@@ -255,6 +252,7 @@ end
 
 DV_target_sim_allT = fxn_getIV_v3(e3D_forDV, template_true, convolveType_true, IVType_true, flag_permT, [1, nORI]);
 assert(~any(isnan(DV_target_sim_allT)), 'IV_target contains NaN');
+
 
 %% Internal noise & responses
 % For now, use DV from target-only energy to drive responses
@@ -1055,8 +1053,8 @@ end
 
 %% helper
 function e3D_white = whiten_e3D(e3D_in, mu_cov, W_white)
-[nT, nOri, nSf] = size(e3D_in);
-X = reshape(e3D_in, [nT, nOri * nSf]);
+[nTrials, nORI, nSF] = size(e3D_in);
+X = reshape(e3D_in, [nTrials, nORI * nSF]);
 Xw = (X - mu_cov) * W_white;
-e3D_white = reshape(Xw, [nT, nOri, nSf]);
+e3D_white = reshape(Xw, [nTrials, nORI, nSF]);
 end
