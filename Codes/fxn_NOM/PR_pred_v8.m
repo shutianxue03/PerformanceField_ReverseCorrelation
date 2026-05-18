@@ -3,7 +3,7 @@ function pred = PR_pred_v8(iModelB, params_est, data, nBins, flag_plotPerIter)
 % Predict pYES, pC, and pA (and their binned versions) for the trial-wise noisy observer model.
 
 %% -------- 1. Extract basic data --------
-IV_allT = data.IV(:); % trial-wise IV
+DV_allT = data.DV(:); % trial-wise DV
 resp_allT = data.resp(:); % trial-wise response (1=YES, 0=NO)
 iPair_allT = data.iPair(:); % pair ID per trial
 iPRS_allT = data.iPRS(:); % 1=PRS, 0=ABS
@@ -16,9 +16,9 @@ pFA_emp  = mean(resp_allT(iPRS_allT== 0));
 nTrials_allBins = data.nTrials_allBins(:);
 iTrial4Bin = data.iTrial4Bin(:);
 
-nTrials = numel(IV_allT);
+nTrials = numel(DV_allT);
 if any([numel(resp_allT), numel(iPair_allT), numel(iTrial4Bin), numel(iPRS_allT)] ~= nTrials)
-    error('PR_pred_v8: IV, resp, iPair, iTrial4Bin, iPRS must have same length.');
+    error('PR_pred_v8: DV, resp, iPair, iTrial4Bin, iPRS must have same length.');
 end
 if numel(nTrials_allBins) ~= nBins
     error('PR_pred_v8: nTrials_allBins must have length nBins (%d).', nBins);
@@ -37,7 +37,7 @@ end
 
 %% -------- 3. Map pair-wise pA back to trials --------
 % pA_pair is defined over unique(iPair). Here we convert it to trial-wise pA_trial
-% so that we can average pA within IV bins using trial membership.
+% so that we can average pA within DV bins using trial membership.
 
 iPairUnik = unique(iPair_allT);
 nPairs = numel(iPairUnik);
@@ -61,8 +61,8 @@ pC_pred_allT = nan(size(pYES_pred_allT));
 pC_pred_allT(iPRS_allT == 1) = pYES_pred_allT(iPRS_allT == 1); % PRS trials
 pC_pred_allT(iPRS_allT == 0) = 1 - pYES_pred_allT(iPRS_allT == 0); % ABS trials
 
-%% -------- 5. Bin metrics as a function of IV --------
-IV_allBins = nan(nBins, 1);
+%% -------- 5. Bin metrics as a function of DV --------
+DV_allBins = nan(nBins, 1);
 pYES_pred_allBins = nan(nBins, 1);
 pYES_data_allBins = nan(nBins, 1);
 pC_pred_allBins = nan(nBins, 1);
@@ -76,7 +76,7 @@ for iBin = 1:nBins
         error('PR_pred_v8: inconsistent number of trials in bin %d.', iBin);
     end
 
-    IV_allBins(iBin) = mean(IV_allT(indTrial));
+    DV_allBins(iBin) = mean(DV_allT(indTrial));
 
     pYES_pred_allBins(iBin) = mean(pYES_pred_allT(indTrial));
     pYES_data_allBins(iBin) = mean(resp_allT(indTrial));
@@ -134,37 +134,37 @@ if flag_plotPerIter
         ylim([0, .5]); xlim([0.5, 1]);
     end
 
-    % Trialwise metrics vs IV
+    % Trialwise metrics vs DV
     figure('Position', [0,0, 2000, 400])
 
     subplot(1,3,1); hold on
-    plot(IV_allT(iPRS_allT==1), pYES_pred_allT(iPRS_allT==1), 'r.');
-    plot(IV_allT(iPRS_allT==0), pYES_pred_allT(iPRS_allT==0), 'b.');
-    plot(IV_allT(iPRS_allT==1), resp_allT(iPRS_allT==1), 'ro');
-    plot(IV_allT(iPRS_allT==0), resp_allT(iPRS_allT==0), 'bo');
-    xlabel('Trialwise IV'); ylabel('Probability / response');
+    plot(DV_allT(iPRS_allT==1), pYES_pred_allT(iPRS_allT==1), 'r.');
+    plot(DV_allT(iPRS_allT==0), pYES_pred_allT(iPRS_allT==0), 'b.');
+    plot(DV_allT(iPRS_allT==1), resp_allT(iPRS_allT==1), 'ro');
+    plot(DV_allT(iPRS_allT==0), resp_allT(iPRS_allT==0), 'bo');
+    xlabel('Trialwise DV'); ylabel('Probability / response');
     ylim([0, 1]); title('pYES');
 
     subplot(1,3,2); hold on
-    plot(IV_allT(iPRS_allT==1), pC_pred_allT(iPRS_allT==1), 'r.');
-    plot(IV_allT(iPRS_allT==0), pC_pred_allT(iPRS_allT==0), 'b.');
-    plot(IV_allT(iPRS_allT==1), correctness_allT(iPRS_allT==1), 'ro');
-    plot(IV_allT(iPRS_allT==0), correctness_allT(iPRS_allT==0), 'bo');
-    xlabel('Trialwise IV'); ylabel('Probability / response');
+    plot(DV_allT(iPRS_allT==1), pC_pred_allT(iPRS_allT==1), 'r.');
+    plot(DV_allT(iPRS_allT==0), pC_pred_allT(iPRS_allT==0), 'b.');
+    plot(DV_allT(iPRS_allT==1), correctness_allT(iPRS_allT==1), 'ro');
+    plot(DV_allT(iPRS_allT==0), correctness_allT(iPRS_allT==0), 'bo');
+    xlabel('Trialwise DV'); ylabel('Probability / response');
     ylim([0, 1]); title('pC');
 
     subplot(1,3,3); hold on
-    plot(IV_allT(iPRS_allT==1), pA_trial(iPRS_allT==1), 'r.');
-    plot(IV_allT(iPRS_allT==0), pA_trial(iPRS_allT==0), 'b.');
-    xlabel('Trialwise IV'); ylabel('Predicted pA');
+    plot(DV_allT(iPRS_allT==1), pA_trial(iPRS_allT==1), 'r.');
+    plot(DV_allT(iPRS_allT==0), pA_trial(iPRS_allT==0), 'b.');
+    xlabel('Trialwise DV'); ylabel('Predicted pA');
     ylim([0, 1]); title('pA');
 
-    sgtitle('Trialwise metrics as a function of IV');
+    sgtitle('Trialwise metrics as a function of DV');
 end
 
 %% -------- 7. Pack outputs --------
 pred.metrics.nTrials_allBins = nTrials_allBins;
-pred.metrics.IV_allBins = IV_allBins;
+pred.metrics.DV_allBins = DV_allBins;
 
 pred.metrics.pYES_pred_allBins = pYES_pred_allBins;
 pred.metrics.pYES_data_allBins = pYES_data_allBins;

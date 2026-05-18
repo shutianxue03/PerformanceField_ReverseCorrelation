@@ -131,8 +131,7 @@ for iComb = 1:nCombBase
         Z_train = Z_all(idxTrain, :);
         Z_test  = Z_all(idxTest, :);
 
-        [Xtrain_all{iFold}, Xtest_all{iFold}] = ...
-            prepare_fold_design_matrices(Z_train, Z_test, opts.zscorePredictor);
+        [Xtrain_all{iFold}, Xtest_all{iFold}] = prepare_fold_design_matrices(Z_train, Z_test, opts.zscorePredictor);
 
         rtrain_all{iFold} = resp_allT(idxTrain);
         rtest_all{iFold}  = resp_allT(idxTest);
@@ -147,12 +146,9 @@ for iComb = 1:nCombBase
         % warm start across ridge values within a fold would require
         % storing one beta per fold. Keep simple first.
         for iFold = 1:nFolds
-            beta = fit_ridge_glm_from_X( ...
-                Xtrain_all{iFold}, rtrain_all{iFold}, ridge, ...
-                opts.link, opts.maxIter, opts.tol);
+            beta = fit_ridge_glm_from_X(Xtrain_all{iFold}, rtrain_all{iFold}, ridge, opts.link, opts.maxIter, opts.tol);
 
-            pred = predict_ridge_glm_from_X( ...
-                Xtest_all{iFold}, rtest_all{iFold}, beta, opts.link);
+            pred = predict_ridge_glm_from_X(Xtest_all{iFold}, rtest_all{iFold}, beta, opts.link);
 
             nLL_test_allFolds(iFold) = pred.nLL;
         end
@@ -168,8 +164,8 @@ for iComb = 1:nCombBase
         res(iRes).ridge = ridge;
         res(iRes).nLL_mean = mean(nLL_test_allFolds, 'omitnan');
         res(iRes).nLL_se   = std(nLL_test_allFolds, 'omitnan') / sqrt(sum(isfinite(nLL_test_allFolds)));
-    end
-end
+    end % iRidge
+end % iComb
 
 % ---------------- choose best by lowest mean nLL ----------------
 [~, idxBest] = min([res.nLL_mean]);
@@ -476,7 +472,7 @@ for iIter = 1:opts.maxIter
 
     beta = beta_new;
     dev_prev = dev;
-end
+end % iIter
 
 % ---------------- final predictions on training data ----------------
 predTrain = compute_predictions_from_beta(Z, resp_allT, beta, muZ, sdZ, opts.link, opts.zscorePredictor);

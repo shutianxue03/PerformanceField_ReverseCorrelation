@@ -7,12 +7,12 @@ function [pYES_pred_allT, pA_pred_allPairs, consistency_allPairs, Cz_fit] = fxn_
 % - consistency_allPairs (empirical agreement per pair)
 %
 % INPUTS
-% data.IV : nTrials x 1 internal variable
+% data.DV : nTrials x 1 internal variable
 % data.resp : nTrials x 1 responses (1 = YES, 0 = NO)
 % data.iPair : nTrials x 1 pair ID for double-pass
 % iModelB : index of noise model variant
 % params_est : fitted parameters for the chosen model
-% c_zscore : criterion in z units (scaled by sigma_pred and added to median(IV))
+% c_zscore : criterion in z units (scaled by sigma_pred and added to median(DV))
 %
 % New parameterization:
 % Nmul : multiplicative (Multi) noise coefficient
@@ -75,13 +75,13 @@ switch iModelB
 end
 
 %% -------- 2. Extract data --------
-DV_allT = data.IV(:); % nTrials x 1
+DV_allT = data.DV(:); % nTrials x 1
 resp_allT = data.resp(:); % 1 = YES, 0 = NO
 iPair_allT = data.iPair(:); % pair id per trial
 
 nTrials = numel(DV_allT);
 if numel(resp_allT) ~= nTrials || numel(iPair_allT) ~= nTrials
-    error('fxn_predMetrics_v3: Data fields IV, resp, iPair must have same length.');
+    error('fxn_predMetrics_v3: Data fields DV, resp, iPair must have same length.');
 end
 if ~isfield(data, 'iPRS') || numel(data.iPRS) ~= nTrials
     error('fxn_predMetrics_v3: data.iPRS must be present and nTrials x 1.');

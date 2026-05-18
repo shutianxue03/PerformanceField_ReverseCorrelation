@@ -1,6 +1,6 @@
-function OOD_NOM_Trialwise_compIV_A12(isubj, iLocComb, lambda_whiten, flag_whitenDV, nIter, nJob, iJob)
+function OOD_NOM_Trialwise_compDV_A12(isubj, iLocComb, lambda_whiten, nIter, nJob, iJob)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% OOD_NOM_Trialwise_compIV.m
+% OOD_NOM_Trialwise_compDV.m
 %
 % Trial-wise noisy observer model – PRE-ESTIMATION STAGE
 %
@@ -16,13 +16,8 @@ fprintf('\n=======================================\n')
 fprintf('Part 1: Compute DVs and derive templates')
 fprintf('\n=======================================\n')
 
-% fprintf('%s: Step 1 started.\n\n', time_start)
-
-addpath(genpath('fxn_exp'));
-addpath(genpath('fxn_NOM'));
-addpath(genpath('fxn_RCplot'));
-addpath(genpath('fxn_analysis_RC_v2'));
-addpath(genpath('SX_toolbox/bads-master'));
+% Add paths for custom functions (client, using absolute paths)
+addpath(genpath('Codes/'));
 
 %% Global settings
 % Define directories
@@ -34,6 +29,8 @@ SX_RC1_setting; % defines nameFolder_*, nORI, nSF, namesLocComb, namesModelA, et
 flag_regressType = flag_regressType;
 
 % Make tuning axes explicit variables (avoid brace-index parsing issues).
+nORI=nORI;
+nSF=nSF;
 axisORI = filtersOri_all - 90;
 axisSF = filtersSF_all_log;
 
@@ -51,7 +48,7 @@ RandStream.setGlobalStream(stream);
 % fprintf('%s: seed determined.\n\n', datetime('now'))
 
 %% General parameters
-IVType = 1; % 1=sum of the dot product/convolution; 2=max; 3=normalized
+DVType = 1; % 1=sum of the dot product/convolution; 2=max; 3=normalized
 templateType = 1; % (1) raw (2) reconstructed kernel (3) mirrored template
 itype_template = 2; % 1=estimate template from PRS trials, ABS trials, or BOTH trials
 flag_PatchMode = 1; % if flag_PatchMode == 1, patchMode = 'T'; else, patchMode = 'N'; end
@@ -66,7 +63,7 @@ assert(abs(wABS + wPRS - 1) < 1e-10, 'wABS + wPRS must equal 1.');
 
 ratio_split = [.8, .15, .05]; % proportion of trials in template set (for RC), training set (for estimating parameters) and test set (for metric predictions)
 assert(abs(sum(ratio_split)-1)<1e-10)
-ORI_bound = [5, 14]; % orientation window, passed to fxn_getIV_v3
+ORI_bound = [5, 14]; % orientation window, passed to fxn_getDV_v3
 
 % whiten features
 eps_whiten = 1e-3;  % floor for eigenvalues
@@ -121,10 +118,10 @@ lbSF = lb_full_all{iFamily_SF};
 flag_plot_tuning = 0;
 
 iSess_start = 1; % first session included
-convolveType = 1; % IV from 1=cross-correlation; 2=convolution (fxn_getIV_v3)
+convolveType = 1; % DV from 1=cross-correlation; 2=convolution (fxn_getDV_v3)
 flag_standEnergy = 1; % 1=z-score energy before RC
-flag_plot_compIV = 1; % plot IV distributions and kernels at the end
-if strcmp(str_envir,'HPC'), flag_plot_compIV = 0; end % don't plot when running on HPC
+flag_plot_compDV = 1; % plot DV distributions and kernels at the end
+if strcmp(str_envir,'HPC'), flag_plot_compDV = 0; end % don't plot when running on HPC
 
 if flag_PatchMode == 1
     namePatchMode = 'T'; % target patch
@@ -197,13 +194,13 @@ fprintf(['\nSubject/IO name: %s ' ...
     '\n - RC class weights: wABS=%.2f, wPRS=%.2f (scale=%d)', ...
     '\n - Energy source: %d (1=TARGET, 2=NOISE)', ...
     '\n - Convolve type: %s', ...
-    '\n - IV type: %s\n\n'], ...
+    '\n - DV type: %s\n\n'], ...
     subjName, ...
     iLocComb, namesLocComb{iLocComb}, ...
     nIter, ...
     nblocks, nORI, nSF, ...
     namesType{itype_template}, wABS, wPRS, weightScale_RC, flag_PatchMode, ...
-    namesConvolveType{convolveType}, namesIVType{IVType});
+    namesConvolveType{convolveType}, namesDVType{DVType});
 
 %% Choose energy source for NOM
 switch flag_PatchMode
@@ -295,7 +292,7 @@ fprintf('%s: Ideal template created.\n\n', datetime('now'))
 %% [A1] Setup
 % Output file name (before estimation)
 iModelA_fit = 1;
-nameFile_compIV_A1 = sprintf('%s/n%d_J%d_A%d_compIV', nameFolder_NOM_save, nIter, iJob, iModelA_fit);
+nameFile_compDV_A1 = sprintf('%s/n%d_J%d_A%d_compDV', nameFolder_NOM_save, nIter, iJob, iModelA_fit);
 
 %% [A1] Main loop over iterations
 % fprintf('%s: Creating empty placeholders for running iterations.\n\n', datetime('now'))
@@ -381,37 +378,18 @@ parfor iIter = 1:nIter
     resp_full_rand_sel = resp_full_rand(useIdx_full);
     iPRS_full_rand_sel = iPRS_full_rand(useIdx_full);
 
-    %% [A1] 2b. Z-score energy for template estimation (but keep raw for DV)
-    % Template weights estimated from z-scored energy
-    % DV computed from centered raw energy: (E_raw - mu0) * T_raw
-    
-    % Z-score and compute normalization parameters
-    e3D_tmpl_rand_zscored = normEnergy(e3D_tmpl_rand_sel, cst_tmpl_rand_sel, iPRS_tmpl_rand_sel);
-    e3D_full_rand_zscored = normEnergy(e3D_full_rand_sel, cst_full_rand_sel, iPRS_full_rand_sel);
-    
-    % Compute per-channel mean and sigma for template back-transformation
-    % These define the centering: E_centered = (E_raw - mu0)
-    [nTrials_tmpl, nORI_local, nSF_local] = size(e3D_tmpl_rand_sel);
-    e3D_tmpl_vec = reshape(e3D_tmpl_rand_sel, [nTrials_tmpl, nORI_local * nSF_local]);
-    mu_cov_tmpl = mean(e3D_tmpl_vec, 1);  % Per-channel mean
-    sigma_cov_tmpl = std(e3D_tmpl_vec, [], 1);  % Per-channel std
-    sigma_cov_tmpl = reshape(sigma_cov_tmpl, [nORI_local, nSF_local]);
-    mu_cov_tmpl_3D = reshape(mu_cov_tmpl, [1, nORI_local, nSF_local]);
-    
-    [nTrials_full, ~, ~] = size(e3D_full_rand_sel);
-    e3D_full_vec = reshape(e3D_full_rand_sel, [nTrials_full, nORI_local * nSF_local]);
-    mu_cov_full = mean(e3D_full_vec, 1);
-    sigma_cov_full = std(e3D_full_vec, [], 1);
-    sigma_cov_full = reshape(sigma_cov_full, [nORI_local, nSF_local]);
-    mu_cov_full_3D = reshape(mu_cov_full, [1, nORI_local, nSF_local]);
-    
-    %% [A1] 3. Estimate template from z-scored energy (no whitening)
-    % Template weights: estimated from z-scored energy with class-weighting
-    % No whitening, no covariance corrections
-    
-    % Safe defaults for whitening (not used)
-    W_white_tmpl = [];
-    W_white_full = [];
+    %% [A1] 2b. Build fixed transform from ABS template trials only
+    % Fixed transform per iteration:
+    % raw energy -> contrast-specific ABS z-score -> optional whitening.
+    Tfix = buildFixedTransformFromABS(e3D_tmpl_rand, cst_tmpl_rand, iPRS_tmpl_rand, lambda_whiten, eps_whiten);
+
+    % Apply the SAME transform to all relevant sets.
+    e3D_tmpl_forRC = applyFixedTransform(e3D_tmpl_rand_sel, cst_tmpl_rand_sel, Tfix);
+    e3D_full_forRC = applyFixedTransform(e3D_full_rand_sel, cst_full_rand_sel, Tfix);
+    e3D_train_forDV = applyFixedTransform(e3D_train_rand, cst_train_rand, Tfix);
+    e3D_test_forDV = applyFixedTransform(e3D_test_rand, cst_test_rand, Tfix);
+
+    %% [A1] 3. Estimate template from transformed energy
 
     % Safe defaults for basis function outputs (case 2 only)
     nBasisORI_tmpl = nan;
@@ -424,8 +402,8 @@ parfor iIter = 1:nIter
     ridge_tmpl = nan;
 
     % Apply class weighting to z-scored energy (if wABS>.5, ABS is emphasized)
-    [e3D_tmpl_forRC, resp_tmpl_forRC] = applyClassWeightsForRC(e3D_tmpl_rand_zscored, resp_tmpl_rand_sel, iPRS_tmpl_rand_sel, wABS, wPRS, weightScale_RC);
-    [e3D_full_forRC, resp_full_forRC] = applyClassWeightsForRC(e3D_full_rand_zscored, resp_full_rand_sel, iPRS_full_rand_sel, wABS, wPRS, weightScale_RC);
+    [e3D_tmpl_forRC, resp_tmpl_forRC] = applyClassWeightsForRC(e3D_tmpl_forRC, resp_tmpl_rand_sel, iPRS_tmpl_rand_sel, wABS, wPRS, weightScale_RC);
+    [e3D_full_forRC, resp_full_forRC] = applyClassWeightsForRC(e3D_full_forRC, resp_full_rand_sel, iPRS_full_rand_sel, wABS, wPRS, weightScale_RC);
 
     % Estimate template from raw energy via regression
     switch flag_regressType
@@ -454,24 +432,24 @@ parfor iIter = 1:nIter
     end % switch
 
     %% [A1] 4. Regularize the derived template
-    template_full = fxn_getTemplate(template_full_raw, templateType, flag_plot_template);
-    template_tmpl = fxn_getTemplate(template_tmpl_raw, templateType, flag_plot_template);
+    template_full_raw = fxn_getTemplate(template_full_raw, templateType, flag_plot_template);
+    template_tmpl_raw = fxn_getTemplate(template_tmpl_raw, templateType, flag_plot_template);
 
     %% [A1] Check how channel correlation affects template estimation
     % -----PCA-based template recovery =====
-    if flag_plot_compIV
+    if flag_plot_compDV
         % NOMplot_PCA
     end
 
     % ----- Debug: check whether channels are too correlated thus redundant
     % !!!! Generate one figure per iteration !!!!
-    if flag_plot_compIV
+    if flag_plot_compDV
         % NOMplot_checkChannelCorr
     end
 
     % ----- Compare the univariate regression and multivariation regression with smoothing
     % One of the two may not be generated; need to pause and generate manually
-    if flag_plot_compIV
+    if flag_plot_compDV
         % template_smooth = template_full_raw;
         % template_noSmoothing = SX_sim07_RC(e3D_full_rand_norm, resp_full_rand_sel);
         % RCplot_compTempSmoothing
@@ -486,27 +464,26 @@ parfor iIter = 1:nIter
     d_test  = struct('resp', resp_test_rand,  'iPRS', iPRS_test_rand,  'respC', respC_test_rand,  'cst', cst_test_rand,  'RT', RT_test_rand,  'iPair', iPair_test_rand);
 
     for iDataset = 1:2 % 1=template set; 2=full set
+        DV_train_override = [];
+        DV_test_override = [];
+
         switch iDataset
             case 1
-                template_use = template_tmpl;
-                mu_cov_use  = mu_cov_tmpl;
-                W_white_use = W_white_tmpl;
+                template_use_raw = template_tmpl_raw;
             case 2
-                template_use = template_full;
-                mu_cov_use  = mu_cov_full;
-                W_white_use = W_white_full;
+                template_use_raw = template_full_raw;
         end
 
         % Calculate separability
         templateType_recon = 2; % 2=reconstructed template
         %--------------------------------------------%
-        template_recon = fxn_getTemplate(template_use, templateType_recon, flag_plot_template);
+        template_recon = fxn_getTemplate(template_use_raw, templateType_recon, flag_plot_template);
         %--------------------------------------------%
-        sep = corr(template_use(:), template_recon(:));
+        sep = corr(template_use_raw(:), template_recon(:));
 
         % Marginalize the template into 1D ORI and SF profiles
-        margORI = mean(template_use, 2)';
-        margSF = mean(template_use, 1);
+        margORI = mean(template_use_raw, 2)';
+        margSF = mean(template_use_raw, 1);
 
         % Fitting
         if any(isnan(margORI)), error('ALERT: NaN in margORI!'), end
@@ -543,16 +520,29 @@ parfor iIter = 1:nIter
 
         %% [A1] 6. Metrics, DV, binning, data structs (tmpl split only)
         if iDataset == 1
-            % Back-transform template to raw-energy space: T_raw = T_zscored / sigma
-            % This allows DV = (E_raw - mu0) * T_raw where mu0 is the centering mean
-            template_raw_space = template_use ./ sigma_cov_tmpl;  % Back-transform: T_raw = T_z / sigma
-            e3D_train_centered = bsxfun(@minus, e3D_train_rand, mu_cov_tmpl_3D);  % E_raw - mu0 (version-safe broadcasting)
-            e3D_test_centered  = bsxfun(@minus, e3D_test_rand,  mu_cov_tmpl_3D);  % E_raw - mu0 (version-safe broadcasting)
-            
+            if flag_regressType == 2
+                basisOpts_use = struct();
+                basisOpts_use.nBasisORI = nBasisORI_tmpl;
+                basisOpts_use.nBasisSF = nBasisSF_tmpl;
+                basisOpts_use.basisFamilyORI = basisFxnORI_tmpl;
+                basisOpts_use.basisFamilySF = basisFxnSF_tmpl;
+                basisOpts_use.basisWidthScaleORI = basisWidthScaleORI_tmpl;
+                basisOpts_use.basisWidthScaleSF = basisWidthScaleSF_tmpl;
+                basisOpts_use.asymSF_rightLeftRatio = asymSF_rightLeftRatio_tmpl;
+                basisOpts_use.oriPeriod_deg = opts.oriPeriod_deg;
+
+                Z_train = SX_RC_basisProject(e3D_train_forDV, axisORI, axisSF, basisOpts_use);
+                Z_test = SX_RC_basisProject(e3D_test_forDV, axisORI, axisSF, basisOpts_use);
+                beta_basis = SX_RC_basisProject(reshape(template_use_raw, [1, nORI, nSF]), axisORI, axisSF, basisOpts_use);
+                DV_train_override = Z_train * beta_basis(:);
+                DV_test_override = Z_test * beta_basis(:);
+            end
+
             [data_train, data_test, metrics] = fxn_compDV_packData( ...
                 d_full, d_tmpl, d_train, d_test, ...
-                e3D_train_centered, e3D_test_centered, ...
-                template_raw_space, convolveType, IVType, ORI_bound, nBins);
+                e3D_train_forDV, e3D_test_forDV, ...
+                template_use_raw, convolveType, DVType, ORI_bound, nBins, ...
+                DV_train_override, DV_test_override);
             data_train_allIter{iIter} = data_train;
             data_test_allIter{iIter}  = data_test;
             data_metrics_allIter(iIter, :, :) = metrics;
@@ -560,8 +550,8 @@ parfor iIter = 1:nIter
     end % iDataset
 
     %% [A1] Store template-related values
-    template_tmpl_allIter(iIter, :, :) = template_tmpl;
-    template_full_allIter(iIter, :, :) = template_full;
+    template_tmpl_allIter(iIter, :, :) = template_tmpl_raw;
+    template_full_allIter(iIter, :, :) = template_full_raw;
     nBasisORI_tmpl_allIter(iIter, :) = nBasisORI_tmpl;
     nBasisSF_tmpl_allIter(iIter, :) = nBasisSF_tmpl;
     basisFxnORI_tmpl_allIter{iIter} = basisFxnORI_tmpl;
@@ -571,21 +561,21 @@ parfor iIter = 1:nIter
     asymSF_rightLeftRatio_tmpl_allIter(iIter) = asymSF_rightLeftRatio_tmpl;
     ridge_tmpl_allIter(iIter) = ridge_tmpl;
 
-end % end for iIter
+end % end parfor iIter
 
 fprintf('\n\n%s: A1 All iterations done.\n\n', datetime('now'))
 
 time_progress = ceil(minutes(datetime('now')-time_start)); % round up to minutes
 
 %% [A1] Save
-save(nameFile_compIV_A1, 'time_progress', 'template_ideal', '*_allIter', 'names*', 'flag*', 'ratio_split', 'ORI_bound', '*Type');
+save(nameFile_compDV_A1, 'time_progress', 'template_ideal', '*_allIter', 'names*', 'flag*', 'ratio_split', 'ORI_bound', '*Type');
 
 fprintf('\n\n%s: A1 Outputs saved.\n\n', datetime('now'))
 
 %% [A1] Plot
-if flag_plot_compIV
+if flag_plot_compDV
     %-------------------%
-    NOMplot_compIV;
+    NOMplot_compDV;
     %-------------------%
     fprintf('\n\n%s: A1 Plots created.\n\n', datetime('now'))
 end
@@ -599,7 +589,7 @@ fprintf('A1 Time used: %s\n\n\n\n', char(elapsed));
 
 %% [A2] Setup
 iModelA_fit=2;
-nameFile_compIV_A2 = sprintf('%s/n%d_J%d_A%d_compIV', nameFolder_NOM_save, nIter, iJob, iModelA_fit);
+nameFile_compDV_A2 = sprintf('%s/n%d_J%d_A%d_compDV', nameFolder_NOM_save, nIter, iJob, iModelA_fit);
 
 %% [A2] Process the true template
 % Average the derived template (tmpl set) across iterations
@@ -672,7 +662,7 @@ parfor iIter = 1:nIter
     iPair_test_rand = R.iPair_test_rand;
     RT_test_rand = R.RT_test_rand;
 
-    %% [A2] 2. Z-score energy for template (but keep raw for DV)
+    %% [A2] 2. Build fixed transform from ABS template trials only
     [useIdx_full, useIdx_tmpl] = selectTemplateIndices(itype_template, iPRS_full_rand, iPRS_tmpl_rand);
 
     e3D_tmpl_rand_sel = e3D_tmpl_rand(useIdx_tmpl, :, :);
@@ -683,28 +673,9 @@ parfor iIter = 1:nIter
     cst_full_rand_sel = cst_full_rand(useIdx_full);
     iPRS_full_rand_sel = iPRS_full_rand(useIdx_full);
 
-    % Z-score energy for template estimation only
-    e3D_tmpl_rand_zscored = normEnergy(e3D_tmpl_rand_sel, cst_tmpl_rand_sel, iPRS_tmpl_rand_sel);
-    e3D_full_rand_zscored = normEnergy(e3D_full_rand_sel, cst_full_rand_sel, iPRS_full_rand_sel);
-    
-    % Compute per-channel mean and sigma for template back-transformation
-    [nTrials_tmpl_A2, nORI_local_A2, nSF_local_A2] = size(e3D_tmpl_rand_sel);
-    e3D_tmpl_vec_A2 = reshape(e3D_tmpl_rand_sel, [nTrials_tmpl_A2, nORI_local_A2 * nSF_local_A2]);
-    mu_cov_tmpl = mean(e3D_tmpl_vec_A2, 1);
-    sigma_cov_tmpl = std(e3D_tmpl_vec_A2, [], 1);
-    sigma_cov_tmpl = reshape(sigma_cov_tmpl, [nORI_local_A2, nSF_local_A2]);
-    mu_cov_tmpl_3D = reshape(mu_cov_tmpl, [1, nORI_local_A2, nSF_local_A2]);
-    
-    [nTrials_full_A2, ~, ~] = size(e3D_full_rand_sel);
-    e3D_full_vec_A2 = reshape(e3D_full_rand_sel, [nTrials_full_A2, nORI_local_A2 * nSF_local_A2]);
-    mu_cov_full = mean(e3D_full_vec_A2, 1);
-    sigma_cov_full = std(e3D_full_vec_A2, [], 1);
-    sigma_cov_full = reshape(sigma_cov_full, [nORI_local_A2, nSF_local_A2]);
-    mu_cov_full_3D = reshape(mu_cov_full, [1, nORI_local_A2, nSF_local_A2]);
-    
-    % Set empty whitening matrices (no whitening used)
-    W_white_tmpl = [];
-    W_white_full = [];
+    Tfix = buildFixedTransformFromABS(e3D_tmpl_rand, cst_tmpl_rand, iPRS_tmpl_rand, lambda_whiten, eps_whiten);
+    e3D_train_forDV = applyFixedTransform(e3D_train_rand, cst_train_rand, Tfix);
+    e3D_test_forDV = applyFixedTransform(e3D_test_rand, cst_test_rand, Tfix);
 
     %% [A2] 5-8. Metrics, DV, binning (using centered raw energy)
     d_full  = struct('resp', resp_full_rand,  'iPRS', iPRS_full_rand,  'respC', respC_full_rand,  'cst', cst_full_rand,  'RT', RT_full_rand);
@@ -712,36 +683,53 @@ parfor iIter = 1:nIter
     d_train = struct('resp', resp_train_rand, 'iPRS', iPRS_train_rand, 'respC', respC_train_rand, 'cst', cst_train_rand, 'RT', RT_train_rand, 'iPair', iPair_train_rand);
     d_test  = struct('resp', resp_test_rand,  'iPRS', iPRS_test_rand,  'respC', respC_test_rand,  'cst', cst_test_rand,  'RT', RT_test_rand,  'iPair', iPair_test_rand);
 
-    % Back-transform template to raw-energy space: T_raw = T_zscored / sigma
-    % This allows DV = (E_raw - mu0) * T_raw
-    template_raw_space = template_use ./ sigma_cov_tmpl;  % Back-transform: T_raw = T_z / sigma
-    e3D_train_centered = bsxfun(@minus, e3D_train_rand, mu_cov_tmpl_3D);  % E_raw - mu0 (version-safe broadcasting)
-    e3D_test_centered  = bsxfun(@minus, e3D_test_rand,  mu_cov_tmpl_3D);  % E_raw - mu0 (version-safe broadcasting)
-    
+    template_transformed = convertTemplateRawToTransformed(template_use, Tfix);
+    DV_train_override = [];
+    DV_test_override = [];
+
+    if flag_regressType == 2
+        basisOpts_A2 = struct();
+        basisOpts_A2.nBasisORI = mode(nBasisORI_tmpl_allIter(isfinite(nBasisORI_tmpl_allIter)));
+        basisOpts_A2.nBasisSF = mode(nBasisSF_tmpl_allIter(isfinite(nBasisSF_tmpl_allIter)));
+        basisOpts_A2.basisFamilyORI = modeStringCell(basisFxnORI_tmpl_allIter);
+        basisOpts_A2.basisFamilySF = modeStringCell(basisFxnSF_tmpl_allIter);
+        basisOpts_A2.basisWidthScaleORI = mode(basisWidthScaleORI_tmpl_allIter(isfinite(basisWidthScaleORI_tmpl_allIter)));
+        basisOpts_A2.basisWidthScaleSF = mode(basisWidthScaleSF_tmpl_allIter(isfinite(basisWidthScaleSF_tmpl_allIter)));
+        basisOpts_A2.asymSF_rightLeftRatio = mode(asymSF_rightLeftRatio_tmpl_allIter(isfinite(asymSF_rightLeftRatio_tmpl_allIter)));
+        basisOpts_A2.oriPeriod_deg = opts.oriPeriod_deg;
+
+        Z_train = SX_RC_basisProject(e3D_train_forDV, axisORI, axisSF, basisOpts_A2);
+        Z_test = SX_RC_basisProject(e3D_test_forDV, axisORI, axisSF, basisOpts_A2);
+        beta_basis = SX_RC_basisProject(reshape(template_transformed, [1, nORI, nSF]), axisORI, axisSF, basisOpts_A2);
+        DV_train_override = Z_train * beta_basis(:);
+        DV_test_override = Z_test * beta_basis(:);
+    end
+
     [data_train, data_test, metrics] = fxn_compDV_packData( ...
         d_full, d_tmpl, d_train, d_test, ...
-        e3D_train_centered, e3D_test_centered, ...
-        template_raw_space, convolveType, IVType, ORI_bound, nBins);
+        e3D_train_forDV, e3D_test_forDV, ...
+        template_transformed, convolveType, DVType, ORI_bound, nBins, ...
+        DV_train_override, DV_test_override);
     data_train_allIter{iIter} = data_train;
     data_test_allIter{iIter}  = data_test;
     data_metrics_allIter(iIter, :, :) = metrics;
 
     % Store templates
     % if iModelA_fit==2
-    template_tmpl = template_use;
-    template_full = template_use;
+    template_tmpl = template_transformed;
+    template_full = template_transformed;
     % end
     template_tmpl_allIter(iIter, :, :) = template_tmpl;
     template_full_allIter(iIter, :, :) = template_full;
 
-end % end for iIter
+end % end parfor iIter
 
 fprintf('\n\n%s: A2 All iterations done.\n\n', datetime('now'))
 
 time_progress = ceil(minutes(datetime('now')-time_start)); % round up to minutes
 
-%% [A2] SAVE 
-save(nameFile_compIV_A2, 'time_progress', 'template_ideal', '*_allIter', 'names*', 'flag*', 'ratio_split', 'ORI_bound', '*Type');
+%% [A2] SAVE
+save(nameFile_compDV_A2, 'time_progress', 'template_ideal', '*_allIter', 'names*', 'flag*', 'ratio_split', 'ORI_bound', '*Type');
 
 fprintf('\n\n%s: A2 Outputs saved.\n\n', datetime('now'))
 end
@@ -750,7 +738,7 @@ end
 function [data_train, data_test, metrics] = fxn_compDV_packData( ...
     d_full, d_tmpl, d_train, d_test, ...
     e3D_train_base, e3D_test_base, ...
-    template_notNormed, convolveType, IVType, ORI_bound, nBins)
+    template_notNormed, convolveType, DVType, ORI_bound, nBins, DV_train_override, DV_test_override)
 % e3D_train_base and e3D_test_base must already be centered: E_raw - mu0
 
 % 1. Compute behavioral metrics
@@ -763,18 +751,21 @@ metrics = [metrics_full; metrics_tmpl; metrics_train; metrics_test];
 criterion_z_train = metrics_train(2);
 criterion_z_test  = metrics_test(2);
 
-% 2. Compute decision variable: DV = (E_raw - mu0) * T_raw
-% Input energy is already centered (E_raw - mu0); template is in raw-energy space.
+% 2. Compute decision variable in transformed coordinate system.
 
 flag_permT = 0;
-
-DV_train = fxn_getIV_v3(e3D_train_base, template_notNormed, convolveType, IVType, flag_permT, ORI_bound);
-DV_test  = fxn_getIV_v3(e3D_test_base,  template_notNormed, convolveType, IVType, flag_permT, ORI_bound);
+if nargin >= 13 && ~isempty(DV_train_override) && ~isempty(DV_test_override)
+    DV_train = DV_train_override(:);
+    DV_test = DV_test_override(:);
+else
+    DV_train = fxn_getDV_v3(e3D_train_base, template_notNormed, convolveType, DVType, flag_permT, ORI_bound);
+    DV_test  = fxn_getDV_v3(e3D_test_base,  template_notNormed, convolveType, DVType, flag_permT, ORI_bound);
+end
 
 nData_train = length(DV_train);
 nData_test  = length(DV_test);
 
-% 3. Bin IV values
+% 3. Bin DV values
 [nTrials_PRS_allBins_train, ~, iTrial4Bin_PRS_train] = histcounts(DV_train(d_train.iPRS == 1), nBins);
 [nTrials_ABS_allBins_train, ~, iTrial4Bin_ABS_train] = histcounts(DV_train(d_train.iPRS == 0), nBins);
 [nTrials_PRS_allBins_test,  ~, iTrial4Bin_PRS_test]  = histcounts(DV_test(d_test.iPRS  == 1), nBins);
@@ -786,7 +777,7 @@ nData_test  = length(DV_test);
 data_train = struct();
 data_train.criterion_z         = criterion_z_train;
 data_train.ndata               = nData_train;
-data_train.IV                  = DV_train;
+data_train.DV                  = DV_train;
 data_train.nTrials_allBins     = nTrials_allBins_train;
 data_train.iTrial4Bin          = iTrial4Bin_train;
 data_train.nTrials_PRS_allBins = nTrials_PRS_allBins_train;
@@ -804,7 +795,7 @@ data_train.metrics_sim         = metrics_train; % keep field name 'metrics_sim'
 data_test = struct();
 data_test.criterion_z         = criterion_z_test;
 data_test.ndata               = nData_test;
-data_test.IV                  = DV_test;
+data_test.DV                  = DV_test;
 data_test.nTrials_allBins     = nTrials_allBins_test;
 data_test.iTrial4Bin          = iTrial4Bin_test;
 data_test.nTrials_PRS_allBins = nTrials_PRS_allBins_test;
@@ -859,6 +850,119 @@ Sigma_shrink = (1 - lambda_whiten) * Sigma + lambda_whiten * mean(diag(Sigma)) *
 d = diag(D);
 d(d < eps_whiten) = eps_whiten;
 W_white = V * diag(1 ./ sqrt(d)) * V';
+end
+
+function Tfix = buildFixedTransformFromABS(e3D_tmpl_rand, cst_tmpl_rand, iPRS_tmpl_rand, lambda_whiten, eps_whiten)
+% Estimate transform parameters from ABS template trials only.
+idxABS = (iPRS_tmpl_rand == 0);
+assert(any(idxABS), 'No ABS trials available for fixed transform estimation.');
+
+[e3D_abs_z, normStats_abs] = normEnergy(e3D_tmpl_rand(idxABS, :, :), cst_tmpl_rand(idxABS), zeros(sum(idxABS), 1));
+[mu_cov_abs, ~, W_white_abs] = computeWhiteningParams(e3D_abs_z, lambda_whiten, eps_whiten);
+
+Tfix = struct();
+Tfix.normStats = normStats_abs;
+Tfix.mu_cov_abs = mu_cov_abs;
+Tfix.W_white = W_white_abs;
+Tfix.useWhiten = ~isempty(W_white_abs);
+end
+
+function e3D_out = applyFixedTransform(e3D_in, cst_in, Tfix)
+% Apply contrast-specific z-scoring (ABS-derived) and optional whitening.
+[nTrials, nORI, nSF] = size(e3D_in);
+e3D_z = nan(size(e3D_in));
+eps_sigma = 1e-8;
+
+cst_unique = Tfix.normStats.cst_unique(:)';
+for iT = 1:nTrials
+    [~, idxC] = min(abs(cst_unique - cst_in(iT)));
+    mu_i = squeeze(Tfix.normStats.mu_byGroup(idxC, 1, :, :));
+    sd_i = squeeze(Tfix.normStats.sigma_byGroup(idxC, 1, :, :));
+    if any(~isfinite(mu_i(:))) || any(~isfinite(sd_i(:)))
+        mu_i = squeeze(Tfix.normStats.mu_global_3D);
+        sd_i = Tfix.normStats.sigma_global_2D;
+    end
+    sd_i(~isfinite(sd_i) | sd_i < eps_sigma) = eps_sigma;
+    e3D_z(iT, :, :) = (squeeze(e3D_in(iT, :, :)) - mu_i) ./ sd_i;
+end
+
+if Tfix.useWhiten
+    Xz = reshape(e3D_z, [nTrials, nORI * nSF]);
+    Xw = bsxfun(@minus, Xz, Tfix.mu_cov_abs) * Tfix.W_white;
+    e3D_out = reshape(Xw, [nTrials, nORI, nSF]);
+else
+    e3D_out = e3D_z;
+end
+end
+
+function template_transformed = convertTemplateRawToTransformed(template_raw, Tfix)
+% Map raw-centered template into transformed coordinate system.
+sigma_vec = Tfix.normStats.sigma_global_2D(:);
+sigma_vec(~isfinite(sigma_vec) | sigma_vec < 1e-8) = 1e-8;
+t_z = template_raw(:) .* sigma_vec;
+if Tfix.useWhiten
+    t_trans = Tfix.W_white \ t_z;
+else
+    t_trans = t_z;
+end
+template_transformed = reshape(t_trans, size(template_raw));
+end
+
+function out = modeStringCell(C)
+% Return modal non-empty string from a cell array.
+S = string(C(:));
+S = S(strlength(S) > 0 & S ~= "<missing>");
+if isempty(S)
+    out = '';
+    return;
+end
+u = unique(S);
+cnt = zeros(size(u));
+for i = 1:numel(u)
+    cnt(i) = sum(S == u(i));
+end
+[~, iMax] = max(cnt);
+out = char(u(iMax));
+end
+
+function setupParforEnvironment(codeRoot)
+% Use absolute paths and synchronize worker path/source visibility.
+
+addpath(codeRoot);
+addpath(genpath(fullfile(codeRoot, 'fxn_exp')));
+addpath(genpath(fullfile(codeRoot, 'fxn_NOM')));
+addpath(genpath(fullfile(codeRoot, 'fxn_RCplot')));
+addpath(genpath(fullfile(codeRoot, 'fxn_analysis_RC_v2')));
+addpath(genpath(fullfile(codeRoot, 'SX_toolbox', 'bads-master')));
+
+pool = gcp('nocreate');
+if isempty(pool)
+    return;
+end
+
+cmds = {
+    sprintf('addpath(''%s'');', codeRoot)
+    sprintf('addpath(genpath(''%s''));', fullfile(codeRoot, 'fxn_exp'))
+    sprintf('addpath(genpath(''%s''));', fullfile(codeRoot, 'fxn_NOM'))
+    sprintf('addpath(genpath(''%s''));', fullfile(codeRoot, 'fxn_RCplot'))
+    sprintf('addpath(genpath(''%s''));', fullfile(codeRoot, 'fxn_analysis_RC_v2'))
+    sprintf('addpath(genpath(''%s''));', fullfile(codeRoot, 'SX_toolbox', 'bads-master'))
+    };
+
+for iCmd = 1:numel(cmds)
+    pctRunOnAll(cmds{iCmd});
+end
+
+attachFiles = {
+    fullfile(codeRoot, 'OOD_NOM_Trialwise_compDV_A12.m')
+    fullfile(codeRoot, 'fxn_analysis_RC_v2', 'SX_RC_basisProject.m')
+    fullfile(codeRoot, 'fxn_analysis_RC_v2', 'normEnergy.m')
+    };
+attachFiles = attachFiles(cellfun(@(f) exist(f, 'file') == 2, attachFiles));
+if ~isempty(attachFiles)
+    addAttachedFiles(pool, attachFiles);
+    updateAttachedFiles(pool);
+end
 end
 %
 % function kernel_corr = invcov_kernel(kernel_raw, W_inv, nOri, nSf)

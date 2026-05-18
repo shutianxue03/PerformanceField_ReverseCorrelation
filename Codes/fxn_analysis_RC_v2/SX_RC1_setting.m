@@ -52,7 +52,7 @@ fxn_getSigma_SPdomain = @(SF) 3 * sqrt(2*log(2)) / (2 * pi * SF);
 % fxn_getSigma_SPdomain = @(SF) SF;
 
 %%  Global parameters
-nBins = 6; % to bin IVs in OOD_xx_beforeEst
+nBins = 6; % to bin DVs in OOD_xx_beforeEst
 binStrategy_all = {'equal', 'algorithm', 'manual'};
 eyeD_all = [1,1,0,1,1,1,1,1,0,0,1,0]; % 1=right eye dominant; 0=left eye dominant
 flag_block200 = 0; % 1; all observers are forced to have 200 blocks; 0=no
@@ -163,18 +163,18 @@ NOMp1_lb = 0;
 NOMp2_lb = 0;
 NOMp3_lb  = 0;
 
-if exist("flag_whitenDV", "var")
-    switch flag_whitenDV
-        case 0 % when DV is not whitened, the noise parameters are in the same scale as the energy, which can be >1; so we set a higher upper bound
+% if exist("flag_whitenDV", "var")
+%     switch flag_whitenDV
+%         case 0 % when DV is not whitened, the noise parameters are in the same scale as the energy, which can be >1; so we set a higher upper bound
             NOMp1_ub = 1.5;     % multi noise
             NOMp2_ub = 20;   % (private) additive noise
             NOMp3_ub = 20; % (shared) additive noise
-        case 1 % when DV is whitened, the noise parameters are in the same scale as dprime, which is usually <1, so we set a lower upper bound
-            NOMp1_ub = 3;     % multi noise
-            NOMp2_ub = 3;   % (private) additive noise
-            NOMp3_ub = 3; % (shared) additive noise
-    end
-end
+%         case 1 % when DV is whitened, the noise parameters are in the same scale as dprime, which is usually <1, so we set a lower upper bound
+%             NOMp1_ub = 3;     % multi noise
+%             NOMp2_ub = 3;   % (private) additive noise
+%             NOMp3_ub = 3; % (shared) additive noise
+%     end
+% end
 
 % Midpoint initial guesses
 NOMp1_0 = mean([NOMp1_lb,  NOMp1_ub]);
@@ -233,7 +233,7 @@ otherwise
         error('Invalid value for flag_incluCrit. Must be 0 or 1.');
 end
 namesConvolveType = {'dot product', 'convolution'}; nConvolveType = length(namesConvolveType);
-namesIVType = {'sum all channels', 'channel with max IV'}; nIVType = length(namesIVType);
+namesDVType = {'sum all channels', 'channel with max DV'}; nDVType = length(namesDVType);
 
 %% Tuning function params
 % names of the tuning models
@@ -339,7 +339,7 @@ publishOptions = struct('format','pdf','outputDir','publishedPDFs/', 'showCode',
 % namesDataset = {'TrainingSet', 'FullSet'};
 % namesDataset = {'TempSet', 'FullSet'}; % template set, full set (all data)
 namesDataset_full = {'FullSet', 'TmplSet', 'TrainSet', 'TestSet'}; nDatasets_full = length(namesDataset_full);
-namesDataset = {'TmplSet', 'FullSet'}; nDatasets = length(namesDataset); % needs to matchOOD_xx_compIV ("for iDataset = 1:2")
+namesDataset = {'TmplSet', 'FullSet'}; nDatasets = length(namesDataset); % needs to matchOOD_xx_compDV ("for iDataset = 1:2")
 
 % Model comparison names
 namesMCmode = {'10-CV', 'LOOCV',   'InfoCriterion'}; nMCmode = length(namesMCmode);

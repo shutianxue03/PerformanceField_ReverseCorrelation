@@ -1,5 +1,5 @@
 
-function [DV_allT, max_allT] = fxn_getIV_v3(e3D, template_input, convolveType, DV_allTType, flag_permT, ORI_bound)
+function [DV_allT, max_allT] = fxn_getDV_v3(e3D, template_input, convolveType, DV_allTType, flag_permT, ORI_bound)
 
 flag_plotMax=0;
 

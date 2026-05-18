@@ -1,4 +1,4 @@
-function OOD_NOM_Trialwise_fitNOM(isubj, iLocComb, flag_whitenDV, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
+function OOD_NOM_Trialwise_fitNOM(isubj, iLocComb, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
 %==========================================================================%
 % OOD_NOM_Trialwise_fitNOM.m
 %--------------------------------------------------------------------------
@@ -9,12 +9,12 @@ function OOD_NOM_Trialwise_fitNOM(isubj, iLocComb, flag_whitenDV, iModelA_fit, i
 %
 % This function:
 % 1) Fits a trial-wise noisy observer model (NOM; Model B) to internal
-% variables (IVs) for the TEST set, precomputed in
-% OOD_NOM_Trialwise_compIV.m.
+% variables (DVs) for the TEST set, precomputed in
+% OOD_NOM_Trialwise_compDV.m.
 % 2) Uses the fitted parameters to predict behavioral metrics (pYES, pC,
-% pA) based on binned empirical IVs.
+% pA) based on binned empirical DVs.
 %
-% Saved variables (appended to *_compIV.mat):
+% Saved variables (appended to *_compDV.mat):
 %       params_est_allIter : [nIter x nParams] fitted parameters
 %       nLL_allIter : [nIter x 1] negative log-likelihood
 %       pred_metrics_allIter : {nIter x 1} predictions from PR_pred_v7
@@ -30,16 +30,10 @@ fprintf('\n=======================================\n')
 fprintf('Part 2: Fit NOM and predict metrics')
 fprintf('\n=======================================\n')
 
-% fprintf('%s: Step 2 started.\n\n', time_start)
-
-addpath(genpath('fxn_exp'));
-addpath(genpath('fxn_NOM'));
-addpath(genpath('fxn_RCplot'));
-addpath(genpath('fxn_analysis_RC_v2'));
-addpath(genpath('SX_toolbox/bads-master'));
+% Add paths for custom functions (client, using absolute paths)
+addpath(genpath('Codes/'));
 
 %% General settings (from master config)
-% flag_whitenDV is needed for SX_RC1_setting
 %--------------%
 SX_RC1_setting; % defines nORI, nSF, namesLocComb, namesModelA, namesModelB, nBins, etc.
 %--------------%
@@ -98,7 +92,7 @@ if ~strcmp(str_envir, 'HPC') && isempty(dir(nameFolder_Figures_perSubj))
 end
 
 % File names:
-nameFile_compIV = sprintf('%s/n%d_J%d_A%d_compIV', nameFolder_NOM_save, nIter, iJob, iModelA_fit);
+nameFile_compDV = sprintf('%s/n%d_J%d_A%d_compDV', nameFolder_NOM_save, nIter, iJob, iModelA_fit);
 nameFile_fitNOM = sprintf('%s/n%d_J%d_A%dB%d', nameFolder_NOM_save, nIter, iJob, iModelA_fit, iModelB_fit);
 
 %% Print header
@@ -113,18 +107,18 @@ fprintf(['\nSubject/IO name: %s ' ...
     iModelB_fit, namesModelB{iModelB_fit}, ...
     nIter);
 
-%% Load trial-wise data and criterion from xx_compIV.mat file
-S_data = load(nameFile_compIV, 'data_train_allIter', 'data_test_allIter');
+%% Load trial-wise data and criterion from xx_compDV.mat file
+S_data = load(nameFile_compDV, 'data_train_allIter', 'data_test_allIter');
 data_train_allIter = S_data.data_train_allIter;
 data_test_allIter = S_data.data_test_allIter;
-fprintf('%s: Loaded xx_compIV.mat for "data_allIter" .\n\n', datetime('now'))
+fprintf('%s: Loaded xx_compDV.mat for "data_allIter" .\n\n', datetime('now'))
 
 %% Parameter vectors per Model B
 switch flag_incluCrit
     case 1
         % Use the min and max of DV to constrain criterion
-        NOMc_lb = min(data_train_allIter{1}.IV);
-        NOMc_ub = max(data_train_allIter{1}.IV);
+        NOMc_lb = min(data_train_allIter{1}.DV);
+        NOMc_ub = max(data_train_allIter{1}.DV);
         NOMc_0 = mean([NOMc_lb, NOMc_ub]);
         switch iModelB_fit
             case 1  % FullModel: multi. + additive + shared, criterion
@@ -399,7 +393,7 @@ end % end of iIter
 
 fprintf('\n\n%s: All iterations done.\n\n', datetime('now'))
 
-%% Save results (append onto *_compIV.mat)
+%% Save results (append onto *_compDV.mat)
 save(nameFile_fitNOM, 'params_est_allIter', 'nLL_train_allIter', 'nLL_test_allIter', 'pred_metrics_allIter');
 
 fprintf('%s: Outputs saved.\n\n', datetime('now'))

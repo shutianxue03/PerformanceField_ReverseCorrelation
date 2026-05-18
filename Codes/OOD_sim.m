@@ -1,4 +1,4 @@
-function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, cSDT_true, lambda_whiten, flag_whitenDV, iModelB_sim, nIter)
+function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, cSDT_true, lambda_whiten, iModelB_sim, nIter)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Script name: OOD_sim.m
@@ -6,7 +6,7 @@ function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true
 %
 % This script simulates observer responses based on a trial-wise
 % noisy observer model (NOM), and then runs the updated
-% OOD_NOM_Trialwise_compIV / OOD_NOM_Trialwise_fitNOM pipeline
+% OOD_NOM_Trialwise_compDV / OOD_NOM_Trialwise_fitNOM pipeline
 % on the simulated data.
 %
 % Notes:
@@ -52,28 +52,22 @@ fprintf('\n\n%s: Simulation starts\n\n', datetime('now'))
 % Set RNG for reproducibility
 rng(1);
 
-% Add paths for custom functions
-addpath(genpath('fxn_exp')); % experimental
-addpath(genpath('fxn_NOM')); % NOM-related
-addpath(genpath('fxn_analysis_RC_v2'));
-addpath(genpath('SX_toolbox'));
+% Add paths for custom functions (client, using absolute paths)
+addpath(genpath('Codes/'));
 
 % Global RC / NOM settings (defines nORI, nSF, nBins, folders, etc.)
-%--%
 SX_RC1_setting;
-%--%
-
 nORI = nORI; % nORI is defined in SX_RC1_setting; repeated here just for parfor loop to work
 nSF = nORI;
 
-% Number of bootstraps for compIV / fitNOM
+% Number of bootstraps for compDV / fitNOM
 nJob = 1;
 iJob = 1;
-pC_filter = [.6, .8]; % Only proceed with compIV/fitNOM if simulated pC falls within this range; otherwise, discard this simulation and try again with different random seed or parameters.
+pC_filter = [.6, .8]; % Only proceed with compDV/fitNOM if simulated pC falls within this range; otherwise, discard this simulation and try again with different random seed or parameters.
 
 templateType_true = 1; % 1 = raw;
-IVType_true = 1; % 1 = sum of dot product;
-convolveType_true = 1; % 1 = dot product; 2 = convolution (for fxn_getIV_v3)
+DVType_true = 1; % 1 = sum of dot product;
+convolveType_true = 1; % 1 = dot product; 2 = convolution (for fxn_getDV_v3)
 flag_permT = 0; %1=permute the input template per trial
 eps_whiten = 1e-3; % floor for whitening eigenvalues
 flag_plotDist = 1;
@@ -81,7 +75,7 @@ if strcmp(str_envir, 'HPC'), flag_plotDist = 0; end % don't plot when running on
 iLocComb = 1; % use single-location index (e.g., fovea) for IO
 
 % Print info --%
-fprintf(' - nIter (for compIV/fitNOM) = %d\n', nIter);
+fprintf(' - nIter (for compDV/fitNOM) = %d\n', nIter);
 fprintf(' - noiseCST = %.2f\n', noiseCST);
 fprintf(' - gaborCST = %.2f\n', gaborCST);
 fprintf(' - nTrials = %d\n', nTrials);
@@ -96,11 +90,11 @@ fprintf(' - Regression type (1=Univariate; 2=Multi+smoothing): %d \n\n', flag_re
 
 % Define IO name & folders %
 % Define the IO name
-nameIO = sprintf('IO_Bsim%d_cN%.0f_cG%.0f_nT%s_Nm%.1f_Na%.1f_Ns%.1f_cSDT%.1f_wDV%d_whiten%.1f', ...
+nameIO = sprintf('IO_Bsim%d_cN%.0f_cG%.0f_nT%s_Nm%.1f_Na%.1f_Ns%.1f_cSDT%.1f_whiten%.1f', ...
     iModelB_sim, ...
     noiseCST*100, gaborCST*100, format_num2exp(nTrials), ...
     Nmul_true, Nadd_true, Nshared_true, cSDT_true, ...
-    flag_whitenDV, lambda_whiten);
+    lambda_whiten);
 
 % Folder to save IO data (energy + behav)
 nameFolder_Data_OOD_IO = sprintf('%s/%s', nameFolder_Data_OOD, nameIO);
@@ -226,39 +220,50 @@ fprintf('\n\n%s: Simulation of all pairs done.\n\n', datetime('now'))
 % Copy pass A -> pass B
 dataMatrix(nPairs+1:end, :, :) = dataMatrix(1:nPairs, :, :);
 e3D_target_allT(nPairs+1:end,:,:) = e3D_target_allT(1:nPairs, :, :);
-DV_target_sim_allT(nPairs+1:end,:) = DV_target_sim_allT(1:nPairs, :);
+% DV_target_sim_allT(nPairs+1:end,:) = DV_target_sim_allT(1:nPairs, :);
 
 assert(sum(e3D_target_allT(nPairs+1:end,:,:) - e3D_target_allT(1:nPairs,:,:), 'all') == 0);
 % assert(sum(e3D_noise_allT(nPairs+1:end,:,:) - e3D_noise_allT(1:nPairs,:,:), 'all') == 0);
 
 fprintf('%s: Pass A copied to pass B done.\n\n', datetime('now'))
 
-%% Compute DV in a canonical centered-energy framework
-% Canonical space is raw-centered: E_centered = E_raw - mu0.
-% If whitening is requested, both E and template are transformed to the same
-% whitened space so the readout remains space-consistent.
-[mu_cov_DV, sigma_cov_DV, e3D_centered] = recenter_e3D(e3D_target_allT, eps_whiten);
-W_white_DV = [];
-template_space_true = 'raw_centered';
+%% Compute DV in a fixed transformed space
+% Fixed transform estimated from ABS trials:
+% raw energy -> contrast-specific ABS z-score -> optional whitening.
+Tfix = buildFixedTransformFromABS(e3D_target_allT, dataMatrix(:, 11), iPRS_allT, lambda_whiten, eps_whiten);
+e3D_forDV = applyFixedTransform(e3D_target_allT, dataMatrix(:, 11), Tfix);
+template_forDV = convertTemplateRawToTransformed(template_true, Tfix);
 
-if flag_whitenDV && ~isnan(lambda_whiten)
-    W_white_DV = build_whitening_matrix(e3D_centered, lambda_whiten, eps_whiten);
-    e3D_forDV = apply_linear_transform_e3D(e3D_centered, W_white_DV);
-    template_forDV = convert_template_space(template_true, template_space_true, 'white', sigma_cov_DV, W_white_DV, eps_whiten);
-    dv_space_used = 'white';
-    fprintf('%s: DV computed in whitened space from centered raw energy (lambda=%.2f).\n\n', datetime('now'), lambda_whiten)
+if flag_regressType == 2
+    basisOpts_true = struct();
+    basisOpts_true.nBasisORI = 6;
+    basisOpts_true.nBasisSF = 6;
+    basisOpts_true.basisFamilyORI = 'vonmises';
+    basisOpts_true.basisFamilySF = 'asymGaussianLog2';
+    basisOpts_true.basisWidthScaleORI = 0.9;
+    basisOpts_true.basisWidthScaleSF = 0.6;
+    basisOpts_true.asymSF_rightLeftRatio = 1.2;
+    basisOpts_true.oriPeriod_deg = 180;
+
+    Z_true_basis = SX_RC_basisProject(e3D_forDV, filtersOri_all - 90, noise.filtersSF_all_log, basisOpts_true);
+    beta_true_basis = SX_RC_basisProject(reshape(template_forDV, [1, nORI, nSF]), filtersOri_all - 90, noise.filtersSF_all_log, basisOpts_true);
+    DV_target_sim_allT = Z_true_basis * beta_true_basis(:);
+    dv_space_used = 'zscore_absContrast_whiten_basis';
 else
-    e3D_forDV = e3D_centered;
-    template_forDV = convert_template_space(template_true, template_space_true, 'raw_centered', sigma_cov_DV, W_white_DV, eps_whiten);
-    dv_space_used = 'raw_centered';
-    fprintf('%s: DV computed in raw-centered space (flag_whitenDV=%d).\n\n', datetime('now'), flag_whitenDV)
+    beta_true_basis = [];
+    basisOpts_true = struct();
+    DV_target_sim_allT = fxn_getDV_v3(e3D_forDV, template_forDV, convolveType_true, DVType_true, flag_permT, [1, nORI]);
+    dv_space_used = 'zscore_absContrast_whiten_channel';
 end
 
-DV_target_sim_allT = fxn_getIV_v3(e3D_forDV, template_forDV, convolveType_true, IVType_true, flag_permT, [1, nORI]);
-assert(~any(isnan(DV_target_sim_allT)), 'IV_target contains NaN');
+mu_cov_DV = Tfix.mu_cov_abs;
+sigma_cov_DV = Tfix.normStats.sigma_global_2D;
+W_white_DV = Tfix.W_white;
+template_space_true = 'fixed_transformed';
 
+assert(~any(isnan(DV_target_sim_allT)), 'DV_target contains NaN');
 
-%% Internal noise & responses
+%% Add internal variability and generate responses
 % For now, use DV from target-only energy to drive responses
 DVclean_sim_allT = DV_target_sim_allT;
 
@@ -332,12 +337,13 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
     % Save only variables used by simPlot4_VaryOneDim.m in one atomic write.
     save(sprintf('%s/truth.mat', nameFolder_Data_OOD_IO), ...
         'template_true', 'template_forDV', 'template_space_true', 'dv_space_used', ...
-        'mu_cov_DV', 'sigma_cov_DV', 'W_white_DV', 'lambda_whiten', 'flag_whitenDV', ...
+        'mu_cov_DV', 'sigma_cov_DV', 'W_white_DV', 'lambda_whiten', ...
+        'beta_true_basis', 'basisOpts_true', ...
         'criterion_DV_true', 'N*_true');
     fprintf('\n\n%s: truth.mat saved (template_true, criterion_DV_true).\n\n', datetime('now'))
 
-    % Save energy for compIV after the accuracy gate.
-    % Use patchMode = ''T'' in compIV; this file must contain both target + noise
+    % Save energy for compDV after the accuracy gate.
+    % Use patchMode = ''T'' in compDV; this file must contain both target + noise
     % energy as well as noise, filters, stim, nBins.
     save(sprintf('%s/energy_T_%d_%d.mat', nameFolder_Data_OOD_IO, nORI, nSF), 'e3D_target_allT', 'noise', 'filtersOri_all', 'stim', 'nBins');
     fprintf('%s: Simulated 3D energy saved (%d trials).\n\n', datetime('now'), nTrials)
@@ -353,7 +359,7 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
 
     metrics_sim = [dprime_sim, cSDT_sim, pC_sim, pHit_sim, pFA_sim, pA_sim, pYES_sim];
 
-    % Save behavioral measures in behavMeas.mat (as expected by compIV)
+    % Save behavioral measures in behavMeas.mat (as expected by compDV)
     save(sprintf('%s/behavMeas.mat', nameFolder_Data_OOD_IO), 'dataMatrix', 'metrics_sim', 'iPRS_allT', 'iPass_allT', 'iPair_allT', 'resp_allT', 'pC_filter');
 
     fprintf('\n%s: Behavioral data saved.\n\nReady for template generation\n\n', datetime('now'))
@@ -368,22 +374,22 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
         NOMplot_dist
     end
 
-    %% Run compIV and fitNOM on this IO
-    % Step 1: compute IVs, templates, and test-set metrics
+    %% Run compDV and fitNOM on this IO
+    % Step 1: compute DVs, templates, and test-set metrics
     %----------------------------%
-    OOD_NOM_Trialwise_compIV_A12({nameIO, criterion_DV_true}, iLocComb, lambda_whiten, flag_whitenDV, nIter, nJob, iJob)
+    OOD_NOM_Trialwise_compDV_A12({nameIO, criterion_DV_true}, iLocComb, lambda_whiten, nIter, nJob, iJob)
     %----------------------------%
 
     %% Step 2: fit NOM parameters and predict metrics
-    for iModelA_fit=iModelA_fit_all
+    for iModelA_fit = iModelA_fit_all
 
         for iModelB_fit = iModelB_fit_all
             %----------------------------%
-            OOD_NOM_Trialwise_fitNOM({nameIO, criterion_DV_true}, iLocComb, flag_whitenDV, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
+            OOD_NOM_Trialwise_fitNOM({nameIO, criterion_DV_true}, iLocComb, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
             %----------------------------%
 
             if iModelB_fit == iModelB_sim
-                % For the simulated model, also plot IV vs DV scatter and parameter recovery
+                % For the simulated model, also plot DV vs DV scatter and parameter recovery
 
                 if flag_plotDist
                     % plot_CorrBasisSetting(nameFolder_Data_NOM_IO, nameFolder_Figures_perSubj, nameIO, ...
@@ -421,7 +427,7 @@ silence = zeros(1, round(fs*pauseDur));
 %% Clean-up temporary files
 clear *allT e2D* e3D* dataMatrix;
 
-% Remove the energy file to save space (compIV has already loaded it)
+% Remove the energy file to save space (compDV has already loaded it)
 nameFile_energy = sprintf('%s/energy_T_%d_%d.mat', nameFolder_Data_OOD_IO, nORI, nSF);
 if exist(nameFile_energy, 'file')
     delete(nameFile_energy);
@@ -441,7 +447,7 @@ function plot_fit_model_comparison(nameFolder_Data_NOM_IO, nameFolder_Figures_pe
     iModelA_fit_all, iModelB_fit_all, namesModelA, namesModelB, namesModelBparams_short, ...
     nIter, iJob, iLocComb, iModelB_sim, ...
     Nmul_true, Nadd_true, Nshared_true, criterion_DV_true)
-
+% This helpder function summarizes the model comparison results across all fitted A/B models, and plots the summary.
 metricNames = {'pYES', 'pC', 'pA'};
 metricLabels = {'pYES', 'pC', 'pA'};
 paramNames = {'Nmul', 'Nadd', 'Nshared', 'criterion_DV'};
@@ -564,7 +570,7 @@ end
 
 %% helper
 function [winRate, deltaNLL, nValidIter] = summarize_nll_compare(nLL_test_byModel)
-
+% This function summarizes the model comparison based on test-set nLL across all iterations, and returns the win rate and median delta nLL for each model.
 nB = size(nLL_test_byModel, 2);
 winCount = zeros(1, nB);
 deltaVals = cell(1, nB);
@@ -606,7 +612,7 @@ end
 
 %% helper
 function rmse_iter = metric_recovery_iter(pred_metrics_allIter, metricName)
-
+% This function computes the RMSE of a specific metric (e.g., pYES) for each iteration, based on the predicted vs data metric values across all bins.
 nIter = numel(pred_metrics_allIter);
 rmse_iter = nan(nIter, 1);
 
@@ -630,7 +636,7 @@ end
 
 %% helper
 function paramRMSE = compute_param_rmse_by_model(params_est_allIter, paramNamesThisModel, paramNamesAll, trueParamVals)
-
+% This function computes the RMSE of each parameter for a specific model, based on the estimated vs true parameter values across all iterations. The input params_est_allIter can be either a cell array (nIter x 1) or a numeric array (nIter x nParamsThisModel).
 paramRMSE = nan(1, numel(paramNamesAll));
 
 if iscell(params_est_allIter)
@@ -653,7 +659,7 @@ end
 
 %% helper
 function [loss, cSDT, pHit, pFA] = fxn_loss_cSDT(k, DV_noisy, iPRS_allT, target_cSDT)
-
+% This function computes the loss for a given criterion k in DV space, based on the simulated noisy DV and the true labels (PRS/ABS). The loss is defined as the squared error between the computed cSDT and the target cSDT. The function also returns the computed cSDT, pHit, and pFA for that criterion.
 nPRS = sum(iPRS_allT == 1);
 nABS = sum(iPRS_allT == 0);
 eps_ = 0.5 / min(nPRS, nABS);
@@ -673,401 +679,85 @@ loss = (cSDT- target_cSDT).^2;
 end
 
 %% helper
-function plot_CorrBasisSetting(nameFolder_Data_NOM_IO, nameFolder_Figures_perSubj, nameIO, ...
-    nIter, iJob, iLocComb, iModelA_fit, iModelB_fit_all, namesModelBparams_short, ...
-    Nmul_true, Nadd_true, Nshared_true, criterion_DV_true, template_true)
+function Tfix = buildFixedTransformFromABS(e3D_allT, cst_allT, iPRS_allT, lambda_whiten, eps_whiten)
+idxABS = (iPRS_allT == 0);
+assert(any(idxABS), 'No ABS trials available for transform estimation.');
 
-sz_font = 15;
-nameFile_compIV = sprintf('%s/n%d_J%d_A%d_compIV.mat', nameFolder_Data_NOM_IO, nIter, iJob, iModelA_fit);
-if ~exist(nameFile_compIV, 'file')
-    nameFile_compIV = sprintf('%s/n%d_J%d_A%d_compIV', nameFolder_Data_NOM_IO, nIter, iJob, iModelA_fit);
-end
-if ~exist(nameFile_compIV, 'file')
-    fprintf('WARNING: compIV file for A%d not found. Skip IVxDV scatter.\n', iModelA_fit);
-    return
-end
+[e3D_abs_z, normStats_abs] = normEnergy(e3D_allT(idxABS, :, :), cst_allT(idxABS), zeros(sum(idxABS), 1));
+[mu_cov_abs, ~, W_white_abs] = computeWhiteningParams_local(e3D_abs_z, lambda_whiten, eps_whiten);
 
-S = load(nameFile_compIV, ...
-    'template_full_allIter', 'margORI_allIter', 'margSF_allIter', ...
-    'margParams_ORI_allIter', 'margParams_SF_allIter', ...
-    'nBasisORI_tmpl_allIter', 'nBasisSF_tmpl_allIter', ...
-    'basisFxnORI_tmpl_allIter', 'basisFxnSF_tmpl_allIter', 'ridge_tmpl_allIter', ...
-    'subjName', 'namesModelA');
-
-if ~isfield(S, 'template_full_allIter') || isempty(S.template_full_allIter)
-    fprintf('WARNING: template_full_allIter missing in A%d compIV file. Skip IVxDV scatter.\n', iModelA_fit);
-    return
-end
-
-% IV list (x-axis in each row)
-IV_vals = {
-    S.nBasisORI_tmpl_allIter, ...
-    S.nBasisSF_tmpl_allIter, ...
-    S.basisFxnORI_tmpl_allIter, ...
-    S.basisFxnSF_tmpl_allIter, ...
-    S.ridge_tmpl_allIter ...
-    };
-IV_names = {'nBasisORI', 'nBasisSF', 'basisFamilyORI', 'basisFamilySF', 'ridge'};
-
-% Reference template and reference marginals
-template_ref = template_true;
-template_ref = template_ref / max(norm(template_ref(:)), eps);
-marg_ref_ORI = squeeze(mean(template_ref, 2))';
-marg_ref_SF = squeeze(mean(template_ref, 1));
-marg_ref_ORI = normalize_by_maxabs_local(marg_ref_ORI);
-marg_ref_SF = normalize_by_maxabs_local(marg_ref_SF);
-
-% A2 may not include marginalized profiles/params in some pipelines.
-% If missing, construct profiles from template and keep param-DVs as NaN.
-if ~isfield(S, 'margORI_allIter') || isempty(S.margORI_allIter)
-    S.margORI_allIter = nan(nIter, 2, size(S.template_full_allIter, 2));
-    for iIter = 1:min(nIter, size(S.template_full_allIter, 1))
-        tmpl = squeeze(S.template_full_allIter(iIter, :, :));
-        S.margORI_allIter(iIter, 2, :) = mean(tmpl, 2);
-    end
-end
-if ~isfield(S, 'margSF_allIter') || isempty(S.margSF_allIter)
-    S.margSF_allIter = nan(nIter, 2, size(S.template_full_allIter, 3));
-    for iIter = 1:min(nIter, size(S.template_full_allIter, 1))
-        tmpl = squeeze(S.template_full_allIter(iIter, :, :));
-        S.margSF_allIter(iIter, 2, :) = mean(tmpl, 1);
-    end
-end
-if ~isfield(S, 'margParams_ORI_allIter') || isempty(S.margParams_ORI_allIter)
-    S.margParams_ORI_allIter = nan(nIter, 2, 0);
-end
-if ~isfield(S, 'margParams_SF_allIter') || isempty(S.margParams_SF_allIter)
-    S.margParams_SF_allIter = nan(nIter, 2, 0);
-end
-
-if isfield(S, 'subjName')
-    subjTag = S.subjName;
-else
-    subjTag = nameIO;
-end
-if isfield(S, 'namesModelA') && numel(S.namesModelA) >= iModelA_fit
-    modelA_name = S.namesModelA{iModelA_fit};
-else
-    modelA_name = sprintf('A%d', iModelA_fit);
-end
-
-% Figure 1 per A: core RMSE (3 columns)
-DV_core = nan(nIter, 3);
-for iIter = 1:nIter
-    template_i = squeeze(S.template_full_allIter(iIter, :, :));
-    template_i = template_i / max(norm(template_i(:)), eps);
-    DV_core(iIter, 1) = rmse_simple_local(template_i(:), template_ref(:));
-
-    margORI_i = squeeze(S.margORI_allIter(iIter, 2, :))';
-    margORI_i = normalize_by_maxabs_local(margORI_i);
-    DV_core(iIter, 2) = rmse_simple_local(margORI_i(:), marg_ref_ORI(:));
-
-    margSF_i = squeeze(S.margSF_allIter(iIter, 2, :))';
-    margSF_i = normalize_by_maxabs_local(margSF_i);
-    DV_core(iIter, 3) = rmse_simple_local(margSF_i(:), marg_ref_SF(:));
-end
-
-dvNames_core = {'Template RMSE', 'ORI tuning RMSE', 'SF tuning RMSE'};
-figure('Position', [20 20 1600 1600]);
-rng(1);
-for iIV = 1:5
-    [x_raw, x_tick, x_ticklabel, isCategorical] = encode_iv_for_scatter_local(IV_vals{iIV});
-    for iDV = 1:3
-        subplot(5, 3, (iIV - 1) * 3 + iDV); hold on;
-        y = DV_core(:, iDV);
-        valid = isfinite(x_raw) & isfinite(y);
-        if ~any(valid)
-            text(0.5, 0.5, 'No data', 'HorizontalAlignment', 'center');
-            axis off;
-            continue
-        end
-        xv = x_raw(valid);
-        yv = y(valid);
-        x_for_corr = xv;
-
-        if iIV == 5
-            % ridge row: plot in log10 steps and show unique ridge values as ticks
-            pos = xv > 0;
-            xv = xv(pos);
-            yv = yv(pos);
-            x_for_corr = xv;
-            if isempty(xv)
-                text(0.5, 0.5, 'No positive ridge', 'HorizontalAlignment', 'center');
-                axis off;
-                continue
-            end
-            xplot = log10(xv);
-            scatter(xplot, yv, 20, 'k', 'filled', 'MarkerFaceAlpha', 0.45, 'MarkerEdgeAlpha', 0.45);
-            uR = unique(xv);
-            xticks(log10(uR));
-            xticklabels(compose('%.3g', uR));
-            if numel(uR) > 1
-                xlim([min(log10(uR)) - 0.2, max(log10(uR)) + 0.2]);
-            else
-                xlim(log10(uR) + [-0.5, 0.5]);
-            end
-            % xtickangle(45);
-            if numel(unique(xplot)) > 1
-                pfit = polyfit(xplot, yv, 1);
-                xr = linspace(min(xplot), max(xplot), 100);
-                plot(xr, polyval(pfit, xr), 'r-', 'LineWidth', 1.5);
-            end
-        elseif isCategorical
-            x_plot = xv + 0.2 * (rand(sum(valid), 1) - 0.5);
-            scatter(x_plot, yv, 20, 'k', 'filled', 'MarkerFaceAlpha', 0.45, 'MarkerEdgeAlpha', 0.45);
-            xticks(x_tick); xticklabels(x_ticklabel); %xtickangle(45);
-            xlim([0.5, numel(x_tick) + 0.5]); % buffer on both ends for categorical rows
-        else
-            scatter(xv, yv, 20, 'k', 'filled', 'MarkerFaceAlpha', 0.45, 'MarkerEdgeAlpha', 0.45);
-            if iIV == 1 || iIV == 2
-                uInt = unique(round(xv));
-                xticks(uInt);
-                xlim([min(uInt) - 0.5, max(uInt) + 0.5]);
-            end
-            if numel(unique(xv)) > 1
-                pfit = polyfit(xv, yv, 1);
-                xr = linspace(min(xv), max(xv), 100);
-                plot(xr, polyval(pfit, xr), 'r-', 'LineWidth', 1.5);
-            end
-        end
-        if numel(x_for_corr) >= 3
-            [rho, pval] = corr(x_for_corr, yv, 'Type', 'Spearman', 'Rows', 'complete');
-            title(sprintf('\\rho=%.2f, p=%.3f', rho, pval));
-        else
-            title('n<3');
-        end
-        if iDV == 1, xlabel(IV_names{iIV}); end
-        if iIV == 1, ylabel(dvNames_core{iDV}); end
-        set(gca, 'XTickLabelRotation', 0);
-        box on; grid on;
-    end
-end
-sgtitle(sprintf('Correlation between basis settings and template recovery\n [A%d, L%d, %d iter]\n%s', ...
-    iModelA_fit, iLocComb, nIter, subjTag));
-set(findall(gcf, '-property', 'fontsize'), 'fontsize', sz_font);
-saveas(gcf, sprintf('%s/4CorrBasisSetting_TempRMSE_A%d.jpg', nameFolder_Figures_perSubj, iModelA_fit));
-close(gcf);
-
-% Additional nBfit figures per A: parameter RMSE by B-fit model
-paramNamesAll = {'Nmul', 'Nadd', 'Nshared', 'criterion_DV'};
-trueParamVals = [Nmul_true, Nadd_true, Nshared_true, criterion_DV_true];
-
-for iiB = 1:numel(iModelB_fit_all)
-    iModelB_fit = iModelB_fit_all(iiB);
-    nameFile_fitNOM = sprintf('%s/n%d_J%d_A%dB%d.mat', nameFolder_Data_NOM_IO, nIter, iJob, iModelA_fit, iModelB_fit);
-    if ~exist(nameFile_fitNOM, 'file')
-        fprintf('WARNING: fitNOM file not found for A%dB%d. Skip parameter-RMSE figure.\n', iModelA_fit, iModelB_fit);
-        continue
-    end
-
-    Sfit = load(nameFile_fitNOM, 'params_est_allIter');
-    if ~isfield(Sfit, 'params_est_allIter') || isempty(Sfit.params_est_allIter)
-        fprintf('WARNING: params_est_allIter missing for A%dB%d. Skip parameter-RMSE figure.\n', iModelA_fit, iModelB_fit);
-        continue
-    end
-
-    if iscell(Sfit.params_est_allIter)
-        P = cell2mat(cellfun(@(x) x(:)', Sfit.params_est_allIter, 'UniformOutput', false));
-    else
-        P = Sfit.params_est_allIter;
-    end
-
-    paramNamesThisModel = namesModelBparams_short{iModelB_fit};
-    nParamThis = numel(paramNamesThisModel);
-    if nParamThis == 0
-        continue
-    end
-
-    DV_param = nan(nIter, nParamThis);
-    for iP = 1:nParamThis
-        idxAll = find(strcmp(paramNamesAll, paramNamesThisModel{iP}), 1, 'first');
-        if isempty(idxAll) || size(P, 2) < iP
-            continue
-        end
-        nRows = min(nIter, size(P, 1));
-        DV_param(1:nRows, iP) = abs(P(1:nRows, iP) - trueParamVals(idxAll));
-    end
-
-    figure('Position', [20 20 max(1200, 350*nParamThis) 1600]);
-    rng(1);
-    for iIV = 1:5
-        [x_raw, x_tick, x_ticklabel, isCategorical] = encode_iv_for_scatter_local(IV_vals{iIV});
-        for iDV = 1:nParamThis
-            subplot(5, nParamThis, (iIV - 1) * nParamThis + iDV); hold on;
-            y = DV_param(:, iDV);
-            valid = isfinite(x_raw) & isfinite(y);
-            if ~any(valid)
-                text(0.5, 0.5, 'No data', 'HorizontalAlignment', 'center');
-                axis off;
-                continue
-            end
-            xv = x_raw(valid);
-            yv = y(valid);
-            x_for_corr = xv;
-
-            if iIV == 5
-                pos = xv > 0;
-                xv = xv(pos);
-                yv = yv(pos);
-                x_for_corr = xv;
-                if isempty(xv)
-                    text(0.5, 0.5, 'No positive ridge', 'HorizontalAlignment', 'center');
-                    axis off;
-                    continue
-                end
-                xplot = log10(xv);
-                scatter(xplot, yv, 20, 'k', 'filled', 'MarkerFaceAlpha', 0.45, 'MarkerEdgeAlpha', 0.45);
-                uR = unique(xv);
-                xticks(log10(uR));
-                xticklabels(compose('%.3g', uR));
-                if numel(uR) > 1
-                    xlim([min(log10(uR)) - 0.2, max(log10(uR)) + 0.2]);
-                else
-                    xlim(log10(uR) + [-0.5, 0.5]);
-                end
-                % xtickangle(45);
-                if numel(unique(xplot)) > 1
-                    pfit = polyfit(xplot, yv, 1);
-                    xr = linspace(min(xplot), max(xplot), 100);
-                    plot(xr, polyval(pfit, xr), 'r-', 'LineWidth', 1.5);
-                end
-            elseif isCategorical
-                x_plot = xv + 0.2 * (rand(sum(valid), 1) - 0.5);
-                scatter(x_plot, yv, 20, 'k', 'filled', 'MarkerFaceAlpha', 0.45, 'MarkerEdgeAlpha', 0.45);
-                xticks(x_tick); xticklabels(x_ticklabel); %xtickangle(45);
-                xlim([0.5, numel(x_tick) + 0.5]);
-            else
-                scatter(xv, yv, 20, 'k', 'filled', 'MarkerFaceAlpha', 0.45, 'MarkerEdgeAlpha', 0.45);
-                if iIV == 1 || iIV == 2
-                    uInt = unique(round(xv));
-                    xticks(uInt);
-                    xlim([min(uInt) - 0.5, max(uInt) + 0.5]);
-                end
-                if numel(unique(xv)) > 1
-                    pfit = polyfit(xv, yv, 1);
-                    xr = linspace(min(xv), max(xv), 100);
-                    plot(xr, polyval(pfit, xr), 'r-', 'LineWidth', 1.5);
-                end
-            end
-            if numel(x_for_corr) >= 3
-                [rho, pval] = corr(x_for_corr, yv, 'Type', 'Spearman', 'Rows', 'complete');
-                title(sprintf('\\rho=%.2f, p=%.3f', rho, pval));
-            else
-                title('n<3');
-            end
-            if iDV == 1, xlabel(IV_names{iIV}); end
-            if iIV == 1, ylabel(sprintf('RMSE %s', paramNamesThisModel{iDV})); end
-            set(gca, 'XTickLabelRotation', 0);
-            box on; grid on;
-        end
-    end
-
-    sgtitle(sprintf('Correlation between basis settings and params recovery\n [A%dB%d, L%d, %d iter]\n%s', ...
-        iModelA_fit, iModelB_fit, iLocComb, nIter, subjTag));
-    set(findall(gcf, '-property', 'fontsize'), 'fontsize', sz_font);
-    saveas(gcf, sprintf('%s/4CorrBasisSetting_ParamsRMSE_A%dB%d.jpg', nameFolder_Figures_perSubj, iModelA_fit, iModelB_fit));
-    close(gcf);
-end
-
-fprintf('%s: Correlation between basis settings and params recovery saved for A%d.\n\n', datetime('now'), iModelA_fit);
+Tfix = struct();
+Tfix.normStats = normStats_abs;
+Tfix.mu_cov_abs = mu_cov_abs;
+Tfix.W_white = W_white_abs;
+Tfix.useWhiten = ~isempty(W_white_abs);
 end
 
 %% helper
-function out = rmse_simple_local(a, b)
-a = a(:); b = b(:);
-ok = isfinite(a) & isfinite(b);
-if ~any(ok)
-    out = NaN;
-else
-    d = a(ok) - b(ok);
-    out = sqrt(mean(d.^2));
-end
-end
-
-%% helper
-function v = normalize_by_maxabs_local(v)
-v = v(:)';
-m = max(abs(v));
-if isfinite(m) && m > 0
-    v = v / m;
-end
-end
-
-%% helper
-function [x, xt, xtl, isCategorical] = encode_iv_for_scatter_local(vals)
-if isnumeric(vals) || islogical(vals)
-    x = vals(:);
-    isCategorical = false;
-    xt = [];
-    xtl = {};
-    return
-end
-
-if iscell(vals) || isstring(vals) || iscategorical(vals)
-    labels = string(vals(:));
-    bad = strlength(labels) == 0;
-    labels(bad) = "<empty>";
-    [u, ~, ic] = unique(labels, 'stable');
-    x = double(ic);
-    xt = 1:numel(u);
-    xtl = cellstr(u);
-    isCategorical = true;
-    return
-end
-
-error('Unsupported IV type for scatter encoding.');
-end
-
-%% helper
-function [pORI, pSF] = fit_marginal_params_from_template_local(template_ref, axis_tuning, iFamily_ORI, iFamily_SF, lb_full_all, ub_full_all, options_fmin)
-pORI = [NaN NaN];
-pSF = [NaN NaN];
-
-try
-    nRep_local = 20;
-    problem_setting_local = MultiStart('StartPointsToRun', 'bounds', 'UseParallel', 1, 'Display', 'off');
-
-    margORI_ref = mean(template_ref, 2)';
-    margSF_ref = mean(template_ref, 1);
-
-    xORI = axis_tuning{1};
-    fxn_tuningLoss_ORI = @(param_est) sum((margORI_ref - predSFkernel(xORI, iFamily_ORI, param_est, 0)).^2);
-    problem_ORI = createOptimProblem('fmincon', ...
-        'objective', fxn_tuningLoss_ORI, ...
-        'x0', (ub_full_all{iFamily_ORI} + lb_full_all{iFamily_ORI}) / 2, ...
-        'lb', lb_full_all{iFamily_ORI}, ...
-        'ub', ub_full_all{iFamily_ORI}, ...
-        'options', options_fmin);
-    pORI_fit = run(problem_setting_local, problem_ORI, nRep_local);
-
-    xSF = axis_tuning{2};
-    xSF_ln = 2.^xSF;
-    fxn_tuningLoss_SF = @(param_est) sum((margSF_ref - predSFkernel(xSF_ln, iFamily_SF, param_est, 0)).^2);
-    problem_SF = createOptimProblem('fmincon', ...
-        'objective', fxn_tuningLoss_SF, ...
-        'x0', (ub_full_all{iFamily_SF} + lb_full_all{iFamily_SF}) / 2, ...
-        'lb', lb_full_all{iFamily_SF}, ...
-        'ub', ub_full_all{iFamily_SF}, ...
-        'options', options_fmin);
-    pSF_fit = run(problem_setting_local, problem_SF, nRep_local);
-
-    pORI(1:min(2, numel(pORI_fit))) = pORI_fit(1:min(2, numel(pORI_fit)));
-    pSF(1:min(2, numel(pSF_fit))) = pSF_fit(1:min(2, numel(pSF_fit)));
-catch
-    % keep NaN so plotting can continue for other DVs
-end
-end
-
-%% helper
-function e3D_white = whiten_e3D(e3D_in, mu_cov, W_white)
+function e3D_out = applyFixedTransform(e3D_in, cst_in, Tfix)
 [nTrials, nORI, nSF] = size(e3D_in);
-X = reshape(e3D_in, [nTrials, nORI * nSF]);
-Xw = (X - mu_cov) * W_white;
-e3D_white = reshape(Xw, [nTrials, nORI, nSF]);
+e3D_z = nan(size(e3D_in));
+eps_sigma = 1e-8;
+cst_unique = Tfix.normStats.cst_unique(:)';
+
+for iT = 1:nTrials
+    [~, idxC] = min(abs(cst_unique - cst_in(iT)));
+    mu_i = squeeze(Tfix.normStats.mu_byGroup(idxC, 1, :, :));
+    sd_i = squeeze(Tfix.normStats.sigma_byGroup(idxC, 1, :, :));
+    if any(~isfinite(mu_i(:))) || any(~isfinite(sd_i(:)))
+        mu_i = squeeze(Tfix.normStats.mu_global_3D);
+        sd_i = Tfix.normStats.sigma_global_2D;
+    end
+    sd_i(~isfinite(sd_i) | sd_i < eps_sigma) = eps_sigma;
+    e3D_z(iT, :, :) = (squeeze(e3D_in(iT, :, :)) - mu_i) ./ sd_i;
 end
+
+if Tfix.useWhiten
+    Xz = reshape(e3D_z, [nTrials, nORI * nSF]);
+    Xw = bsxfun(@minus, Xz, Tfix.mu_cov_abs) * Tfix.W_white;
+    e3D_out = reshape(Xw, [nTrials, nORI, nSF]);
+else
+    e3D_out = e3D_z;
+end
+end
+
+%% helper
+function template_transformed = convertTemplateRawToTransformed(template_raw, Tfix)
+sigma_vec = Tfix.normStats.sigma_global_2D(:);
+sigma_vec(~isfinite(sigma_vec) | sigma_vec < 1e-8) = 1e-8;
+t_z = template_raw(:) .* sigma_vec;
+if Tfix.useWhiten
+    t_trans = Tfix.W_white \ t_z;
+else
+    t_trans = t_z;
+end
+template_transformed = reshape(t_trans, size(template_raw));
+end
+
+%% helper
+function [mu_cov, Sigma, W_white] = computeWhiteningParams_local(e3D_norm, lambda_whiten, eps_whiten)
+[nTrials_cov, nOri_cov, nSf_cov] = size(e3D_norm);
+e3D_vec = reshape(e3D_norm, [nTrials_cov, nOri_cov * nSf_cov]);
+mu_cov = mean(e3D_vec, 1);
+Sigma = cov(e3D_vec - mu_cov, 1);
+
+if isnan(lambda_whiten)
+    W_white = [];
+    return;
+end
+
+Sigma_shrink = (1 - lambda_whiten) * Sigma + lambda_whiten * mean(diag(Sigma)) * eye(size(Sigma, 1));
+[V, D] = eig((Sigma_shrink + Sigma_shrink') / 2);
+d = diag(D);
+d(d < eps_whiten) = eps_whiten;
+W_white = V * diag(1 ./ sqrt(d)) * V';
+end
+
 
 %% helper
 function [mu_cov, sigma_cov_2D, e3D_centered] = recenter_e3D(e3D_in, eps_sigma)
+% This function recenters a 3D array e3D_in by subtracting the mean across trials.
+% It also computes the standard deviation for each element, ensuring a minimum value of eps_sigma.
 [nTrials, nORI, nSF] = size(e3D_in);
 X = reshape(e3D_in, [nTrials, nORI * nSF]);
 mu_cov = mean(X, 1);
@@ -1082,6 +772,8 @@ end
 
 %% helper
 function W_white = build_whitening_matrix(e3D_centered, lambda_whiten, eps_whiten)
+% This function builds a whitening matrix W_white based on the covariance of the centered 3D data.
+% It applies shrinkage to the covariance matrix to ensure numerical stability, and then computes the whitening transformation.
 [nTrials, nORI, nSF] = size(e3D_centered);
 X_centered = reshape(e3D_centered, [nTrials, nORI * nSF]);
 
@@ -1097,6 +789,8 @@ end
 
 %% helper
 function e3D_out = apply_linear_transform_e3D(e3D_centered, W)
+% This function applies a linear transformation W to the centered 3D data e3D_centered.
+% The transformation is applied to the trial dimension, and the output is reshaped back to the original 3D format.
 [nTrials, nORI, nSF] = size(e3D_centered);
 X = reshape(e3D_centered, [nTrials, nORI * nSF]);
 X_out = X * W;
@@ -1105,6 +799,8 @@ end
 
 %% helper
 function template_out = convert_template_space(template_in, fromSpace, toSpace, sigma_cov_2D, W_white, eps_sigma)
+% This function converts a template from one space to another.
+% Supported spaces: 'raw_centered', 'z', 'white'.
 template_vec = template_in(:);
 
 if strcmp(fromSpace, toSpace)
