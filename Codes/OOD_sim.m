@@ -15,7 +15,7 @@ function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Simulation input parameters
-iModelA_fit_all = [1]; % DO NOT CHANGE! 1 = RC-derived template (Model A), 2=ideal template; 3=permuted template
+iModelA_fit_all = [1:2]; % DO NOT CHANGE! 1 = RC-derived template (Model A), 2=ideal template; 3=permuted template
 iModelB_fit_all = iModelB_sim; %1=full, 2=No Nmul, 3=No Nadd, 4=No Nshared, 5=Nmul-only, 6=Nadd-only, 7=Nshared-only, 8=criterion-only
 
 % Enforce reduced-model ground truth by zeroing excluded IN terms.
@@ -96,10 +96,11 @@ fprintf(' - Regression type (1=Univariate; 2=Multi+smoothing): %d \n\n', flag_re
 
 % Define IO name & folders %
 % Define the IO name
-nameIO = sprintf('IO_cN%.0f_cG%.0f_nT%s_Nm%.1f_Na%.1f_Ns%.1f_cSDT%.1f_whiten%.1f_wDV%d_Bsim%d', ...
+nameIO = sprintf('IO_Bsim%d_cN%.0f_cG%.0f_nT%s_Nm%.1f_Na%.1f_Ns%.1f_cSDT%.1f_wDV%d_whiten%.1f', ...
+    iModelB_sim, ...
     noiseCST*100, gaborCST*100, format_num2exp(nTrials), ...
-    Nmul_true, Nadd_true, Nshared_true, ...
-    cSDT_true, lambda_whiten, flag_whitenDV, iModelB_sim);
+    Nmul_true, Nadd_true, Nshared_true, cSDT_true, ...
+    flag_whitenDV, lambda_whiten);
 
 % Folder to save IO data (energy + behav)
 nameFolder_Data_OOD_IO = sprintf('%s/%s', nameFolder_Data_OOD, nameIO);
@@ -326,7 +327,7 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
     if isempty(dir(nameFolder_Data_NOM_IO)), mkdir(nameFolder_Data_NOM_IO); end
 
     % Save only variables used by simPlot4_VaryOneDim.m in one atomic write.
-    save(sprintf('%s/truth.mat', nameFolder_Data_OOD_IO), 'template_true', 'criterion_DV_true');
+    save(sprintf('%s/truth.mat', nameFolder_Data_OOD_IO), 'template_true', 'criterion_DV_true', 'N*_true');
     fprintf('\n\n%s: truth.mat saved (template_true, criterion_DV_true).\n\n', datetime('now'))
 
     % Save energy for compIV after the accuracy gate.
@@ -379,22 +380,22 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
                 % For the simulated model, also plot IV vs DV scatter and parameter recovery
 
                 if flag_plotDist
-                plot_CorrBasisSetting(nameFolder_Data_NOM_IO, nameFolder_Figures_perSubj, nameIO, ...
-                    nIter, iJob, iLocComb, iModelA_fit, iModelB_fit_all, namesModelBparams_short, ...
-                    Nmul_true, Nadd_true, Nshared_true, criterion_DV_true, template_true);
+                    % plot_CorrBasisSetting(nameFolder_Data_NOM_IO, nameFolder_Figures_perSubj, nameIO, ...
+                    %     nIter, iJob, iLocComb, iModelA_fit, iModelB_fit_all, namesModelBparams_short, ...
+                    %     Nmul_true, Nadd_true, Nshared_true, criterion_DV_true, template_true);
                 end
             end % if iModelB_fit == iModelB_sim
         end % for iModelB_fit
 
     end % for iModelA_fit
-%%
+    %%
     % Summarize model comparison after all A/B fits finish.
     if flag_plotDist
-    plot_fit_model_comparison( ...
-        nameFolder_Data_NOM_IO, nameFolder_Figures_perSubj, nameIO, ...
-        iModelA_fit_all, iModelB_fit_all, namesModelA, namesModelB, namesModelBparams_short, ...
-        nIter, iJob, iLocComb, iModelB_sim, ...
-        Nmul_true, Nadd_true, Nshared_true, criterion_DV_true);
+        % plot_fit_model_comparison( ...
+        %     nameFolder_Data_NOM_IO, nameFolder_Figures_perSubj, nameIO, ...
+        %     iModelA_fit_all, iModelB_fit_all, namesModelA, namesModelB, namesModelBparams_short, ...
+        %     nIter, iJob, iLocComb, iModelB_sim, ...
+        %     Nmul_true, Nadd_true, Nshared_true, criterion_DV_true);
     end
 else
     fprintf('\n\n ** Simulated pC=%.2f, OUT OF the range [%.2f, %.2f] ** \n\n', pC_sim, pC_filter)

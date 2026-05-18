@@ -35,47 +35,46 @@ set(0, 'DefaultFigureVisible', 'off') % avoid printing figures on the desktop
 xORI = axis_tuning{1}; xSF = axis_tuning{2};
 
 %% Figure 1: Performance Metrics across Iterations
-figure('Position', [100, 100, 2e3, 2e3])
-for iMetric = 1:nMetrics
-    subplot(3, 4, iMetric), hold on
-
-    [metric_med, ~, ~, metric_sem_neg, metric_sem_pos] = getCI(data_metrics_allIter(:, :, iMetric), 1, 1);
-
-    for iDataset = 1:nDatasets % iDataset: 1=full, 2=tmpl, 3=train, 4=test
-        if iDataset==1, color_face = 'k'; else, color_face = 1-ratio_split(iDataset-1)*ones(1,3); end
-        bar(iDataset, metric_med(iDataset), 'EdgeColor', 'k', 'FaceColor', color_face)
-        errorbar(iDataset, metric_med(iDataset), metric_sem_neg, metric_sem_pos, 'k', 'capsize', 0)
-    end
-
-    xticks(1:nDatasets)
-    xticklabels(namesDataset_full)
-    % ylabel(namesMetrics{iMetric})
-    title(namesMetrics{iMetric})
-
-    % Set y-axis limits based on metric type
-    switch iMetric
-        % metrics: [dprime, criterion, [pC, pHit, pFA], nanmean(respC), pYES, mean(1./contrast), median(RT)];
-        case 1, ylimits = [0,2]; yline(dprime_theo, 'k--'); % dprime
-        case 2, ylimits = [-1,1]; yline(0, 'k--'); % criterion
-        case 3, ylimits = [0,1]; yline(.7, 'k--'); % pC; pC_titrate = 0.7 (defined in OOD_sim)
-        case 4, ylimits = [.5, 1]; % pHit
-        case 5, ylimits = [0, .5]; % pFA
-        case 6, ylimits = [.5, 1]; % pA
-        case 7, ylimits = [.5, 1]; % pA1
-        case 8, ylimits = [.5, 1]; % pA0
-        case 9, ylimits = [0, 1]; yline(.5, 'k--'); % pYES
-        case 10, ylimits = [2, 3]; % CS
-        case 11, ylimits = [0, .5]; % RT
-    end
-    ylim(ylimits)
-end
-
-set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
-set(findall(gcf, '-property', 'linewidth'), 'linewidth', 2)
-
-sgtitle(sprintf('Figure 1. Measured metrics (Ave across %d iterations +- 68%% CI)\n%s (Loc%d ModelA%d %s)', ...
-    nIter, subjName, iLocComb, iModelA_fit, namesModelA{iModelA_fit}))
-saveas(gcf, sprintf('%s/11MetricMeasured_L%d_A%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit))
+% figure('Position', [100, 100, 2e3, 2e3])
+% for iMetric = 1:nMetrics
+%     subplot(3, 4, iMetric), hold on
+% 
+%     [metric_med, ~, ~, metric_sem_neg, metric_sem_pos] = getCI(data_metrics_allIter(:, :, iMetric), 1, 1);
+% 
+%     for iDataset = 1:nDatasets % iDataset: 1=full, 2=tmpl, 3=train, 4=test
+%         if iDataset==1, color_face = 'k'; else, color_face = 1-ratio_split(iDataset-1)*ones(1,3); end
+%         bar(iDataset, metric_med(iDataset), 'EdgeColor', 'k', 'FaceColor', color_face)
+%         errorbar(iDataset, metric_med(iDataset), metric_sem_neg, metric_sem_pos, 'k', 'capsize', 0)
+%     end
+% 
+%     xticks(1:nDatasets)
+%     xticklabels(namesDataset_full)
+%     % ylabel(namesMetrics{iMetric})
+%     title(namesMetrics{iMetric})
+% 
+%     % Set y-axis limits based on metric type
+%     switch iMetric
+%         % metrics: [dprime, criterion, [pC, pHit, pFA], nanmean(respC), pYES, mean(1./contrast), median(RT)];
+%         case 1, ylimits = [0,2]; yline(dprime_theo, 'k--'); % dprime
+%         case 2, ylimits = [-1,1]; yline(0, 'k--'); % criterion
+%         case 3, ylimits = [0,1]; yline(.7, 'k--'); % pC; pC_titrate = 0.7 (defined in OOD_sim)
+%         case 4, ylimits = [.5, 1]; % pHit
+%         case 5, ylimits = [0, .5]; % pFA
+%         case 6, ylimits = [.5, 1]; % pA
+%         case 7, ylimits = [.5, 1]; % pA1
+%         case 8, ylimits = [.5, 1]; % pA0
+%         case 9, ylimits = [0, 1]; yline(.5, 'k--'); % pYES
+%         case 10, ylimits = [2, 3]; % CS
+%         case 11, ylimits = [0, .5]; % RT
+%     end
+%     ylim(ylimits)
+% end
+% 
+% set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
+% set(findall(gcf, '-property', 'linewidth'), 'linewidth', 2)
+% 
+% sgtitle(sprintf('Figure 1. Measured metrics (Ave across %d iterations +- 68%% CI)\n%s (Loc%d ModelA%d %s)', nIter, subjName, iLocComb, iModelA_fit, namesModelA{iModelA_fit}))
+% saveas(gcf, sprintf('%s/11MetricMeasured_L%d_A%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit))
 
 %% Figure 2: 2D Kernel
 template_tmpl_ave = squeeze(mean(template_tmpl_allIter, 1));
@@ -249,82 +248,73 @@ end
 
 
 %% Figure 4: Plot rank of selected basis counts / families / width scales / ridge across iterations
-% Assumes these variables already exist:
-%   nBasisORI_tmpl_allIter
-%   nBasisSF_tmpl_allIter
-%   basisFxnORI_tmpl_allIter
-%   basisFxnSF_tmpl_allIter
-%   basisWidthScaleORI_tmpl_allIter
-%   basisWidthScaleSF_tmpl_allIter
-%   asymSF_rightLeftRatio_tmpl_allIter
-%   ridge_tmpl_allIter
 
-if ~exist('asymSF_rightLeftRatio_tmpl_allIter', 'var')
-    asymSF_rightLeftRatio_tmpl_allIter = nan(size(nBasisSF_tmpl_allIter));
-end
-
-figure('Position', [100 100 1600 800]);
-% tiledlayout(3, 3, 'TileSpacing', 'compact', 'Padding', 'compact');
-
-% ---------- 1. nBasisORI ----------
-subplot(2,4,1); hold on;
-plot_ranked_categorical(nBasisORI_tmpl_allIter, 'nBasisORI');
-ylabel('% iterations selected');
-title('nBasisORI');
-box on;
-
-% ---------- 2. nBasisSF ----------
-subplot(2,4,5); hold on;
-plot_ranked_categorical(nBasisSF_tmpl_allIter, 'nBasisSF');
-ylabel('% iterations selected');
-title('nBasisSF');
-box on;
-
-% ---------- 3. basisFxnORI ----------
-subplot(2,4,2); hold on;
-plot_ranked_categorical(basisFxnORI_tmpl_allIter, 'basisFxnORI');
-ylabel('% iterations selected');
-title('basisFxnORI');
-box on;
-
-% ---------- 4. basisFxnSF ----------
-subplot(2,4,6); hold on;
-plot_ranked_categorical(basisFxnSF_tmpl_allIter, 'basisFxnSF');
-ylabel('% iterations selected');
-title('basisFxnSF');
-box on;
-
-% ---------- 5. basisWidthScaleORI ----------
-subplot(2,4,3); hold on;
-plot_ranked_categorical(basisWidthScaleORI_tmpl_allIter, 'basisWidthScaleORI');
-ylabel('% iterations selected');
-title('basisWidthScaleORI');
-box on;
-
-% ---------- 6. basisWidthScaleSF ----------
-subplot(2,4,7); hold on;
-plot_ranked_categorical(basisWidthScaleSF_tmpl_allIter, 'basisWidthScaleSF');
-ylabel('% iterations selected');
-title('basisWidthScaleSF');
-box on;
-
-% ---------- 7. ridge ----------
-subplot(2,4,4); hold on;
-plot_ranked_categorical(ridge_tmpl_allIter, 'ridge');
-ylabel('% iterations selected');
-title('ridge');
-box on;
-
-% ---------- 8. asymSF_rightLeftRatio ----------
-subplot(2,4,8); hold on;
-plot_ranked_categorical(asymSF_rightLeftRatio_tmpl_allIter, 'asymSF_rightLeftRatio');
-ylabel('% iterations selected');
-title('asymSF_rightLeftRatio');
-box on;
-
-sgtitle('Rank of selected basis settings across iterations');
-
-saveas(gcf, sprintf('%s/14SelectedBasis_L%d_A%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit))
+% if ~exist('asymSF_rightLeftRatio_tmpl_allIter', 'var')
+%     asymSF_rightLeftRatio_tmpl_allIter = nan(size(nBasisSF_tmpl_allIter));
+% end
+% 
+% figure('Position', [100 100 1600 800]);
+% % tiledlayout(3, 3, 'TileSpacing', 'compact', 'Padding', 'compact');
+% 
+% % ---------- 1. nBasisORI ----------
+% subplot(2,4,1); hold on;
+% plot_ranked_categorical(nBasisORI_tmpl_allIter, 'nBasisORI');
+% ylabel('% iterations selected');
+% title('nBasisORI');
+% box on;
+% 
+% % ---------- 2. nBasisSF ----------
+% subplot(2,4,5); hold on;
+% plot_ranked_categorical(nBasisSF_tmpl_allIter, 'nBasisSF');
+% ylabel('% iterations selected');
+% title('nBasisSF');
+% box on;
+% 
+% % ---------- 3. basisFxnORI ----------
+% subplot(2,4,2); hold on;
+% plot_ranked_categorical(basisFxnORI_tmpl_allIter, 'basisFxnORI');
+% ylabel('% iterations selected');
+% title('basisFxnORI');
+% box on;
+% 
+% % ---------- 4. basisFxnSF ----------
+% subplot(2,4,6); hold on;
+% plot_ranked_categorical(basisFxnSF_tmpl_allIter, 'basisFxnSF');
+% ylabel('% iterations selected');
+% title('basisFxnSF');
+% box on;
+% 
+% % ---------- 5. basisWidthScaleORI ----------
+% subplot(2,4,3); hold on;
+% plot_ranked_categorical(basisWidthScaleORI_tmpl_allIter, 'basisWidthScaleORI');
+% ylabel('% iterations selected');
+% title('basisWidthScaleORI');
+% box on;
+% 
+% % ---------- 6. basisWidthScaleSF ----------
+% subplot(2,4,7); hold on;
+% plot_ranked_categorical(basisWidthScaleSF_tmpl_allIter, 'basisWidthScaleSF');
+% ylabel('% iterations selected');
+% title('basisWidthScaleSF');
+% box on;
+% 
+% % ---------- 7. ridge ----------
+% subplot(2,4,4); hold on;
+% plot_ranked_categorical(ridge_tmpl_allIter, 'ridge');
+% ylabel('% iterations selected');
+% title('ridge');
+% box on;
+% 
+% % ---------- 8. asymSF_rightLeftRatio ----------
+% subplot(2,4,8); hold on;
+% plot_ranked_categorical(asymSF_rightLeftRatio_tmpl_allIter, 'asymSF_rightLeftRatio');
+% ylabel('% iterations selected');
+% title('asymSF_rightLeftRatio');
+% box on;
+% 
+% sgtitle('Rank of selected basis settings across iterations');
+% 
+% saveas(gcf, sprintf('%s/14SelectedBasis_L%d_A%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit))
 
 %% ---------- local helper ----------
 function plot_ranked_categorical(vals, xLabelText)

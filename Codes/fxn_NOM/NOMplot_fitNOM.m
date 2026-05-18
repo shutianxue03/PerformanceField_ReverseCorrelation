@@ -103,7 +103,7 @@ for iBin = 1:nBins
     plot(DV_allBins_med(iBin), pA_data_med(iBin), 'ko', 'MarkerSize', nData_allB_med(iBin)/sz_scale+5)
     errorbar(DV_allBins_med(iBin), pA_data_med(iBin), pA_data_SEM_neg(iBin), pA_data_SEM_pos(iBin), 'k', 'CapSize', 0)
     % Plot predictied pA from measured pYES
-    % plot(DV_allBins_med(iBin), pYES_data_med(iBin)^2+(1-pYES_data_med(iBin))^2, 'co', 'MarkerSize', nData_allB_med(iBin)/sz_scale+5)
+    plot(DV_allBins_med(iBin), pYES_data_med(iBin)^2+(1-pYES_data_med(iBin))^2, 'co', 'MarkerSize', nData_allB_med(iBin)/sz_scale+5)
 end
 % Pred (shaded errorbars)
 plot(DV_allBins_med, pA_pred_med, 'k-');
@@ -124,19 +124,19 @@ sgtitle(sprintf('Figure 1. Metrics vs. binned DV\n%s\nModelA%dB%d %s, L%d, nIter
 
 saveas(gcf, sprintf('%s/21Metrics_L%d_A%dB%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit, iModelB_fit))
 
-%% Figure 2: Plot estimated parameters across iterations
+%% Figure 2: Estimated parameters across iterations
 nParams_full = 5; % Nmul, Nadd, Nshared, criterion_DV, Empirical Criterion SDT
 params_est_allIter = [params_est_allIter, Cz_emp_allIter];
 
 % Load truth once if this is a simulation dataset
-hasTruth = numel(subjName) > 10;
+hasTruth = contains(subjName, 'IO');
 if hasTruth
     S_truth = load(fullfile(nameFolder_OOD_load, 'truth.mat'), '*_true');
 end
 
 % Define fixed 5-column layout
 % Columns: 1=Nmul, 2=Nadd, 3=Nshared, 4=criterion_DV, 5=Empirical Criterion SDT
-NOMc_ub = 20;
+% NOMc_ub = 20;
 switch iModelB_fit
     case 1 % Full: Nmul, Nadd, Nshared, criterion_DV
         col_idx      = [1 2 3 4 5];
@@ -220,16 +220,6 @@ switch iModelB_fit
             if isfield(S_truth, 'cSDT_true'), true_vals(3) = S_truth.cSDT_true; end
         end
 
-    case 8 % Criterion only: criterion_DV
-        col_idx      = [4 5];
-        param_labels = {'Empirical Criterion DV', 'Empirical Criterion SDT'};
-        ylim_list    = {[0 NOMc_ub], [-1 1]};
-        true_vals    = nan(1, 2);
-        if hasTruth
-            if isfield(S_truth, 'criterion_DV_true'), true_vals(1) = S_truth.criterion_DV_true; end
-            if isfield(S_truth, 'cSDT_true'), true_vals(2) = S_truth.cSDT_true; end
-        end
-
     otherwise
         error('Unknown iModelB_fit = %d', iModelB_fit);
 end
@@ -276,8 +266,7 @@ end
 sgtitle(sprintf('Figure 2. Estimated parameters across iterations\n%s (ModelA%dB%d %s, L%d, nIter=%d)', ...
     subjName, iModelA_fit, iModelB_fit, namesModelB{iModelB_fit}, iLocComb, nIter));
 
-saveas(gcf, sprintf('%s/22Params_L%d_A%dB%d.jpg', ...
-    nameFolder_Figures_perSubj, iLocComb, iModelA_fit, iModelB_fit));
+saveas(gcf, sprintf('%s/22Params_L%d_A%dB%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit, iModelB_fit));
 
 %% Figure 3: Correlation between paired parameters across iterations
 params_plot = params_est_allIter(:, 1:numel(param_labels));
@@ -318,8 +307,7 @@ for iRow = 1:nParams_plot
             title(param_labels{iCol}, 'Interpreter', 'none');
         else
             % scatter across iterations
-            plot(x, y, 'ko', 'MarkerSize', 4, 'MarkerFaceColor', [0.65 0.65 0.65], ...
-                'MarkerEdgeColor', [0.65 0.65 0.65]);
+            plot(x, y, 'ko', 'MarkerSize', 4, 'MarkerFaceColor', [0.65 0.65 0.65], 'MarkerEdgeColor', [0.65 0.65 0.65]);
 
             % median point with 68% CI error bars
             errorbar(param_med(iCol), param_med(iRow), ...
@@ -365,12 +353,9 @@ for iRow = 1:nParams_plot
     end
 end
 
-sgtitle(sprintf(['Figure 3. Pairwise correlation between parameter estimates across iterations\n' ...
-    '%s (ModelA%dB%d %s, L%d, nIter=%d)'], ...
-    subjName, iModelA_fit, iModelB_fit, namesModelB{iModelB_fit}, iLocComb, nIter));
+sgtitle(sprintf(['Figure 3. Pairwise correlation between parameter estimates across iterations\n' '%s (ModelA%dB%d %s, L%d, nIter=%d)'], subjName, iModelA_fit, iModelB_fit, namesModelB{iModelB_fit}, iLocComb, nIter));
 
-saveas(gcf, sprintf('%s/23ParamCorr_L%d_A%dB%d.jpg', ...
-    nameFolder_Figures_perSubj, iLocComb, iModelA_fit, iModelB_fit));
+saveas(gcf, sprintf('%s/23ParamCorr_L%d_A%dB%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit, iModelB_fit));
 
 %% 3. Freeze other params and vary one param to see its corr with pA
 % figure('Position', [0 0 1e3 800])

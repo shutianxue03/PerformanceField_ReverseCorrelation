@@ -292,12 +292,12 @@ fprintf('%s: Ideal template created.\n\n', datetime('now'))
 % template with a fixed "true" template scaled to A1's mean derived amplitude.
 % Execution order matters because A2 depends on A1 outputs.
 
-%% A1
+%% [A1] Setup
 % Output file name (before estimation)
 iModelA_fit = 1;
 nameFile_compIV_A1 = sprintf('%s/n%d_J%d_A%d_compIV', nameFolder_NOM_save, nIter, iJob, iModelA_fit);
 
-%% A1—Main loop over iterations
+%% [A1] Main loop over iterations
 % fprintf('%s: Creating empty placeholders for running iterations.\n\n', datetime('now'))
 data_metrics_allIter = nan(nIter, nDatasets_full, nMetrics); % see fxn_getMetrics for all 11 metrics
 data_train_allIter = cell(nIter, 1); % tmpl-split template (mainstream output)
@@ -333,7 +333,7 @@ parfor iIter = 1:nIter
     iterStream.Substream = S_seed.iterIdxList(iIter);
     RandStream.setGlobalStream(iterStream);
 
-    %% 1. Resample trials into FULL or TEMPLATE/TRAIN / TEST
+    %% [A1] 1. Resample trials into FULL or TEMPLATE/TRAIN / TEST
     R = fxn_resampleTrials(dataMatrix, e3D_allT, iSess_select, iLoc_all, ratio_split);
     e3D_full_rand = R.e3D_full_rand;
     iPRS_full_rand = R.iPRS_full_rand;
@@ -367,7 +367,7 @@ parfor iIter = 1:nIter
     iPair_test_rand = R.iPair_test_rand;
     RT_test_rand = R.RT_test_rand;
 
-    %% 2. Select which trials to use to estimate the template (TEMPLATE set)
+    %% [A1] 2. Select which trials to use to estimate the template (TEMPLATE set)
     [useIdx_full, useIdx_tmpl] = selectTemplateIndices(itype_template, iPRS_full_rand, iPRS_tmpl_rand);
 
     % sel for "selected"
@@ -396,7 +396,7 @@ parfor iIter = 1:nIter
         e3D_test_rand_norm  = e3D_test_rand;
     end
 
-    %% 3. Whiten the energy matrix
+    %% [A1] 3. Whiten the energy matrix
     % Two alternative strategies (lambda_whiten = NaN  --> Way 2)
     % Way 1: whiten the feature/channel energy before template estimation
     % Way 2: estimate the template in the original feature space, then apply
@@ -471,11 +471,11 @@ parfor iIter = 1:nIter
         % whitened feature spaces and should stay there for subsequent DV computation.
     end % isnan()
 
-    %% 4. Regularize the derived template
+    %% [A1] 4. Regularize the derived template
     template_full = fxn_getTemplate(template_full_raw, templateType, flag_plot_template);
     template_tmpl = fxn_getTemplate(template_tmpl_raw, templateType, flag_plot_template);
 
-    %% Check how channel correlation affects template estimation
+    %% [A1] Check how channel correlation affects template estimation
     % -----PCA-based template recovery =====
     if flag_plot_compIV
         % NOMplot_PCA
@@ -495,7 +495,7 @@ parfor iIter = 1:nIter
         % RCplot_compTempSmoothing
     end
 
-    %% 5. Marginalization, fit tuning functions, and calculate DV
+    %% [A1] 5. Marginalization, fit tuning functions, and calculate DV
     template_notNormed_tmpl = template_tmpl;
     template_notNormed_full = template_full;
 
@@ -561,7 +561,7 @@ parfor iIter = 1:nIter
         margParams_SF_allIter(iIter, iDataset, :) = margParams_SF;
         margR2_SF_allIter(iIter, iDataset) = margR2_SF;
 
-        %% 6. Metrics, DV, binning, data structs (tmpl split only)
+        %% [A1] 6. Metrics, DV, binning, data structs (tmpl split only)
         if iDataset == 1
             [data_train, data_test, metrics] = fxn_compDV_packData( ...
                 d_full, d_tmpl, d_train, d_test, ...
@@ -574,7 +574,7 @@ parfor iIter = 1:nIter
         end
     end % iDataset
 
-    %% Store template-related values
+    %% [A1] Store template-related values
     template_tmpl_allIter(iIter, :, :) = template_notNormed_tmpl;
     template_full_allIter(iIter, :, :) = template_notNormed_full;
     nBasisORI_tmpl_allIter(iIter, :) = nBasisORI_tmpl;
@@ -592,12 +592,12 @@ fprintf('\n\n%s: A1 All iterations done.\n\n', datetime('now'))
 
 time_progress = ceil(minutes(datetime('now')-time_start)); % round up to minutes
 
-%% SAVE A1
+%% [A1] Save
 save(nameFile_compIV_A1, 'time_progress', 'template_ideal', '*_allIter', 'names*', 'flag*', 'ratio_split', 'ORI_bound', '*Type');
 
 fprintf('\n\n%s: A1 Outputs saved.\n\n', datetime('now'))
 
-%% Plot A1 (optional)
+%% [A1] Plot
 if flag_plot_compIV
     %-------------------%
     NOMplot_compIV;
@@ -606,163 +606,163 @@ if flag_plot_compIV
 end
 close all;
 
-%% End timing for A1
+%% [A1] End timing
 time_end = datetime('now');
 fprintf('%s: A1 Compute DV done.\n\n', time_end)
 elapsed = time_end - time_start;
 fprintf('A1 Time used: %s\n\n\n\n', char(elapsed));
 
-%% A2
-% iModelA_fit=2;
-% nameFile_compIV_A2 = sprintf('%s/n%d_J%d_A%d_compIV', nameFolder_NOM_save, nIter, iJob, iModelA_fit);
+%% [A2] Setup
+iModelA_fit=2;
+nameFile_compIV_A2 = sprintf('%s/n%d_J%d_A%d_compIV', nameFolder_NOM_save, nIter, iJob, iModelA_fit);
 
-% %% Process the true template
-% % Average the derived template (tmpl set) across iterations
-% template_tmpl_ave_A1 = squeeze(mean(template_tmpl_allIter, 1, 'omitnan'));
-% peak_tmpl_A1 = max(abs(template_tmpl_ave_A1(:)));
-% % Rescale the true/ideal template to match the peak of the derived template
-% % (apply scaling right after template_notNormed is loaded below)
-% if ~isnumeric(isubj) % for IO, you may reload 'template_true' from disk
-%     load(sprintf('%s/truth.mat', nameFolder_OOD_load), 'template_true');
-%     template_notNormed = template_true;
-% else
-%     template_notNormed = template_ideal;
-% end
+%% [A2] Process the true template
+% Average the derived template (tmpl set) across iterations
+template_tmpl_ave_A1 = squeeze(mean(template_tmpl_allIter, 1, 'omitnan'));
+peak_tmpl_A1 = max(abs(template_tmpl_ave_A1(:)));
+% Rescale the true/ideal template to match the peak of the derived template
+% (apply scaling right after template_notNormed is loaded below)
+if ~isnumeric(isubj) % for IO, you may reload 'template_true' from disk
+    load(sprintf('%s/truth.mat', nameFolder_OOD_load), 'template_true');
+    template_notNormed = template_true;
+else
+    template_notNormed = template_ideal;
+end
 
-% if isfinite(peak_tmpl_A1) && peak_tmpl_A1 > 0
-%     peak_true = max(abs(template_notNormed(:)));
-%     if isfinite(peak_true) && peak_true > 0
-%         template_notNormed = template_notNormed * (peak_tmpl_A1 / peak_true);
-%     end
-% end
+if isfinite(peak_tmpl_A1) && peak_tmpl_A1 > 0
+    peak_true = max(abs(template_notNormed(:)));
+    if isfinite(peak_true) && peak_true > 0
+        template_notNormed = template_notNormed * (peak_tmpl_A1 / peak_true);
+    end
+end
 
-%%% A2: Main loop over iterations
-% % fprintf('%s: Creating empty placeholders for running iterations.\n\n', datetime('now'))
-% data_metrics_allIter = nan(nIter, nDatasets_full, nMetrics); % see fxn_getMetrics for all 11 metrics
-% data_train_allIter = cell(nIter, 1);
-% data_test_allIter  = cell(nIter, 1);
-% template_tmpl_allIter = nan(nIter, nORI, nSF);
-% template_full_allIter = template_tmpl_allIter;
-% fprintf('%s: A2 Started running %d iterations.\n\n', datetime('now'), nIter)
+%% [A2] Main loop over iterations
+% fprintf('%s: Creating empty placeholders for running iterations.\n\n', datetime('now'))
+data_metrics_allIter = nan(nIter, nDatasets_full, nMetrics); % see fxn_getMetrics for all 11 metrics
+data_train_allIter = cell(nIter, 1);
+data_test_allIter  = cell(nIter, 1);
+template_tmpl_allIter = nan(nIter, nORI, nSF);
+template_full_allIter = template_tmpl_allIter;
+fprintf('%s: A2 Started running %d iterations.\n\n', datetime('now'), nIter)
 
-% parfor iIter = 1:nIter
-%     fprintf('\n%s: %d...', datetime('now'), iIter);
+parfor iIter = 1:nIter
+    fprintf('\n%s: %d...', datetime('now'), iIter);
 
-%     % Deterministic randomness for THIS iteration (global index across jobs)
-%     iterStream = RandStream('Threefry', 'Seed', S_seed.grandSeed);
-%     iterStream.Substream = S_seed.iterIdxList(iIter);
-%     RandStream.setGlobalStream(iterStream);
+    % Deterministic randomness for THIS iteration (global index across jobs)
+    iterStream = RandStream('Threefry', 'Seed', S_seed.grandSeed);
+    iterStream.Substream = S_seed.iterIdxList(iIter);
+    RandStream.setGlobalStream(iterStream);
 
-%     %% 1. Resample trials into FULL or TEMPLATE/TRAIN / TEST
-%     R = fxn_resampleTrials(dataMatrix, e3D_allT, iSess_select, iLoc_all, ratio_split);
-%     e3D_full_rand = R.e3D_full_rand;
-%     iPRS_full_rand = R.iPRS_full_rand;
-%     resp_full_rand = R.resp_full_rand;
-%     cst_full_rand = R.cst_full_rand;
-%     respC_full_rand = R.respC_full_rand;
-%     iPair_full_rand = R.iPair_full_rand;
-%     RT_full_rand = R.RT_full_rand;
+    %% [A2] 1. Resample trials into FULL or TEMPLATE/TRAIN / TEST
+    R = fxn_resampleTrials(dataMatrix, e3D_allT, iSess_select, iLoc_all, ratio_split);
+    e3D_full_rand = R.e3D_full_rand;
+    iPRS_full_rand = R.iPRS_full_rand;
+    resp_full_rand = R.resp_full_rand;
+    cst_full_rand = R.cst_full_rand;
+    respC_full_rand = R.respC_full_rand;
+    iPair_full_rand = R.iPair_full_rand;
+    RT_full_rand = R.RT_full_rand;
 
-%     e3D_tmpl_rand = R.e3D_tmpl_rand;
-%     iPRS_tmpl_rand = R.iPRS_tmpl_rand;
-%     resp_tmpl_rand = R.resp_tmpl_rand;
-%     cst_tmpl_rand = R.cst_tmpl_rand;
-%     respC_tmpl_rand = R.respC_tmpl_rand;
-%     iPair_tmpl_rand = R.iPair_tmpl_rand;
-%     RT_tmpl_rand = R.RT_tmpl_rand;
+    e3D_tmpl_rand = R.e3D_tmpl_rand;
+    iPRS_tmpl_rand = R.iPRS_tmpl_rand;
+    resp_tmpl_rand = R.resp_tmpl_rand;
+    cst_tmpl_rand = R.cst_tmpl_rand;
+    respC_tmpl_rand = R.respC_tmpl_rand;
+    iPair_tmpl_rand = R.iPair_tmpl_rand;
+    RT_tmpl_rand = R.RT_tmpl_rand;
 
-%     e3D_train_rand = R.e3D_train_rand;
-%     iPRS_train_rand = R.iPRS_train_rand;
-%     resp_train_rand = R.resp_train_rand;
-%     cst_train_rand = R.cst_train_rand;
-%     respC_train_rand = R.respC_train_rand;
-%     iPair_train_rand = R.iPair_train_rand;
-%     RT_train_rand = R.RT_train_rand;
+    e3D_train_rand = R.e3D_train_rand;
+    iPRS_train_rand = R.iPRS_train_rand;
+    resp_train_rand = R.resp_train_rand;
+    cst_train_rand = R.cst_train_rand;
+    respC_train_rand = R.respC_train_rand;
+    iPair_train_rand = R.iPair_train_rand;
+    RT_train_rand = R.RT_train_rand;
 
-%     e3D_test_rand = R.e3D_test_rand;
-%     iPRS_test_rand = R.iPRS_test_rand;
-%     resp_test_rand = R.resp_test_rand;
-%     cst_test_rand = R.cst_test_rand;
-%     respC_test_rand = R.respC_test_rand;
-%     iPair_test_rand = R.iPair_test_rand;
-%     RT_test_rand = R.RT_test_rand;
+    e3D_test_rand = R.e3D_test_rand;
+    iPRS_test_rand = R.iPRS_test_rand;
+    resp_test_rand = R.resp_test_rand;
+    cst_test_rand = R.cst_test_rand;
+    respC_test_rand = R.respC_test_rand;
+    iPair_test_rand = R.iPair_test_rand;
+    RT_test_rand = R.RT_test_rand;
 
-%     %% 2. Select which trials to use to estimate whitening params (tmpl/full sets)
-%     [useIdx_full, useIdx_tmpl] = selectTemplateIndices(itype_template, iPRS_full_rand, iPRS_tmpl_rand);
+    %% [A2] 2. Select which trials to use to estimate whitening params (tmpl/full sets)
+    [useIdx_full, useIdx_tmpl] = selectTemplateIndices(itype_template, iPRS_full_rand, iPRS_tmpl_rand);
 
-%     e3D_tmpl_rand_sel = e3D_tmpl_rand(useIdx_tmpl, :, :);
-%     cst_tmpl_rand_sel = cst_tmpl_rand(useIdx_tmpl);
-%     iPRS_tmpl_rand_sel = iPRS_tmpl_rand(useIdx_tmpl);
+    e3D_tmpl_rand_sel = e3D_tmpl_rand(useIdx_tmpl, :, :);
+    cst_tmpl_rand_sel = cst_tmpl_rand(useIdx_tmpl);
+    iPRS_tmpl_rand_sel = iPRS_tmpl_rand(useIdx_tmpl);
 
-%     e3D_full_rand_sel = e3D_full_rand(useIdx_full, :, :);
-%     cst_full_rand_sel = cst_full_rand(useIdx_full);
-%     iPRS_full_rand_sel = iPRS_full_rand(useIdx_full);
+    e3D_full_rand_sel = e3D_full_rand(useIdx_full, :, :);
+    cst_full_rand_sel = cst_full_rand(useIdx_full);
+    iPRS_full_rand_sel = iPRS_full_rand(useIdx_full);
 
-%     if flag_standEnergy
-%         e3D_tmpl_rand_norm = normEnergy(e3D_tmpl_rand_sel, cst_tmpl_rand_sel, iPRS_tmpl_rand_sel);
-%         e3D_full_rand_norm = normEnergy(e3D_full_rand_sel, cst_full_rand_sel, iPRS_full_rand_sel);
-%         e3D_train_rand_norm = normEnergy(e3D_train_rand, cst_train_rand, iPRS_train_rand);
-%         e3D_test_rand_norm  = normEnergy(e3D_test_rand,  cst_test_rand,  iPRS_test_rand);
-%     else
-%         e3D_tmpl_rand_norm = e3D_tmpl_rand_sel;
-%         e3D_full_rand_norm = e3D_full_rand_sel;
-%         e3D_train_rand_norm = e3D_train_rand;
-%         e3D_test_rand_norm  = e3D_test_rand;
-%     end
+    if flag_standEnergy
+        e3D_tmpl_rand_norm = normEnergy(e3D_tmpl_rand_sel, cst_tmpl_rand_sel, iPRS_tmpl_rand_sel);
+        e3D_full_rand_norm = normEnergy(e3D_full_rand_sel, cst_full_rand_sel, iPRS_full_rand_sel);
+        e3D_train_rand_norm = normEnergy(e3D_train_rand, cst_train_rand, iPRS_train_rand);
+        e3D_test_rand_norm  = normEnergy(e3D_test_rand,  cst_test_rand,  iPRS_test_rand);
+    else
+        e3D_tmpl_rand_norm = e3D_tmpl_rand_sel;
+        e3D_full_rand_norm = e3D_full_rand_sel;
+        e3D_train_rand_norm = e3D_train_rand;
+        e3D_test_rand_norm  = e3D_test_rand;
+    end
 
-%     [mu_cov_tmpl, ~, W_white_tmpl] = computeWhiteningParams(e3D_tmpl_rand_norm, lambda_whiten, eps_whiten);
-%     [mu_cov_full, ~, W_white_full] = computeWhiteningParams(e3D_full_rand_norm, lambda_whiten, eps_whiten);
+    [mu_cov_tmpl, ~, W_white_tmpl] = computeWhiteningParams(e3D_tmpl_rand_norm, lambda_whiten, eps_whiten);
+    [mu_cov_full, ~, W_white_full] = computeWhiteningParams(e3D_full_rand_norm, lambda_whiten, eps_whiten);
 
-%     %% 5-8. Metrics, DV, binning, data structs (A1-identical iDataset structure)
-%     d_full  = struct('resp', resp_full_rand,  'iPRS', iPRS_full_rand,  'respC', respC_full_rand,  'cst', cst_full_rand,  'RT', RT_full_rand);
-%     d_tmpl  = struct('resp', resp_tmpl_rand,  'iPRS', iPRS_tmpl_rand,  'respC', respC_tmpl_rand,  'cst', cst_tmpl_rand,  'RT', RT_tmpl_rand);
-%     d_train = struct('resp', resp_train_rand, 'iPRS', iPRS_train_rand, 'respC', respC_train_rand, 'cst', cst_train_rand, 'RT', RT_train_rand, 'iPair', iPair_train_rand);
-%     d_test  = struct('resp', resp_test_rand,  'iPRS', iPRS_test_rand,  'respC', respC_test_rand,  'cst', cst_test_rand,  'RT', RT_test_rand,  'iPair', iPair_test_rand);
+    %% [A2] 5-8. Metrics, DV, binning, data structs (A1-identical iDataset structure)
+    d_full  = struct('resp', resp_full_rand,  'iPRS', iPRS_full_rand,  'respC', respC_full_rand,  'cst', cst_full_rand,  'RT', RT_full_rand);
+    d_tmpl  = struct('resp', resp_tmpl_rand,  'iPRS', iPRS_tmpl_rand,  'respC', respC_tmpl_rand,  'cst', cst_tmpl_rand,  'RT', RT_tmpl_rand);
+    d_train = struct('resp', resp_train_rand, 'iPRS', iPRS_train_rand, 'respC', respC_train_rand, 'cst', cst_train_rand, 'RT', RT_train_rand, 'iPair', iPair_train_rand);
+    d_test  = struct('resp', resp_test_rand,  'iPRS', iPRS_test_rand,  'respC', respC_test_rand,  'cst', cst_test_rand,  'RT', RT_test_rand,  'iPair', iPair_test_rand);
 
-%     for iDataset = 1:2
-%         mu_cov_use = [];
-%         W_white_use = [];
-%         switch iDataset
-%             case 1
-%                 mu_cov_use  = mu_cov_tmpl;
-%                 W_white_use = W_white_tmpl;
-%             case 2
-%                 mu_cov_use  = mu_cov_full;
-%                 W_white_use = W_white_full;
-%             otherwise
-%                 error('Unexpected iDataset=%d in A2.', iDataset);
-%         end
+    for iDataset = 1:2
+        mu_cov_use = [];
+        W_white_use = [];
+        switch iDataset
+            case 1
+                mu_cov_use  = mu_cov_tmpl;
+                W_white_use = W_white_tmpl;
+            case 2
+                mu_cov_use  = mu_cov_full;
+                W_white_use = W_white_full;
+            otherwise
+                error('Unexpected iDataset=%d in A2.', iDataset);
+        end
 
-%         if iDataset == 1
-%             [data_train, data_test, metrics] = fxn_compDV_packData( ...
-%                 d_full, d_tmpl, d_train, d_test, ...
-%                 e3D_train_rand_norm, e3D_test_rand_norm, ...
-%                 flag_whitenDV, lambda_whiten, mu_cov_use, W_white_use, ...
-%                 template_notNormed, convolveType, IVType, ORI_bound, nBins);
-%             data_train_allIter{iIter} = data_train;
-%             data_test_allIter{iIter}  = data_test;
-%             data_metrics_allIter(iIter, :, :) = metrics;
-%         end
-%     end
+        if iDataset == 1
+            [data_train, data_test, metrics] = fxn_compDV_packData( ...
+                d_full, d_tmpl, d_train, d_test, ...
+                e3D_train_rand_norm, e3D_test_rand_norm, ...
+                flag_whitenDV, lambda_whiten, mu_cov_use, W_white_use, ...
+                template_notNormed, convolveType, IVType, ORI_bound, nBins);
+            data_train_allIter{iIter} = data_train;
+            data_test_allIter{iIter}  = data_test;
+            data_metrics_allIter(iIter, :, :) = metrics;
+        end
+    end
 
-%     % Store templates
-%     % if iModelA_fit==2
-%     template_notNormed_tmpl = template_notNormed;
-%     template_notNormed_full = template_notNormed;
-%     % end
-%     template_tmpl_allIter(iIter, :, :) = template_notNormed_tmpl;
-%     template_full_allIter(iIter, :, :) = template_notNormed_full;
+    % Store templates
+    % if iModelA_fit==2
+    template_notNormed_tmpl = template_notNormed;
+    template_notNormed_full = template_notNormed;
+    % end
+    template_tmpl_allIter(iIter, :, :) = template_notNormed_tmpl;
+    template_full_allIter(iIter, :, :) = template_notNormed_full;
 
-% end % end for iIter
+end % end for iIter
 
-% fprintf('\n\n%s: A2 All iterations done.\n\n', datetime('now'))
+fprintf('\n\n%s: A2 All iterations done.\n\n', datetime('now'))
 
-% time_progress = ceil(minutes(datetime('now')-time_start)); % round up to minutes
+time_progress = ceil(minutes(datetime('now')-time_start)); % round up to minutes
 
-% %% SAVE for A2
-% save(nameFile_compIV_A2, 'time_progress', 'template_ideal', '*_allIter', 'names*', 'flag*', 'ratio_split', 'ORI_bound', '*Type');
+%% [A2] SAVE 
+save(nameFile_compIV_A2, 'time_progress', 'template_ideal', '*_allIter', 'names*', 'flag*', 'ratio_split', 'ORI_bound', '*Type');
 
-% fprintf('\n\n%s: A2 Outputs saved.\n\n', datetime('now'))
+fprintf('\n\n%s: A2 Outputs saved.\n\n', datetime('now'))
 end
 
 %% HELPER
