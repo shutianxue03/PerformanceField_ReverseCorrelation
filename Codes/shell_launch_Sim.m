@@ -1,19 +1,18 @@
+noiseCST = .2;
 
-gaborCST=.5;
+gaborCST=.3;
 nTrials=1e4;
-nIter = 20;
+nIter = 16;
 cSDT_true = 0;
-
-noiseCST=.2;
 lambda_whiten = 0;
+iModelB_sim = 6;
 
-for Nmul_true = [.6 .9]
-    for Nadd_true = [6,9]
-        for Nshared_true = [6,9]
-            for iModelB_sim = 1:7
-                OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, cSDT_true, ...
-                    lambda_whiten, iModelB_sim, nIter)
-            end
-        end
+for flag_whitenDV = 1%0:1
+    switch flag_whitenDV
+        case 0, Nmul_true = .5; Nadd_true = 5; Nshared_true = 5;
+            case 1, Nmul_true = .2; Nadd_true = .2; Nshared_true = .2;
     end
+
+    OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, cSDT_true, lambda_whiten, flag_whitenDV, iModelB_sim, nIter)
+
 end

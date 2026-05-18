@@ -76,12 +76,12 @@ xORI = axis_tuning{1}; xSF = axis_tuning{2};
 % sgtitle(sprintf('Figure 1. Measured metrics (Ave across %d iterations +- 68%% CI)\n%s (Loc%d ModelA%d %s)', nIter, subjName, iLocComb, iModelA_fit, namesModelA{iModelA_fit}))
 % saveas(gcf, sprintf('%s/11MetricMeasured_L%d_A%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit))
 
-%% Figure 2: 2D Kernel
+%% Figure 2: 2D Template
 template_tmpl_ave = squeeze(mean(template_tmpl_allIter, 1));
 template_full_ave = squeeze(mean(template_full_allIter, 1));
 
-template_tmpl_ave = template_tmpl_ave/norm(template_tmpl_ave(:));
-template_full_ave = template_full_ave/norm(template_full_ave(:));
+% template_tmpl_ave = template_tmpl_ave / norm(template_tmpl_ave(:));
+% template_full_ave = template_full_ave / norm(template_full_ave(:));
 
 figure('Position', [100, 100, 2e3, 2e3])
 
@@ -101,10 +101,10 @@ yline(0, 'r-'); % Gabor ori
 xlabel('Spatial Frequency'), ylabel('Orientation')
 xticks(axisTicks_tuning{2}), xticklabels(axisTL_tuning{2})
 yticks(axisTicks_tuning{1}), yticklabels(axisTL_tuning{1})
-title('Template derived from TRAINING trials')
+title('Template derived from TEMPLATE-set trials')
 
 subplot(2,3,3), hold on
-imagesc(axis_tuning{2}, axis_tuning{1}, template_tmpl_ave-template_ideal); axis square; colorbar;
+imagesc(axis_tuning{2}, axis_tuning{1}, template_tmpl_ave - template_ideal); axis square; colorbar;
 xline(1, 'r-'); % log gabor SF
 yline(0, 'r-'); % Gabor ori
 xlabel('Spatial Frequency'), ylabel('Orientation')
@@ -113,13 +113,13 @@ yticks(axisTicks_tuning{1}), yticklabels(axisTL_tuning{1})
 title('Difference with the true template')
 
 subplot(2,3,4), hold on
-imagesc(axis_tuning{2}, axis_tuning{1}, template_tmpl_ave-template_full_ave); axis square; colorbar;
+imagesc(axis_tuning{2}, axis_tuning{1}, template_tmpl_ave - template_full_ave); axis square; colorbar;
 xline(1, 'r-'); % log gabor SF
 yline(0, 'r-'); % Gabor ori
 xlabel('Spatial Frequency'), ylabel('Orientation')
 xticks(axisTicks_tuning{2}), xticklabels(axisTL_tuning{2})
 yticks(axisTicks_tuning{1}), yticklabels(axisTL_tuning{1})
-title('Full template minus training template')
+title('Template-set template minus full-set template')
 
 subplot(2,3,5), hold on
 imagesc(axis_tuning{2}, axis_tuning{1}, template_full_ave); axis square; colorbar; %clim([0, .2])
@@ -128,10 +128,10 @@ yline(0, 'r-'); % Gabor ori
 xlabel('Spatial Frequency'), ylabel('Orientation')
 xticks(axisTicks_tuning{2}), xticklabels(axisTL_tuning{2})
 yticks(axisTicks_tuning{1}), yticklabels(axisTL_tuning{1})
-title('Template derived from ALL trials')
+title('Template derived from FULL-set trials')
 
 subplot(2,3,6), hold on
-imagesc(axis_tuning{2}, axis_tuning{1}, template_full_ave-template_ideal); axis square; colorbar;
+imagesc(axis_tuning{2}, axis_tuning{1}, template_full_ave - template_ideal); axis square; colorbar;
 xline(1, 'r-'); % log gabor SF
 yline(0, 'r-'); % Gabor ori
 xlabel('Spatial Frequency'), ylabel('Orientation')
@@ -180,22 +180,22 @@ if iModelA_fit==1 % data-derived template
 
     % Process the ideal template
     margIO_ORI = mean(template_ideal, 2);
-    margIO_ORI_norm_training = margIO_ORI/max(margIO_ORI(:))*max(margORI_med(1, :));
+    margIO_ORI_norm_tmpl = margIO_ORI/max(margIO_ORI(:))*max(margORI_med(1, :));
     margIO_ORI_norm_full = margIO_ORI/max(margIO_ORI(:))*max(margORI_med(2, :));
 
     margIO_SF = mean(template_ideal, 1);
-    margIO_SF_norm_training = margIO_SF/max(margIO_SF(:))*max(margSF_med(1, :));
+    margIO_SF_norm_tmpl = margIO_SF/max(margIO_SF(:))*max(margSF_med(1, :));
     margIO_SF_norm_full = margIO_SF/max(margIO_SF(:))*max(margSF_med(2, :));
 
     figure('Position', [0 0 1e3 1e3])
-    % ORI tuning (training set)
+    % ORI tuning (template set)
     subplot(2,2,1); hold on;
     plot(xORI, margORI_med(1, :)/max(margORI_med(1, :)), 'ko-', 'MarkerFaceColor', 'w');
     plot(xORI, margPred_ORI_med(1, :)/max(margPred_ORI_med(1, :)), 'k-', 'LineWidth', 2);
-    plot(xORI, margIO_ORI_norm_training/max(margIO_ORI_norm_training), 'r-', 'LineWidth', 2); % ideal template
+    plot(xORI, margIO_ORI_norm_tmpl/max(margIO_ORI_norm_tmpl), 'r-', 'LineWidth', 2); % ideal template
     xline(0, 'k--', 'LineWidth', 1); % ORI=0
     yline(0, 'k--', 'LineWidth', 1); % Marginalized kernel=0
-    title(sprintf('ORI tuning function (training set)\nR2=%.2f (+-%.2f)| Params=[%s ]', margR2_ORI_med(1), margR2_ORI_sem(1), num2str(margParam_ORI_med(1, :), ' %.2f')));
+    title(sprintf('ORI tuning function (template set)\nR2=%.2f (+-%.2f)| Params=[%s ]', margR2_ORI_med(1), margR2_ORI_sem(1), num2str(margParam_ORI_med(1, :), ' %.2f')));
     xlabel('Orientation (deg)'); ylabel('Amplitude');
     % yticks(-.1:.1:1)
     ylim([-.2, 1])
@@ -213,14 +213,14 @@ if iModelA_fit==1 % data-derived template
     % yticks(-.1:.1:1)
     ylim([-.2, 1])
 
-    % SF tuning (training set)
+    % SF tuning (template set)
     subplot(2,2,2); hold on;
     plot(xSF, margSF_med(1, :)/max(margSF_med(1, :)), 'ko-', 'MarkerFaceColor', 'w');
     plot(xSF, margPred_SF_med(1, :)/max(margPred_SF_med(1, :)), 'k-', 'LineWidth', 2);
-    plot(xSF, margIO_SF_norm_training/max(margIO_SF_norm_training), 'r-', 'LineWidth', 2); % ideal template
+    plot(xSF, margIO_SF_norm_tmpl/max(margIO_SF_norm_tmpl), 'r-', 'LineWidth', 2); % ideal template
     xline(1, 'k--', 'LineWidth', 1); % SF=2 cpd
     yline(0, 'k--', 'LineWidth', 1); % Marginalized kernel=0
-    title(sprintf('SF tuning function (training set)\nR2=%.2f (+-%.2f)| Params=[%s]', margR2_SF_med(1), margR2_SF_sem(1), num2str(margParam_SF_med(1, :), ' %.2f')));
+    title(sprintf('SF tuning function (template set)\nR2=%.2f (+-%.2f)| Params=[%s]', margR2_SF_med(1), margR2_SF_sem(1), num2str(margParam_SF_med(1, :), ' %.2f')));
     xlabel('Log Spatial frequency (cpd)'); ylabel('Amplitude');
     % yticks(-.1:.1:.6)
     ylim([-.2, 1])

@@ -233,25 +233,28 @@ assert(sum(e3D_target_allT(nPairs+1:end,:,:) - e3D_target_allT(1:nPairs,:,:), 'a
 
 fprintf('%s: Pass A copied to pass B done.\n\n', datetime('now'))
 
-%% Compute DV from raw or whitened energy (raw energy is always saved)
+%% Compute DV in a canonical centered-energy framework
+% Canonical space is raw-centered: E_centered = E_raw - mu0.
+% If whitening is requested, both E and template are transformed to the same
+% whitened space so the readout remains space-consistent.
+[mu_cov_DV, sigma_cov_DV, e3D_centered] = recenter_e3D(e3D_target_allT, eps_whiten);
+W_white_DV = [];
+template_space_true = 'raw_centered';
+
 if flag_whitenDV && ~isnan(lambda_whiten)
-    [nTrials_cov, nOri_cov, nSf_cov] = size(e3D_target_allT);
-    e3D_vec = reshape(e3D_target_allT, [nTrials_cov, nOri_cov * nSf_cov]);
-    mu_cov = mean(e3D_vec, 1);
-    Sigma = cov(e3D_vec - mu_cov, 1);
-    Sigma_shrink = (1 - lambda_whiten) * Sigma + lambda_whiten * mean(diag(Sigma)) * eye(size(Sigma, 1));
-    [V, D] = eig((Sigma_shrink + Sigma_shrink') / 2);
-    d = diag(D);
-    d(d < eps_whiten) = eps_whiten;
-    W_white = V * diag(1 ./ sqrt(d)) * V';
-    e3D_forDV = whiten_e3D(e3D_target_allT, mu_cov, W_white);
-    fprintf('%s: Energy whitened for DV (lambda=%.2f).\n\n', datetime('now'), lambda_whiten)
+    W_white_DV = build_whitening_matrix(e3D_centered, lambda_whiten, eps_whiten);
+    e3D_forDV = apply_linear_transform_e3D(e3D_centered, W_white_DV);
+    template_forDV = convert_template_space(template_true, template_space_true, 'white', sigma_cov_DV, W_white_DV, eps_whiten);
+    dv_space_used = 'white';
+    fprintf('%s: DV computed in whitened space from centered raw energy (lambda=%.2f).\n\n', datetime('now'), lambda_whiten)
 else
-    e3D_forDV = e3D_target_allT; % use raw energy
-    fprintf('%s: DV computed from raw energy (flag_whitenDV=%d).\n\n', datetime('now'), flag_whitenDV)
+    e3D_forDV = e3D_centered;
+    template_forDV = convert_template_space(template_true, template_space_true, 'raw_centered', sigma_cov_DV, W_white_DV, eps_whiten);
+    dv_space_used = 'raw_centered';
+    fprintf('%s: DV computed in raw-centered space (flag_whitenDV=%d).\n\n', datetime('now'), flag_whitenDV)
 end
 
-DV_target_sim_allT = fxn_getIV_v3(e3D_forDV, template_true, convolveType_true, IVType_true, flag_permT, [1, nORI]);
+DV_target_sim_allT = fxn_getIV_v3(e3D_forDV, template_forDV, convolveType_true, IVType_true, flag_permT, [1, nORI]);
 assert(~any(isnan(DV_target_sim_allT)), 'IV_target contains NaN');
 
 
@@ -327,7 +330,10 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
     if isempty(dir(nameFolder_Data_NOM_IO)), mkdir(nameFolder_Data_NOM_IO); end
 
     % Save only variables used by simPlot4_VaryOneDim.m in one atomic write.
-    save(sprintf('%s/truth.mat', nameFolder_Data_OOD_IO), 'template_true', 'criterion_DV_true', 'N*_true');
+    save(sprintf('%s/truth.mat', nameFolder_Data_OOD_IO), ...
+        'template_true', 'template_forDV', 'template_space_true', 'dv_space_used', ...
+        'mu_cov_DV', 'sigma_cov_DV', 'W_white_DV', 'lambda_whiten', 'flag_whitenDV', ...
+        'criterion_DV_true', 'N*_true');
     fprintf('\n\n%s: truth.mat saved (template_true, criterion_DV_true).\n\n', datetime('now'))
 
     % Save energy for compIV after the accuracy gate.
@@ -1058,4 +1064,85 @@ function e3D_white = whiten_e3D(e3D_in, mu_cov, W_white)
 X = reshape(e3D_in, [nTrials, nORI * nSF]);
 Xw = (X - mu_cov) * W_white;
 e3D_white = reshape(Xw, [nTrials, nORI, nSF]);
+end
+
+%% helper
+function [mu_cov, sigma_cov_2D, e3D_centered] = recenter_e3D(e3D_in, eps_sigma)
+[nTrials, nORI, nSF] = size(e3D_in);
+X = reshape(e3D_in, [nTrials, nORI * nSF]);
+mu_cov = mean(X, 1);
+X_centered = X - mu_cov;
+
+sigma_cov = std(X, [], 1);
+sigma_cov(~isfinite(sigma_cov) | sigma_cov < eps_sigma) = eps_sigma;
+sigma_cov_2D = reshape(sigma_cov, [nORI, nSF]);
+
+e3D_centered = reshape(X_centered, [nTrials, nORI, nSF]);
+end
+
+%% helper
+function W_white = build_whitening_matrix(e3D_centered, lambda_whiten, eps_whiten)
+[nTrials, nORI, nSF] = size(e3D_centered);
+X_centered = reshape(e3D_centered, [nTrials, nORI * nSF]);
+
+Sigma = cov(X_centered, 1);
+Sigma_shrink = (1 - lambda_whiten) * Sigma + lambda_whiten * mean(diag(Sigma)) * eye(size(Sigma, 1));
+Sigma_sym = (Sigma_shrink + Sigma_shrink') / 2;
+
+[V, D] = eig(Sigma_sym);
+d = diag(D);
+d(~isfinite(d) | d < eps_whiten) = eps_whiten;
+W_white = V * diag(1 ./ sqrt(d)) * V';
+end
+
+%% helper
+function e3D_out = apply_linear_transform_e3D(e3D_centered, W)
+[nTrials, nORI, nSF] = size(e3D_centered);
+X = reshape(e3D_centered, [nTrials, nORI * nSF]);
+X_out = X * W;
+e3D_out = reshape(X_out, [nTrials, nORI, nSF]);
+end
+
+%% helper
+function template_out = convert_template_space(template_in, fromSpace, toSpace, sigma_cov_2D, W_white, eps_sigma)
+template_vec = template_in(:);
+
+if strcmp(fromSpace, toSpace)
+    template_out = template_in;
+    return;
+end
+
+switch fromSpace
+    case 'raw_centered'
+        template_raw = template_vec;
+    case 'z'
+        sigma_vec = sigma_cov_2D(:);
+        sigma_vec(~isfinite(sigma_vec) | sigma_vec < eps_sigma) = eps_sigma;
+        template_raw = template_vec ./ sigma_vec;
+    case 'white'
+        if isempty(W_white)
+            error('W_white is required to convert from white to raw_centered.');
+        end
+        template_raw = W_white * template_vec;
+    otherwise
+        error('Unknown template space: %s', fromSpace);
+end
+
+switch toSpace
+    case 'raw_centered'
+        template_vec_out = template_raw;
+    case 'z'
+        sigma_vec = sigma_cov_2D(:);
+        sigma_vec(~isfinite(sigma_vec) | sigma_vec < eps_sigma) = eps_sigma;
+        template_vec_out = template_raw .* sigma_vec;
+    case 'white'
+        if isempty(W_white)
+            error('W_white is required to convert from raw_centered to white.');
+        end
+        template_vec_out = W_white \ template_raw;
+    otherwise
+        error('Unknown target template space: %s', toSpace);
+end
+
+template_out = reshape(template_vec_out, size(template_in));
 end
