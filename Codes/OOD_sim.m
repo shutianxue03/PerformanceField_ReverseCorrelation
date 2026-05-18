@@ -1,4 +1,4 @@
-function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, cSDT_true, lambda_whiten, iModelB_sim, nIter)
+function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, cSDT_true, lambda_whiten, iModelB_sim, nIter, nBasisORI, basisWidthORI, nBasisSF, basisWidthSF)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Script name: OOD_sim.m
@@ -90,11 +90,11 @@ fprintf(' - Regression type (1=Univariate; 2=Multi+smoothing): %d \n\n', flag_re
 
 % Define IO name & folders %
 % Define the IO name
-nameIO = sprintf('IO_Bsim%d_cN%.0f_cG%.0f_nT%s_Nm%.1f_Na%.1f_Ns%.1f_cSDT%.1f_whiten%.1f', ...
+nameIO = sprintf('IO_Bsim%d_cN%.0f_cG%.0f_nT%s_Nm%.1f_Na%.1f_Ns%.1f_cSDT%.1f_whiten%.1f_bORI%d_%.1f_bSF%d_%.1f', ...
     iModelB_sim, ...
     noiseCST*100, gaborCST*100, format_num2exp(nTrials), ...
     Nmul_true, Nadd_true, Nshared_true, cSDT_true, ...
-    lambda_whiten);
+    lambda_whiten, nBasisORI, basisWidthORI, nBasisSF, basisWidthSF);
 
 % Folder to save IO data (energy + behav)
 nameFolder_Data_OOD_IO = sprintf('%s/%s', nameFolder_Data_OOD, nameIO);
@@ -230,18 +230,76 @@ fprintf('%s: Pass A copied to pass B done.\n\n', datetime('now'))
 %% Compute DV in a fixed transformed space
 % Fixed transform estimated from ABS trials:
 % raw energy -> contrast-specific ABS z-score -> optional whitening.
-Tfix = buildFixedTransformFromABS(e3D_target_allT, dataMatrix(:, 11), iPRS_allT, lambda_whiten, eps_whiten);
-e3D_forDV = applyFixedTransform(e3D_target_allT, dataMatrix(:, 11), Tfix);
-template_forDV = convertTemplateRawToTransformed(template_true, Tfix);
+
+% (1) Build fixed transform from ABS trials to obtain whitening matrix
+idxABS = (iPRS_allT == 0);
+assert(any(idxABS), 'No ABS trials available for transform estimation.');
+
+[e3D_abs_z, normStats_abs] = normEnergy(e3D_target_allT(idxABS, :, :), dataMatrix(idxABS, 11), zeros(sum(idxABS), 1));
+[nTrials_cov, nORI_cov, nSF_cov] = size(e3D_abs_z);
+e3D_vec = reshape(e3D_abs_z, [nTrials_cov, nORI_cov * nSF_cov]);
+mu_cov_abs = mean(e3D_vec, 1);
+Sigma = cov(e3D_vec - mu_cov_abs, 1);
+
+if isnan(lambda_whiten)
+    W_white_abs = [];
+else
+    Sigma_shrink = (1 - lambda_whiten) * Sigma + lambda_whiten * mean(diag(Sigma)) * eye(size(Sigma, 1));
+    [V, D] = eig((Sigma_shrink + Sigma_shrink') / 2);
+    d = diag(D);
+    d(d < eps_whiten) = eps_whiten;
+    W_white_abs = V * diag(1 ./ sqrt(d)) * V';
+end
+
+Tfix = struct();
+Tfix.normStats = normStats_abs;
+Tfix.mu_cov_abs = mu_cov_abs;
+Tfix.W_white = W_white_abs;
+Tfix.useWhiten = ~isempty(W_white_abs);
+
+% (2) Apply fixed transform to energy of all trials, to prepare for DV computation
+[nTrials, nORI_local, nSF_local] = size(e3D_target_allT);
+e3D_z = nan(size(e3D_target_allT));
+eps_sigma = 1e-8;
+cst_unique = Tfix.normStats.cst_unique(:)';
+for iTrial = 1:nTrials
+    [~, idxC] = min(abs(cst_unique - dataMatrix(iTrial, 11)));
+    mu_i = squeeze(Tfix.normStats.mu_byGroup(idxC, 1, :, :));
+    sd_i = squeeze(Tfix.normStats.sigma_byGroup(idxC, 1, :, :));
+    if any(~isfinite(mu_i(:))) || any(~isfinite(sd_i(:)))
+        mu_i = squeeze(Tfix.normStats.mu_global_3D);
+        sd_i = Tfix.normStats.sigma_global_2D;
+    end
+    sd_i(~isfinite(sd_i) | sd_i < eps_sigma) = eps_sigma;
+    e3D_z(iTrial, :, :) = (squeeze(e3D_target_allT(iTrial, :, :)) - mu_i) ./ sd_i;
+end
+if Tfix.useWhiten
+    Xz = reshape(e3D_z, [nTrials, nORI_local * nSF_local]);
+    Xw = bsxfun(@minus, Xz, Tfix.mu_cov_abs) * Tfix.W_white;
+    e3D_forDV = reshape(Xw, [nTrials, nORI_local, nSF_local]);
+else
+    e3D_forDV = e3D_z;
+end
+
+% (3) Convert template into the same transformed space.
+sigma_vec = Tfix.normStats.sigma_global_2D(:);
+sigma_vec(~isfinite(sigma_vec) | sigma_vec < 1e-8) = 1e-8;
+template_z = template_true(:) .* sigma_vec;
+if Tfix.useWhiten
+    t_trans = Tfix.W_white \ template_z;
+else
+    t_trans = template_z;
+end
+template_forDV = reshape(t_trans, size(template_true));
 
 if flag_regressType == 2
     basisOpts_true = struct();
-    basisOpts_true.nBasisORI = 6;
-    basisOpts_true.nBasisSF = 6;
+    basisOpts_true.nBasisORI = nBasisORI;
+    basisOpts_true.nBasisSF = nBasisSF;
+    basisOpts_true.basisWidthScaleORI = basisWidthORI;
+    basisOpts_true.basisWidthScaleSF = basisWidthSF;
     basisOpts_true.basisFamilyORI = 'vonmises';
     basisOpts_true.basisFamilySF = 'asymGaussianLog2';
-    basisOpts_true.basisWidthScaleORI = 0.9;
-    basisOpts_true.basisWidthScaleSF = 0.6;
     basisOpts_true.asymSF_rightLeftRatio = 1.2;
     basisOpts_true.oriPeriod_deg = 180;
 
@@ -679,81 +737,6 @@ loss = (cSDT- target_cSDT).^2;
 end
 
 %% helper
-function Tfix = buildFixedTransformFromABS(e3D_allT, cst_allT, iPRS_allT, lambda_whiten, eps_whiten)
-idxABS = (iPRS_allT == 0);
-assert(any(idxABS), 'No ABS trials available for transform estimation.');
-
-[e3D_abs_z, normStats_abs] = normEnergy(e3D_allT(idxABS, :, :), cst_allT(idxABS), zeros(sum(idxABS), 1));
-[mu_cov_abs, ~, W_white_abs] = computeWhiteningParams_local(e3D_abs_z, lambda_whiten, eps_whiten);
-
-Tfix = struct();
-Tfix.normStats = normStats_abs;
-Tfix.mu_cov_abs = mu_cov_abs;
-Tfix.W_white = W_white_abs;
-Tfix.useWhiten = ~isempty(W_white_abs);
-end
-
-%% helper
-function e3D_out = applyFixedTransform(e3D_in, cst_in, Tfix)
-[nTrials, nORI, nSF] = size(e3D_in);
-e3D_z = nan(size(e3D_in));
-eps_sigma = 1e-8;
-cst_unique = Tfix.normStats.cst_unique(:)';
-
-for iT = 1:nTrials
-    [~, idxC] = min(abs(cst_unique - cst_in(iT)));
-    mu_i = squeeze(Tfix.normStats.mu_byGroup(idxC, 1, :, :));
-    sd_i = squeeze(Tfix.normStats.sigma_byGroup(idxC, 1, :, :));
-    if any(~isfinite(mu_i(:))) || any(~isfinite(sd_i(:)))
-        mu_i = squeeze(Tfix.normStats.mu_global_3D);
-        sd_i = Tfix.normStats.sigma_global_2D;
-    end
-    sd_i(~isfinite(sd_i) | sd_i < eps_sigma) = eps_sigma;
-    e3D_z(iT, :, :) = (squeeze(e3D_in(iT, :, :)) - mu_i) ./ sd_i;
-end
-
-if Tfix.useWhiten
-    Xz = reshape(e3D_z, [nTrials, nORI * nSF]);
-    Xw = bsxfun(@minus, Xz, Tfix.mu_cov_abs) * Tfix.W_white;
-    e3D_out = reshape(Xw, [nTrials, nORI, nSF]);
-else
-    e3D_out = e3D_z;
-end
-end
-
-%% helper
-function template_transformed = convertTemplateRawToTransformed(template_raw, Tfix)
-sigma_vec = Tfix.normStats.sigma_global_2D(:);
-sigma_vec(~isfinite(sigma_vec) | sigma_vec < 1e-8) = 1e-8;
-t_z = template_raw(:) .* sigma_vec;
-if Tfix.useWhiten
-    t_trans = Tfix.W_white \ t_z;
-else
-    t_trans = t_z;
-end
-template_transformed = reshape(t_trans, size(template_raw));
-end
-
-%% helper
-function [mu_cov, Sigma, W_white] = computeWhiteningParams_local(e3D_norm, lambda_whiten, eps_whiten)
-[nTrials_cov, nOri_cov, nSf_cov] = size(e3D_norm);
-e3D_vec = reshape(e3D_norm, [nTrials_cov, nOri_cov * nSf_cov]);
-mu_cov = mean(e3D_vec, 1);
-Sigma = cov(e3D_vec - mu_cov, 1);
-
-if isnan(lambda_whiten)
-    W_white = [];
-    return;
-end
-
-Sigma_shrink = (1 - lambda_whiten) * Sigma + lambda_whiten * mean(diag(Sigma)) * eye(size(Sigma, 1));
-[V, D] = eig((Sigma_shrink + Sigma_shrink') / 2);
-d = diag(D);
-d(d < eps_whiten) = eps_whiten;
-W_white = V * diag(1 ./ sqrt(d)) * V';
-end
-
-
 %% helper
 function [mu_cov, sigma_cov_2D, e3D_centered] = recenter_e3D(e3D_in, eps_sigma)
 % This function recenters a 3D array e3D_in by subtracting the mean across trials.
