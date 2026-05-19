@@ -52,8 +52,9 @@ fprintf('\n\n%s: Simulation starts\n\n', datetime('now'))
 % Set RNG for reproducibility
 rng(1);
 
-% Add paths for custom functions (client, using absolute paths)
-addpath(genpath('Codes/'));
+% Add paths for custom functions using the function's own location.
+code_root = fileparts(mfilename('fullpath'));
+addpath(genpath(code_root));
 
 % Global RC / NOM settings (defines nORI, nSF, nBins, folders, etc.)
 SX_RC1_setting;
@@ -293,15 +294,21 @@ end
 template_forDV = reshape(t_trans, size(template_true));
 
 if flag_regressType == 2
+    basisCfg_true = SX_RC_getBasisSettings(struct( ...
+        'nBasisORI', nBasisORI, ...
+        'nBasisSF', nBasisSF, ...
+        'basisWidthScaleORI', basisWidthORI, ...
+        'basisWidthScaleSF', basisWidthSF));
+
     basisOpts_true = struct();
-    basisOpts_true.nBasisORI = nBasisORI;
-    basisOpts_true.nBasisSF = nBasisSF;
-    basisOpts_true.basisWidthScaleORI = basisWidthORI;
-    basisOpts_true.basisWidthScaleSF = basisWidthSF;
-    basisOpts_true.basisFamilyORI = 'vonmises';
-    basisOpts_true.basisFamilySF = 'asymGaussianLog2';
-    basisOpts_true.asymSF_rightLeftRatio = 1.2;
-    basisOpts_true.oriPeriod_deg = 180;
+    basisOpts_true.nBasisORI = basisCfg_true.nBasisORI;
+    basisOpts_true.nBasisSF = basisCfg_true.nBasisSF;
+    basisOpts_true.basisWidthScaleORI = basisCfg_true.basisWidthScaleORI;
+    basisOpts_true.basisWidthScaleSF = basisCfg_true.basisWidthScaleSF;
+    basisOpts_true.basisFamilyORI = basisCfg_true.basisFamilyORI;
+    basisOpts_true.basisFamilySF = basisCfg_true.basisFamilySF;
+    basisOpts_true.asymSF_rightLeftRatio = basisCfg_true.asymSF_rightLeftRatio;
+    basisOpts_true.oriPeriod_deg = basisCfg_true.oriPeriod_deg;
 
     Z_true_basis = SX_RC_basisProject(e3D_forDV, filtersOri_all - 90, noise.filtersSF_all_log, basisOpts_true);
     beta_true_basis = SX_RC_basisProject(reshape(template_forDV, [1, nORI, nSF]), filtersOri_all - 90, noise.filtersSF_all_log, basisOpts_true);

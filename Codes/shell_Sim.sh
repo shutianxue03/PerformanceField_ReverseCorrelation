@@ -70,9 +70,13 @@ IFS=$'\t' read -r \
   cSDT_true \
   lambda_whiten \
   iModelB_sim \
-  nIter <<< "${line}"
+  nIter \
+  nBasisORI \
+  basisWidthORI \
+  nBasisSF \
+  basisWidthSF <<< "${line}"
 
-job_name="gCST${gaborCST}_Nm${Nmul_true}_Na${Nadd_true}_Ns${Nshared_true}_Cz${cSDT_true}_Bsim${iModelB_sim}"
+job_name="gCST${gaborCST}_Nm${Nmul_true}_Na${Nadd_true}_Ns${Nshared_true}_Cz${cSDT_true}_Bsim${iModelB_sim}_bORI${nBasisORI}_${basisWidthORI}_bSF${nBasisSF}_${basisWidthSF}"
 
 # -----------------------------
 # Print metadata
@@ -100,7 +104,7 @@ cd "${script_dir}"
 
 module load matlab/2025b
 
-matlab -batch "try, OOD_sim(${noiseCST}, ${gaborCST}, ${nTrials}, ${Nmul_true}, ${Nadd_true}, ${Nshared_true}, ${cSDT_true}, ${lambda_whiten}, ${iModelB_sim}, ${nIter}); catch ME, disp(getReport(ME,'extended')); exit(1); end; exit(0);"
+matlab -batch "try, OOD_sim(${noiseCST}, ${gaborCST}, ${nTrials}, ${Nmul_true}, ${Nadd_true}, ${Nshared_true}, ${cSDT_true}, ${lambda_whiten}, ${iModelB_sim}, ${nIter}, ${nBasisORI}, ${basisWidthORI}, ${nBasisSF}, ${basisWidthSF}); catch ME, disp(getReport(ME,'extended')); exit(1); end; exit(0);"
 
 echo "======================================"
 echo "Finished: $(date)"

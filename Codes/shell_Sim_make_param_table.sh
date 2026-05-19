@@ -15,35 +15,47 @@ mkdir -p "${param_dir}"
 param_file="${param_dir}/OOD_sim_params.tsv"
 
 # Header
-printf "noiseCST\tgaborCST\tnTrials\tNmul_true\tNadd_true\tNshared_true\tcSDT_true\tlambda_whiten\tiModelB_sim\tnIter\n" > "${param_file}"
+printf "noiseCST\tgaborCST\tnTrials\tNmul_true\tNadd_true\tNshared_true\tcSDT_true\tlambda_whiten\tiModelB_sim\tnIter\tnBasisORI\tbasisWidthORI\tnBasisSF\tbasisWidthSF\n" > "${param_file}"
 
-for gaborCST in 0.3 0.4 0.5; do
-  for Nmul_true in 0.5 1 1.5; do
-    for Nadd_true in 0.5 1 1.5; do
-      for Nshared_true in 0.5 1 1.5; do
-        for cSDT_true in -0.2 0 0.2; do
-          for iModelB_sim in 1 2 3 4 5 6 7; do
-            for nIter in 100; do
-              for nTrials in 10000; do
-                for noiseCST in 0.2; do
-                  for lambda_whiten in 0; do
-                    printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" \
-                      "${noiseCST}" \
-                      "${gaborCST}" \
-                      "${nTrials}" \
-                      "${Nmul_true}" \
-                      "${Nadd_true}" \
-                      "${Nshared_true}" \
-                      "${cSDT_true}" \
-                      "${lambda_whiten}" \
-                      "${iModelB_sim}" \
-                      "${nIter}" >> "${param_file}"
+for gaborCST in 0.3; do
+  for Nmul_true in 0.5; do
+    for Nadd_true in 5; do
+      for Nshared_true in 5; do
+        for cSDT_true in 0; do
+          for iModelB_sim in 6; do
+            for nBasisORI in 4 5 6 7 8; do
+              for basisWidthORI in .6 .8 1; do
+                for nBasisSF in 4 5 6 7 8; do
+                  for basisWidthSF in .4 .6 .8; do
+                    for nIter in 100; do
+                      for nTrials in 10000; do
+                        for noiseCST in 0.2; do
+                          for lambda_whiten in 0; do
+                            printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" \
+                              "${noiseCST}" \
+                              "${gaborCST}" \
+                              "${nTrials}" \
+                              "${Nmul_true}" \
+                              "${Nadd_true}" \
+                              "${Nshared_true}" \
+                              "${cSDT_true}" \
+                              "${lambda_whiten}" \
+                              "${iModelB_sim}" \
+                              "${nIter}" \
+                              "${nBasisORI}" \
+                              "${basisWidthORI}" \
+                              "${nBasisSF}" \
+                              "${basisWidthSF}" >> "${param_file}"
+                          done
+                        done
+                      done
+                    done
                   done
                 done
               done
             done
           done
-        done
+          done
       done
     done
   done

@@ -71,29 +71,25 @@ eps_whiten = 1e-3;  % floor for eigenvalues
 % Setting for multivariate regression with smoothing
 % 1=Univariate; 2=MultiSmooth and Univariate
 if flag_regressType == 2
+    basisCfg = SX_RC_getBasisSettings();
+
     opts = struct();
-    % candidateORI = 3:9;
-    % candidateSF = 3:9;
-    candidateORI = 4;
-    candidateSF = 6;
-    % candidateSF = 6:8;
-    % candidateBasisFamilyORI = {'circ_gaussian', 'vonmises'};
-    candidateBasisFamilyORI = {'vonmises'};
-    % candidateBasisFamilySF  = {'gaussianLog2', 'asymGaussianLog2', 'LogParabola', 'asymLogParabola'};
-    candidateBasisFamilySF  = {'asymGaussianLog2'};
-    % candidateRidge  = [0, 10.^(-2:3)];
-    candidateRidge  = 100;
-    opts.basisWidthScaleORI = [0.9]; % set vector to search ORI width scales; typical range: [0.5, 0.9]; higher values = wider basis functions = stronger smoothing
-    opts.basisWidthScaleSF  = [0.6]; % set vector to search SF width scales; typical range: [0.5, 0.9]
-    opts. asymSF_rightLeftRatio = [1.2]; % typical range: [1.1, 1.5]
-    opts.nFolds = 5; % number of folds for cross-validation (CV) to select the best model
-    opts.link = 'probit';
-    opts.sigmaORI_deg = [];
-    opts.sigmaSF_log2 = [];
-    opts.oriPeriod_deg = 180;
-    opts.zscorePredictor = true;
-    opts.maxIter = 100;
-    opts.tol = 1e-6;
+    candidateORI = basisCfg.candidateORI;
+    candidateSF = basisCfg.candidateSF;
+    candidateBasisFamilyORI = {basisCfg.basisFamilyORI};
+    candidateBasisFamilySF = {basisCfg.basisFamilySF};
+    candidateRidge = basisCfg.candidateRidge;
+    opts.basisWidthScaleORI = basisCfg.basisWidthScaleORI; % set vector to search ORI width scales; typical range: [0.5, 0.9]; higher values = wider basis functions = stronger smoothing
+    opts.basisWidthScaleSF = basisCfg.basisWidthScaleSF; % set vector to search SF width scales; typical range: [0.5, 0.9]
+    opts.asymSF_rightLeftRatio = basisCfg.asymSF_rightLeftRatio; % typical range: [1.1, 1.5]
+    opts.nFolds = basisCfg.nFolds; % number of folds for cross-validation (CV) to select the best model
+    opts.link = basisCfg.link;
+    opts.sigmaORI_deg = basisCfg.sigmaORI_deg;
+    opts.sigmaSF_log2 = basisCfg.sigmaSF_log2;
+    opts.oriPeriod_deg = basisCfg.oriPeriod_deg;
+    opts.zscorePredictor = basisCfg.zscorePredictor;
+    opts.maxIter = basisCfg.maxIter;
+    opts.tol = basisCfg.tol;
 end
 
 % Settings for fitting tuning functions
