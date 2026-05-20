@@ -369,25 +369,23 @@ parfor iIter = 1:nIter
 
     % sel for "selected"
     e3D_tmpl_rand_sel = e3D_tmpl_rand(useIdx_tmpl, :, :);
-    cst_tmpl_rand_sel = cst_tmpl_rand(useIdx_tmpl);
     resp_tmpl_rand_sel = resp_tmpl_rand(useIdx_tmpl);
     iPRS_tmpl_rand_sel = iPRS_tmpl_rand(useIdx_tmpl);
 
     e3D_full_rand_sel = e3D_full_rand(useIdx_full, :, :);
-    cst_full_rand_sel = cst_full_rand(useIdx_full);
     resp_full_rand_sel = resp_full_rand(useIdx_full);
     iPRS_full_rand_sel = iPRS_full_rand(useIdx_full);
 
     %% [A1] 2b. Build fixed transform from ABS template trials only
     % Fixed transform per iteration:
-    % raw energy -> contrast-specific ABS z-score -> optional whitening.
-    Tfix = buildFixedTransformFromABS(e3D_tmpl_rand, cst_tmpl_rand, iPRS_tmpl_rand, lambda_whiten, eps_whiten);
+    % raw energy -> global ABS z-score (one mean/SD per channel) -> optional whitening.
+    Tfix = fxn_buildFixedTransformFromABS(e3D_tmpl_rand, iPRS_tmpl_rand, lambda_whiten, eps_whiten);
 
     % Apply the SAME transform to all relevant sets.
-    e3D_tmpl_forRC = applyFixedTransform(e3D_tmpl_rand_sel, cst_tmpl_rand_sel, Tfix);
-    e3D_full_forRC = applyFixedTransform(e3D_full_rand_sel, cst_full_rand_sel, Tfix);
-    e3D_train_forDV = applyFixedTransform(e3D_train_rand, cst_train_rand, Tfix);
-    e3D_test_forDV = applyFixedTransform(e3D_test_rand, cst_test_rand, Tfix);
+    e3D_tmpl_forRC = applyFixedTransform(e3D_tmpl_rand_sel, Tfix);
+    e3D_full_forRC = applyFixedTransform(e3D_full_rand_sel, Tfix);
+    e3D_train_forDV = applyFixedTransform(e3D_train_rand, Tfix);
+    e3D_test_forDV = applyFixedTransform(e3D_test_rand, Tfix);
 
     %% [A1] 3. Estimate template from transformed energy
 
@@ -682,6 +680,7 @@ parfor iIter = 1:nIter
     RT_test_rand = R.RT_test_rand;
 
     %% [A2] 2. Build fixed transform from ABS template trials only
+    % To obtain whitening matrix Q and normalization stats
     [useIdx_full, useIdx_tmpl] = selectTemplateIndices(itype_template, iPRS_full_rand, iPRS_tmpl_rand);
 
     e3D_tmpl_rand_sel = e3D_tmpl_rand(useIdx_tmpl, :, :);
@@ -692,9 +691,9 @@ parfor iIter = 1:nIter
     cst_full_rand_sel = cst_full_rand(useIdx_full);
     iPRS_full_rand_sel = iPRS_full_rand(useIdx_full);
 
-    Tfix = buildFixedTransformFromABS(e3D_tmpl_rand, cst_tmpl_rand, iPRS_tmpl_rand, lambda_whiten, eps_whiten);
-    e3D_train_forDV = applyFixedTransform(e3D_train_rand, cst_train_rand, Tfix);
-    e3D_test_forDV = applyFixedTransform(e3D_test_rand, cst_test_rand, Tfix);
+    Tfix = fxn_buildFixedTransformFromABS(e3D_tmpl_rand, iPRS_tmpl_rand, lambda_whiten, eps_whiten);
+    e3D_train_forDV = applyFixedTransform(e3D_train_rand, Tfix);
+    e3D_test_forDV = applyFixedTransform(e3D_test_rand, Tfix);
 
     %% [A2] 5-8. Metrics, DV, binning (using centered raw energy)
     d_full  = struct('resp', resp_full_rand,  'iPRS', iPRS_full_rand,  'respC', respC_full_rand,  'cst', cst_full_rand,  'RT', RT_full_rand);
@@ -852,75 +851,29 @@ switch itype_template
 end
 end
 
-function [mu_cov, Sigma, W_white] = computeWhiteningParams(e3D_norm, lambda_whiten, eps_whiten)
-% Compute mean/covariance and optional whitening transform in channel space.
-[nTrials_cov, nOri_cov, nSf_cov] = size(e3D_norm);
-e3D_vec = reshape(e3D_norm, [nTrials_cov, nOri_cov * nSf_cov]);
-mu_cov = mean(e3D_vec, 1);
-Sigma = cov(e3D_vec - mu_cov, 1); % population covariance
 
-if isnan(lambda_whiten)
-    W_white = [];
-    return;
-end
 
-Sigma_shrink = (1 - lambda_whiten) * Sigma + lambda_whiten * mean(diag(Sigma)) * eye(size(Sigma, 1));
-[V, D] = eig((Sigma_shrink + Sigma_shrink') / 2);
-d = diag(D);
-d(d < eps_whiten) = eps_whiten;
-W_white = V * diag(1 ./ sqrt(d)) * V';
-end
-
-function Tfix = buildFixedTransformFromABS(e3D_tmpl_rand, cst_tmpl_rand, iPRS_tmpl_rand, lambda_whiten, eps_whiten)
-% Estimate transform parameters from ABS template trials only.
-idxABS = (iPRS_tmpl_rand == 0);
-assert(any(idxABS), 'No ABS trials available for fixed transform estimation.');
-
-[e3D_abs_z, normStats_abs] = normEnergy(e3D_tmpl_rand(idxABS, :, :), cst_tmpl_rand(idxABS), zeros(sum(idxABS), 1));
-[mu_cov_abs, ~, W_white_abs] = computeWhiteningParams(e3D_abs_z, lambda_whiten, eps_whiten);
-
-Tfix = struct();
-Tfix.normStats = normStats_abs;
-Tfix.mu_cov_abs = mu_cov_abs;
-Tfix.W_white = W_white_abs;
-Tfix.useWhiten = ~isempty(W_white_abs);
-end
-
-function e3D_out = applyFixedTransform(e3D_in, cst_in, Tfix)
-% Apply contrast-specific z-scoring (ABS-derived) and optional whitening.
+function e3D_out = applyFixedTransform(e3D_in, Tfix)
+% Apply global ABS z-scoring and optional whitening.
 [nTrials, nORI, nSF] = size(e3D_in);
-e3D_z = nan(size(e3D_in));
-eps_sigma = 1e-8;
-
-cst_unique = Tfix.normStats.cst_unique(:)';
-for iT = 1:nTrials
-    [~, idxC] = min(abs(cst_unique - cst_in(iT)));
-    mu_i = squeeze(Tfix.normStats.mu_byGroup(idxC, 1, :, :));
-    sd_i = squeeze(Tfix.normStats.sigma_byGroup(idxC, 1, :, :));
-    if any(~isfinite(mu_i(:))) || any(~isfinite(sd_i(:)))
-        mu_i = squeeze(Tfix.normStats.mu_global_3D);
-        sd_i = Tfix.normStats.sigma_global_2D;
-    end
-    sd_i(~isfinite(sd_i) | sd_i < eps_sigma) = eps_sigma;
-    e3D_z(iT, :, :) = (squeeze(e3D_in(iT, :, :)) - mu_i) ./ sd_i;
-end
+X = reshape(e3D_in, [nTrials, nORI * nSF]);
+X_z = (X - Tfix.mu_abs) ./ Tfix.sigma_abs;
 
 if Tfix.useWhiten
-    Xz = reshape(e3D_z, [nTrials, nORI * nSF]);
-    Xw = bsxfun(@minus, Xz, Tfix.mu_cov_abs) * Tfix.W_white;
+    Xw = bsxfun(@minus, X_z, Tfix.mu_cov_abs) * Tfix.Q;
     e3D_out = reshape(Xw, [nTrials, nORI, nSF]);
 else
-    e3D_out = e3D_z;
+    e3D_out = reshape(X_z, [nTrials, nORI, nSF]);
 end
 end
 
 function template_transformed = convertTemplateRawToTransformed(template_raw, Tfix)
 % Map raw-centered template into transformed coordinate system.
-sigma_vec = Tfix.normStats.sigma_global_2D(:);
+sigma_vec = Tfix.sigma_abs(:);
 sigma_vec(~isfinite(sigma_vec) | sigma_vec < 1e-8) = 1e-8;
 t_z = template_raw(:) .* sigma_vec;
 if Tfix.useWhiten
-    t_trans = Tfix.W_white \ t_z;
+    t_trans = Tfix.Q \ t_z;
 else
     t_trans = t_z;
 end

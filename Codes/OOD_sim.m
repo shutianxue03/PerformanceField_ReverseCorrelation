@@ -1,4 +1,4 @@
-function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, cSDT_true, lambda_whiten, iModelB_sim, nIter, nBasisORI, basisWidthORI, nBasisSF, basisWidthSF)
+% function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, cSDT_true, lambda_whiten, iModelB_sim, nIter, nBasisORI, basisWidthORI, nBasisSF, basisWidthSF)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Script name: OOD_sim.m
@@ -230,70 +230,113 @@ fprintf('%s: Pass A copied to pass B done.\n\n', datetime('now'))
 
 %% Compute DV in a fixed transformed space
 % Fixed transform estimated from ABS trials:
-% raw energy -> contrast-specific ABS z-score -> optional whitening.
+% raw energy -> global ABS z-score (one mean/SD per channel) -> optional whitening.
 
-% (1) Build fixed transform from ABS trials to obtain whitening matrix
-idxABS = (iPRS_allT == 0);
-assert(any(idxABS), 'No ABS trials available for transform estimation.');
-
-[e3D_abs_z, normStats_abs] = normEnergy(e3D_target_allT(idxABS, :, :), dataMatrix(idxABS, 11), zeros(sum(idxABS), 1));
-[nTrials_cov, nORI_cov, nSF_cov] = size(e3D_abs_z);
-e3D_vec = reshape(e3D_abs_z, [nTrials_cov, nORI_cov * nSF_cov]);
-mu_cov_abs = mean(e3D_vec, 1);
-Sigma = cov(e3D_vec - mu_cov_abs, 1);
-
-if isnan(lambda_whiten)
-    W_white_abs = [];
-else
-    Sigma_shrink = (1 - lambda_whiten) * Sigma + lambda_whiten * mean(diag(Sigma)) * eye(size(Sigma, 1));
-    [V, D] = eig((Sigma_shrink + Sigma_shrink') / 2);
-    d = diag(D);
-    d(d < eps_whiten) = eps_whiten;
-    W_white_abs = V * diag(1 ./ sqrt(d)) * V';
-end
-
-Tfix = struct();
-Tfix.normStats = normStats_abs;
-Tfix.mu_cov_abs = mu_cov_abs;
-Tfix.W_white = W_white_abs;
-Tfix.useWhiten = ~isempty(W_white_abs);
+% (1) Build fixed transform from ABS trials
+% to obtain whitening matrix (Q) + normalization stats (mu, sigma) for each channel.
+Tfix = fxn_buildFixedTransformFromABS(e3D_target_allT, iPRS_allT, lambda_whiten, eps_whiten);
 
 % (2) Apply fixed transform to energy of all trials, to prepare for DV computation
 [nTrials, nORI_local, nSF_local] = size(e3D_target_allT);
-e3D_z = nan(size(e3D_target_allT));
-eps_sigma = 1e-8;
-cst_unique = Tfix.normStats.cst_unique(:)';
-for iTrial = 1:nTrials
-    [~, idxC] = min(abs(cst_unique - dataMatrix(iTrial, 11)));
-    mu_i = squeeze(Tfix.normStats.mu_byGroup(idxC, 1, :, :));
-    sd_i = squeeze(Tfix.normStats.sigma_byGroup(idxC, 1, :, :));
-    if any(~isfinite(mu_i(:))) || any(~isfinite(sd_i(:)))
-        mu_i = squeeze(Tfix.normStats.mu_global_3D);
-        sd_i = Tfix.normStats.sigma_global_2D;
-    end
-    sd_i(~isfinite(sd_i) | sd_i < eps_sigma) = eps_sigma;
-    e3D_z(iTrial, :, :) = (squeeze(e3D_target_allT(iTrial, :, :)) - mu_i) ./ sd_i;
-end
-if Tfix.useWhiten
-    Xz = reshape(e3D_z, [nTrials, nORI_local * nSF_local]);
-    Xw = bsxfun(@minus, Xz, Tfix.mu_cov_abs) * Tfix.W_white;
-    e3D_forDV = reshape(Xw, [nTrials, nORI_local, nSF_local]);
-else
-    e3D_forDV = e3D_z;
-end
+e3D_allT = reshape(e3D_target_allT, [nTrials, nORI_local * nSF_local]);
+% To z-score
+e3D_allT_z = (e3D_allT - Tfix.mu_abs) ./ Tfix.sigma_abs;
+% To whiten
+e3D_allT_whitened = e3D_allT_z * Tfix.Q;
+e3D_forDV = reshape(e3D_allT_whitened, [nTrials, nORI_local, nSF_local]);
 
+%% Sanity check: fixed transform correctness
+idxABS_check = (iPRS_allT == 0);
+X_abs = reshape(e3D_forDV(idxABS_check, :, :), [sum(idxABS_check), nORI_local * nSF_local]);
+X_prs = reshape(e3D_forDV(~idxABS_check, :, :), [sum(~idxABS_check), nORI_local * nSF_local]);
+
+figure('Position', [100 100 1000 400]);
+
+% --- Check 2: ABS-trial covariance ≈ identity ---
+C_abs = cov(X_abs);                          % should be ~I after whitening
+diag_vals    = diag(C_abs);
+offdiag_vals = C_abs(~logical(eye(size(C_abs, 1))));
+
+subplot(1, 2, 1);
+histogram(diag_vals, 20, 'FaceColor', [0.2 0.5 0.8]);
+xline(1, 'r--', 'LineWidth', 1.5);
+xlabel('Diagonal value'); ylabel('Count');
+title(sprintf('Diag: mean=%.3f, sd=%.3f\nShould concentrate at 1', mean(diag_vals), std(diag_vals)));
+
+subplot(1, 2, 2);
+histogram(offdiag_vals, 50, 'FaceColor', [0.7 0.4 0.2]);
+xline(0, 'r--', 'LineWidth', 1.5);
+xlabel('Off-diagonal value'); ylabel('Count');
+title(sprintf('Off-diag: mean=%.3f, sd=%.3f\nShould concentrate at 0', mean(offdiag_vals), std(offdiag_vals)));
+
+sgtitle('ABS-trial Covariance Check', 'Interpreter', 'none');
+
+%% Sanity check: Compute eigenvalues of actual ABS covariance in whitened space
+Xz_abs = reshape(e3D_z(iPRS_allT==0,:,:), [sum(iPRS_allT==0), nORI_local*nSF_local]);
+Xz_abs_c = bsxfun(@minus, Xz_abs, Tfix.mu_cov_abs);
+[V_check, D_check] = eig(cov(Xz_abs_c, 1));
+d_check = diag(D_check);
+
+% After whitening, variance in each eigendirection = d_i / max(d_i, eps_whiten)
+post_whiten_var = d_check ./ max(d_check, eps_whiten);
+
+figure;
+subplot(1,2,1);
+histogram(d_check, 50); xline(eps_whiten, 'r--');
+xlabel('Eigenvalue of Sigma'); title('Many below eps\_whiten floor (red)');
+
+subplot(1,2,2);
+histogram(post_whiten_var, 50); xline(1, 'r--');
+xlabel('Post-whitening variance per eigendirection');
+title('Should cluster at 1 (floored dirs < 1)');
+
+
+%%
 % (3) Convert template into the same transformed space.
-sigma_vec = Tfix.normStats.sigma_global_2D(:);
+sigma_vec = Tfix.sigma_abs(:);
 sigma_vec(~isfinite(sigma_vec) | sigma_vec < 1e-8) = 1e-8;
 template_z = template_true(:) .* sigma_vec;
 if Tfix.useWhiten
-    t_trans = Tfix.W_white \ template_z;
+    t_trans = Tfix.Q \ template_z;
 else
     t_trans = template_z;
 end
 template_forDV = reshape(t_trans, size(template_true));
 
-if flag_regressType == 2
+%% Visualize template in the original vs transformed space
+figure,
+% Scale the transformed template back to the same max as the original template for better visualization; this scaling does not affect the DV since it's just a constant factor.
+template_forDV_scaled = template_forDV / max(template_forDV(:)) * max(template_true(:));
+margORI_true = mean(template_true, 2);
+margORI_forDV = mean(template_forDV, 2);
+margORI_forDV_scaled = margORI_forDV / max(margORI_forDV(:)) * max(margORI_true(:));
+margSF_true = mean(template_true, 1);
+margSF_forDV = mean(template_forDV, 1);
+margSF_forDV_scaled = margSF_forDV / max(margSF_forDV(:)) * max(margSF_true(:));
+
+% Row 1: 2D template;
+subplot(3,3,1), imagesc(template_true), colorbar, title('Ground-truth template (no scaling)')
+subplot(3,3,2), imagesc(template_forDV_scaled), colorbar, title('Transformed template (no further scaling)')
+subplot(3,3,3), imagesc(template_true - template_forDV_scaled), colorbar, title('Difference')
+% Row 2: ORI tuning curve (averaged across SF)
+subplot(3,3,5), hold on
+plot(axis_tuning{1}, margORI_true, '-r')
+plot(axis_tuning{1}, margORI_forDV_scaled, 'k--')
+xticks(axisTicks_tuning{1})
+title('Mean(true template, 2) and scaled template for DV')
+subplot(3,3,6), plot(axis_tuning{1}, margORI_true-margORI_forDV_scaled), xticks(axisTicks_tuning{1}), ylim([-.1, .1])
+title('Difference')
+% Row 3: SF tuning curve (averaged across SF)
+subplot(3,3,8), hold on
+plot(axis_tuning{2}, margSF_true, '-r'),
+plot(axis_tuning{2}, margSF_forDV_scaled, 'k--')
+xticks(axisTicks_tuning{2})
+subplot(3,3,9), plot(axis_tuning{2}, margSF_true-margSF_forDV_scaled), xticks(axisTicks_tuning{2}), ylim([-.1, .1])
+
+% Results: whitened template is slightly wider than the raw template
+
+%% Project whitened energy and template onto the basis functions
+
     basisCfg_true = SX_RC_getBasisSettings(struct( ...
         'nBasisORI', nBasisORI, ...
         'nBasisSF', nBasisSF, ...
@@ -310,20 +353,21 @@ if flag_regressType == 2
     basisOpts_true.asymSF_rightLeftRatio = basisCfg_true.asymSF_rightLeftRatio;
     basisOpts_true.oriPeriod_deg = basisCfg_true.oriPeriod_deg;
 
+    %------------------%
     Z_true_basis = SX_RC_basisProject(e3D_forDV, filtersOri_all - 90, noise.filtersSF_all_log, basisOpts_true);
+    %------------------%
+    %------------------%
     beta_true_basis = SX_RC_basisProject(reshape(template_forDV, [1, nORI, nSF]), filtersOri_all - 90, noise.filtersSF_all_log, basisOpts_true);
+    %------------------%
+
+    %% Compute DV from the basis representation
     DV_target_sim_allT = Z_true_basis * beta_true_basis(:);
     dv_space_used = 'zscore_absContrast_whiten_basis';
-else
-    beta_true_basis = [];
-    basisOpts_true = struct();
-    DV_target_sim_allT = fxn_getDV_v3(e3D_forDV, template_forDV, convolveType_true, DVType_true, flag_permT, [1, nORI]);
-    dv_space_used = 'zscore_absContrast_whiten_channel';
-end
 
+    % Store Q, mu and signal for both
 mu_cov_DV = Tfix.mu_cov_abs;
 sigma_cov_DV = Tfix.normStats.sigma_global_2D;
-W_white_DV = Tfix.W_white;
+W_white_DV = Tfix.Q;
 template_space_true = 'fixed_transformed';
 
 assert(~any(isnan(DV_target_sim_allT)), 'DV_target contains NaN');
@@ -505,133 +549,133 @@ fprintf('%s: Simulation done.\n\n', time_end)
 elapsed = time_end - time_start;
 fprintf('Time used: %s\n\n\n\n', char(elapsed));
 
-end % end of the OOD_sim function
+% end % end of the OOD_sim function
 
 %% helper
-function plot_fit_model_comparison(nameFolder_Data_NOM_IO, nameFolder_Figures_perSubj, nameIO, ...
-    iModelA_fit_all, iModelB_fit_all, namesModelA, namesModelB, namesModelBparams_short, ...
-    nIter, iJob, iLocComb, iModelB_sim, ...
-    Nmul_true, Nadd_true, Nshared_true, criterion_DV_true)
-% This helpder function summarizes the model comparison results across all fitted A/B models, and plots the summary.
-metricNames = {'pYES', 'pC', 'pA'};
-metricLabels = {'pYES', 'pC', 'pA'};
-paramNames = {'Nmul', 'Nadd', 'Nshared', 'criterion_DV'};
-paramLabels = {'Nmul', 'Nadd', 'Nshared', 'criterion DV'};
+% function plot_fit_model_comparison(nameFolder_Data_NOM_IO, nameFolder_Figures_perSubj, nameIO, ...
+%     iModelA_fit_all, iModelB_fit_all, namesModelA, namesModelB, namesModelBparams_short, ...
+%     nIter, iJob, iLocComb, iModelB_sim, ...
+%     Nmul_true, Nadd_true, Nshared_true, criterion_DV_true)
+% % This helpder function summarizes the model comparison results across all fitted A/B models, and plots the summary.
+% metricNames = {'pYES', 'pC', 'pA'};
+% metricLabels = {'pYES', 'pC', 'pA'};
+% paramNames = {'Nmul', 'Nadd', 'Nshared', 'criterion_DV'};
+% paramLabels = {'Nmul', 'Nadd', 'Nshared', 'criterion DV'};
 
-nA = numel(iModelA_fit_all);
-nB = numel(iModelB_fit_all);
+% nA = numel(iModelA_fit_all);
+% nB = numel(iModelB_fit_all);
 
-summaryA = repmat(struct( ...
-    'winRate', nan(1, nB), ...
-    'deltaNLL', nan(1, nB), ...
-    'metricRMSE', nan(nB, numel(metricNames)), ...
-    'paramRMSE', nan(nB, numel(paramNames)), ...
-    'nValidIter', 0), nA, 1);
+% summaryA = repmat(struct( ...
+%     'winRate', nan(1, nB), ...
+%     'deltaNLL', nan(1, nB), ...
+%     'metricRMSE', nan(nB, numel(metricNames)), ...
+%     'paramRMSE', nan(nB, numel(paramNames)), ...
+%     'nValidIter', 0), nA, 1);
 
-trueParamVals = [Nmul_true, Nadd_true, Nshared_true, criterion_DV_true];
+% trueParamVals = [Nmul_true, Nadd_true, Nshared_true, criterion_DV_true];
 
-for iA = 1:nA
-    iModelA_fit = iModelA_fit_all(iA);
-    nLL_test_byModel = nan(nIter, nB);
+% for iA = 1:nA
+%     iModelA_fit = iModelA_fit_all(iA);
+%     nLL_test_byModel = nan(nIter, nB);
 
-    for iB = 1:nB
-        iModelB_fit = iModelB_fit_all(iB);
-        nameFile_fitNOM = sprintf('%s/n%d_J%d_A%dB%d.mat', ...
-            nameFolder_Data_NOM_IO, nIter, iJob, iModelA_fit, iModelB_fit);
+%     for iB = 1:nB
+%         iModelB_fit = iModelB_fit_all(iB);
+%         nameFile_fitNOM = sprintf('%s/n%d_J%d_A%dB%d.mat', ...
+%             nameFolder_Data_NOM_IO, nIter, iJob, iModelA_fit, iModelB_fit);
 
-        if ~exist(nameFile_fitNOM, 'file')
-            continue
-        end
+%         if ~exist(nameFile_fitNOM, 'file')
+%             continue
+%         end
 
-        S_fit = load(nameFile_fitNOM, 'nLL_test_allIter', 'pred_metrics_allIter', 'params_est_allIter');
+%         S_fit = load(nameFile_fitNOM, 'nLL_test_allIter', 'pred_metrics_allIter', 'params_est_allIter');
 
-        if isfield(S_fit, 'nLL_test_allIter') && ~isempty(S_fit.nLL_test_allIter)
-            nCopy = min(nIter, numel(S_fit.nLL_test_allIter));
-            nLL_test_byModel(1:nCopy, iB) = S_fit.nLL_test_allIter(1:nCopy);
-        end
+%         if isfield(S_fit, 'nLL_test_allIter') && ~isempty(S_fit.nLL_test_allIter)
+%             nCopy = min(nIter, numel(S_fit.nLL_test_allIter));
+%             nLL_test_byModel(1:nCopy, iB) = S_fit.nLL_test_allIter(1:nCopy);
+%         end
 
-        if isfield(S_fit, 'pred_metrics_allIter') && ~isempty(S_fit.pred_metrics_allIter)
-            for iMetric = 1:numel(metricNames)
-                rmse_iter = metric_recovery_iter(S_fit.pred_metrics_allIter, metricNames{iMetric});
-                summaryA(iA).metricRMSE(iB, iMetric) = median(rmse_iter(isfinite(rmse_iter)), 'omitnan');
-            end
-        end
+%         if isfield(S_fit, 'pred_metrics_allIter') && ~isempty(S_fit.pred_metrics_allIter)
+%             for iMetric = 1:numel(metricNames)
+%                 rmse_iter = metric_recovery_iter(S_fit.pred_metrics_allIter, metricNames{iMetric});
+%                 summaryA(iA).metricRMSE(iB, iMetric) = median(rmse_iter(isfinite(rmse_iter)), 'omitnan');
+%             end
+%         end
 
-        if isfield(S_fit, 'params_est_allIter') && ~isempty(S_fit.params_est_allIter)
-            paramRMSE_thisModel = compute_param_rmse_by_model( ...
-                S_fit.params_est_allIter, namesModelBparams_short{iModelB_fit}, paramNames, trueParamVals);
-            summaryA(iA).paramRMSE(iB, :) = paramRMSE_thisModel;
-        end
-    end
+%         if isfield(S_fit, 'params_est_allIter') && ~isempty(S_fit.params_est_allIter)
+%             paramRMSE_thisModel = compute_param_rmse_by_model( ...
+%                 S_fit.params_est_allIter, namesModelBparams_short{iModelB_fit}, paramNames, trueParamVals);
+%             summaryA(iA).paramRMSE(iB, :) = paramRMSE_thisModel;
+%         end
+%     end
 
-    [summaryA(iA).winRate, summaryA(iA).deltaNLL, summaryA(iA).nValidIter] = summarize_nll_compare(nLL_test_byModel);
-end
+%     [summaryA(iA).winRate, summaryA(iA).deltaNLL, summaryA(iA).nValidIter] = summarize_nll_compare(nLL_test_byModel);
+% end
 
-figPos = [100, 100, 1300, 1100];
-figure('Position', figPos);
-tiledlayout(4, nA, 'TileSpacing', 'compact', 'Padding', 'compact');
+% figPos = [100, 100, 1300, 1100];
+% figure('Position', figPos);
+% tiledlayout(4, nA, 'TileSpacing', 'compact', 'Padding', 'compact');
 
-metricColors = [0.25 0.45 0.75; 0.20 0.65 0.35; 0.80 0.35 0.20];
-paramColors = [0.20 0.45 0.75; 0.20 0.70 0.55; 0.80 0.55 0.20; 0.55 0.35 0.75];
-xTicks = 1:nB;
-xLabels = cellfun(@(x) char(string(x)), namesModelB(iModelB_fit_all), 'UniformOutput', false);
+% metricColors = [0.25 0.45 0.75; 0.20 0.65 0.35; 0.80 0.35 0.20];
+% paramColors = [0.20 0.45 0.75; 0.20 0.70 0.55; 0.80 0.55 0.20; 0.55 0.35 0.75];
+% xTicks = 1:nB;
+% xLabels = cellfun(@(x) char(string(x)), namesModelB(iModelB_fit_all), 'UniformOutput', false);
 
-for iA = 1:nA
-    S = summaryA(iA);
+% for iA = 1:nA
+%     S = summaryA(iA);
 
-    nexttile(iA); hold on;
-    bar(xTicks, S.winRate, 0.75, 'FaceColor', [0.55 0.55 0.55], 'EdgeColor', 'none');
-    ylim([0 1]);
-    xlim([0.4 nB + 0.6]);
-    set(gca, 'XTick', xTicks, 'XTickLabel', xLabels, 'XTickLabelRotation', 0);
-    ylabel('Win rate');
-    title(sprintf('A%d %s', iModelA_fit_all(iA), namesModelA{iModelA_fit_all(iA)}), 'Interpreter', 'none');
-    box on;
+%     nexttile(iA); hold on;
+%     bar(xTicks, S.winRate, 0.75, 'FaceColor', [0.55 0.55 0.55], 'EdgeColor', 'none');
+%     ylim([0 1]);
+%     xlim([0.4 nB + 0.6]);
+%     set(gca, 'XTick', xTicks, 'XTickLabel', xLabels, 'XTickLabelRotation', 0);
+%     ylabel('Win rate');
+%     title(sprintf('A%d %s', iModelA_fit_all(iA), namesModelA{iModelA_fit_all(iA)}), 'Interpreter', 'none');
+%     box on;
 
-    nexttile(nA + iA); hold on;
-    bar(xTicks, S.deltaNLL, 0.75, 'FaceColor', [0.55 0.55 0.55], 'EdgeColor', 'none');
-    xlim([0.4 nB + 0.6]);
-    set(gca, 'XTick', xTicks, 'XTickLabel', xLabels, 'XTickLabelRotation', 0);
-    ylabel('\Delta nLL from best');
-    box on;
+%     nexttile(nA + iA); hold on;
+%     bar(xTicks, S.deltaNLL, 0.75, 'FaceColor', [0.55 0.55 0.55], 'EdgeColor', 'none');
+%     xlim([0.4 nB + 0.6]);
+%     set(gca, 'XTick', xTicks, 'XTickLabel', xLabels, 'XTickLabelRotation', 0);
+%     ylabel('\Delta nLL from best');
+%     box on;
 
-    nexttile(2*nA + iA); hold on;
-    hb = bar(S.metricRMSE, 'grouped');
-    for iMetric = 1:numel(hb)
-        hb(iMetric).FaceColor = metricColors(iMetric, :);
-        hb(iMetric).EdgeColor = 'none';
-    end
-    xlim([0.4 nB + 0.6]);
-    set(gca, 'XTick', xTicks, 'XTickLabel', xLabels, 'XTickLabelRotation', 0);
-    ylabel('Metric RMSE');
-    box on;
-    if iA == nA
-        legend(metricLabels, 'Location', 'best', 'Box', 'off');
-    end
+%     nexttile(2*nA + iA); hold on;
+%     hb = bar(S.metricRMSE, 'grouped');
+%     for iMetric = 1:numel(hb)
+%         hb(iMetric).FaceColor = metricColors(iMetric, :);
+%         hb(iMetric).EdgeColor = 'none';
+%     end
+%     xlim([0.4 nB + 0.6]);
+%     set(gca, 'XTick', xTicks, 'XTickLabel', xLabels, 'XTickLabelRotation', 0);
+%     ylabel('Metric RMSE');
+%     box on;
+%     if iA == nA
+%         legend(metricLabels, 'Location', 'best', 'Box', 'off');
+%     end
 
-    nexttile(3*nA + iA); hold on;
-    hb = bar(S.paramRMSE, 'grouped');
-    for iParam = 1:numel(hb)
-        hb(iParam).FaceColor = paramColors(iParam, :);
-        hb(iParam).EdgeColor = 'none';
-    end
-    xlim([0.4 nB + 0.6]);
-    set(gca, 'XTick', xTicks, 'XTickLabel', xLabels, 'XTickLabelRotation', 0);
-    ylabel('Parameter RMSE');
-    xlabel('Fitting model');
-    box on;
-    if iA == nA
-        legend(paramLabels, 'Location', 'best', 'Box', 'off');
-    end
-end
+%     nexttile(3*nA + iA); hold on;
+%     hb = bar(S.paramRMSE, 'grouped');
+%     for iParam = 1:numel(hb)
+%         hb(iParam).FaceColor = paramColors(iParam, :);
+%         hb(iParam).EdgeColor = 'none';
+%     end
+%     xlim([0.4 nB + 0.6]);
+%     set(gca, 'XTick', xTicks, 'XTickLabel', xLabels, 'XTickLabelRotation', 0);
+%     ylabel('Parameter RMSE');
+%     xlabel('Fitting model');
+%     box on;
+%     if iA == nA
+%         legend(paramLabels, 'Location', 'best', 'Box', 'off');
+%     end
+% end
 
-sgtitle(sprintf(['Model comparison across fitted B models\n' ...
-    '%s | Bsim=%d | L%d | nIter=%d'], ...
-    nameIO, iModelB_sim, iLocComb, nIter), 'Interpreter', 'none');
+% sgtitle(sprintf(['Model comparison across fitted B models\n' ...
+%     '%s | Bsim=%d | L%d | nIter=%d'], ...
+%     nameIO, iModelB_sim, iLocComb, nIter), 'Interpreter', 'none');
 
-saveas(gcf, sprintf('%s/3Summary.jpg', nameFolder_Figures_perSubj));
-close(gcf);
-end
+% saveas(gcf, sprintf('%s/3Summary.jpg', nameFolder_Figures_perSubj));
+% close(gcf);
+% end
 
 %% helper
 function [winRate, deltaNLL, nValidIter] = summarize_nll_compare(nLL_test_byModel)
@@ -743,92 +787,92 @@ cSDT = -0.5 * (norminv(pHit) + norminv(pFA));
 loss = (cSDT- target_cSDT).^2;
 end
 
-%% helper
-%% helper
-function [mu_cov, sigma_cov_2D, e3D_centered] = recenter_e3D(e3D_in, eps_sigma)
-% This function recenters a 3D array e3D_in by subtracting the mean across trials.
-% It also computes the standard deviation for each element, ensuring a minimum value of eps_sigma.
-[nTrials, nORI, nSF] = size(e3D_in);
-X = reshape(e3D_in, [nTrials, nORI * nSF]);
-mu_cov = mean(X, 1);
-X_centered = X - mu_cov;
+% %% helper
+% %% helper
+% function [mu_cov, sigma_cov_2D, e3D_centered] = recenter_e3D(e3D_in, eps_sigma)
+% % This function recenters a 3D array e3D_in by subtracting the mean across trials.
+% % It also computes the standard deviation for each element, ensuring a minimum value of eps_sigma.
+% [nTrials, nORI, nSF] = size(e3D_in);
+% X = reshape(e3D_in, [nTrials, nORI * nSF]);
+% mu_cov = mean(X, 1);
+% X_centered = X - mu_cov;
 
-sigma_cov = std(X, [], 1);
-sigma_cov(~isfinite(sigma_cov) | sigma_cov < eps_sigma) = eps_sigma;
-sigma_cov_2D = reshape(sigma_cov, [nORI, nSF]);
+% sigma_cov = std(X, [], 1);
+% sigma_cov(~isfinite(sigma_cov) | sigma_cov < eps_sigma) = eps_sigma;
+% sigma_cov_2D = reshape(sigma_cov, [nORI, nSF]);
 
-e3D_centered = reshape(X_centered, [nTrials, nORI, nSF]);
-end
-
-%% helper
-function W_white = build_whitening_matrix(e3D_centered, lambda_whiten, eps_whiten)
-% This function builds a whitening matrix W_white based on the covariance of the centered 3D data.
-% It applies shrinkage to the covariance matrix to ensure numerical stability, and then computes the whitening transformation.
-[nTrials, nORI, nSF] = size(e3D_centered);
-X_centered = reshape(e3D_centered, [nTrials, nORI * nSF]);
-
-Sigma = cov(X_centered, 1);
-Sigma_shrink = (1 - lambda_whiten) * Sigma + lambda_whiten * mean(diag(Sigma)) * eye(size(Sigma, 1));
-Sigma_sym = (Sigma_shrink + Sigma_shrink') / 2;
-
-[V, D] = eig(Sigma_sym);
-d = diag(D);
-d(~isfinite(d) | d < eps_whiten) = eps_whiten;
-W_white = V * diag(1 ./ sqrt(d)) * V';
-end
+% e3D_centered = reshape(X_centered, [nTrials, nORI, nSF]);
+% end
 
 %% helper
-function e3D_out = apply_linear_transform_e3D(e3D_centered, W)
-% This function applies a linear transformation W to the centered 3D data e3D_centered.
-% The transformation is applied to the trial dimension, and the output is reshaped back to the original 3D format.
-[nTrials, nORI, nSF] = size(e3D_centered);
-X = reshape(e3D_centered, [nTrials, nORI * nSF]);
-X_out = X * W;
-e3D_out = reshape(X_out, [nTrials, nORI, nSF]);
-end
+% function W_white = build_whitening_matrix(e3D_centered, lambda_whiten, eps_whiten)
+% % This function builds a whitening matrix W_white based on the covariance of the centered 3D data.
+% % It applies shrinkage to the covariance matrix to ensure numerical stability, and then computes the whitening transformation.
+% [nTrials, nORI, nSF] = size(e3D_centered);
+% X_centered = reshape(e3D_centered, [nTrials, nORI * nSF]);
 
-%% helper
-function template_out = convert_template_space(template_in, fromSpace, toSpace, sigma_cov_2D, W_white, eps_sigma)
-% This function converts a template from one space to another.
-% Supported spaces: 'raw_centered', 'z', 'white'.
-template_vec = template_in(:);
+% Sigma = cov(X_centered, 1);
+% Sigma_shrink = (1 - lambda_whiten) * Sigma + lambda_whiten * mean(diag(Sigma)) * eye(size(Sigma, 1));
+% Sigma_sym = (Sigma_shrink + Sigma_shrink') / 2;
 
-if strcmp(fromSpace, toSpace)
-    template_out = template_in;
-    return;
-end
+% [V, D] = eig(Sigma_sym);
+% d = diag(D);
+% d(~isfinite(d) | d < eps_whiten) = eps_whiten;
+% W_white = V * diag(1 ./ sqrt(d)) * V';
+% end
 
-switch fromSpace
-    case 'raw_centered'
-        template_raw = template_vec;
-    case 'z'
-        sigma_vec = sigma_cov_2D(:);
-        sigma_vec(~isfinite(sigma_vec) | sigma_vec < eps_sigma) = eps_sigma;
-        template_raw = template_vec ./ sigma_vec;
-    case 'white'
-        if isempty(W_white)
-            error('W_white is required to convert from white to raw_centered.');
-        end
-        template_raw = W_white * template_vec;
-    otherwise
-        error('Unknown template space: %s', fromSpace);
-end
+% %% helper
+% function e3D_out = apply_linear_transform_e3D(e3D_centered, W)
+% % This function applies a linear transformation W to the centered 3D data e3D_centered.
+% % The transformation is applied to the trial dimension, and the output is reshaped back to the original 3D format.
+% [nTrials, nORI, nSF] = size(e3D_centered);
+% X = reshape(e3D_centered, [nTrials, nORI * nSF]);
+% X_out = X * W;
+% e3D_out = reshape(X_out, [nTrials, nORI, nSF]);
+% end
 
-switch toSpace
-    case 'raw_centered'
-        template_vec_out = template_raw;
-    case 'z'
-        sigma_vec = sigma_cov_2D(:);
-        sigma_vec(~isfinite(sigma_vec) | sigma_vec < eps_sigma) = eps_sigma;
-        template_vec_out = template_raw .* sigma_vec;
-    case 'white'
-        if isempty(W_white)
-            error('W_white is required to convert from raw_centered to white.');
-        end
-        template_vec_out = W_white \ template_raw;
-    otherwise
-        error('Unknown target template space: %s', toSpace);
-end
+% %% helper
+% function template_out = convert_template_space(template_in, fromSpace, toSpace, sigma_cov_2D, W_white, eps_sigma)
+% % This function converts a template from one space to another.
+% % Supported spaces: 'raw_centered', 'z', 'white'.
+% template_vec = template_in(:);
 
-template_out = reshape(template_vec_out, size(template_in));
-end
+% if strcmp(fromSpace, toSpace)
+%     template_out = template_in;
+%     return;
+% end
+
+% switch fromSpace
+%     case 'raw_centered'
+%         template_raw = template_vec;
+%     case 'z'
+%         sigma_vec = sigma_cov_2D(:);
+%         sigma_vec(~isfinite(sigma_vec) | sigma_vec < eps_sigma) = eps_sigma;
+%         template_raw = template_vec ./ sigma_vec;
+%     case 'white'
+%         if isempty(W_white)
+%             error('W_white is required to convert from white to raw_centered.');
+%         end
+%         template_raw = W_white * template_vec;
+%     otherwise
+%         error('Unknown template space: %s', fromSpace);
+% end
+
+% switch toSpace
+%     case 'raw_centered'
+%         template_vec_out = template_raw;
+%     case 'z'
+%         sigma_vec = sigma_cov_2D(:);
+%         sigma_vec(~isfinite(sigma_vec) | sigma_vec < eps_sigma) = eps_sigma;
+%         template_vec_out = template_raw .* sigma_vec;
+%     case 'white'
+%         if isempty(W_white)
+%             error('W_white is required to convert from raw_centered to white.');
+%         end
+%         template_vec_out = W_white \ template_raw;
+%     otherwise
+%         error('Unknown target template space: %s', toSpace);
+% end
+
+% template_out = reshape(template_vec_out, size(template_in));
+% end
