@@ -22,6 +22,7 @@ set(0, 'DefaultFigureVisible', 'off');
 %% settings
 flag_whitenDV = 1; % NEEDED for SX_RC1_setting!!
 str_part = sprintf('whitenDV%d', flag_whitenDV); % <-- change if needed
+str_part = '0519Hyperparams';
 iModelA_fit = [1]; %1=use data-derived template; 2=use true template
 nBfit = 7;          % number of B-model variants to evaluate (each uses a different internal-noise structure)
 nBins_Part4 = 3; % define bins for collapsing parameter recovery points; use 3 for main text, 5 for Supp
@@ -39,7 +40,7 @@ if isempty(dir(nameFolder_Output)), mkdir(nameFolder_Output), end
 
 namesMetrics_behav = {'pYES','pC','pA'};
 
-% find IO folders
+%% find IO folders
 if ~exist(nameFile_R, 'file')
 
     nameDir = dir(nameFolder_Data_NOM_Trialwise);
@@ -644,6 +645,345 @@ setting.lineStyles_fit = setting.lineStyles_fit(1:numel(Bfit_unik));
 % figure section can be run independently after this point.
 R = fxn_attach_medians_from_iter(R, namesMetrics_behav);
 fprintf('\n%s: Median/CI fields extracted for all metrics.\n', string(datetime('now')))
+
+%% Temporary check: Basis-hyperparameter combos vs template-estimation nLL
+% This is a standalone diagnostic block. It does not change any core outputs.
+% It is designed to run with only the setup code above "%% find IO folders".
+fprintf('\n%s: Fig temp: Hyperparameters combo...', string(datetime('now')))
+
+iModelA_tmp = iModelA_fit(1);
+
+% Standalone-safe output paths (do not depend on later plotting sections).
+if ~exist('nameFolder_Output', 'var') || isempty(nameFolder_Output)
+    error('nameFolder_Output is undefined. Run the setup code above "%% find IO folders" first.');
+end
+if ~exist(nameFolder_Output, 'dir')
+    mkdir(nameFolder_Output);
+end
+
+if ~exist('nameFolder_Figures', 'var') || isempty(nameFolder_Figures)
+    nameFolder_Figures_tmp = nameFolder_Output;
+else
+    nameFolder_Figures_tmp = fullfile(nameFolder_Figures, sprintf('IO_%s_A%d', str_part, iModelA_tmp));
+    if ~exist(nameFolder_Figures_tmp, 'dir')
+        mkdir(nameFolder_Figures_tmp);
+    end
+end
+
+folderInfo_tmp = dir(nameFolder_Data_NOM_Trialwise);
+folderInfo_tmp = folderInfo_tmp([folderInfo_tmp.isdir]);
+folderInfo_tmp = folderInfo_tmp(~ismember({folderInfo_tmp.name}, {'.', '..'}));
+
+T_tmp = table();
+comboPlot_tmp = struct('combo', {}, 'nameIO', {}, 'nBasisORI', {}, 'basisWidthORI', {}, ...
+    'nBasisSF', {}, 'basisWidthSF', {}, 'margORI_true', {}, 'margSF_true', {}, ...
+    'margORI_est_med', {}, 'margSF_est_med', {});
+
+for iFold_tmp = 1:numel(folderInfo_tmp)
+    fprintf('%d/%d\n', iFold_tmp, numel(folderInfo_tmp))
+    nameIO_tmp = folderInfo_tmp(iFold_tmp).name;
+    folderNOM_tmp = fullfile(folderInfo_tmp(iFold_tmp).folder, folderInfo_tmp(iFold_tmp).name);
+    folderOOD_tmp = fullfile(nameFolder_Data_OOD, nameIO_tmp);
+
+    nBasisORI_tmp = parse_num_from_name_basisRelevant(nameIO_tmp, 'nBasisORI');
+    nBasisSF_tmp = parse_num_from_name_basisRelevant(nameIO_tmp, 'nBasisSF');
+    basisWidthORI_tmp = parse_num_from_name_basisRelevant(nameIO_tmp, 'basisWidthORI');
+    basisWidthSF_tmp = parse_num_from_name_basisRelevant(nameIO_tmp, 'basisWidthSF');
+
+    fileInfo_tmp = dir(fullfile(folderNOM_tmp, sprintf('n*_A%d_compDV.mat', iModelA_tmp)));
+    fileInfo_tmp = fileInfo_tmp(~contains({fileInfo_tmp.name}, 'min'));
+    if isempty(fileInfo_tmp)
+        continue
+    end
+
+    nameFile_truth_tmp = fullfile(folderOOD_tmp, 'truth.mat');
+    if ~exist(nameFile_truth_tmp, 'file')
+        continue
+    end
+
+    % Load the file
+    [~, iNewest_tmp] = max([fileInfo_tmp.datenum]);
+    compFile_tmp = fullfile(fileInfo_tmp(iNewest_tmp).folder, fileInfo_tmp(iNewest_tmp).name);
+    S_tmp = load(compFile_tmp);
+    truth_tmp = load(nameFile_truth_tmp);
+    nLL_tmp = S_tmp.nLL_tmpl_allIter(:);
+    nLL_tmp = nLL_tmp(isfinite(nLL_tmp));
+
+    [margORI_true_tmp, margSF_true_tmp, margORI_est_iter_norm_tmp, margSF_est_iter_norm_tmp] = ...
+        fxn_extract_normalized_tuning_curves(truth_tmp, S_tmp, nORI, nSF);
+
+    % Fill the matrix
+    row_tmp = table();
+    row_tmp.nameIO = string(nameIO_tmp);
+    row_tmp.nBasisORI = nBasisORI_tmp;
+    row_tmp.nBasisSF = nBasisSF_tmp;
+    row_tmp.basisWidthORI = basisWidthORI_tmp;
+    row_tmp.basisWidthSF = basisWidthSF_tmp;
+    row_tmp.nLL_med_file = median(nLL_tmp, 'omitnan');
+    row_tmp.nLL_mean_file = mean(nLL_tmp, 'omitnan');
+    row_tmp.nLL_sem_file = std(nLL_tmp, 'omitnan') / sqrt(numel(nLL_tmp));
+    row_tmp.nIter_valid = numel(nLL_tmp);
+
+    if all(isfinite([nBasisORI_tmp, basisWidthORI_tmp, nBasisSF_tmp, basisWidthSF_tmp]))
+        row_tmp.combo = string(sprintf('o%d_wO%.3g_s%d_wS%.3g', nBasisORI_tmp, basisWidthORI_tmp, nBasisSF_tmp, basisWidthSF_tmp));
+    else
+        row_tmp.combo = "unparsed";
+    end
+
+    T_tmp = [T_tmp; row_tmp]; %#ok<AGROW>
+
+    if row_tmp.combo ~= "unparsed"
+        comboPlot_tmp(end+1).combo = row_tmp.combo; %#ok<AGROW>
+        comboPlot_tmp(end).nameIO = string(nameIO_tmp);
+        comboPlot_tmp(end).nBasisORI = nBasisORI_tmp;
+        comboPlot_tmp(end).basisWidthORI = basisWidthORI_tmp;
+        comboPlot_tmp(end).nBasisSF = nBasisSF_tmp;
+        comboPlot_tmp(end).basisWidthSF = basisWidthSF_tmp;
+        comboPlot_tmp(end).margORI_true = margORI_true_tmp;
+        comboPlot_tmp(end).margSF_true = margSF_true_tmp;
+        if isempty(margORI_est_iter_norm_tmp)
+            comboPlot_tmp(end).margORI_est_med = nan(1, numel(margORI_true_tmp));
+        else
+            [comboPlot_tmp(end).margORI_est_med, ~, ~] = getCI(margORI_est_iter_norm_tmp, 1, 1);
+        end
+        if isempty(margSF_est_iter_norm_tmp)
+            comboPlot_tmp(end).margSF_est_med = nan(1, numel(margSF_true_tmp));
+        else
+            [comboPlot_tmp(end).margSF_est_med, ~, ~] = getCI(margSF_est_iter_norm_tmp, 1, 1);
+        end
+    end
+end % iFold_temp
+
+T_plot_tmp = T_tmp(T_tmp.combo ~= "unparsed", :);
+
+% Summary by combo
+G_tmp = groupsummary(T_plot_tmp, 'combo', {'median', 'mean', 'std'}, 'nLL_med_file');
+G_tmp = sortrows(G_tmp, 'median_nLL_med_file', 'ascend');
+
+save(fullfile(nameFolder_Output, 'Temp_basisCombo_nLL.mat'), 'T_tmp', 'T_plot_tmp', 'G_tmp', 'comboPlot_tmp');
+fprintf('\n%s: data extracted, compiled and saved.\n', string(datetime('now')))
+
+% Build ORI heatmap: x=nBasisORI, y=basisWidthORI (collapse over SF settings)
+uBasisORI_tmp = unique(T_plot_tmp.nBasisORI);
+uWidthORI_tmp = unique(T_plot_tmp.basisWidthORI);
+M_ori_tmp = nan(numel(uWidthORI_tmp), numel(uBasisORI_tmp));
+for ix_tmp = 1:numel(uBasisORI_tmp)
+    for iy_tmp = 1:numel(uWidthORI_tmp)
+        idx_tmp = T_plot_tmp.nBasisORI == uBasisORI_tmp(ix_tmp) & T_plot_tmp.basisWidthORI == uWidthORI_tmp(iy_tmp);
+        if any(idx_tmp)
+            M_ori_tmp(iy_tmp, ix_tmp) = median(T_plot_tmp.nLL_med_file(idx_tmp), 'omitnan');
+        end
+    end
+end
+
+% Build SF heatmap: x=nBasisSF, y=basisWidthSF (collapse over ORI settings)
+uBasisSF_tmp = unique(T_plot_tmp.nBasisSF);
+uWidthSF_tmp = unique(T_plot_tmp.basisWidthSF);
+M_sf_tmp = nan(numel(uWidthSF_tmp), numel(uBasisSF_tmp));
+for ix_tmp = 1:numel(uBasisSF_tmp)
+    for iy_tmp = 1:numel(uWidthSF_tmp)
+        idx_tmp = T_plot_tmp.nBasisSF == uBasisSF_tmp(ix_tmp) & T_plot_tmp.basisWidthSF == uWidthSF_tmp(iy_tmp);
+        if any(idx_tmp)
+            M_sf_tmp(iy_tmp, ix_tmp) = median(T_plot_tmp.nLL_med_file(idx_tmp), 'omitnan');
+        end
+    end
+end
+
+% Panel-specific color scales (ORI and SF use independent ranges).
+vals_ori_tmp = M_ori_tmp(isfinite(M_ori_tmp));
+if isempty(vals_ori_tmp)
+    clim_ori_tmp = [0, 1];
+else
+    clim_ori_tmp = [min(vals_ori_tmp), max(vals_ori_tmp)];
+    if clim_ori_tmp(1) == clim_ori_tmp(2)
+        clim_ori_tmp = clim_ori_tmp + [-eps, eps];
+    end
+end
+
+vals_sf_tmp = M_sf_tmp(isfinite(M_sf_tmp));
+if isempty(vals_sf_tmp)
+    clim_sf_tmp = [0, 1];
+else
+    clim_sf_tmp = [min(vals_sf_tmp), max(vals_sf_tmp)];
+    if clim_sf_tmp(1) == clim_sf_tmp(2)
+        clim_sf_tmp = clim_sf_tmp + [-eps, eps];
+    end
+end
+
+% Plot
+h_tmp = figure('Position', [120 120 1400 620], 'Color', 'w');
+tlo_tmp = tiledlayout(1, 2, 'TileSpacing', 'compact', 'Padding', 'compact'); %#ok<NASGU>
+
+% Left: ORI heatmap
+ax1_tmp = nexttile; hold on;
+imagesc(M_ori_tmp);
+set(ax1_tmp, 'YDir', 'normal', ...
+    'XTick', 1:numel(uBasisORI_tmp), 'XTickLabel', string(uBasisORI_tmp), ...
+    'YTick', 1:numel(uWidthORI_tmp), 'YTickLabel', compose('%.2g', uWidthORI_tmp));
+xlabel('nBasisORI');
+ylabel('basisWidthORI');
+title('ORI hyperparameters');
+axis square;
+colormap(ax1_tmp, turbo);
+clim(ax1_tmp, clim_ori_tmp);
+cb1_tmp = colorbar;
+cb1_tmp.Label.String = 'Median template-estimation nLL';
+
+for iy_tmp = 1:size(M_ori_tmp, 1)
+    for ix_tmp = 1:size(M_ori_tmp, 2)
+        v_tmp = M_ori_tmp(iy_tmp, ix_tmp);
+        if isfinite(v_tmp)
+            frac_tmp = (v_tmp - clim_ori_tmp(1)) / max(clim_ori_tmp(2) - clim_ori_tmp(1), eps);
+            txtColor_tmp = [0 0 0];
+            if frac_tmp > 0.55
+                txtColor_tmp = [1 1 1];
+            end
+            text(ix_tmp, iy_tmp, sprintf('%.2f', v_tmp), ...
+                'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle', ...
+                'Color', txtColor_tmp, 'FontSize', 10, 'FontWeight', 'bold');
+        end
+    end
+end
+grid on; box on;
+
+% Right: SF heatmap
+ax2_tmp = nexttile; hold on;
+imagesc(M_sf_tmp);
+set(ax2_tmp, 'YDir', 'normal', ...
+    'XTick', 1:numel(uBasisSF_tmp), 'XTickLabel', string(uBasisSF_tmp), ...
+    'YTick', 1:numel(uWidthSF_tmp), 'YTickLabel', compose('%.2g', uWidthSF_tmp));
+xlabel('nBasisSF');
+ylabel('basisWidthSF');
+title('SF hyperparameters');
+axis square;
+colormap(ax2_tmp, turbo);
+clim(ax2_tmp, clim_sf_tmp);
+cb2_tmp = colorbar;
+cb2_tmp.Label.String = 'Median template-estimation nLL';
+
+for iy_tmp = 1:size(M_sf_tmp, 1)
+    for ix_tmp = 1:size(M_sf_tmp, 2)
+        v_tmp = M_sf_tmp(iy_tmp, ix_tmp);
+        if isfinite(v_tmp)
+            frac_tmp = (v_tmp - clim_sf_tmp(1)) / max(clim_sf_tmp(2) - clim_sf_tmp(1), eps);
+            txtColor_tmp = [0 0 0];
+            if frac_tmp > 0.55
+                txtColor_tmp = [1 1 1];
+            end
+            text(ix_tmp, iy_tmp, sprintf('%.2f', v_tmp), ...
+                'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle', ...
+                'Color', txtColor_tmp, 'FontSize', 10, 'FontWeight', 'bold');
+        end
+    end
+end
+grid on; box on;
+
+sgtitle(sprintf('Temporary check: nLL heatmaps by basis dimensions (N=%d files)', height(T_plot_tmp)));
+set(findall(gcf, '-property', 'FontSize'), 'FontSize', 12);
+
+saveas(h_tmp, fullfile(nameFolder_Figures_tmp, 'FigTMP_basisCombo_nLL.png'));
+close(h_tmp);
+
+% Part 2: Plot tuning overlays by basis combo
+% Layout: rows = basisWidth levels, columns = nBasis levels (separate figures for ORI and SF)
+if ~isempty(comboPlot_tmp)
+    % ---- collect unique axis levels ----
+    uNORI_tmp  = unique([comboPlot_tmp.nBasisORI]);
+    uWORI_tmp  = unique([comboPlot_tmp.basisWidthORI]);
+    uNSF_tmp   = unique([comboPlot_tmp.nBasisSF]);
+    uWSF_tmp   = unique([comboPlot_tmp.basisWidthSF]);
+
+    nColORI_tmp = numel(uNORI_tmp);
+    nRowORI_tmp = numel(uWORI_tmp);
+    nColSF_tmp  = numel(uNSF_tmp);
+    nRowSF_tmp  = numel(uWSF_tmp);
+
+    % ---- Figure A: ORI tuning ----
+    h_oriTuning_tmp = figure('Position', [80 80 max(400, 320*nColORI_tmp) max(320, 220*nRowORI_tmp)], 'Color', 'w');
+    tiledlayout(nRowORI_tmp, nColORI_tmp, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+    for iRow_tmp = 1:nRowORI_tmp
+        for iCol_tmp = 1:nColORI_tmp
+            wORI_tmp = uWORI_tmp(iRow_tmp);
+            nORI_key_tmp = uNORI_tmp(iCol_tmp);
+
+            % find entries matching this (nBasisORI, basisWidthORI) cell; collapse over SF params
+            mask_tmp = abs([comboPlot_tmp.nBasisORI] - nORI_key_tmp) < 1e-9 & ...
+                       abs([comboPlot_tmp.basisWidthORI] - wORI_tmp) < 1e-9;
+            entries_tmp = comboPlot_tmp(mask_tmp);
+
+            axORI_tmp = nexttile; hold(axORI_tmp, 'on');
+            if ~isempty(entries_tmp)
+                yTrue_tmp = mean(vertcat(entries_tmp.margORI_true), 1, 'omitnan');
+                mat_tmp = vertcat(entries_tmp.margORI_est_med);
+                yEst_tmp = nan(1, size(mat_tmp, 2));
+                for iCh_tmp = 1:size(mat_tmp, 2)
+                    v_tmp = mat_tmp(:, iCh_tmp); v_tmp = v_tmp(isfinite(v_tmp));
+                    if ~isempty(v_tmp), [yEst_tmp(iCh_tmp), ~, ~] = getCI(v_tmp, 2, 1); end
+                end
+                plot(axis_tuning{1}, yTrue_tmp, 'r-', 'LineWidth', setting.trueWidth);
+                plot(axis_tuning{1}, yEst_tmp,  'k-', 'LineWidth', setting.lineWidth);
+            end
+            fxn_style_ax(axORI_tmp, setting);
+            xticks(axORI_tmp, axisTicks_tuning{1}); xticklabels(axORI_tmp, axisTL_tuning{1});
+            ylim(axORI_tmp, [-0.2 1]);
+            if iRow_tmp == nRowORI_tmp, xlabel(axORI_tmp, namesFeature{1}); end
+            if iCol_tmp == 1, ylabel(axORI_tmp, sprintf('wORI=%.3g', wORI_tmp)); end
+            title(axORI_tmp, sprintf('nORI=%d', nORI_key_tmp));
+            if iRow_tmp == 1 && iCol_tmp == 1
+                % legend(axORI_tmp, {'True','Est'}, 'Location','south','Box','off','FontSize',setting.fontSize);
+            end
+        end % iCol_tmp
+    end % iRow_tmp
+    sgtitle(sprintf('Temp: ORI tuning (rows=basisWidthORI, cols=nBasisORI)'));
+    set(findall(gcf, '-property', 'FontSize'), 'FontSize', 12);
+    saveas(h_oriTuning_tmp, fullfile(nameFolder_Figures_tmp, 'FigTMP_basisCombo_tuningORI.png'));
+    close(h_oriTuning_tmp);
+
+    % ---- Figure B: SF tuning ----
+    h_sfTuning_tmp = figure('Position', [80 80 max(400, 320*nColSF_tmp) max(320, 220*nRowSF_tmp)], 'Color', 'w');
+    tiledlayout(nRowSF_tmp, nColSF_tmp, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+    for iRow_tmp = 1:nRowSF_tmp
+        for iCol_tmp = 1:nColSF_tmp
+            wSF_tmp = uWSF_tmp(iRow_tmp);
+            nSF_key_tmp = uNSF_tmp(iCol_tmp);
+
+            mask_tmp = abs([comboPlot_tmp.nBasisSF] - nSF_key_tmp) < 1e-9 & ...
+                       abs([comboPlot_tmp.basisWidthSF] - wSF_tmp) < 1e-9;
+            entries_tmp = comboPlot_tmp(mask_tmp);
+
+            axSF_tmp = nexttile; hold(axSF_tmp, 'on');
+            if ~isempty(entries_tmp)
+                yTrue_tmp = mean(vertcat(entries_tmp.margSF_true), 1, 'omitnan');
+                mat_tmp = vertcat(entries_tmp.margSF_est_med);
+                yEst_tmp = nan(1, size(mat_tmp, 2));
+                for iCh_tmp = 1:size(mat_tmp, 2)
+                    v_tmp = mat_tmp(:, iCh_tmp); v_tmp = v_tmp(isfinite(v_tmp));
+                    if ~isempty(v_tmp), [yEst_tmp(iCh_tmp), ~, ~] = getCI(v_tmp, 2, 1); end
+                end
+                plot(axis_tuning{2}, yTrue_tmp, 'r-', 'LineWidth', setting.trueWidth);
+                plot(axis_tuning{2}, yEst_tmp,  'k-', 'LineWidth', setting.lineWidth);
+            end
+            fxn_style_ax(axSF_tmp, setting);
+            xticks(axSF_tmp, axisTicks_tuning{2}); xticklabels(axSF_tmp, axisTL_tuning{2});
+            ylim(axSF_tmp, [-0.2 1]);
+            if iRow_tmp == nRowSF_tmp, xlabel(axSF_tmp, namesFeature{2}); end
+            if iCol_tmp == 1, ylabel(axSF_tmp, sprintf('wSF=%.3g', wSF_tmp)); end
+            title(axSF_tmp, sprintf('nSF=%d', nSF_key_tmp));
+            if iRow_tmp == 1 && iCol_tmp == 1
+                % legend(axSF_tmp, {'True','Est'}, 'Location','south','Box','off','FontSize',setting.fontSize);
+            end
+        end
+    end
+    sgtitle(sprintf('Temp: SF tuning (rows=basisWidthSF, cols=nBasisSF)'));
+    set(findall(gcf, '-property', 'FontSize'), 'FontSize', 12);
+    saveas(h_sfTuning_tmp, fullfile(nameFolder_Figures_tmp, 'FigTMP_basisCombo_tuningSF.png'));
+    close(h_sfTuning_tmp);
+end
+
+% save(fullfile(nameFolder_Output, 'Temp_basisCombo_nLL.mat'), 'T_tmp', 'T_plot_tmp', 'G_tmp', 'comboPlot_tmp');
+fprintf('\n%s: saved figure.\n', string(datetime('now')))
 
 %% Figure 0: condition composition overview from compiled R
 % Keep one row per simulated condition to avoid duplication across fitted B models.
@@ -2008,7 +2348,7 @@ if ~isempty(R) && isfield(R, 'nLL_med')
                 if isempty(vals_dn)
                     scores_dn(iFit_dn)=nan;
                 else
-                [scores_dn(iFit_dn), ~, ~] = getCI(vals_dn, 2, 1);
+                    [scores_dn(iFit_dn), ~, ~] = getCI(vals_dn, 2, 1);
                 end
             end
 
@@ -2675,9 +3015,107 @@ info.flag_regressType = str2double(tok{10});
 info.iModelB_sim = str2double(tok{11});
 end
 
+function val = parse_num_from_name_basisRelevant(nameStr, key)
+% BASIS-RELEVANT ONLY:
+% Parse numeric tokens for basis-hyperparameter keys from folder/title names.
+% Primary format (from OOD_sim nameIO):
+%   ..._bORI<nBasisORI>_<basisWidthORI>_bSF<nBasisSF>_<basisWidthSF>
+% Example:
+%   ..._bORI6_0.9_bSF5_0.7
+
+basisKeys = {'nBasisORI', 'nBasisSF', 'basisWidthORI', 'basisWidthSF', ...
+    'basisWidthScaleORI', 'basisWidthScaleSF', 'asymSF_rightLeftRatio', 'ridge'};
+
+if ~ismember(key, basisKeys)
+    val = nan;
+    return;
+end
+
+nameStr = char(nameStr);
+numExpr = '[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?';
+
+% First try the current canonical OOD_sim format.
+% Captures: bORI count, bORI width, bSF count, bSF width.
+tokBasis = regexp(nameStr, ['_bORI(\d+)_(' numExpr ')_bSF(\d+)_(' numExpr ')(?:_|$)'], 'tokens', 'once');
+
+if ~isempty(tokBasis)
+    switch key
+        case 'nBasisORI'
+            val = str2double(tokBasis{1});
+            return;
+        case {'basisWidthORI', 'basisWidthScaleORI'}
+            val = str2double(tokBasis{2});
+            return;
+        case 'nBasisSF'
+            val = str2double(tokBasis{3});
+            return;
+        case {'basisWidthSF', 'basisWidthScaleSF'}
+            val = str2double(tokBasis{4});
+            return;
+    end
+end
+
+% Fallback for old key-labeled formats (e.g., nBasisORI6 or basisWidthORI0.9).
+keyEsc = regexptranslate('escape', key);
+exprKey = [keyEsc '(?:[_\-])?(' numExpr ')'];
+tokKey = regexp(nameStr, exprKey, 'tokens', 'once');
+
+if isempty(tokKey)
+    val = nan;
+    return;
+end
+
+val = str2double(tokKey{1});
+if ~isfinite(val)
+    val = nan;
+end
+end
+
 function x = fxn_parse_num2exp(str_in)
 % parse strings like '8e3', '0', '10', etc.
 x = str2double(strrep(str_in, 'p', '.'));
+end
+
+function [margORI_true, margSF_true, margORI_est_iter_norm, margSF_est_iter_norm] = fxn_extract_normalized_tuning_curves(truth, data_compIV, nORI, nSF)
+
+template_true_vec = truth.template_true(:)';
+template_true_2D = reshape(template_true_vec, [nORI, nSF]);
+
+margORI_true = mean(template_true_2D, 2)';
+margSF_true = mean(template_true_2D, 1);
+
+mxORI_true = max(margORI_true, [], 2);
+mxSF_true = max(margSF_true, [], 2);
+if isfinite(mxORI_true) && mxORI_true ~= 0
+    margORI_true = margORI_true ./ mxORI_true;
+end
+if isfinite(mxSF_true) && mxSF_true ~= 0
+    margSF_true = margSF_true ./ mxSF_true;
+end
+
+template_est = data_compIV.template_tmpl_allIter;
+if ndims(template_est) == 3
+    template_est = reshape(template_est, size(template_est, 1), []);
+end
+
+nIter_est = size(template_est, 1);
+margORI_est_iter_norm = nan(nIter_est, nORI);
+margSF_est_iter_norm = nan(nIter_est, nSF);
+
+for iIter = 1:nIter_est
+    tmp2D = reshape(template_est(iIter, :), [nORI, nSF]);
+    margORI_est_iter_norm(iIter, :) = mean(tmp2D, 2)';
+    margSF_est_iter_norm(iIter, :) = mean(tmp2D, 1);
+
+    mxORI = max(margORI_est_iter_norm(iIter, :), [], 2);
+    mxSF = max(margSF_est_iter_norm(iIter, :), [], 2);
+    if isfinite(mxORI) && mxORI ~= 0
+        margORI_est_iter_norm(iIter, :) = margORI_est_iter_norm(iIter, :) ./ mxORI;
+    end
+    if isfinite(mxSF) && mxSF ~= 0
+        margSF_est_iter_norm(iIter, :) = margSF_est_iter_norm(iIter, :) ./ mxSF;
+    end
+end
 end
 
 function [template_rmse_iter, template_R2_iter] = fxn_templateRecovery_simPlot2Style_iter(truth, data_compIV, nIter)

@@ -17,7 +17,7 @@ param_file="${param_dir}/OOD_Human_params.tsv"
 # Header
 printf "isubj\tiLocComb\tlambda_whiten\tnIter\n" > "${param_file}"
 
-for isubj in $(seq 1 15); do
+for isubj in $(seq 1 2 15); do
   for iLocComb in 1 2 3 4 5 6 7 8; do
     for lambda_whiten in 0; do
       for nIter in 1000; do

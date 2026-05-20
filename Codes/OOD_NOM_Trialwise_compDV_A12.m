@@ -305,6 +305,10 @@ ridge_tmpl_allIter = nBasisSF_tmpl_allIter;
 basisWidthScaleORI_tmpl_allIter = nBasisSF_tmpl_allIter;
 basisWidthScaleSF_tmpl_allIter  = nBasisSF_tmpl_allIter;
 asymSF_rightLeftRatio_tmpl_allIter = nBasisSF_tmpl_allIter;
+% nLL_tmpl_allIter         = nan(nIter, 1); % training NLL of selected model (tmpl set)
+nLL_tmpl_allIter = nan(nIter, 1); % mean held-out NLL from CV model selection
+% nLL_cv_se_tmpl_allIter   = nan(nIter, 1); % SE of held-out NLL across CV folds
+pseudoR2_Tjur_tmpl_allIter = nan(nIter, 1); % Tjur R² on training set
 
 sep_allIter = nan(nIter, 2); % 1=template set, 2=full set
 margORI_allIter = nan(nIter, 2, nORI);
@@ -396,6 +400,10 @@ parfor iIter = 1:nIter
     basisWidthScaleSF_tmpl = nan;
     asymSF_rightLeftRatio_tmpl = nan;
     ridge_tmpl = nan;
+    nLL_tmpl = nan;
+    nLL_cv_mean_tmpl = nan;
+    nLL_cv_se_tmpl = nan;
+    pseudoR2_Tjur_tmpl = nan;
 
     % Apply class weighting to z-scored energy (if wABS>.5, ABS is emphasized)
     [e3D_tmpl_forRC, resp_tmpl_forRC] = applyClassWeightsForRC(e3D_tmpl_forRC, resp_tmpl_rand_sel, iPRS_tmpl_rand_sel, wABS, wPRS, weightScale_RC);
@@ -410,9 +418,18 @@ parfor iIter = 1:nIter
         case 2  % Multivariate + smoothing
             opts_local = opts;
             opts_local.template_ideal = template_ideal;
-            out = SX_RC_selectBasis_cv(e3D_tmpl_forRC, resp_tmpl_forRC, axisORI, axisSF, candidateORI, candidateSF, candidateBasisFamilyORI, candidateBasisFamilySF, candidateRidge, opts_local);
-            template_tmpl_raw = out.template2D;
 
+            % For the "template set"
+            out = SX_RC_selectBasis_cv(e3D_tmpl_forRC, resp_tmpl_forRC, axisORI, axisSF, candidateORI, candidateSF, candidateBasisFamilyORI, candidateBasisFamilySF, candidateRidge, opts_local);
+            
+            % Store the outputs of the best fit
+            template_tmpl_raw = out.template2D;
+            % nLL_tmpl = out.nLL; % This is training nLL from the best fit, so only secondary
+            nLL_cv_mean_tmpl = out.bestRes.nLL_mean; % This is the mean held-out nLL across CV folds for the selected model, so primary for model quality
+            % nLL_cv_se_tmpl = out.bestRes.nLL_se;
+            pseudoR2_Tjur_tmpl = out.pseudoR2_Tjur;
+
+            % Store the selected hyperparameters for reference
             nBasisORI_tmpl = out.nBasisORI;
             nBasisSF_tmpl = out.nBasisSF;
             basisFxnORI_tmpl = out.basisFamilyORI;
@@ -421,7 +438,8 @@ parfor iIter = 1:nIter
             basisWidthScaleSF_tmpl = out.basisWidthScaleSF;
             asymSF_rightLeftRatio_tmpl = out.asymSF_rightLeftRatio;
             ridge_tmpl = out.ridge;
-
+            
+            % Same thing for the full set, but just the best template
             out = SX_RC_selectBasis_cv(e3D_full_forRC, resp_full_forRC, axisORI, axisSF, candidateORI, candidateSF, candidateBasisFamilyORI, candidateBasisFamilySF, candidateRidge, opts_local);
             template_full_raw = out.template2D;
 
@@ -556,6 +574,11 @@ parfor iIter = 1:nIter
     basisWidthScaleSF_tmpl_allIter(iIter) = basisWidthScaleSF_tmpl;
     asymSF_rightLeftRatio_tmpl_allIter(iIter) = asymSF_rightLeftRatio_tmpl;
     ridge_tmpl_allIter(iIter) = ridge_tmpl;
+    
+    % GoF
+    nLL_tmpl_allIter(iIter) = nLL_cv_mean_tmpl;
+    % nLL_cv_se_tmpl_allIter(iIter) = nLL_cv_se_tmpl;
+    pseudoR2_Tjur_tmpl_allIter(iIter) = pseudoR2_Tjur_tmpl;
 
 end % end parfor iIter
 

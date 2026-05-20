@@ -181,7 +181,14 @@ opts_best.ridge = bestRes.ridge;
 out_best = SX_RC_fit_smoothBasis(e3D_allT, resp_allT, axis_ori_deg, axis_sf_log2, opts_best);
 
 output = [];
+% Store the outputs of the best fit
 output.template2D = out_best.template2D;
+output.nLL = out_best.nLL; % This is training nLL from the best fit, so only secondary
+output.deviance = out_best.deviance;
+output.pseudoR2_Tjur = out_best.pseudoR2_Tjur;
+output.bestRes = bestRes; % GoF from CV, more informative for model selection than the training nLL
+
+% Store the selected hyperparameters for reference
 output.nBasisORI = opts_best.nBasisORI;
 output.nBasisSF = opts_best.nBasisSF;
 output.basisFamilyORI = opts_best.basisFamilyORI;
@@ -190,8 +197,6 @@ output.basisWidthScaleORI = opts_best.basisWidthScaleORI;
 output.basisWidthScaleSF = opts_best.basisWidthScaleSF;
 output.asymSF_rightLeftRatio = opts_best.asymSF_rightLeftRatio;
 output.ridge = opts_best.ridge;
-output.bestRes = bestRes;
-% output.res = res; % enable only if needed for diagnostics
 
 %% Visualize GoF
 % set(0, 'DefaultFigureVisible', 'on')

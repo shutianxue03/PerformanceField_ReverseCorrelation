@@ -3,8 +3,8 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=12
-#SBATCH --mem=24G
-#SBATCH --time=3:30:00
+#SBATCH --mem=16G
+#SBATCH --time=00:30:00
 #SBATCH --output=Logs/Sim_%A_%a.out
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=shutianxue30@gmail.com
