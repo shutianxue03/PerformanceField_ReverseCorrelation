@@ -228,15 +228,19 @@ assert(sum(e3D_target_allT(nPairs+1:end,:,:) - e3D_target_allT(1:nPairs,:,:), 'a
 
 fprintf('%s: Pass A copied to pass B done.\n\n', datetime('now'))
 
-%% Compute DV in a fixed transformed space
-% Fixed transform estimated from ABS trials:
-% raw energy -> global ABS z-score (one mean/SD per channel) -> optional whitening.
+% Contrast per trial (ABS=0, PRS=stim.gaborCST).
+CST_allT = dataMatrix(:, 11);
 
-% (1) Build fixed transform from ABS trials
-% to obtain whitening matrix (Q) + normalization stats (mu, sigma) for each channel.
-Tfix = fxn_buildFixedTransformFromABS(e3D_target_allT, iPRS_allT, lambda_whiten, eps_whiten);
 
-% (2) Apply fixed transform to energy of all trials, to prepare for DV computation
+%% Obtain whitening matrix (Q) + normalization stats (mu, sigma) for each channel.
+flag_meanMode = 'abs_global'; % 'abs_global',  'all_global', 'abs_per_contrast'
+% flag_meanMode = 'all_global'; % 'abs_global',  'all_global', 'abs_per_contrast'
+% flag_meanMode = 'abs_per_contrast'; % 'abs_global',  'all_global', 'abs_per_contrast'
+flag_plot = 1;
+Tfix = fxn_buildFixedTransformFromABS(e3D_target_allT, iPRS_allT, CST_allT, lambda_whiten, eps_whiten, flag_meanMode, flag_plot);
+
+%% Obtain fixed transformed energy for all trials, using the fixed transform estimated from ABS trials only.
+%  Apply fixed transform to energy of all trials, to prepare for DV computation
 [nTrials, nORI_local, nSF_local] = size(e3D_target_allT);
 e3D_allT = reshape(e3D_target_allT, [nTrials, nORI_local * nSF_local]);
 % To z-score
