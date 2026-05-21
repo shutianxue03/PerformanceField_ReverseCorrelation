@@ -15,7 +15,7 @@ function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Simulation input parameters
-iModelA_fit_all = [1:2]; % DO NOT CHANGE! 1 = RC-derived template (Model A), 2=ideal template; 3=permuted template
+iModelA_fit_all = [2]; % DO NOT CHANGE! 1 = RC-derived template (Model A), 2=ideal template; 3=permuted template
 iModelB_fit_all = iModelB_sim; %1=full, 2=No Nmul, 3=No Nadd, 4=No Nshared, 5=Nmul-only, 6=Nadd-only, 7=Nshared-only, 8=criterion-only
 
 % Enforce reduced-model ground truth by zeroing excluded IN terms.
@@ -167,9 +167,9 @@ template_true = squeeze(template_true); % remove singleton dim
 template_true = fxn_getTemplate(template_true, templateType_true, 0);
 %--------------------------------------------%
 
-% NOTE: Do NOT rescale/L2-normalize template_true. The simulator must use
-% the raw signal-energy template so that DV lives in raw channel-energy space.
-
+% Do L2 normalization
+% MAKE SURE THIS IS the same as OOD_xx_compDV_A12 when creating the ideal template
+template_true = template_true / norm(template_true(:));
 fprintf('%s: Ground-truth template created.\n\n', datetime('now'))
 
 %% Preallocate sim arrays
@@ -234,9 +234,6 @@ assert(sum(e3D_target_allT(nPairs+1:end,:,:) - e3D_target_allT(1:nPairs,:,:), 'a
 % assert(sum(e3D_noise_allT(nPairs+1:end,:,:) - e3D_noise_allT(1:nPairs,:,:), 'all') == 0);
 
 fprintf('%s: Pass A copied to pass B done.\n\n', datetime('now'))
-
-% Contrast per trial (ABS=0, PRS=stim.gaborCST).
-CST_allT = dataMatrix(:, 11);
 
 %% Compute simulated DV in RAW channel-energy space
 % Whitening / z-scoring / basis projection are NOT part of the observer's
@@ -310,7 +307,7 @@ fprintf('%s: Defined a true criterion in DV unit given the true SDT criterion.\n
 resp_allT = DVnoisy_sim_allT > criterion_DV_true;
 
 % pYES per trial from SDT mapping
-% pYES_pred_allT = 1 - normcdf(criterion_DV_true, DVclean_sim_allT, sigma_pred_allT);
+pYES_pred_allT = 1 - normcdf(criterion_DV_true, DVclean_sim_allT, sigma_pred_allT);
 
 % Fill behavior columns in dataMatrix
 dataMatrix(:, 1) = (1:nTrials)'; % trial index
@@ -329,6 +326,25 @@ pHit_sim = sum((iPRS_allT == 1) & (resp_allT == 1)) / sum(iPRS_allT == 1);
 pFA_sim = sum((iPRS_allT == 0) & (resp_allT == 1)) / sum(iPRS_allT == 0);
 pC_sim = mean( (iPRS_allT==1 & resp_allT==1) | (iPRS_allT==0 & resp_allT==0) );
 
+[dprime_sim, cSDT_sim] = SX_sim06_SDT(pHit_sim, pFA_sim);
+
+respC_sim = nan(nPairs, 1);
+for iPairUnik = 1:nPairs
+    respAB = resp_allT(iPair_allT == iPairUnik);
+    respC_sim(iPairUnik) = (respAB(1) == respAB(2));
+end
+pA_sim = mean(respC_sim);
+
+metrics_sim = [dprime_sim, cSDT_sim, pC_sim, pHit_sim, pFA_sim, pA_sim, pYES_sim];
+
+%% Plotting DV dist and behav metrics
+% Create figure folder only when plotting is enabled (never on HPC).
+if flag_plotDist
+    mkdir(nameFolder_Figures_perSubj);
+    NOMplot_dist
+end
+
+%%
 % Stop if simulated pC is too low or too high
 if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
     fprintf('\n\n ** Simulated pC=%.2f, within the range [%.2f, %.2f] ** \n\n', pC_sim, pC_filter)
@@ -338,40 +354,16 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
     if isempty(dir(nameFolder_Data_NOM_IO)), mkdir(nameFolder_Data_NOM_IO); end
 
     % Save only variables used by simPlot4_VaryOneDim.m in one atomic write.
-    save(sprintf('%s/truth.mat', nameFolder_Data_OOD_IO), ...
-        '*_true', 'dv_space_used', 'mu_cov_DV', 'sigma_cov_DV', 'W_white_DV', 'lambda_whiten', 'beta_true_basis');
+    save(sprintf('%s/truth.mat', nameFolder_Data_OOD_IO), '*_true', 'dv_space_used', 'mu_cov_DV', 'sigma_cov_DV', 'W_white_DV', 'lambda_whiten', 'beta_true_basis');
     fprintf('\n\n%s: truth.mat saved (template_true, criterion_DV_true).\n\n', datetime('now'))
 
-    % Save the target-energy tensor and the metadata compDV expects when
-    % running in patchMode = 'T'.
+    % Save the target-energy tensor
     save(sprintf('%s/energy_T_%d_%d.mat', nameFolder_Data_OOD_IO, nORI, nSF), 'e3D_target_allT', 'noise', 'filtersOri_all', 'stim', 'nBins');
     fprintf('%s: Simulated 3D energy saved (%d trials).\n\n', datetime('now'), nTrials)
 
-    [dprime_sim, cSDT_sim] = SX_sim06_SDT(pHit_sim, pFA_sim);
-
-    respC_sim = nan(nPairs, 1);
-    for iPairUnik = 1:nPairs
-        respAB = resp_allT(iPair_allT == iPairUnik);
-        respC_sim(iPairUnik) = (respAB(1) == respAB(2));
-    end
-    pA_sim = mean(respC_sim);
-
-    metrics_sim = [dprime_sim, cSDT_sim, pC_sim, pHit_sim, pFA_sim, pA_sim, pYES_sim];
-
     % Save behavioral measures in behavMeas.mat (as expected by compDV)
     save(sprintf('%s/behavMeas.mat', nameFolder_Data_OOD_IO), 'dataMatrix', 'metrics_sim', 'iPRS_allT', 'iPass_allT', 'iPair_allT', 'resp_allT', 'pC_filter');
-
     fprintf('\n%s: Behavioral data saved.\n\nReady for template generation\n\n', datetime('now'))
-
-    % Create figure folder only when plotting is enabled (never on HPC).
-    if flag_plotDist && isempty(dir(nameFolder_Figures_perSubj))
-        mkdir(nameFolder_Figures_perSubj);
-    end
-
-    %% Plotting DV dist and behav metrics
-    if flag_plotDist
-        NOMplot_dist
-    end
 
     %% Run compDV and fitNOM on this IO
     % Step 1: compute DVs, templates, and test-set metrics

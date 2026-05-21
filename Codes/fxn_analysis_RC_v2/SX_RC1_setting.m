@@ -167,8 +167,8 @@ NOMp3_lb  = 0;
 %     switch flag_whitenDV
 %         case 0 % when DV is not whitened, the noise parameters are in the same scale as the energy, which can be >1; so we set a higher upper bound
             NOMp1_ub = 1.5;     % multi noise
-            NOMp2_ub = 20;   % (private) additive noise
-            NOMp3_ub = 20; % (shared) additive noise
+            NOMp2_ub = 400;   % (private) additive noise
+            NOMp3_ub = 400; % (shared) additive noise
 %         case 1 % when DV is whitened, the noise parameters are in the same scale as dprime, which is usually <1, so we set a lower upper bound
 %             NOMp1_ub = 3;     % multi noise
 %             NOMp2_ub = 3;   % (private) additive noise

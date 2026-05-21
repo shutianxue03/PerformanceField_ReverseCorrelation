@@ -266,8 +266,9 @@ template_ideal = squeeze(template_ideal); % remove singleton dim
 template_ideal = fxn_getTemplate(template_ideal, templateType_true, 0);
 %--------------------------------------------%
 
-% NOTE: Do NOT rescale/L2-normalize template_ideal. A2 uses the fixed
-% template directly in raw channel-energy space.
+% Do L2 normalization
+% MAKE SURE THIS IS the same as OOD_xx_compDV_A12 when creating the ideal template
+template_ideal = template_ideal / norm(template_ideal(:));
 
 fprintf('%s: Ideal template created.\n\n', datetime('now'))
 
