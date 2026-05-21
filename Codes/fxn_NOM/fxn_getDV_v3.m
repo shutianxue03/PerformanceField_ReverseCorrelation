@@ -3,8 +3,9 @@ function [DV_allT, max_allT] = fxn_getDV_v3(e3D, template_input, convolveType, D
 
 flag_plotMax=0;
 
-% Normalize template (Unit L2-norm)
-template_input = template_input / norm(template_input(:));
+% Use the template exactly as provided by the caller.
+% Any whitening / basis reconstruction / conversion back to raw space must
+% be handled upstream so the simulated and fitted DV stay in the same space.
 
 if ndims(e3D)==3
     [nTrials, nORI, nSF] = size(e3D);
@@ -62,4 +63,3 @@ for iTrial = 1:nTrials
         case 3, DV_allT(iTrial) = max_/(sum(tempCovE(:))); if sum(tempCovE(:)) == 0, error('ALERT: The suppressDV_allTe drDV_allTe is 0.'); end% SS stands for the estimated semi-saturation factor
     end
 end % end of itrial
-

@@ -108,7 +108,7 @@ flag_plot_tuning = 0;
 
 iSess_start = 1; % first session included
 convolveType = 1; % DV from 1=cross-correlation; 2=convolution (fxn_getDV_v3)
-flag_standEnergy = 1; % 1=z-score energy before RC
+% flag_standEnergy = 1; % 1=z-score energy before RC
 flag_plot_compDV = 1; % plot DV distributions and kernels at the end
 if strcmp(str_envir,'HPC'), flag_plot_compDV = 0; end % don't plot when running on HPC
 
@@ -247,8 +247,6 @@ for iSS = 1:length(iSess_select)
     cst_nonrand = [cst_nonrand; dataMatrix(indLoc,11)];
 end
 
-
-
 %% Create Gabor filters used for energy computation
 [filter_sin, filter_cos] = SX_sim02_setFilters(stim, noise.filtersSF_all, filtersOri_all, fxn_getSigma_SPdomain, 0);
 fprintf('%s: Filter banks (nORI=%d, nSF=%d) created and saved.\n\n', datetime('now'), length(filtersOri_all), length(noise.filtersSF_all))
@@ -268,15 +266,16 @@ template_ideal = squeeze(template_ideal); % remove singleton dim
 template_ideal = fxn_getTemplate(template_ideal, templateType_true, 0);
 %--------------------------------------------%
 
-% NOTE: Do NOT rescale/L2-normalize template_true. The simulator must use
-% the raw signal-energy template so that DV lives in raw channel-energy space.
+% NOTE: Do NOT rescale/L2-normalize template_ideal. A2 uses the fixed
+% template directly in raw channel-energy space.
 
 fprintf('%s: Ideal template created.\n\n', datetime('now'))
 
 %% Stage overview
 % A1: estimate trial-wise templates from data and compute DVs.
-% A2: keep trial resampling/whitening/DV pipeline the same, but replace the
-% template with a fixed "true" template scaled to A1's mean derived amplitude.
+% A2: keep the same trial resampling and downstream DV/metric computation,
+% but skip RC estimation entirely and use the fixed ideal/true template in
+% raw channel-energy space.
 % Execution order matters because A2 depends on A1 outputs.
 
 %% [A1] Setup

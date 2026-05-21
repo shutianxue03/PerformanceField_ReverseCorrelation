@@ -70,7 +70,6 @@ templateType_true = 1; % 1 = raw;
 DVType_true = 1; % 1 = sum of dot product;
 convolveType_true = 1; % 1 = dot product; 2 = convolution (for fxn_getDV_v3)
 flag_permT = 0; %1=permute the input template per trial
-eps_whiten = 1e-3; % floor for whitening eigenvalues
 flag_plotDist = 1;
 if strcmp(str_envir, 'HPC'), flag_plotDist = 0; end % don't plot when running on HPC
 iLocComb = 1; % use single-location index (e.g., fovea) for IO
@@ -156,7 +155,7 @@ end
 [filter_sin, filter_cos] = SX_sim02_setFilters(stim, noise.filtersSF_all, filtersOri_all, fxn_getSigma_SPdomain, 0);
 fprintf('%s: Filter banks (nORI=%d, nSF=%d) created and saved.\n\n', datetime('now'), length(filtersOri_all), length(noise.filtersSF_all))
 
-%% Create the groud-truth template (ORI×SF)
+%% Create the ground-truth template (ORI x SF)
 % Make sure this part is exactly the same as how ideal template is created
 % in OOD_NOM_compDV_A12
 template_gabor_true = exp_CreateGabor(stim, stim.gaborCST);
@@ -171,7 +170,7 @@ template_true = fxn_getTemplate(template_true, templateType_true, 0);
 % NOTE: Do NOT rescale/L2-normalize template_true. The simulator must use
 % the raw signal-energy template so that DV lives in raw channel-energy space.
 
-fprintf('%s: Group-truth template created.\n\n', datetime('now'))
+fprintf('%s: Ground-truth template created.\n\n', datetime('now'))
 
 %% Preallocate sim arrays
 nMetrics = 11;
@@ -295,10 +294,11 @@ DV_sorted = sort(unique(DVnoisy_sim_allT(:)));
 cDV_grid = [-Inf; (DV_sorted(1:end-1) + DV_sorted(2:end))/2; Inf];
 loss_grid = nan(size(cDV_grid));
 cSDT_grid = nan(size(cDV_grid));
-for iC = 1:numel(cDV_grid)
+parfor iC = 1:numel(cDV_grid)
     c_try = cDV_grid(iC);
     [loss_grid(iC), cSDT_grid(iC)] = fxn_loss_cSDT(c_try, DVnoisy_sim_allT, iPRS_allT, cSDT_true);
 end
+
 % Choose the criterion in DV unit
 [~, idx_best] = min(loss_grid);
 criterion_DV_true = cDV_grid(idx_best);
@@ -310,7 +310,7 @@ fprintf('%s: Defined a true criterion in DV unit given the true SDT criterion.\n
 resp_allT = DVnoisy_sim_allT > criterion_DV_true;
 
 % pYES per trial from SDT mapping
-pYES_pred_allT = 1 - normcdf(criterion_DV_true, DVclean_sim_allT, sigma_pred_allT);
+% pYES_pred_allT = 1 - normcdf(criterion_DV_true, DVclean_sim_allT, sigma_pred_allT);
 
 % Fill behavior columns in dataMatrix
 dataMatrix(:, 1) = (1:nTrials)'; % trial index
@@ -339,15 +339,11 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
 
     % Save only variables used by simPlot4_VaryOneDim.m in one atomic write.
     save(sprintf('%s/truth.mat', nameFolder_Data_OOD_IO), ...
-        'template_true', 'template_space_true', 'dv_space_used', ...
-        'mu_cov_DV', 'sigma_cov_DV', 'W_white_DV', 'lambda_whiten', ...
-        'beta_true_basis', 'basisOpts_true', ...
-        'criterion_DV_true', 'cSDT_true', 'N*_true');
+        '*_true', 'dv_space_used', 'mu_cov_DV', 'sigma_cov_DV', 'W_white_DV', 'lambda_whiten', 'beta_true_basis');
     fprintf('\n\n%s: truth.mat saved (template_true, criterion_DV_true).\n\n', datetime('now'))
 
-    % Save energy for compDV after the accuracy gate.
-    % Use patchMode = ''T'' in compDV; this file must contain both target + noise
-    % energy as well as noise, filters, stim, nBins.
+    % Save the target-energy tensor and the metadata compDV expects when
+    % running in patchMode = 'T'.
     save(sprintf('%s/energy_T_%d_%d.mat', nameFolder_Data_OOD_IO, nORI, nSF), 'e3D_target_allT', 'noise', 'filtersOri_all', 'stim', 'nBins');
     fprintf('%s: Simulated 3D energy saved (%d trials).\n\n', datetime('now'), nTrials)
 
