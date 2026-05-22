@@ -1,4 +1,4 @@
-function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, cSDT_true, lambda_whiten, iModelB_sim, nIter, nBasisORI, basisWidthORI, nBasisSF, basisWidthSF)
+function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, cSDT_true, lambda_whiten, iModelB_sim, nIter)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Script name: OOD_sim.m
@@ -90,11 +90,11 @@ fprintf(' - Regression type (1=Univariate; 2=Multi+smoothing): %d \n\n', flag_re
 
 % Define IO name & folders %
 % Define the IO name
-nameIO = sprintf('IO_Bsim%d_cN%.0f_cG%.0f_nT%s_Nm%.1f_Na%.1f_Ns%.1f_cSDT%.1f_whiten%.1f_bORI%d_%.1f_bSF%d_%.1f', ...
+nameIO = sprintf('IO_Bsim%d_cN%.0f_cG%.0f_nT%s_Nm%.1f_Na%.1f_Ns%.1f_cSDT%.1f_whiten%.1f', ...
     iModelB_sim, ...
     noiseCST*100, gaborCST*100, format_num2exp(nTrials), ...
     Nmul_true, Nadd_true, Nshared_true, cSDT_true, ...
-    lambda_whiten, nBasisORI, basisWidthORI, nBasisSF, basisWidthSF);
+    lambda_whiten);
 
 % Folder to save IO data (energy + behav)
 nameFolder_Data_OOD_IO = sprintf('%s/%s', nameFolder_Data_OOD, nameIO);

@@ -169,10 +169,10 @@ if ~exist(nameFile_R, 'file')
         fileBase.basisFxnSF_mode_pct = nan;
         fileBase.ridge_mode = "";
         fileBase.ridge_mode_pct = nan;
-        fileBase.basisWidthScaleORI_mode = "";
-        fileBase.basisWidthScaleORI_mode_pct = nan;
-        fileBase.basisWidthScaleSF_mode = "";
-        fileBase.basisWidthScaleSF_mode_pct = nan;
+        fileBase.basisWidthORI_mode = "";
+        fileBase.basisWidthORI_mode_pct = nan;
+        fileBase.basisWidthSF_mode = "";
+        fileBase.basisWidthSF_mode_pct = nan;
         fileBase.asymSF_rightLeftRatio_mode = "";
         fileBase.asymSF_rightLeftRatio_mode_pct = nan;
 
@@ -288,23 +288,31 @@ if ~exist(nameFile_R, 'file')
         fileBase.ridge_mode     = uniqueVals(idxMax);
         fileBase.ridge_mode_pct = counts(idxMax) / numel(strVec);
 
-        % Modal ORI width-scale setting across iterations.
-        vals = data_compIV.basisWidthScaleORI_tmpl_allIter(:);
+        % Modal ORI width setting across iterations.
+        if isfield(data_compIV, 'basisWidthORI_tmpl_allIter')
+            vals = data_compIV.basisWidthORI_tmpl_allIter(:);
+        else
+            vals = data_compIV.basisWidthScaleORI_tmpl_allIter(:);
+        end
         strVec = string(vals);
         [uniqueVals, ~, groupIdx] = unique(strVec);
         counts = accumarray(groupIdx, 1);
         [~, idxMax] = max(counts);
-        fileBase.basisWidthScaleORI_mode     = uniqueVals(idxMax);
-        fileBase.basisWidthScaleORI_mode_pct = counts(idxMax) / numel(strVec);
+        fileBase.basisWidthORI_mode     = uniqueVals(idxMax);
+        fileBase.basisWidthORI_mode_pct = counts(idxMax) / numel(strVec);
 
-        % Modal SF width-scale setting across iterations.
-        vals = data_compIV.basisWidthScaleSF_tmpl_allIter(:);
+        % Modal SF width setting across iterations.
+        if isfield(data_compIV, 'basisWidthSF_tmpl_allIter')
+            vals = data_compIV.basisWidthSF_tmpl_allIter(:);
+        else
+            vals = data_compIV.basisWidthScaleSF_tmpl_allIter(:);
+        end
         strVec = string(vals);
         [uniqueVals, ~, groupIdx] = unique(strVec);
         counts = accumarray(groupIdx, 1);
         [~, idxMax] = max(counts);
-        fileBase.basisWidthScaleSF_mode     = uniqueVals(idxMax);
-        fileBase.basisWidthScaleSF_mode_pct = counts(idxMax) / numel(strVec);
+        fileBase.basisWidthSF_mode     = uniqueVals(idxMax);
+        fileBase.basisWidthSF_mode_pct = counts(idxMax) / numel(strVec);
 
         % Modal SF asymmetry setting across iterations.
         vals = data_compIV.asymSF_rightLeftRatio_tmpl_allIter(:);
@@ -595,11 +603,11 @@ setting.fig12_Bsim = 1;
 setting.fig12_Bfit = 1;
 
 % ---------- field names ----------
-setting.fig1_mode_fields = {'nBasisORI_mode', 'nBasisSF_mode', 'basisFxnORI_mode', 'basisFxnSF_mode',  'basisWidthScaleORI_mode', 'basisWidthScaleSF_mode', 'ridge_mode', 'asymSF_rightLeftRatio_mode'};
-setting.fig1_mode_labels = {'ORI basis mode', 'SF basis mode', 'ORI basis family mode', 'SF basis family mode',  'ORI width-scale mode', 'SF width-scale mode', 'Ridge mode', 'SF asymmetry mode'};
+setting.fig1_mode_fields = {'nBasisORI_mode', 'nBasisSF_mode', 'basisFxnORI_mode', 'basisFxnSF_mode',  'basisWidthORI_mode', 'basisWidthSF_mode', 'ridge_mode', 'asymSF_rightLeftRatio_mode'};
+setting.fig1_mode_labels = {'ORI basis mode', 'SF basis mode', 'ORI basis family mode', 'SF basis family mode',  'ORI width mode', 'SF width mode', 'Ridge mode', 'SF asymmetry mode'};
 
-setting.fig1_pct_fields = {'nBasisORI_mode_pct', 'nBasisSF_mode_pct', 'basisFxnORI_mode_pct', 'basisFxnSF_mode_pct',  'basisWidthScaleORI_mode_pct', 'basisWidthScaleSF_mode_pct', 'ridge_mode_pct', 'asymSF_rightLeftRatio_mode_pct'};
-setting.fig1_pct_labels = {'ORI mode selection rate', 'SF mode selection rate', 'ORI basis family mode selection rate', 'SF basis family mode selection rate',  'ORI width-scale mode selection rate', 'SF width-scale mode selection rate', 'Ridge mode selection rate', 'SF asymmetry mode selection rate'};
+setting.fig1_pct_fields = {'nBasisORI_mode_pct', 'nBasisSF_mode_pct', 'basisFxnORI_mode_pct', 'basisFxnSF_mode_pct',  'basisWidthORI_mode_pct', 'basisWidthSF_mode_pct', 'ridge_mode_pct', 'asymSF_rightLeftRatio_mode_pct'};
+setting.fig1_pct_labels = {'ORI mode selection rate', 'SF mode selection rate', 'ORI basis family mode selection rate', 'SF basis family mode selection rate',  'ORI width mode selection rate', 'SF width mode selection rate', 'Ridge mode selection rate', 'SF asymmetry mode selection rate'};
 
 setting.varFields = {'Nmul_true', 'Nadd_true', 'Nshared_true', 'gaborCST', 'cSDT_true'};
 setting.varNames  = {'Nmul', 'Nadd', 'Nshared', 'signalCST', 'Cz'};
@@ -1118,8 +1126,8 @@ grpCmap_fig1 = setting.palette(1:numel(uGrp_fig1), :);
 h = figure('Position', [100 100 2e3 1e3]);
 
 panel_order = [1, 5, 2, 6, 3, 7, 4, 8];
-panel_xlabel = {'# ORI basis functions', '# SF basis functions',  'ORI basis family', 'SF basis family',  'ORI width scale', 'SF width scale',  'Ridge penalty', 'asymSF_rightLeftRatio'};
-panel_title = {'nBasisORI', 'nBasisSF',  'basisFxnORI', 'basisFxnSF',  'basisWidthScaleORI', 'basisWidthScaleSF',  'ridge', 'asymSF_rightLeftRatio'};
+panel_xlabel = {'# ORI basis functions', '# SF basis functions',  'ORI basis family', 'SF basis family',  'ORI width', 'SF width',  'Ridge penalty', 'asymSF_rightLeftRatio'};
+panel_title = {'nBasisORI', 'nBasisSF',  'basisFxnORI', 'basisFxnSF',  'basisWidthORI', 'basisWidthSF',  'ridge', 'asymSF_rightLeftRatio'};
 
 for iPanel = 1:numel(setting.fig1_mode_fields)
     subplot(2,4,panel_order(iPanel)); hold on;

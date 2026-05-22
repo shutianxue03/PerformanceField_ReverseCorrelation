@@ -1,5 +1,4 @@
-function output = SX_RC_selectBasis_cv(e3D_allT, resp_allT, axis_ori_deg, axis_sf_log2, ...
-    candidateORI, candidateSF, candidateBasisFamilyORI, candidateBasisFamilySF, candidateRidge, opts)
+function output = SX_RC_selectBasis_cv(e3D_allT, resp_allT, axis_ori_deg, axis_sf_log2, opts)
 % ============================================================
 % Select ORI / SF basis counts, basis families, and ridge by
 % cross-validated held-out negative log likelihood.
@@ -7,9 +6,8 @@ function output = SX_RC_selectBasis_cv(e3D_allT, resp_allT, axis_ori_deg, axis_s
 % Cached-Z + precomputed fold-standardization version.
 % ============================================================
 
-if nargin < 10
-    error(['Need e3D_allT, resp_allT, axis_ori_deg, axis_sf_log2, ', ...
-        'candidateORI, candidateSF, candidateBasisFamilyORI, candidateBasisFamilySF, candidateRidge, opts']);
+if nargin < 5
+    error('Need e3D_allT, resp_allT, axis_ori_deg, axis_sf_log2, and opts');
 end
 
 opts = fill_default_opts(opts);
@@ -21,6 +19,20 @@ if length(resp_allT) ~= nTrials
     error('resp_allT length does not match number of trials');
 end
 
+%% Extract (range of) hyperparameters
+candidateORI = opts.nBasisORI(:)';
+candidateSF = opts.nBasisSF(:)';
+
+if isfield(opts, 'candidateBasisFamilyORI') && ~isempty(opts.candidateBasisFamilyORI)
+    candidateBasisFamilyORI = opts.candidateBasisFamilyORI;
+else
+    candidateBasisFamilyORI = opts.basisFamilyORI;
+end
+if isfield(opts, 'candidateBasisFamilySF') && ~isempty(opts.candidateBasisFamilySF)
+    candidateBasisFamilySF = opts.candidateBasisFamilySF;
+else
+    candidateBasisFamilySF = opts.basisFamilySF;
+end
 if ischar(candidateBasisFamilyORI) || isstring(candidateBasisFamilyORI)
     candidateBasisFamilyORI = cellstr(candidateBasisFamilyORI);
 end
@@ -28,12 +40,17 @@ if ischar(candidateBasisFamilySF) || isstring(candidateBasisFamilySF)
     candidateBasisFamilySF = cellstr(candidateBasisFamilySF);
 end
 
-% candidate basis-width scales (allow scalar or vector); keep backward compatibility
-candidateBasisWidthScaleORI = get_candidate_basis_width(opts, 'basisWidthScaleORI');
-candidateBasisWidthScaleSF  = get_candidate_basis_width(opts, 'basisWidthScaleSF');
-candidateAsymSF_rightLeftRatio = get_candidate_asym_sf_ratio(opts);
+candidateBasisWidthORI = opts.basisWidthORI(:)';
+candidateBasisWidthSF = opts.basisWidthSF(:)';
+candidateAsymSF_rightLeftRatio = opts.asymSF_rightLeftRatio(:)';
 
-% ---------------- create CV folds ----------------
+if isfield(opts, 'Ridge') && ~isempty(opts.Ridge)
+    candidateRidge = opts.Ridge(:)';
+else
+    candidateRidge = opts.ridge(:)';
+end
+
+%% ---------------- create CV folds ----------------
 if isfield(opts, 'foldID') && ~isempty(opts.foldID)
     foldID = opts.foldID(:);
     if length(foldID) ~= nTrials
@@ -53,7 +70,7 @@ for iFold = 1:nFolds
     idxTrain_all{iFold} = ~idxTest_all{iFold};
 end
 
-% ---------------- build all non-ridge combinations ----------------
+%% ---------------- build all non-ridge combinations ----------------
 comb = struct([]);
 iComb = 0;
 
@@ -61,16 +78,16 @@ for iFamORI = 1:numel(candidateBasisFamilyORI)
     for iFamSF = 1:numel(candidateBasisFamilySF)
         for iORIcand = 1:numel(candidateORI)
             for iSFcand = 1:numel(candidateSF)
-                for iBWori = 1:numel(candidateBasisWidthScaleORI)
-                    for iBWsf = 1:numel(candidateBasisWidthScaleSF)
+                for iBWori = 1:numel(candidateBasisWidthORI)
+                    for iBWsf = 1:numel(candidateBasisWidthSF)
                         for iAsym = 1:numel(candidateAsymSF_rightLeftRatio)
                             iComb = iComb + 1;
                             comb(iComb).nBasisORI = candidateORI(iORIcand);
                             comb(iComb).nBasisSF  = candidateSF(iSFcand);
                             comb(iComb).basisFamilyORI = char(candidateBasisFamilyORI{iFamORI});
                             comb(iComb).basisFamilySF  = char(candidateBasisFamilySF{iFamSF});
-                            comb(iComb).basisWidthScaleORI = candidateBasisWidthScaleORI(iBWori);
-                            comb(iComb).basisWidthScaleSF  = candidateBasisWidthScaleSF(iBWsf);
+                            comb(iComb).basisWidthORI = candidateBasisWidthORI(iBWori);
+                            comb(iComb).basisWidthSF  = candidateBasisWidthSF(iBWsf);
                             comb(iComb).asymSF_rightLeftRatio = candidateAsymSF_rightLeftRatio(iAsym);
                         end
                     end
@@ -90,16 +107,16 @@ res(nRes) = struct( ...
     'nBasisSF', [], ...
     'basisFamilyORI', '', ...
     'basisFamilySF', '', ...
-    'basisWidthScaleORI', [], ...
-    'basisWidthScaleSF', [], ...
+    'basisWidthORI', [], ...
+    'basisWidthSF', [], ...
     'asymSF_rightLeftRatio', [], ...
-    'ridge', [], ...
+    'Ridge', [], ...
     'nLL_mean', [], ...
     'nLL_se', [] );
 
 iRes = 0;
 
-% ---------------- main search ----------------
+%% ---------------- main search ----------------
 for iComb = 1:nCombBase
 
     opts_basis = opts;
@@ -107,8 +124,8 @@ for iComb = 1:nCombBase
     opts_basis.nBasisSF  = comb(iComb).nBasisSF;
     opts_basis.basisFamilyORI = comb(iComb).basisFamilyORI;
     opts_basis.basisFamilySF  = comb(iComb).basisFamilySF;
-    opts_basis.basisWidthScaleORI = comb(iComb).basisWidthScaleORI;
-    opts_basis.basisWidthScaleSF  = comb(iComb).basisWidthScaleSF;
+    opts_basis.basisWidthORI = comb(iComb).basisWidthORI;
+    opts_basis.basisWidthSF  = comb(iComb).basisWidthSF;
     opts_basis.asymSF_rightLeftRatio = comb(iComb).asymSF_rightLeftRatio;
 
     % project all trials once using the shared basis-projector
@@ -154,34 +171,35 @@ for iComb = 1:nCombBase
         res(iRes).nBasisSF  = comb(iComb).nBasisSF;
         res(iRes).basisFamilyORI = comb(iComb).basisFamilyORI;
         res(iRes).basisFamilySF  = comb(iComb).basisFamilySF;
-        res(iRes).basisWidthScaleORI = comb(iComb).basisWidthScaleORI;
-        res(iRes).basisWidthScaleSF  = comb(iComb).basisWidthScaleSF;
+        res(iRes).basisWidthORI = comb(iComb).basisWidthORI;
+        res(iRes).basisWidthSF  = comb(iComb).basisWidthSF;
         res(iRes).asymSF_rightLeftRatio = comb(iComb).asymSF_rightLeftRatio;
-        res(iRes).ridge = ridge;
+        res(iRes).Ridge = ridge;
         res(iRes).nLL_mean = mean(nLL_test_allFolds, 'omitnan');
         res(iRes).nLL_se   = std(nLL_test_allFolds, 'omitnan') / sqrt(sum(isfinite(nLL_test_allFolds)));
     end % iRidge
 end % iComb
 
-% ---------------- choose best by lowest mean nLL ----------------
+%% ---------------- choose best by lowest mean nLL ----------------
 [~, idxBest] = min([res.nLL_mean]);
 bestRes = res(idxBest);
 
-% ---------------- refit on all data using full model ----------------
+%% ---------------- refit on all data using full model ----------------
 opts_best = opts;
 opts_best.nBasisORI = bestRes.nBasisORI;
 opts_best.nBasisSF  = bestRes.nBasisSF;
 opts_best.basisFamilyORI = bestRes.basisFamilyORI;
 opts_best.basisFamilySF  = bestRes.basisFamilySF;
-opts_best.basisWidthScaleORI = bestRes.basisWidthScaleORI;
-opts_best.basisWidthScaleSF  = bestRes.basisWidthScaleSF;
+opts_best.basisWidthORI = bestRes.basisWidthORI;
+opts_best.basisWidthSF  = bestRes.basisWidthSF;
 opts_best.asymSF_rightLeftRatio = bestRes.asymSF_rightLeftRatio;
-opts_best.ridge = bestRes.ridge;
+opts_best.Ridge = bestRes.Ridge;
 
 out_best = SX_RC_fit_smoothBasis(e3D_allT, resp_allT, axis_ori_deg, axis_sf_log2, opts_best);
 
+%% Store the outputs of the best fit
 output = [];
-% Store the outputs of the best fit
+
 output.template2D = out_best.template2D;
 output.nLL = out_best.nLL; % This is training nLL from the best fit, so only secondary
 output.deviance = out_best.deviance;
@@ -193,10 +211,10 @@ output.nBasisORI = opts_best.nBasisORI;
 output.nBasisSF = opts_best.nBasisSF;
 output.basisFamilyORI = opts_best.basisFamilyORI;
 output.basisFamilySF = opts_best.basisFamilySF;
-output.basisWidthScaleORI = opts_best.basisWidthScaleORI;
-output.basisWidthScaleSF = opts_best.basisWidthScaleSF;
+output.basisWidthORI = opts_best.basisWidthORI;
+output.basisWidthSF = opts_best.basisWidthSF;
 output.asymSF_rightLeftRatio = opts_best.asymSF_rightLeftRatio;
-output.ridge = opts_best.ridge;
+output.Ridge = opts_best.Ridge;
 
 %% Visualize GoF
 % set(0, 'DefaultFigureVisible', 'on')
@@ -304,78 +322,7 @@ pred.yhat = yhat;
 pred.nLL = -sum(resp .* log(yhat) + (1 - resp) .* log(1 - yhat));
 end
 
-
-%% Helper: FIT FUNCTION
-% function fitOut = fit_ridge_glm_from_Z(Z, resp_allT, ridge, linkName, zscorePredictor, maxIter, tol)
-%
-% resp_allT = resp_allT(:);
-% nTrials = size(Z, 1);
-%
-% % standardize predictors
-% muZ = mean(Z, 1);
-% sdZ = std(Z, 0, 1);
-% sdZ(sdZ < 1e-8) = 1;
-%
-% if zscorePredictor
-%     Zfit = (Z - muZ) ./ sdZ;
-% else
-%     Zfit = Z;
-%     muZ = zeros(1, size(Z,2));
-%     sdZ = ones(1, size(Z,2));
-% end
-%
-% X = [ones(nTrials,1), Zfit];
-% p = size(X,2);
-%
-% beta = zeros(p,1);
-% ridgeMat = diag([0; ones(p-1,1)]) * ridge;
-% dev_prev = Inf;
-%
-% for iIter = 1:maxIter
-%     eta = X * beta;
-%     eta = max(min(eta, 8), -8);
-%
-%     switch lower(linkName)
-%         case 'logit'
-%             mu = 1 ./ (1 + exp(-eta));
-%             gprime = mu .* (1 - mu);
-%         case 'probit'
-%             mu = normcdf(eta);
-%             gprime = normpdf(eta);
-%         otherwise
-%             error('Unknown link: use ''probit'' or ''logit''');
-%     end
-%
-%     mu = min(max(mu, 1e-8), 1 - 1e-8);
-%     gprime = max(gprime, 1e-6);
-%
-%     W = (gprime.^2) ./ (mu .* (1 - mu) + eps);
-%     W = max(W, 1e-8);
-%
-%     z = eta + (resp_allT - mu) ./ (gprime + eps);
-%
-%     WX = X .* sqrt(W);
-%     wz = sqrt(W) .* z;
-%
-%     beta_new = (WX' * WX + ridgeMat) \ (WX' * wz);
-%
-%     dev = -2 * sum(resp_allT .* log(mu) + (1 - resp_allT) .* log(1 - mu));
-%
-%     if abs(dev_prev - dev) < tol
-%         beta = beta_new;
-%         break;
-%     end
-%
-%     beta = beta_new;
-%     dev_prev = dev;
-% end
-%
-% fitOut = struct();
-% fitOut.beta = beta;
-% fitOut.muZ = muZ;
-% fitOut.sdZ = sdZ;
-% end
-
+%%
 function out = SX_RC_fit_smoothBasis(e3D_allT, resp_allT, axis_ori_deg, axis_sf_log2, opts)
 
 opts = fill_default_opts(opts);
@@ -607,253 +554,10 @@ if ~isfield(opts, 'stratifyByResp') || isempty(opts.stratifyByResp), opts.strati
 if ~isfield(opts, 'basisFamilyORI') || isempty(opts.basisFamilyORI), opts.basisFamilyORI = 'circ_gaussian'; end
 if ~isfield(opts, 'basisFamilySF') || isempty(opts.basisFamilySF), opts.basisFamilySF = 'gaussianLog2'; end
 if ~isfield(opts, 'kappaORI'), opts.kappaORI = []; end
-if ~isfield(opts, 'basisWidthScale') || isempty(opts.basisWidthScale), opts.basisWidthScale = 0.8; end
-if ~isfield(opts, 'basisWidthScaleORI') || isempty(opts.basisWidthScaleORI), opts.basisWidthScaleORI = opts.basisWidthScale; end
-if ~isfield(opts, 'basisWidthScaleSF') || isempty(opts.basisWidthScaleSF), opts.basisWidthScaleSF = opts.basisWidthScale; end
+if ~isfield(opts, 'basisWidthORI') || isempty(opts.basisWidthORI), opts.basisWidthORI = opts.basisWidth; end
+if ~isfield(opts, 'basisWidthSF') || isempty(opts.basisWidthSF), opts.basisWidthSF = opts.basisWidth; end
 if ~isfield(opts, 'asymSF_rightLeftRatio') || isempty(opts.asymSF_rightLeftRatio), opts.asymSF_rightLeftRatio = 1.5; end
 if ~isfield(opts, 'widthSF_logParabola'), opts.widthSF_logParabola = []; end
 if ~isfield(opts, 'widthSF_logParabola_left'),  opts.widthSF_logParabola_left  = []; end
 if ~isfield(opts, 'widthSF_logParabola_right'), opts.widthSF_logParabola_right = []; end
 end
-
-
-%% Helper: normalize candidate basis-width option
-function vals = get_candidate_basis_width(opts, fieldName)
-
-if isfield(opts, fieldName) && ~isempty(opts.(fieldName))
-    vals = opts.(fieldName);
-elseif isfield(opts, 'basisWidthScale') && ~isempty(opts.basisWidthScale)
-    vals = opts.basisWidthScale;
-else
-    vals = 0.8;
-end
-
-vals = vals(:)';
-end
-
-%% Helper: normalize candidate asymmetry ratio option
-function vals = get_candidate_asym_sf_ratio(opts)
-
-if isfield(opts, 'asymSF_rightLeftRatio') && ~isempty(opts.asymSF_rightLeftRatio)
-    vals = opts.asymSF_rightLeftRatio;
-else
-    vals = 1.5;
-end
-
-vals = vals(:)';
-end
-
-%% Check helper: plot nLL
-% function bestPerFam = plot_basis_cv_heatmap(res)
-%
-% candidateORI = unique([res.nBasisORI]);
-% candidateSF  = unique([res.nBasisSF]);
-%
-% famORI = unique(string({res.basisFamilyORI}));
-% famSF  = unique(string({res.basisFamilySF}));
-%
-% nRows = numel(famORI);
-% nCols = numel(famSF);
-%
-% figure('Position', [100 100 800*nCols 600*nRows]);
-% tiledlayout(nRows, nCols, 'TileSpacing', 'compact', 'Padding', 'compact');
-%
-% allVals = [res.nLL_mean];
-% cMin = min(allVals);
-% cMax = max(allVals);
-% bestPerFam = nan(nRows, nCols, 2);
-%
-% for iFamORI = 1:nRows
-%     for iFamSF = 1:nCols
-%
-%         nexttile; hold on;
-%
-%         thisFamORI = famORI(iFamORI);
-%         thisFamSF  = famSF(iFamSF);
-%
-%         M = nan(numel(candidateORI), numel(candidateSF));
-%
-%         idxPanel = strcmp(string({res.basisFamilyORI}), thisFamORI) & ...
-%             strcmp(string({res.basisFamilySF}),  thisFamSF);
-%
-%         resPanel = res(idxPanel);
-%
-%         for i = 1:numel(resPanel)
-%             r = resPanel(i);
-%
-%             iRow = find(candidateORI == r.nBasisORI, 1, 'first');
-%             iCol = find(candidateSF  == r.nBasisSF,  1, 'first');
-%
-%             M(iRow, iCol) = r.nLL_mean;
-%         end
-%
-%         % find minimum nLL in this panel
-%         [minVal, idxMin] = min(M(:), [], 'omitnan');
-%         [iRowMin, iColMin] = ind2sub(size(M), idxMin);
-%         best_nORI = candidateORI(iRowMin);
-%         best_nSF  = candidateSF(iColMin);
-%         bestPerFam(iFamORI, iFamSF, 1:2) = [best_nORI, best_nSF];
-%
-%         % Plot
-%         imagesc(1:numel(candidateSF), 1:numel(candidateORI), M);
-%         set(gca, 'YDir', 'normal', ...
-%             'XTick', 1:numel(candidateSF), ...
-%             'XTickLabel', string(candidateSF), ...
-%             'YTick', 1:numel(candidateORI), ...
-%             'YTickLabel', string(candidateORI), ...
-%             'FontSize', 10);
-%         axis square;
-%         clim([cMin cMax]);
-%         xlabel('nBasisSF');
-%         ylabel('nBasisORI');
-%         title(sprintf(['ORI: %s | SF: %s\n' 'min nLL = %.2f | nORI = %d, nSF = %d'], thisFamORI, thisFamSF, minVal, best_nORI, best_nSF), 'Interpreter', 'none');
-%
-%         % annotate cell values
-%         for iRow = 1:size(M,1)
-%             for iCol = 1:size(M,2)
-%                 if isfinite(M(iRow, iCol))
-%                     text(iCol, iRow, sprintf('%.2f', M(iRow, iCol)), ...
-%                         'HorizontalAlignment', 'center', ...
-%                         'VerticalAlignment', 'middle', ...
-%                         'FontSize', 8, 'Color', 'k');
-%                 end
-%             end % iCol
-%         end % iRow
-%
-%     end % iSF
-% end % iORI
-%
-% cb = colorbar;
-% cb.Layout.Tile = 'east';
-% cb.Label.String = 'Mean held-out nLL';
-%
-% sgtitle('Cross-validated basis selection landscape');
-% end
-
-%%
-% function plot_best_template_marginalized(template_est_2D, axis_ori_deg, axis_sf_log2, template_true, bestRes)
-%
-% nORI = numel(axis_ori_deg);
-% nSF  = numel(axis_sf_log2);
-%
-% hasTruth = ~isempty(template_true);
-%
-% % ---------------- estimated template ----------------
-% margORI_est = mean(template_est_2D, 2)';
-% margSF_est  = mean(template_est_2D, 1);
-%
-% if max(abs(margORI_est)) > 0
-%     margORI_est = margORI_est ./ max(abs(margORI_est));
-% end
-% if max(abs(margSF_est)) > 0
-%     margSF_est = margSF_est ./ max(abs(margSF_est));
-% end
-%
-% % ---------------- true template + true projected into selected basis ----------------
-% if hasTruth
-%     template_true_2D = reshape(template_true, [nORI, nSF]);
-%
-%     margORI_true = mean(template_true_2D, 2)';
-%     margSF_true  = mean(template_true_2D, 1);
-%
-%     if max(abs(margORI_true)) > 0
-%         margORI_true = margORI_true ./ max(abs(margORI_true));
-%     end
-%     if max(abs(margSF_true)) > 0
-%         margSF_true = margSF_true ./ max(abs(margSF_true));
-%     end
-%
-%     % Build opts from bestRes for basis-only projection
-%     opts_proj = struct();
-%     opts_proj.nBasisORI = bestRes.nBasisORI;
-%     opts_proj.nBasisSF  = bestRes.nBasisSF;
-%     opts_proj.basisFamilyORI = bestRes.basisFamilyORI;
-%     opts_proj.basisFamilySF  = bestRes.basisFamilySF;
-%     opts_proj.oriPeriod_deg = 180;
-%     opts_proj.sigmaORI_deg = [];
-%     opts_proj.sigmaSF_log2 = [];
-%     opts_proj.kappaORI = [];
-%     opts_proj.widthSF_logParabola = [];
-%
-%     out_proj = project_trueTemplate_to_basis(template_true_2D, axis_ori_deg, axis_sf_log2, opts_proj);
-%     template_proj_2D = out_proj.template_proj_2D;
-%
-%     margORI_proj = mean(template_proj_2D, 2)';
-%     margSF_proj  = mean(template_proj_2D, 1);
-%
-%     if max(abs(margORI_proj)) > 0
-%         margORI_proj = margORI_proj ./ max(abs(margORI_proj));
-%     end
-%     if max(abs(margSF_proj)) > 0
-%         margSF_proj = margSF_proj ./ max(abs(margSF_proj));
-%     end
-% end
-%
-% % ---------------- plot ----------------
-% figure('Position', [100 100 1000 400]);
-% tiledlayout(1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
-%
-% nexttile; hold on;
-% if hasTruth
-%     % True template in original space
-%     plot(axis_ori_deg, margORI_true, 'k-', 'LineWidth', 2, 'DisplayName', 'True');
-%     % True template projected into selected basis function
-%     plot(axis_ori_deg, margORI_proj, 'b--', 'LineWidth', 1.8, 'DisplayName', 'True \rightarrow basis');
-% end
-% % Estimated template, in basis function
-% plot(axis_ori_deg, margORI_est, 'r--', 'LineWidth', 1.8, 'DisplayName', 'Est.');
-%
-% legend('show', 'Location', 'best');
-% box on;
-% xlabel('Orientation (deg)');
-% ylabel('Marginalized weight');
-% ylim([-0.2 1.05]);
-% title(sprintf('ORI | %s | %s | nORI=%d, nSF=%d', ...
-%     bestRes.basisFamilyORI, bestRes.basisFamilySF, bestRes.nBasisORI, bestRes.nBasisSF), ...
-%     'Interpreter', 'none');
-%
-% nexttile; hold on;
-% if hasTruth
-%     plot(2.^axis_sf_log2, margSF_true, 'k-', 'LineWidth', 2, 'DisplayName', 'True');
-%     plot(2.^axis_sf_log2, margSF_proj, 'b--', 'LineWidth', 1.8, 'DisplayName', 'True \rightarrow basis');
-% end
-% plot(2.^axis_sf_log2, margSF_est, 'r--', 'LineWidth', 1.8, 'DisplayName', 'Est.');
-% legend('show', 'Location', 'best');
-% box on;
-% set(gca, 'XScale', 'log');
-% xlabel('Spatial frequency (cpd)');
-% ylabel('Marginalized weight');
-% ylim([-0.2 1.05]);
-% title(sprintf('SF | %s | %s | nORI=%d, nSF=%d', ...
-%     bestRes.basisFamilyORI, bestRes.basisFamilySF, bestRes.nBasisORI, bestRes.nBasisSF), ...
-%     'Interpreter', 'none');
-%
-% sgtitle('Best recovered template (marginalized)');
-% end
-
-%%
-% function out = project_trueTemplate_to_basis(template_true_2D, axis_ori_deg, axis_sf_log2, opts)
-
-% % Build basis
-% Bori = predSFkernel('make_basis_ori', axis_ori_deg, opts, 0);
-% Bsf  = predSFkernel('make_basis_sf', axis_sf_log2, opts, 0);
-
-% Kori = size(Bori, 2);
-% Ksf  = size(Bsf, 2);
-
-% % Solve least-squares projection:
-% % vec(T) ≈ kron(Bsf, Bori) * vec(Theta)
-% A = kron(Bsf, Bori);                  % [nORI*nSF x Kori*Ksf]
-% t = template_true_2D(:);              % [nORI*nSF x 1]
-
-% theta_vec = A \ t;                    % least-squares solution
-% Theta = reshape(theta_vec, [Kori, Ksf]);
-
-% template_proj_2D = Bori * Theta * Bsf';
-
-% out = struct();
-% out.template_proj_2D = template_proj_2D;
-% out.Theta = Theta;
-% out.Bori = Bori;
-% out.Bsf = Bsf;
-% end

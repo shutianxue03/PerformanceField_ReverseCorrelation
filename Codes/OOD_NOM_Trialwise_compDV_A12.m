@@ -64,25 +64,23 @@ eps_whiten = 1e-3;  % floor for eigenvalues
 % Setting for multivariate regression with smoothing
 % 1=Univariate; 2=MultiSmooth and Univariate
 if flag_regressType == 2
-    basisCfg = SX_RC_getBasisSettings();
-
-    opts = struct();
-    candidateORI = basisCfg.candidateORI;
-    candidateSF = basisCfg.candidateSF;
-    candidateBasisFamilyORI = {basisCfg.basisFamilyORI};
-    candidateBasisFamilySF = {basisCfg.basisFamilySF};
-    candidateRidge = basisCfg.candidateRidge;
-    opts.basisWidthScaleORI = basisCfg.basisWidthScaleORI; % set vector to search ORI width scales; typical range: [0.5, 0.9]; higher values = wider basis functions = stronger smoothing
-    opts.basisWidthScaleSF = basisCfg.basisWidthScaleSF; % set vector to search SF width scales; typical range: [0.5, 0.9]
-    opts.asymSF_rightLeftRatio = basisCfg.asymSF_rightLeftRatio; % typical range: [1.1, 1.5]
-    opts.nFolds = basisCfg.nFolds; % number of folds for cross-validation (CV) to select the best model
-    opts.link = basisCfg.link;
-    opts.sigmaORI_deg = basisCfg.sigmaORI_deg;
-    opts.sigmaSF_log2 = basisCfg.sigmaSF_log2;
-    opts.oriPeriod_deg = basisCfg.oriPeriod_deg;
-    opts.zscorePredictor = basisCfg.zscorePredictor;
-    opts.maxIter = basisCfg.maxIter;
-    opts.tol = basisCfg.tol;
+    basisCfg = struct();
+    basisCfg.basisFamilyORI = 'vonmises';
+    basisCfg.basisFamilySF = 'asymGaussianLog2';
+    basisCfg.asymSF_rightLeftRatio = 1.2;
+    basisCfg.oriPeriod_deg = 180;
+    basisCfg.nBasisORI = 3:2:11;
+    basisCfg.nBasisSF = 3:2:11;
+    basisCfg.basisWidthORI = .1:.2:1.1;
+    basisCfg.basisWidthSF = .1:.2:1.1;
+    basisCfg.Ridge = [1,10,100];
+    basisCfg.nFolds = 5;
+    basisCfg.link = 'probit';
+    basisCfg.sigmaORI_deg = [];
+    basisCfg.sigmaSF_log2 = [];
+    basisCfg.zscorePredictor = true;
+    basisCfg.maxIter = 100;
+    basisCfg.tol = 1e-6;
 end
 
 % Settings for fitting tuning functions
@@ -296,8 +294,8 @@ nBasisSF_tmpl_allIter = nan(nIter, 1);
 basisFxnORI_tmpl_allIter = cell(nIter, 1);
 basisFxnSF_tmpl_allIter  = cell(nIter, 1);
 ridge_tmpl_allIter = nBasisSF_tmpl_allIter;
-basisWidthScaleORI_tmpl_allIter = nBasisSF_tmpl_allIter;
-basisWidthScaleSF_tmpl_allIter  = nBasisSF_tmpl_allIter;
+basisWidthORI_tmpl_allIter = nBasisSF_tmpl_allIter;
+basisWidthSF_tmpl_allIter  = nBasisSF_tmpl_allIter;
 asymSF_rightLeftRatio_tmpl_allIter = nBasisSF_tmpl_allIter;
 % nLL_tmpl_allIter         = nan(nIter, 1); % training NLL of selected model (tmpl set)
 nLL_tmpl_allIter = nan(nIter, 1); % mean held-out NLL from CV model selection
@@ -386,8 +384,8 @@ parfor iIter = 1:nIter
     nBasisSF_tmpl = nan;
     basisFxnORI_tmpl = '';
     basisFxnSF_tmpl = '';
-    basisWidthScaleORI_tmpl = nan;
-    basisWidthScaleSF_tmpl = nan;
+    basisWidthORI_tmpl = nan;
+    basisWidthSF_tmpl = nan;
     asymSF_rightLeftRatio_tmpl = nan;
     ridge_tmpl = nan;
     nLL_tmpl = nan;
@@ -402,11 +400,11 @@ parfor iIter = 1:nIter
             template_full_white = SX_sim07_RC(e3D_full_forRC, resp_full_rand_sel);
 
         case 2  % Multivariate + smoothing
-            opts_local = opts;
-            opts_local.template_ideal = template_ideal;
+            basisCfg_thisIter = basisCfg;
+            basisCfg_thisIter.template_ideal = template_ideal;
 
             % For the "template set"
-            out = SX_RC_selectBasis_cv(e3D_tmpl_forRC, resp_tmpl_rand_sel, axisORI, axisSF, candidateORI, candidateSF, candidateBasisFamilyORI, candidateBasisFamilySF, candidateRidge, opts_local);
+            out = SX_RC_selectBasis_cv(e3D_tmpl_forRC, resp_tmpl_rand_sel, axisORI, axisSF, basisCfg_thisIter);
 
             % Store the outputs of the best fit
             template_tmpl_white = out.template2D;
@@ -419,13 +417,13 @@ parfor iIter = 1:nIter
             nBasisSF_tmpl = out.nBasisSF;
             basisFxnORI_tmpl = out.basisFamilyORI;
             basisFxnSF_tmpl = out.basisFamilySF;
-            basisWidthScaleORI_tmpl = out.basisWidthScaleORI;
-            basisWidthScaleSF_tmpl = out.basisWidthScaleSF;
+            basisWidthORI_tmpl = out.basisWidthORI;
+            basisWidthSF_tmpl = out.basisWidthSF;
             asymSF_rightLeftRatio_tmpl = out.asymSF_rightLeftRatio;
-            ridge_tmpl = out.ridge;
+            ridge_tmpl = out.Ridge;
 
             % Same thing for the full set, but just the best template
-            out = SX_RC_selectBasis_cv(e3D_full_forRC, resp_full_rand_sel, axisORI, axisSF, candidateORI, candidateSF, candidateBasisFamilyORI, candidateBasisFamilySF, candidateRidge, opts_local);
+            out = SX_RC_selectBasis_cv(e3D_full_forRC, resp_full_rand_sel, axisORI, axisSF, basisCfg_thisIter);
             template_full_white = out.template2D;
 
     end % switch
@@ -545,8 +543,8 @@ parfor iIter = 1:nIter
     nBasisSF_tmpl_allIter(iIter, :) = nBasisSF_tmpl;
     basisFxnORI_tmpl_allIter{iIter} = basisFxnORI_tmpl;
     basisFxnSF_tmpl_allIter{iIter} = basisFxnSF_tmpl;
-    basisWidthScaleORI_tmpl_allIter(iIter) = basisWidthScaleORI_tmpl;
-    basisWidthScaleSF_tmpl_allIter(iIter) = basisWidthScaleSF_tmpl;
+    basisWidthORI_tmpl_allIter(iIter) = basisWidthORI_tmpl;
+    basisWidthSF_tmpl_allIter(iIter) = basisWidthSF_tmpl;
     asymSF_rightLeftRatio_tmpl_allIter(iIter) = asymSF_rightLeftRatio_tmpl;
     ridge_tmpl_allIter(iIter) = ridge_tmpl;
 

@@ -247,74 +247,74 @@ if iModelA_fit==1 % data-derived template
 end
 
 
-%% Figure 4: Plot rank of selected basis counts / families / width scales / ridge across iterations
+%% Figure 4: Plot rank of selected basis counts / families / width / ridge across iterations
 
-% if ~exist('asymSF_rightLeftRatio_tmpl_allIter', 'var')
-%     asymSF_rightLeftRatio_tmpl_allIter = nan(size(nBasisSF_tmpl_allIter));
-% end
-%
-% figure('Position', [100 100 1600 800]);
-% % tiledlayout(3, 3, 'TileSpacing', 'compact', 'Padding', 'compact');
-%
-% % ---------- 1. nBasisORI ----------
-% subplot(2,4,1); hold on;
-% plot_ranked_categorical(nBasisORI_tmpl_allIter, 'nBasisORI');
-% ylabel('% iterations selected');
-% title('nBasisORI');
-% box on;
-%
-% % ---------- 2. nBasisSF ----------
-% subplot(2,4,5); hold on;
-% plot_ranked_categorical(nBasisSF_tmpl_allIter, 'nBasisSF');
-% ylabel('% iterations selected');
-% title('nBasisSF');
-% box on;
-%
-% % ---------- 3. basisFxnORI ----------
-% subplot(2,4,2); hold on;
-% plot_ranked_categorical(basisFxnORI_tmpl_allIter, 'basisFxnORI');
-% ylabel('% iterations selected');
-% title('basisFxnORI');
-% box on;
-%
-% % ---------- 4. basisFxnSF ----------
-% subplot(2,4,6); hold on;
-% plot_ranked_categorical(basisFxnSF_tmpl_allIter, 'basisFxnSF');
-% ylabel('% iterations selected');
-% title('basisFxnSF');
-% box on;
-%
-% % ---------- 5. basisWidthScaleORI ----------
-% subplot(2,4,3); hold on;
-% plot_ranked_categorical(basisWidthScaleORI_tmpl_allIter, 'basisWidthScaleORI');
-% ylabel('% iterations selected');
-% title('basisWidthScaleORI');
-% box on;
-%
-% % ---------- 6. basisWidthScaleSF ----------
-% subplot(2,4,7); hold on;
-% plot_ranked_categorical(basisWidthScaleSF_tmpl_allIter, 'basisWidthScaleSF');
-% ylabel('% iterations selected');
-% title('basisWidthScaleSF');
-% box on;
-%
-% % ---------- 7. ridge ----------
-% subplot(2,4,4); hold on;
-% plot_ranked_categorical(ridge_tmpl_allIter, 'ridge');
-% ylabel('% iterations selected');
-% title('ridge');
-% box on;
-%
-% % ---------- 8. asymSF_rightLeftRatio ----------
-% subplot(2,4,8); hold on;
-% plot_ranked_categorical(asymSF_rightLeftRatio_tmpl_allIter, 'asymSF_rightLeftRatio');
-% ylabel('% iterations selected');
-% title('asymSF_rightLeftRatio');
-% box on;
-%
-% sgtitle('Rank of selected basis settings across iterations');
-%
-% saveas(gcf, sprintf('%s/14SelectedBasis_L%d_A%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit))
+if ~exist('asymSF_rightLeftRatio_tmpl_allIter', 'var')
+    asymSF_rightLeftRatio_tmpl_allIter = nan(size(nBasisSF_tmpl_allIter));
+end
+
+figure('Position', [100 100 1600 800]);
+% tiledlayout(3, 3, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+% ---------- 1. nBasisORI ----------
+subplot(2,4,1); hold on;
+plot_ranked_categorical(nBasisORI_tmpl_allIter, 'nBasisORI');
+ylabel('% iterations selected');
+title('nBasisORI');
+box on;
+
+% ---------- 2. nBasisSF ----------
+subplot(2,4,5); hold on;
+plot_ranked_categorical(nBasisSF_tmpl_allIter, 'nBasisSF');
+ylabel('% iterations selected');
+title('nBasisSF');
+box on;
+
+% ---------- 3. basisFxnORI ----------
+subplot(2,4,2); hold on;
+plot_ranked_categorical(basisFxnORI_tmpl_allIter, 'basisFxnORI');
+ylabel('% iterations selected');
+title('basisFxnORI');
+box on;
+
+% ---------- 4. basisFxnSF ----------
+subplot(2,4,6); hold on;
+plot_ranked_categorical(basisFxnSF_tmpl_allIter, 'basisFxnSF');
+ylabel('% iterations selected');
+title('basisFxnSF');
+box on;
+
+% ---------- 5. basisWidthORI ----------
+subplot(2,4,3); hold on;
+plot_ranked_categorical(basisWidthORI_tmpl_allIter, 'basisWidthORI');
+ylabel('% iterations selected');
+title('basisWidthORI');
+box on;
+
+% ---------- 6. basisWidthSF ----------
+subplot(2,4,7); hold on;
+plot_ranked_categorical(basisWidthScaleSfigurF_tmpl_allIter, 'basisWidthSF');
+ylabel('% iterations selected');
+title('basisWidthSF');
+box on;
+
+% ---------- 7. ridge ----------
+subplot(2,4,4); hold on;
+plot_ranked_categorical(ridge_tmpl_allIter, 'ridge');
+ylabel('% iterations selected');
+title('ridge');
+box on;
+
+% ---------- 8. asymSF_rightLeftRatio ----------
+subplot(2,4,8); hold on;
+plot_ranked_categorical(asymSF_rightLeftRatio_tmpl_allIter, 'asymSF_rightLeftRatio');
+ylabel('% iterations selected');
+title('asymSF_rightLeftRatio');
+box on;
+
+sgtitle('Rank of selected basis settings across iterations');
+
+saveas(gcf, sprintf('%s/14SelectedBasis_L%d_A%d.jpg', nameFolder_Figures_perSubj, iLocComb, iModelA_fit))
 
 %% ---------- local helper ----------
 function plot_ranked_categorical(vals, xLabelText)
