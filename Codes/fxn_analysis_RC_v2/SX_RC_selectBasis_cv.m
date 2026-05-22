@@ -22,45 +22,18 @@ end
 %% Extract (range of) hyperparameters
 candidateORI = opts.nBasisORI(:)';
 candidateSF = opts.nBasisSF(:)';
-
-if isfield(opts, 'candidateBasisFamilyORI') && ~isempty(opts.candidateBasisFamilyORI)
-    candidateBasisFamilyORI = opts.candidateBasisFamilyORI;
-else
-    candidateBasisFamilyORI = opts.basisFamilyORI;
-end
-if isfield(opts, 'candidateBasisFamilySF') && ~isempty(opts.candidateBasisFamilySF)
-    candidateBasisFamilySF = opts.candidateBasisFamilySF;
-else
-    candidateBasisFamilySF = opts.basisFamilySF;
-end
-if ischar(candidateBasisFamilyORI) || isstring(candidateBasisFamilyORI)
-    candidateBasisFamilyORI = cellstr(candidateBasisFamilyORI);
-end
-if ischar(candidateBasisFamilySF) || isstring(candidateBasisFamilySF)
-    candidateBasisFamilySF = cellstr(candidateBasisFamilySF);
-end
-
+candidateBasisFamilyORI = opts.basisFamilyORI;
+candidateBasisFamilySF = opts.basisFamilySF;
+candidateBasisFamilyORI = cellstr(candidateBasisFamilyORI); % turn into cellstr if it's a single string for easier handling in comb loop
+candidateBasisFamilySF = cellstr(candidateBasisFamilySF);
 candidateBasisWidthORI = opts.basisWidthORI(:)';
 candidateBasisWidthSF = opts.basisWidthSF(:)';
 candidateAsymSF_rightLeftRatio = opts.asymSF_rightLeftRatio(:)';
-
-if isfield(opts, 'Ridge') && ~isempty(opts.Ridge)
-    candidateRidge = opts.Ridge(:)';
-else
-    candidateRidge = opts.ridge(:)';
-end
+candidateRidge = opts.Ridge(:)';
 
 %% ---------------- create CV folds ----------------
-if isfield(opts, 'foldID') && ~isempty(opts.foldID)
-    foldID = opts.foldID(:);
-    if length(foldID) ~= nTrials
-        error('opts.foldID length does not match number of trials');
-    end
-    nFolds = max(foldID);
-else
-    nFolds = opts.nFolds;
-    foldID = make_cv_folds(resp_allT, nFolds, opts);
-end
+nFolds = opts.nFolds;
+foldID = make_cv_folds(resp_allT, nFolds, opts);
 
 % precompute fold masks once
 idxTrain_all = cell(nFolds,1);
@@ -144,6 +117,7 @@ for iComb = 1:nCombBase
         Z_train = Z_all(idxTrain, :);
         Z_test  = Z_all(idxTest, :);
 
+        % fold-specific standardization and design matrix construction
         [Xtrain_all{iFold}, Xtest_all{iFold}] = prepare_fold_design_matrices(Z_train, Z_test, opts.zscorePredictor);
 
         rtrain_all{iFold} = resp_allT(idxTrain);
@@ -159,10 +133,11 @@ for iComb = 1:nCombBase
         % warm start across ridge values within a fold would require
         % storing one beta per fold. Keep simple first.
         for iFold = 1:nFolds
+            % fit on train, predict on test using precomputed X
             beta = fit_ridge_glm_from_X(Xtrain_all{iFold}, rtrain_all{iFold}, ridge, opts.link, opts.maxIter, opts.tol);
-
+            % Prediction on test set using the beta fitted on the train set of this fold
             pred = predict_ridge_glm_from_X(Xtest_all{iFold}, rtest_all{iFold}, beta, opts.link);
-
+            % Store the test nLL for this fold
             nLL_test_allFolds(iFold) = pred.nLL;
         end
 

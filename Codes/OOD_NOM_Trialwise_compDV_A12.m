@@ -69,11 +69,11 @@ if flag_regressType == 2
     basisCfg.basisFamilySF = 'asymGaussianLog2';
     basisCfg.asymSF_rightLeftRatio = 1.2;
     basisCfg.oriPeriod_deg = 180;
-    basisCfg.nBasisORI = 3:2:11;
-    basisCfg.nBasisSF = 3:2:11;
-    basisCfg.basisWidthORI = .1:.2:1.1;
-    basisCfg.basisWidthSF = .1:.2:1.1;
-    basisCfg.Ridge = [1,10,100];
+    basisCfg.nBasisORI = 3; go back to the values reported in the paper
+    basisCfg.nBasisSF = 7;
+    basisCfg.basisWidthORI = .1;
+    basisCfg.basisWidthSF = .1;
+    basisCfg.Ridge = 100;
     basisCfg.nFolds = 5;
     basisCfg.link = 'probit';
     basisCfg.sigmaORI_deg = [];
@@ -314,7 +314,7 @@ margR2_SF_allIter = nan(nIter, 2);
 
 fprintf('%s: A1 Started running %d iterations.\n\n', datetime('now'), nIter)
 
-parfor iIter = 1:nIter
+for iIter = 1:nIter
     fprintf('\n%s: %d...', datetime('now'), iIter);
 
     % Deterministic randomness for THIS iteration (global index across jobs)
@@ -433,6 +433,9 @@ parfor iIter = 1:nIter
     % undo the (z-score + whitening) mapping that was applied to RC inputs.
     template_tmpl_raw = fxn_convertTemp2Raw(template_tmpl_white, Tfix);
     template_full_raw = fxn_convertTemp2Raw(template_full_white, Tfix);
+
+    template_tmpl_raw = template_tmpl_white;
+    template_full_raw = template_full_white;
 
     %% [A1] 4. Regularize the derived template
     template_full_raw = fxn_getTemplate(template_full_raw, templateType, flag_plot_template);

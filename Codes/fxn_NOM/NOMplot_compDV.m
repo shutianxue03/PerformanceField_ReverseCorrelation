@@ -248,7 +248,6 @@ end
 
 
 %% Figure 4: Plot rank of selected basis counts / families / width / ridge across iterations
-
 if ~exist('asymSF_rightLeftRatio_tmpl_allIter', 'var')
     asymSF_rightLeftRatio_tmpl_allIter = nan(size(nBasisSF_tmpl_allIter));
 end
@@ -293,7 +292,7 @@ box on;
 
 % ---------- 6. basisWidthSF ----------
 subplot(2,4,7); hold on;
-plot_ranked_categorical(basisWidthScaleSfigurF_tmpl_allIter, 'basisWidthSF');
+plot_ranked_categorical(basisWidthSF_tmpl_allIter, 'basisWidthSF');
 ylabel('% iterations selected');
 title('basisWidthSF');
 box on;

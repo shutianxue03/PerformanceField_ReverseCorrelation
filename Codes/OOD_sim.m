@@ -1,21 +1,17 @@
-function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, cSDT_true, lambda_whiten, iModelB_sim, nIter)
+% function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, cSDT_true, lambda_whiten, iModelB_sim, nIter)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Script name: OOD_sim.m
-% Adapted by Shutian Xue on 03/27/2026
+% Adapted by Shutian Xue on 05/27/2026
 %
 % This script simulates observer responses based on a trial-wise
 % noisy observer model (NOM), and then runs the updated
 % OOD_NOM_Trialwise_compDV / OOD_NOM_Trialwise_fitNOM pipeline
 % on the simulated data.
-%
-% Notes:
-% - Gabor SD is normalized by SF only when creating the filters,
-% not when creating the Gabor patches.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Simulation input parameters
-iModelA_fit_all = [2]; % DO NOT CHANGE! 1 = RC-derived template (Model A), 2=ideal template; 3=permuted template
+iModelA_fit_all = [1:2]; % DO NOT CHANGE! 1 = RC-derived template (Model A), 2=ideal template; 3=permuted template
 iModelB_fit_all = iModelB_sim; %1=full, 2=No Nmul, 3=No Nadd, 4=No Nshared, 5=Nmul-only, 6=Nadd-only, 7=Nshared-only, 8=criterion-only
 
 % Enforce reduced-model ground truth by zeroing excluded IN terms.
@@ -365,7 +361,7 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
     save(sprintf('%s/behavMeas.mat', nameFolder_Data_OOD_IO), 'dataMatrix', 'metrics_sim', 'iPRS_allT', 'iPass_allT', 'iPair_allT', 'resp_allT', 'pC_filter');
     fprintf('\n%s: Behavioral data saved.\n\nReady for template generation\n\n', datetime('now'))
 
-    %% Run compDV and fitNOM on this IO
+    %% Step 1: Estimate the template and compute DV
     % Step 1: compute DVs, templates, and test-set metrics
     %----------------------------%
     OOD_NOM_Trialwise_compDV_A12({nameIO, criterion_DV_true}, iLocComb, lambda_whiten, nIter, nJob, iJob)
@@ -431,7 +427,7 @@ fprintf('%s: Simulation done.\n\n', time_end)
 elapsed = time_end - time_start;
 fprintf('Time used: %s\n\n\n\n', char(elapsed));
 
-end % end of the OOD_sim function
+% end % end of the OOD_sim function
 
 
 %% helper
