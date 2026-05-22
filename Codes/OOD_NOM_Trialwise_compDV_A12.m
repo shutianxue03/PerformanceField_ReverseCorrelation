@@ -69,7 +69,7 @@ if flag_regressType == 2
     basisCfg.basisFamilySF = 'asymGaussianLog2';
     basisCfg.asymSF_rightLeftRatio = 1.2;
     basisCfg.oriPeriod_deg = 180;
-    basisCfg.nBasisORI = 3; go back to the values reported in the paper
+    basisCfg.nBasisORI = 3;
     basisCfg.nBasisSF = 7;
     basisCfg.basisWidthORI = .1;
     basisCfg.basisWidthSF = .1;
@@ -311,10 +311,11 @@ margSF_allIter = nan(nIter, 2, nSF);
 margPred_SF_allIter = nan(nIter, 2, nSF);
 margParams_SF_allIter = nan(nIter, 2, length(namesParams_all{iFamily_SF}));
 margR2_SF_allIter = nan(nIter, 2);
+DVcorr_converted_allIter = nan(nIter, 2);   % 1=template set, 2=full set
 
 fprintf('%s: A1 Started running %d iterations.\n\n', datetime('now'), nIter)
 
-for iIter = 1:nIter
+parfor iIter = 1:nIter
     fprintf('\n%s: %d...', datetime('now'), iIter);
 
     % Deterministic randomness for THIS iteration (global index across jobs)
@@ -329,7 +330,7 @@ for iIter = 1:nIter
     resp_full_rand = R.resp_full_rand;
     cst_full_rand = R.cst_full_rand;
     respC_full_rand = R.respC_full_rand;
-    iPair_full_rand = R.iPair_full_rand;
+    % iPair_full_rand = R.iPair_full_rand;
     RT_full_rand = R.RT_full_rand;
 
     e3D_tmpl_rand = R.e3D_tmpl_rand;
@@ -337,7 +338,7 @@ for iIter = 1:nIter
     resp_tmpl_rand = R.resp_tmpl_rand;
     cst_tmpl_rand = R.cst_tmpl_rand;
     respC_tmpl_rand = R.respC_tmpl_rand;
-    iPair_tmpl_rand = R.iPair_tmpl_rand;
+    % iPair_tmpl_rand = R.iPair_tmpl_rand;
     RT_tmpl_rand = R.RT_tmpl_rand;
 
     e3D_train_rand = R.e3D_train_rand;
@@ -362,11 +363,11 @@ for iIter = 1:nIter
     % sel for "selected"
     e3D_tmpl_rand_sel = e3D_tmpl_rand(useIdx_tmpl, :, :);
     resp_tmpl_rand_sel = resp_tmpl_rand(useIdx_tmpl);
-    iPRS_tmpl_rand_sel = iPRS_tmpl_rand(useIdx_tmpl);
+    % iPRS_tmpl_rand_sel = iPRS_tmpl_rand(useIdx_tmpl);
 
     e3D_full_rand_sel = e3D_full_rand(useIdx_full, :, :);
     resp_full_rand_sel = resp_full_rand(useIdx_full);
-    iPRS_full_rand_sel = iPRS_full_rand(useIdx_full);
+    % iPRS_full_rand_sel = iPRS_full_rand(useIdx_full);
 
     %% [A1] 2b. Build fixed transform from ABS template trials only
     Tfix = fxn_buildFixedTransformFromABS(e3D_tmpl_rand, iPRS_tmpl_rand, lambda_whiten, eps_whiten);
@@ -388,9 +389,9 @@ for iIter = 1:nIter
     basisWidthSF_tmpl = nan;
     asymSF_rightLeftRatio_tmpl = nan;
     ridge_tmpl = nan;
-    nLL_tmpl = nan;
+    % nLL_tmpl = nan;
     nLL_cv_mean_tmpl = nan;
-    nLL_cv_se_tmpl = nan;
+    % nLL_cv_se_tmpl = nan;
     pseudoR2_Tjur_tmpl = nan;
 
     % Estimate template in whitened space via regression
@@ -434,8 +435,14 @@ for iIter = 1:nIter
     template_tmpl_raw = fxn_convertTemp2Raw(template_tmpl_white, Tfix);
     template_full_raw = fxn_convertTemp2Raw(template_full_white, Tfix);
 
-    template_tmpl_raw = template_tmpl_white;
-    template_full_raw = template_full_white;
+    % Diagnostic check for the conversion algebra.
+    % If the inverse mapping is correct, the dot product in whitened space
+    % should match the equivalent dot product in z-scored space.
+    DVcorr_converted = fxn_checkConvertedDVConsistency(e3D_tmpl_rand_sel, e3D_tmpl_forRC, template_tmpl_white, Tfix);
+
+    % Testing: do NOT inverse-whitene the estimated template
+    % template_tmpl_raw = template_tmpl_white;
+    % template_full_raw = template_full_white;
 
     %% [A1] 4. Regularize the derived template
     template_full_raw = fxn_getTemplate(template_full_raw, templateType, flag_plot_template);
@@ -526,6 +533,8 @@ for iIter = 1:nIter
 
         %% [A1] 6. Metrics, DV, binning, data structs (tmpl split only)
         if iDataset == 1
+
+
             % DV is ALWAYS computed from RAW channel energy times the
             % raw-space template. No basis-projection override.
             [data_train, data_test, metrics] = fxn_compDV_packData( ...
@@ -542,6 +551,8 @@ for iIter = 1:nIter
     %% [A1] Store template-related values
     template_tmpl_allIter(iIter, :, :) = template_tmpl_raw;
     template_full_allIter(iIter, :, :) = template_full_raw;
+    DVcorr_converted_allIter(iIter, :) = DVcorr_converted;
+    
     nBasisORI_tmpl_allIter(iIter, :) = nBasisORI_tmpl;
     nBasisSF_tmpl_allIter(iIter, :) = nBasisSF_tmpl;
     basisFxnORI_tmpl_allIter{iIter} = basisFxnORI_tmpl;
@@ -553,18 +564,14 @@ for iIter = 1:nIter
 
     % GoF
     nLL_tmpl_allIter(iIter) = nLL_cv_mean_tmpl;
-    % nLL_cv_se_tmpl_allIter(iIter) = nLL_cv_se_tmpl;
     pseudoR2_Tjur_tmpl_allIter(iIter) = pseudoR2_Tjur_tmpl;
 
 end % end parfor iIter
 
 fprintf('\n\n%s: A1 All iterations done.\n\n', datetime('now'))
 
-time_progress = ceil(minutes(datetime('now')-time_start)); % round up to minutes
-
 %% [A1] Save
-save(nameFile_compDV_A1, 'time_progress', 'template_ideal', '*_allIter', 'names*', 'flag*', 'ratio_split', 'ORI_bound', '*Type');
-
+save(nameFile_compDV_A1, 'template_ideal', '*_allIter', 'names*', 'flag*', 'ratio_split', 'ORI_bound', '*Type');
 fprintf('\n\n%s: A1 Outputs saved.\n\n', datetime('now'))
 
 %% [A1] Plot
@@ -688,10 +695,8 @@ end % end parfor iIter
 
 fprintf('\n\n%s: A2 All iterations done.\n\n', datetime('now'))
 
-time_progress = ceil(minutes(datetime('now')-time_start)); % round up to minutes
-
 %% [A2] SAVE
-save(nameFile_compDV_A2, 'time_progress', 'template_ideal', '*_allIter', 'names*', 'flag*', 'ratio_split', 'ORI_bound', '*Type');
+save(nameFile_compDV_A2, 'template_ideal', '*_allIter', 'names*', 'flag*', 'ratio_split', 'ORI_bound', '*Type');
 
 fprintf('\n\n%s: A2 Outputs saved.\n\n', datetime('now'))
 end
@@ -823,6 +828,39 @@ else
 end
 t_raw = t_z ./ sigma_vec;
 template_converted = reshape(t_raw, size(template_white));
+end
+
+%%
+function dvCorr = fxn_checkConvertedDVConsistency(e3D_raw, e3D_white, template_white, Tfix)
+% Check that the template conversion is algebraically consistent.
+%
+% Whitening case:
+%   E_white = (E_z - mu_cov_abs) * Q
+%   t_z     = Q * t_white
+% so
+%   DV_white = E_white * t_white
+%   DV_z     = (E_z - mu_cov_abs) * t_z
+%
+% No-whitening case:
+%   E_white == E_z and t_z == t_white.
+
+[nTrials, nORI, nSF] = size(e3D_raw);
+e3D_raw = reshape(e3D_raw, [nTrials, nORI * nSF]);
+e3D_white = reshape(e3D_white, [nTrials, nORI * nSF]);
+
+e3D_converted = (e3D_raw - Tfix.mu_abs) ./ Tfix.sigma_abs;
+template_white = template_white(:);
+
+DV_white = e3D_white * template_white;
+
+if Tfix.useWhiten
+    template_converted = Tfix.Q * template_white;
+    DV_converted = bsxfun(@minus, e3D_converted, Tfix.mu_cov_abs) * template_converted;
+else
+    DV_converted = e3D_converted * template_white;
+end
+
+dvCorr = corr(DV_white, DV_converted);
 end
 
 %%
