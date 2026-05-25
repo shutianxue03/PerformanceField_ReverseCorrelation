@@ -20,7 +20,13 @@ sigma_abs(~isfinite(sigma_abs) | sigma_abs < 1e-8) = 1e-8;
 e3D_allAbs_z = (e3D_allAbs - mu_abs) ./ sigma_abs;
 
 %% Optional whitening matrix from z-scored ABS trials
-[mu_cov_abs, Q] = fxn_getWhiteningMatrix(e3D_allAbs_z, lambda_whiten, eps_whiten);
+disableWhiten = isnan(lambda_whiten) || isequal(lambda_whiten, 99);
+if disableWhiten
+    mu_cov_abs = [];
+    Q = [];
+else
+    [mu_cov_abs, Q] = fxn_getWhiteningMatrix(e3D_allAbs_z, lambda_whiten, eps_whiten);
+end
 
 %% Pack
 Tfix = struct();
@@ -28,7 +34,7 @@ Tfix.mu_abs     = mu_abs;        % [1, nORI*nSF]
 Tfix.sigma_abs  = sigma_abs;     % [1, nORI*nSF]
 Tfix.mu_cov_abs = mu_cov_abs;    % [1, nORI*nSF]
 Tfix.Q          = Q;             % [nChan, nChan] or []
-Tfix.useWhiten  = ~isempty(Q);
+Tfix.useWhiten  = ~disableWhiten;
 
 end % fxn_buildFixedTransformFromABS
 

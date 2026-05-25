@@ -21,7 +21,7 @@ addpath(genpath('Codes/'));
 
 %% Global settings
 % Define directories
-nORI=19;
+nORI = 19;
 
 % --------------%
 SX_RC1_setting; % defines nameFolder_*, nORI, nSF, namesLocComb, namesModelA, etc.
@@ -69,10 +69,10 @@ if flag_regressType == 2
     basisCfg.basisFamilySF = 'asymGaussianLog2';
     basisCfg.asymSF_rightLeftRatio = 1.2;
     basisCfg.oriPeriod_deg = 180;
-    basisCfg.nBasisORI = 3;
-    basisCfg.nBasisSF = 7;
-    basisCfg.basisWidthORI = .1;
-    basisCfg.basisWidthSF = .1;
+    basisCfg.nBasisORI = 4;
+    basisCfg.nBasisSF = 6;
+    basisCfg.basisWidthORI = .9;
+    basisCfg.basisWidthSF = .6;
     basisCfg.Ridge = 100;
     basisCfg.nFolds = 5;
     basisCfg.link = 'probit';
@@ -265,10 +265,13 @@ template_ideal = fxn_getTemplate(template_ideal, templateType_true, 0);
 %--------------------------------------------%
 
 % Do L2 normalization
-% MAKE SURE THIS IS the same as OOD_xx_compDV_A12 when creating the ideal template
-template_ideal = template_ideal / norm(template_ideal(:));
+% ENSURE this step is consistent with OOD_xx_compDV_A12 when creating the ideal template
+% template_true = template_true / norm(template_true(:));
+template_ideal = template_ideal - min(template_ideal(:));
+template_ideal = template_ideal ./ max(template_ideal(:));
+template_ideal = 0.1 * template_ideal;
 
-fprintf('%s: Ideal template created.\n\n', datetime('now'))
+fprintf('%s: Ideal template created and scaled.\n\n', datetime('now'))
 
 %% Stage overview
 % A1: estimate trial-wise templates from data and compute DVs.
@@ -441,8 +444,8 @@ parfor iIter = 1:nIter
     DVcorr_converted = fxn_checkConvertedDVConsistency(e3D_tmpl_rand_sel, e3D_tmpl_forRC, template_tmpl_white, Tfix);
 
     % Testing: do NOT inverse-whitene the estimated template
-    % template_tmpl_raw = template_tmpl_white;
-    % template_full_raw = template_full_white;
+    template_tmpl_raw = template_tmpl_white;
+    template_full_raw = template_full_white;
 
     %% [A1] 4. Regularize the derived template
     template_full_raw = fxn_getTemplate(template_full_raw, templateType, flag_plot_template);

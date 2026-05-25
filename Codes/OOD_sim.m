@@ -1,4 +1,4 @@
-% function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, cSDT_true, lambda_whiten, iModelB_sim, nIter)
+function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, cSDT_true, lambda_whiten, iModelB_sim, nIter)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Script name: OOD_sim.m
@@ -164,9 +164,12 @@ template_true = fxn_getTemplate(template_true, templateType_true, 0);
 %--------------------------------------------%
 
 % Do L2 normalization
-% MAKE SURE THIS IS the same as OOD_xx_compDV_A12 when creating the ideal template
-template_true = template_true / norm(template_true(:));
-fprintf('%s: Ground-truth template created.\n\n', datetime('now'))
+% ENSURE this step is consistent with OOD_xx_compDV_A12 when creating the ideal template
+% template_true = template_true / norm(template_true(:));
+template_true = template_true - min(template_true(:));
+template_true = template_true ./ max(template_true(:));
+template_true = 0.1 * template_true;
+fprintf('%s: Ground-truth template created and scaled.\n\n', datetime('now'))
 
 %% Preallocate sim arrays
 nMetrics = 11;
@@ -427,8 +430,7 @@ fprintf('%s: Simulation done.\n\n', time_end)
 elapsed = time_end - time_start;
 fprintf('Time used: %s\n\n\n\n', char(elapsed));
 
-% end % end of the OOD_sim function
-
+end % end of the OOD_sim function
 
 %% helper
 function [loss, cSDT, pHit, pFA] = fxn_loss_cSDT(k, DV_noisy, iPRS_allT, target_cSDT)
