@@ -54,12 +54,12 @@ if flag_regressType == 2
     basisCfg = struct();
     basisCfg.basisFamilyORI = 'vonmises';
     basisCfg.basisFamilySF = 'asymGaussianLog2';
-    basisCfg.asymSF_rightLeftRatio = 1.2;
     basisCfg.oriPeriod_deg = 180;
-    basisCfg.nBasisORI = 4:2:8;
-    basisCfg.nBasisSF = 4:2:8;
-    basisCfg.basisWidthORI = .4:.2:1;
-    basisCfg.basisWidthSF = .4:.2:1;
+    basisCfg.nBasisORI = 4;
+    basisCfg.nBasisSF = 6;
+    basisCfg.basisWidthORI = .9;
+    basisCfg.basisWidthSF = .6;
+    basisCfg.asymSF_rightLeftRatio = 1.2;
     basisCfg.Ridge = 100;
     basisCfg.nFolds = 5;
     basisCfg.link = 'probit';
@@ -285,9 +285,7 @@ ridge_tmpl_allIter = nBasisSF_tmpl_allIter;
 basisWidthORI_tmpl_allIter = nBasisSF_tmpl_allIter;
 basisWidthSF_tmpl_allIter  = nBasisSF_tmpl_allIter;
 asymSF_rightLeftRatio_tmpl_allIter = nBasisSF_tmpl_allIter;
-% nLL_tmpl_allIter         = nan(nIter, 1); % training NLL of selected model (tmpl set)
 nLL_tmpl_allIter = nan(nIter, 1); % mean held-out NLL from CV model selection
-% nLL_cv_se_tmpl_allIter   = nan(nIter, 1); % SE of held-out NLL across CV folds
 pseudoR2_Tjur_tmpl_allIter = nan(nIter, 1); % Tjur R² on training set
 
 sep_allIter = nan(nIter, 2); % 1=template set, 2=full set
