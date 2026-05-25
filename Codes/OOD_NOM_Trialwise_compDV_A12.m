@@ -1,11 +1,5 @@
-function OOD_NOM_Trialwise_compDV_A12(isubj, iLocComb, nIter, nJob, iJob)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% OOD_NOM_Trialwise_compDV.m
-%
-% Trial-wise noisy observer model – PRE-ESTIMATION STAGE
-%
+function OOD_NOM_Trialwise_compDV_A12(isubj, iLocComb, nIter, nJob, iJob, flag_normDV)
 % Created by Shutian Xue on August 27, 2025
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 clc; close all;
 warning off; % (You may want to remove this once things are stable.)
@@ -34,10 +28,6 @@ nSF=nSF;
 axisORI = filtersOri_all - 90;
 axisSF = filtersSF_all_log;
 
-% nameFolder_Data = sprintf('%s/Data_Part2_nBasis%d%d_noMirror', nameFolder_server, nBasisORI, nBasisSF) ;
-% nameFolder_Data_OOD = sprintf('%s/Data_OOD_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
-% nameFolder_Data_NOM_Trialwise = sprintf('%s/Data_NOM_Trialwise_%d%d', nameFolder_Data, nORI, nSF);  % Folder to save data
-
 %% Deterministic RNG (grand seed + per-iteration substreams)
 S_seed = GetGrandSeed(nIter, iJob, nJob, nameFolder_Data);
 
@@ -51,7 +41,6 @@ RandStream.setGlobalStream(stream);
 str_DVType = 'sum'; % 1=sum of the dot product/convolution; 2=max; 3=normalized
 str_templateType = 'raw'; % (1) raw (2) reconstructed kernel (3) mirrored template
 str_itype_template = 'ABS'; % 1=estimate template from PRS trials, ABS trials, or BOTH trials
-flag_normDV = 1; % 1=scale-only DV normalization from training-set SD; 0=raw DV
 flag_PatchMode = 1; % if flag_PatchMode == 1, patchMode = 'T'; else, patchMode = 'N'; end
 flag_plot_template = 0;
 
@@ -67,10 +56,10 @@ if flag_regressType == 2
     basisCfg.basisFamilySF = 'asymGaussianLog2';
     basisCfg.asymSF_rightLeftRatio = 1.2;
     basisCfg.oriPeriod_deg = 180;
-    basisCfg.nBasisORI = 4;
-    basisCfg.nBasisSF = 6;
-    basisCfg.basisWidthORI = .9;
-    basisCfg.basisWidthSF = .6;
+    basisCfg.nBasisORI = 4:2:8;
+    basisCfg.nBasisSF = 4:2:8;
+    basisCfg.basisWidthORI = .4:.2:1;
+    basisCfg.basisWidthSF = .4:.2:1;
     basisCfg.Ridge = 100;
     basisCfg.nFolds = 5;
     basisCfg.link = 'probit';
@@ -265,10 +254,7 @@ template_ideal = fxn_getTemplate(template_ideal, str_templateType_true, 0);
 
 % Do L2 normalization
 % ENSURE this step is consistent with OOD_xx_compDV_A12 when creating the ideal template
-template_true = template_true / norm(template_true(:));
-% template_ideal = template_ideal - min(template_ideal(:));
-% template_ideal = template_ideal ./ max(template_ideal(:));
-% template_ideal = 0.1 * template_ideal;
+template_ideal = template_ideal / norm(template_ideal(:));
 
 fprintf('%s: Ideal template created and scaled.\n\n', datetime('now'))
 
@@ -428,8 +414,8 @@ parfor iIter = 1:nIter
     end % switch
 
     %% [A1] 4. Regularize the derived template
-    template_full = fxn_getTemplate(template_full, str_templateType, flag_plot_template);
     template_tmpl = fxn_getTemplate(template_tmpl, str_templateType, flag_plot_template);
+    template_full = fxn_getTemplate(template_full, str_templateType, flag_plot_template);
 
     %% [A1] 5. Marginalization, fit tuning functions, and calculate DV
 
@@ -440,9 +426,6 @@ parfor iIter = 1:nIter
     d_test  = struct('resp', resp_test_rand,  'iPRS', iPRS_test_rand,  'respC', respC_test_rand,  'cst', cst_test_rand,  'RT', RT_test_rand,  'iPair', iPair_test_rand);
 
     for iDataset = 1:2 % 1=template set; 2=full set
-        DV_train_override = [];
-        DV_test_override = [];
-
         switch iDataset
             case 1
                 template_inUse = template_tmpl;
@@ -503,7 +486,7 @@ parfor iIter = 1:nIter
                 d_full, d_tmpl, d_train, d_test, ...
                 e3D_train_rand, e3D_test_rand, ...
                 template_inUse, str_convolveType, str_DVType, ORI_bound, nBins, ...
-                [], [], flag_normDV);
+                flag_normDV);
             data_train_allIter{iIter} = data_train;
             data_test_allIter{iIter}  = data_test;
             data_metrics_allIter(iIter, :, :) = metrics;
@@ -551,7 +534,7 @@ elapsed = time_end - time_start;
 fprintf('A1 Time used: %s\n\n\n\n', char(elapsed));
 
 %% [A2] Setup
-iModelA_fit=2;
+iModelA_fit = 2;
 nameFile_compDV_A2 = sprintf('%s/n%d_J%d_A%d_compDV', nameFolder_NOM_save, nIter, iJob, iModelA_fit);
 
 %% [A2] Process the true template
@@ -563,8 +546,6 @@ if ~isnumeric(isubj) % for IO, load 'template_true' from truth.mat
 else
     template_use = template_ideal;
 end
-
-% template_true is NOT euqal to template_ideal !!!
 
 %% [A2] Main loop over iterations
 % fprintf('%s: Creating empty placeholders for running iterations.\n\n', datetime('now'))
@@ -632,6 +613,7 @@ parfor iIter = 1:nIter
     iPRS_full_rand_sel = iPRS_full_rand(useIdx_full);
 
     %% [A2] 5-8. Metrics, DV, binning (raw energy, raw template)
+
     d_full  = struct('resp', resp_full_rand,  'iPRS', iPRS_full_rand,  'respC', respC_full_rand,  'cst', cst_full_rand,  'RT', RT_full_rand);
     d_tmpl  = struct('resp', resp_tmpl_rand,  'iPRS', iPRS_tmpl_rand,  'respC', respC_tmpl_rand,  'cst', cst_tmpl_rand,  'RT', RT_tmpl_rand);
     d_train = struct('resp', resp_train_rand, 'iPRS', iPRS_train_rand, 'respC', respC_train_rand, 'cst', cst_train_rand, 'RT', RT_train_rand, 'iPair', iPair_train_rand);
@@ -641,16 +623,14 @@ parfor iIter = 1:nIter
         d_full, d_tmpl, d_train, d_test, ...
         e3D_train_rand, e3D_test_rand, ...
         template_use, str_convolveType, str_DVType, ORI_bound, nBins, ...
-        [], [], flag_normDV);
+        flag_normDV);
+
+    % Store
     data_train_allIter{iIter} = data_train;
     data_test_allIter{iIter}  = data_test;
     data_metrics_allIter(iIter, :, :) = metrics;
-
-    % Store templates (raw space)
-    template_tmpl = template_use;
-    template_full = template_use;
-    template_tmpl_allIter(iIter, :, :) = template_tmpl;
-    template_full_allIter(iIter, :, :) = template_full;
+    template_tmpl_allIter(iIter, :, :) = template_use;
+    template_full_allIter(iIter, :, :) = template_use;
 
 end % end parfor iIter
 
@@ -673,7 +653,7 @@ assert(numel(iPRS_rand_sel) == nTrials_all, 'iPRS_allT length must match size(e3
 [nTrials_abs, nORI, nSF] = size(e3D_rand(idxABS, :, :));
 e3D_allAbs = reshape(e3D_rand(idxABS, :, :), [nTrials_abs, nORI * nSF]);
 
-%Per-channel mean and SD from ABS trials only
+% Per-channel mean and SD from ABS trials only
 mu_abs = mean(e3D_allAbs, 1);
 sigma_abs = std(e3D_allAbs, [], 1);
 sigma_abs(~isfinite(sigma_abs) | sigma_abs < 1e-8) = 1e-8;
@@ -688,7 +668,7 @@ end
 function [data_train, data_test, metrics] = fxn_compDV_packData( ...
     d_full, d_tmpl, d_train, d_test, ...
     e3D_train_base, e3D_test_base, ...
-    template_notNormed, convolveType, DVType, ORI_bound, nBins, DV_train_override, DV_test_override, flag_normDV)
+    template, str_convolveType, str_DVType, ORI_bound, nBins, flag_normDV)
 % e3D_train_base and e3D_test_base must already be centered: E_raw - mu0
 
 % 1. Compute behavioral metrics
@@ -703,19 +683,10 @@ criterion_z_test  = metrics_test(2);
 
 % 2. Compute decision variable in transformed coordinate system.
 flag_permT = 0;
-if nargin >= 13 && ~isempty(DV_train_override) && ~isempty(DV_test_override)
-    DV_train_raw = DV_train_override(:);
-    DV_test_raw = DV_test_override(:);
-else
-    DV_train_raw = fxn_getDV_v3(e3D_train_base, template_notNormed, convolveType, DVType, flag_permT, ORI_bound);
-    DV_test_raw  = fxn_getDV_v3(e3D_test_base,  template_notNormed, convolveType, DVType, flag_permT, ORI_bound);
-end
+DV_train_raw = fxn_getDV_v3(e3D_train_base, template, str_convolveType, str_DVType, flag_permT, ORI_bound);
+DV_test_raw  = fxn_getDV_v3(e3D_test_base,  template, str_convolveType, str_DVType, flag_permT, ORI_bound);
 
-if nargin < 15
-    flag_normDV = 0;
-end
-
-DV_scaleFactor = 1;
+% Calculate the DV scale factor
 if flag_normDV
     DV_scaleFactor = std(DV_train_raw);
     if ~isfinite(DV_scaleFactor) || DV_scaleFactor < 1e-8
@@ -724,6 +695,8 @@ if flag_normDV
     if ~isfinite(DV_scaleFactor) || DV_scaleFactor < 1e-8
         DV_scaleFactor = 1;
     end
+else
+    DV_scaleFactor = 1;
 end
 
 DV_train = DV_train_raw ./ DV_scaleFactor;

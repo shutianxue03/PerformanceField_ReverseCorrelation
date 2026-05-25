@@ -10,8 +10,6 @@
 %   It defines experimental settings (folder paths), global parameters (stimulus and noise properties), model fitting settings, names (in strings), and plotting styles.
 %   The script is intended to be run at the start of most analysis scripts to ensure consistency and reproducibility across all modeling
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 % Define number of ORI (and SF) channels
 nORI = 19;
 nSF = nORI;
@@ -107,30 +105,17 @@ params.stim=stim;
 params.noise=noise;
 
 %% Settings for ORI/SF filter
-% ORI filter
-% switch nORI
-%     case 29,
-% fOri = [5:5:50, 60:10:90]; % nORI=29
-%     case 19,
-% fOri = [5:10:45, 60:10:90]; % nORI=19
-% end
 fOri = linspace(0, 90, (nORI+1)/2); fOri = fOri(2:end);
 filtersOri_all = round([-flip(fOri), 0, fOri] + 90); % must +90 !! otherwise the ori filters are 90 deg phased off
 assert(nORI == length(filtersOri_all));
 
 % SF filter
 nSF = nORI; % could generate 0.5: 17, 29, 37
-noise.SF_low = 1;
-% noise.SF_low = 1.1869;
+noise.SF_low = 1; % used to be 1.1869
 noise.SF_high = 2/noise.SF_low*2;
 noise.filtersSF_all_log = linspace(log2(noise.SF_low), log2(noise.SF_high), nSF);
 noise.filtersSF_all = 2.^noise.filtersSF_all_log;
-% cut_ORI = 1:nORI; cut_SF = 1:nSF;
-% nORI = length(cut_ORI);
-% nSF = length(cut_SF);
 
-% filtersOri_all = filtersOri_all(cut_ORI);
-% nSF = length(cut_SF);
 filtersSF_all_log = noise.filtersSF_all_log;
 filtersSF_all = noise.filtersSF_all;
 
@@ -163,24 +148,14 @@ NOMp1_lb = 0;
 NOMp2_lb = 0;
 NOMp3_lb  = 0;
 
-% if exist("flag_whitenDV", "var")
-%     switch flag_whitenDV
-%         case 0 % when DV is not whitened, the noise parameters are in the same scale as the energy, which can be >1; so we set a higher upper bound
-NOMp1_ub = 1.5;     % multi noise
-NOMp2_ub = 20;   % (private) additive noise
-NOMp3_ub = 20; % (shared) additive noise
-%         case 1 % when DV is whitened, the noise parameters are in the same scale as dprime, which is usually <1, so we set a lower upper bound
-%             NOMp1_ub = 3;     % multi noise
-%             NOMp2_ub = 3;   % (private) additive noise
-%             NOMp3_ub = 3; % (shared) additive noise
-%     end
-% end
+NOMp1_ub = 1;     % multi noise
+NOMp2_ub = 5;   % (private) additive noise
+NOMp3_ub = 5; % (shared) additive noise
 
 % Midpoint initial guesses
 NOMp1_0 = mean([NOMp1_lb,  NOMp1_ub]);
 NOMp2_0 = mean([NOMp2_lb, NOMp2_ub]);
 NOMp3_0   = mean([NOMp3_lb,   NOMp3_ub]);
-% NOMc_0   = mean([NOMc_lb,   NOMc_ub]);
 
 % BADS options
 options_bads = bads('defaults');

@@ -3,7 +3,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=12
-#SBATCH --mem=16G
+#SBATCH --mem=32G
 #SBATCH --time=00:30:00
 #SBATCH --output=Logs/Sim_%A_%a.out
 #SBATCH --mail-type=FAIL
@@ -68,15 +68,10 @@ IFS=$'\t' read -r \
   Nadd_true \
   Nshared_true \
   cSDT_true \
-  lambda_whiten \
   iModelB_sim \
-  nIter \
-  nBasisORI \
-  basisWidthORI \
-  nBasisSF \
-  basisWidthSF <<< "${line}"
+  nIter <<< "${line}"
 
-job_name="gCST${gaborCST}_Nm${Nmul_true}_Na${Nadd_true}_Ns${Nshared_true}_Cz${cSDT_true}_Bsim${iModelB_sim}_bORI${nBasisORI}_${basisWidthORI}_bSF${nBasisSF}_${basisWidthSF}"
+job_name="gCST${gaborCST}_Nm${Nmul_true}_Na${Nadd_true}_Ns${Nshared_true}_Cz${cSDT_true}_Bsim${iModelB_sim}"
 
 # -----------------------------
 # Print metadata

@@ -61,10 +61,12 @@ nSF = nORI;
 nJob = 1;
 iJob = 1;
 pC_filter = [.6, .8]; % Only proceed with compDV/fitNOM if simulated pC falls within this range; otherwise, discard this simulation and try again with different random seed or parameters.
+ORI_bound = [5, 14]; % orientation window passed to fxn_getDV_v3
 
 str_templateType_true = 'raw'; % see 'fxn_getTemplate' for other options
 str_DVType_true = 'sum'; % see 'fxn_getDV_v3' for other options
 str_convolveType_true = 'dot'; % see 'fxn_getDV_v3' for other options
+flag_normDV = 1; % 1=normalize simulated DV by global SD before adding internal noise
 flag_permT = 0; %1=permute the input template per trial
 flag_plotDist = 1;
 if strcmp(str_envir, 'HPC'), flag_plotDist = 0; end % don't plot when running on HPC
@@ -77,6 +79,7 @@ fprintf(' - gaborCST = %.2f\n', gaborCST);
 fprintf(' - nTrials = %d\n', nTrials);
 fprintf(' - Simulated with ModelB = %d \n', iModelB_sim);
 fprintf(' - True IN params: Nmul=%.3g, Nadd=%.3g, Nshared=%.3g\n', Nmul_true, Nadd_true, Nshared_true);
+fprintf(' - Normalize simulated DV (global SD): %d\n', flag_normDV);
 fprintf(' - Fitted with ModelA = %s (1=Data-derived template; 2=ideal template)\n', strjoin(string(iModelA_fit_all), ' '));
 fprintf(' - Fitted with ModelB = %s (1=full, 2=No Nmul, 3=No Nadd, 4=No Nshared, 5=Nmul-only, 6=Nadd-only, 7=Nshared-only, 8=criterion-only)\n', strjoin(string(iModelB_fit_all), ' '));
 fprintf(' - SDT Criterion=%.1f \n', cSDT_true);
@@ -164,10 +167,6 @@ template_true = fxn_getTemplate(template_true, str_templateType_true, 0);
 % Do L2 normalization
 % ENSURE this step is consistent with OOD_xx_compDV_A12 when creating the ideal template
 template_true = template_true / norm(template_true(:));
-% template_true = template_true - min(template_true(:));
-% template_true = template_true ./ max(template_true(:));
-% template_true = 0.1 * template_true;
-% fprintf('%s: Ground-truth template created and scaled.\n\n', datetime('now'))
 
 %% Preallocate sim arrays
 nMetrics = 11;
@@ -179,7 +178,7 @@ iSess_allT = repmat(1:nSess, 1, nTrialsPerSess)';
 
 dataMatrix = nan(nTrials, nMetrics);
 e3D_target_allT = nan(nTrials, nORI, nSF);
-DV_target_sim_allT= nan(nTrials, 1);
+% DV_target_sim_allT= nan(nTrials, 1);
 
 mask = stim.mask;
 ratio_base = noise.ratio_base;
@@ -232,19 +231,26 @@ assert(sum(e3D_target_allT(nPairs+1:end,:,:) - e3D_target_allT(1:nPairs,:,:), 'a
 
 fprintf('%s: Pass A copied to pass B done.\n\n', datetime('now'))
 
-%% Compute simulated DV in RAW channel-energy space
-% Whitening / z-scoring / basis projection are NOT part of the observer's
-% DV computation. The DV used to generate responses is computed from RAW
-% target energy multiplied by the RAW signal-energy template.
-
-template_space_true  = 'raw_channel_energy';
-dv_space_used        = 'raw_energy_raw_template';
-
-ORI_bound = [5, 14]; % orientation window passed to fxn_getDV_v3
-
+%% Compute simulated DV
 DV_target_sim_allT = fxn_getDV_v3(e3D_target_allT, template_true, str_convolveType_true, str_DVType_true, flag_permT, ORI_bound);
 
 assert(~any(isnan(DV_target_sim_allT)), 'DV_target contains NaN');
+
+%% Normalize simulated DV before internal-noise sampling
+if flag_normDV
+    DV_scaleFactor_sim = std(DV_target_sim_allT);
+    if ~isfinite(DV_scaleFactor_sim) || DV_scaleFactor_sim < 1e-8
+        DV_scaleFactor_sim = max(abs(DV_target_sim_allT));
+    end
+    if ~isfinite(DV_scaleFactor_sim) || DV_scaleFactor_sim < 1e-8
+        DV_scaleFactor_sim = 1;
+    end
+else
+    DV_scaleFactor_sim = 1;
+end
+
+fprintf('%s: Sim DV normalization scale = %.6g; true params used on normalized DV Nmul=%.3g, Nadd=%.3g, Nshared=%.3g\n\n', ...
+    datetime('now'), DV_scaleFactor_sim, Nmul_true, Nadd_true, Nshared_true);
 
 % Empty placeholders kept ONLY for backward compatibility with downstream
 % code that may still expect these variable names. Do NOT use them in
@@ -259,7 +265,7 @@ fprintf('%s: DV computed in the raw-energy space.\n\n', datetime('now'))
 
 %% Add internal variability and generate responses
 % For now, use DV from target-only energy to drive responses
-DVclean_sim_allT = DV_target_sim_allT;
+DVclean_sim_allT = DV_target_sim_allT ./ DV_scaleFactor_sim;
 
 % Independent (pass-specific) SD per trial
 sigma_priv_allT = sqrt((DVclean_sim_allT .* Nmul_true).^2 + Nadd_true^2);
@@ -351,7 +357,7 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
     if isempty(dir(nameFolder_Data_NOM_IO)), mkdir(nameFolder_Data_NOM_IO); end
 
     % Save only variables used by simPlot4_VaryOneDim.m in one atomic write.
-    save(sprintf('%s/truth.mat', nameFolder_Data_OOD_IO), '*_true', 'dv_space_used', 'mu_cov_DV', 'sigma_cov_DV', 'W_white_DV', 'beta_true_basis');
+    save(sprintf('%s/truth.mat', nameFolder_Data_OOD_IO), '*_true', 'mu_cov_DV', 'sigma_cov_DV', 'W_white_DV', 'beta_true_basis', 'flag_normDV', 'DV_scaleFactor_sim');
     fprintf('\n\n%s: truth.mat saved (template_true, criterion_DV_true).\n\n', datetime('now'))
 
     % Save the target-energy tensor
@@ -365,7 +371,7 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
     %% Step 1: Estimate the template and compute DV
     % Step 1: compute DVs, templates, and test-set metrics
     %----------------------------%
-    OOD_NOM_Trialwise_compDV_A12({nameIO, criterion_DV_true}, iLocComb, nIter, nJob, iJob)
+    OOD_NOM_Trialwise_compDV_A12({nameIO, criterion_DV_true}, iLocComb, nIter, nJob, iJob, flag_normDV)
     %----------------------------%
 
     %% Step 2: fit NOM parameters and predict metrics
@@ -376,41 +382,13 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
             OOD_NOM_Trialwise_fitNOM({nameIO, criterion_DV_true}, iLocComb, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
             %----------------------------%
 
-            if iModelB_fit == iModelB_sim
-                % For the simulated model, also plot DV vs DV scatter and parameter recovery
-
-                if flag_plotDist
-                    % plot_CorrBasisSetting(nameFolder_Data_NOM_IO, nameFolder_Figures_perSubj, nameIO, ...
-                    %     nIter, iJob, iLocComb, iModelA_fit, iModelB_fit_all, namesModelBparams_short, ...
-                    %     Nmul_true, Nadd_true, Nshared_true, criterion_DV_true, template_true);
-                end
-            end % if iModelB_fit == iModelB_sim
         end % for iModelB_fit
 
     end % for iModelA_fit
-    %%
-    % Summarize model comparison after all A/B fits finish.
-    if flag_plotDist
-        % plot_fit_model_comparison( ...
-        %     nameFolder_Data_NOM_IO, nameFolder_Figures_perSubj, nameIO, ...
-        %     iModelA_fit_all, iModelB_fit_all, namesModelA, namesModelB, namesModelBparams_short, ...
-        %     nIter, iJob, iLocComb, iModelB_sim, ...
-        %     Nmul_true, Nadd_true, Nshared_true, criterion_DV_true);
-    end
 else
     fprintf('\n\n ** Simulated pC=%.2f, OUT OF the range [%.2f, %.2f] ** \n\n', pC_sim, pC_filter)
 end % if
 
-% Play sound to indicate end of analysis
-fs = 44100;              % sampling rate
-dur = 0.25;              % duration of each beep (seconds)
-pauseDur = 0.1;          % silence between beeps
-t = 0:1/fs:dur;
-beep1 = sin(2*pi*400*t);
-beep2 = sin(2*pi*600*t);
-beep3 = sin(2*pi*800*t);
-silence = zeros(1, round(fs*pauseDur));
-% sound([beep1 silence beep2 silence beep3], fs)
 
 %% Clean-up temporary files
 clear *allT e2D* e3D* dataMatrix;

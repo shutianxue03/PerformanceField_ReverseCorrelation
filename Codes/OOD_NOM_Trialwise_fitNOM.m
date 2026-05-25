@@ -1,25 +1,7 @@
 function OOD_NOM_Trialwise_fitNOM(isubj, iLocComb, iModelA_fit, iModelB_fit, nIter, nJob, iJob)
-%==========================================================================%
-% OOD_NOM_Trialwise_fitNOM.m
-%--------------------------------------------------------------------------
 % Author: Shutian Xue
 % Last update: 2025-08-27
-%
-% Part of the OOD_NOM_Trialwise pipeline.
-%
-% This function:
-% 1) Fits a trial-wise noisy observer model (NOM; Model B) to internal
-% variables (DVs) for the TEST set, precomputed in
-% OOD_NOM_Trialwise_compDV.m.
-% 2) Uses the fitted parameters to predict behavioral metrics (pYES, pC,
-% pA) based on binned empirical DVs.
-%
-% Saved variables (appended to *_compDV.mat):
-%       params_est_allIter : [nIter x nParams] fitted parameters
-%       nLL_allIter : [nIter x 1] negative log-likelihood
-%       pred_metrics_allIter : {nIter x 1} predictions from PR_pred_v7
-%
-%==========================================================================%
+
 
 clc; close all;
 warning off; % (You may want to remove this once things are stable.)
@@ -44,6 +26,10 @@ flag_incluCrit = flag_incluCrit;
 C_contribution = C_contribution;
 options_fmin = options_fmin;
 options_bads = options_bads;
+namesLocComb = namesLocComb;
+namesModelA = namesModelA;
+namesModelB = namesModelB;
+namesModelBparams = namesModelBparams;
 
 flag_fittingStep = 1; % one vs. two step fitting (one step is more standard)
 flag_fminconORbads = 2; % 1 = use fmincon (faster, local); 2 = use BADS (slower, more robust)
@@ -191,6 +177,7 @@ parfor iIter = 1:nIter
     data_train = data_train_allIter{iIter}; % (for estimating params)
     data_test = data_test_allIter{iIter}; % for predicting metrics and calculating nLL
 
+    % Determine the scale factor of DV
     DV_scaleFactor = 1;
     if isfield(data_train, 'DV_scaleFactor') && ~isempty(data_train.DV_scaleFactor)
         DV_scaleFactor = data_train.DV_scaleFactor;
@@ -392,14 +379,37 @@ parfor iIter = 1:nIter
             %------------------------------%
     end
 
+    %% Denormalize the est. parameter
+    params_raw = params_est(:).';
+    % switch iModelB_fit
+    %     case 1 % [M, Nadd, Nshared, criterion]
+    %         params_raw([2, 3, 4]) = params_raw([2, 3, 4]) .* DV_scaleFactor;
+    %     case 2 % [Nadd, Nshared, criterion]
+    %         params_raw([1, 2, 3]) = params_raw([1, 2, 3]) .* DV_scaleFactor;
+    %     case 3 % [M, Nshared, criterion]
+    %         params_raw([2, 3]) = params_raw([2, 3]) .* DV_scaleFactor;
+    %     case 4 % [M, Nadd, criterion]
+    %         params_raw([2, 3]) = params_raw([2, 3]) .* DV_scaleFactor;
+    %     case 5 % [M, criterion]
+    %         params_raw(2) = params_raw(2) .* DV_scaleFactor;
+    %     case 6 % [Nadd, criterion]
+    %         params_raw([1, 2]) = params_raw([1, 2]) .* DV_scaleFactor;
+    %     case 7 % [Nshared, criterion]
+    %         params_raw([1, 2]) = params_raw([1, 2]) .* DV_scaleFactor;
+    %     case 8 % [criterion]
+    %         params_raw(1) = params_raw(1) .* DV_scaleFactor;
+    %     otherwise
+    %         error('Unknown iModelB_fit = %d', iModelB_fit);
+    % end
+
     %% Compile
     nLL_train_allIter(iIter) = nLL_train;
     nLL_test_allIter(iIter) = nLL_test;
     params_est_norm_allIter(iIter, :) = params_est(:).';
-    params_est_allIter(iIter, :) = denormParams(params_est, iModelB_fit, DV_scaleFactor);
+    params_est_allIter(iIter, :) = params_raw;
     pred_metrics_allIter{iIter} = pred_test;
 
-end % end of iIter
+end % parfor
 
 fprintf('\n\n%s: All iterations done.\n\n', datetime('now'))
 
@@ -414,35 +424,6 @@ if flag_plot_allIter
     NOMplot_fitNOM;
     %-------------------%
     fprintf('\n\n%s: Plots created.\n\n', datetime('now'))
-end
-
-%% helper
-function params_raw = denormParams(params_norm, iModelB_fit, DV_scaleFactor)
-% Convert fitted parameters from normalized-DV units back to raw-DV units.
-% Scale-only normalization keeps M unchanged while scaling additive/shared
-% noise and criterion by the DV scale factor.
-params_raw = params_norm(:)';
-
-switch iModelB_fit
-    case 1 % [M, Nadd, Nshared, criterion]
-        params_raw([2, 3, 4]) = params_raw([2, 3, 4]) .* DV_scaleFactor;
-    case 2 % [Nadd, Nshared, criterion]
-        params_raw([1, 2, 3]) = params_raw([1, 2, 3]) .* DV_scaleFactor;
-    case 3 % [M, Nshared, criterion]
-        params_raw([2, 3]) = params_raw([2, 3]) .* DV_scaleFactor;
-    case 4 % [M, Nadd, criterion]
-        params_raw([2, 3]) = params_raw([2, 3]) .* DV_scaleFactor;
-    case 5 % [M, criterion]
-        params_raw(2) = params_raw(2) .* DV_scaleFactor;
-    case 6 % [Nadd, criterion]
-        params_raw([1, 2]) = params_raw([1, 2]) .* DV_scaleFactor;
-    case 7 % [Nshared, criterion]
-        params_raw([1, 2]) = params_raw([1, 2]) .* DV_scaleFactor;
-    case 8 % [criterion]
-        params_raw(1) = params_raw(1) .* DV_scaleFactor;
-    otherwise
-        error('denormParams: Unknown iModelB_fit = %d', iModelB_fit);
-end
 end
 close all;
 

@@ -20,9 +20,7 @@ clear; clc; close all;
 set(0, 'DefaultFigureVisible', 'off');
 
 %% settings
-flag_whitenDV = 1; % NEEDED for SX_RC1_setting!!
-str_part = sprintf('whitenDV%d', flag_whitenDV); % <-- change if needed
-str_part = '0519Hyperparams';
+str_part = '0525';
 iModelA_fit = [1]; %1=use data-derived template; 2=use true template
 nBfit = 7;          % number of B-model variants to evaluate (each uses a different internal-noise structure)
 nBins_Part4 = 3; % define bins for collapsing parameter recovery points; use 3 for main text, 5 for Supp
@@ -64,7 +62,6 @@ if ~exist(nameFile_R, 'file')
 
         if isempty(fieldnames(info))
             fprintf('Could not parse: %s\n', nameIO);
-            continue
         end
 
         info.nameIO = nameIO;
@@ -73,7 +70,7 @@ if ~exist(nameFile_R, 'file')
 
         info_all{iFile} = info;
         keepParse(iFile) = true;
-    end
+    end % iFile
 
     info_all = info_all(keepParse);
     nFiles = numel(info_all);
@@ -101,29 +98,26 @@ if ~exist(nameFile_R, 'file')
         nameFile_truth = fullfile(info.folder_OOD, 'truth.mat');
         if ~exist(nameFile_truth, 'file')
             fprintf('Missing truth.mat: %s\n', nameFile_truth);
-            continue
         end
         truth = load(nameFile_truth);
 
-        str_loadCompIV = sprintf('n*_A%d_compIV.mat', iModelA_fit);
-        nameDir_compIV = dir(fullfile(info.folder_NOM, str_loadCompIV));
-        nameDir_compIV = nameDir_compIV(~contains({nameDir_compIV.name}, 'min'));
-        if isempty(nameDir_compIV)
-            fprintf('No compIV file found in %s\n', info.folder_NOM);
-            continue
+        str_loadCompDV = sprintf('n*_A%d_compDV.mat', iModelA_fit);
+        nameDir_compDV = dir(fullfile(info.folder_NOM, str_loadCompDV));
+        nameDir_compDV = nameDir_compDV(~contains({nameDir_compDV.name}, 'min'));
+        if isempty(nameDir_compDV)
+            fprintf('No compDV file found in %s\n', info.folder_NOM);
         end
 
         try
-            data_compIV = load(fullfile(nameDir_compIV(1).folder, nameDir_compIV(1).name));
+            data_compDV = load(fullfile(nameDir_compDV(1).folder, nameDir_compDV(1).name));
         catch
             nameDir_fitNOM_chk = dir(fullfile(info.folder_NOM, sprintf('n*_A%dB*.mat', iModelA_fit)));
-            nameDir_fitNOM_chk = nameDir_fitNOM_chk(~contains({nameDir_fitNOM_chk.name}, {'min','compIV'}));
+            nameDir_fitNOM_chk = nameDir_fitNOM_chk(~contains({nameDir_fitNOM_chk.name}, {'min','compDV'}));
             if ~isempty(nameDir_fitNOM_chk)
-                fprintf('corrupted compIV file, with fitNOM files present: %s\n', info.folder_NOM);
+                fprintf('corrupted compDV file, with fitNOM files present: %s\n', info.folder_NOM);
             else
-                fprintf('corrupted compIV file, but NO fitNOM files: %s\n', info.folder_NOM);
+                fprintf('corrupted compDV file, but NO fitNOM files: %s\n', info.folder_NOM);
             end
-            continue
         end
 
         % =========================================================
@@ -138,12 +132,8 @@ if ~exist(nameFile_R, 'file')
         if isfield(truth, 'nIter')
             nIter = truth.nIter;
         else
-            template_est_tmp = data_compIV.template_tmpl_allIter;
-            % if ndims(template_est_tmp) == 3
+            template_est_tmp = data_compDV.template_tmpl_allIter;
             nIter = size(template_est_tmp, 1);
-            % else
-            % nIter = size(template_est_tmp, 1);
-            % end
         end
 
         % =========================================================
@@ -199,7 +189,7 @@ if ~exist(nameFile_R, 'file')
         % =========================================================
         % 1. template recovery
         % =========================================================
-        [template_rmse_iter, template_R2_iter] = fxn_templateRecovery_simPlot2Style_iter(  truth, data_compIV, nIter);
+        [template_rmse_iter, template_R2_iter] = fxn_templateRecovery_simPlot2Style_iter(  truth, data_compDV, nIter);
 
         fileBase.template_rmse_iter = template_rmse_iter(:)';
         fileBase.template_R2_iter = template_R2_iter(:)';
@@ -218,7 +208,7 @@ if ~exist(nameFile_R, 'file')
         fileBase.margORI_true = margORI_true;
         fileBase.margSF_true = margSF_true;
 
-        template_est = data_compIV.template_tmpl_allIter;
+        template_est = data_compDV.template_tmpl_allIter;
         if ndims(template_est) == 3
             template_est = reshape(template_est, size(template_est,1), []);
         end
@@ -254,8 +244,8 @@ if ~exist(nameFile_R, 'file')
         % =========================================================
         % 2. Basis-settings-related values
         % =========================================================
-        nBasisORI_allIter = data_compIV.nBasisORI_tmpl_allIter;
-        nBasisSF_allIter = data_compIV.nBasisSF_tmpl_allIter;
+        nBasisORI_allIter = data_compDV.nBasisORI_tmpl_allIter;
+        nBasisSF_allIter = data_compDV.nBasisSF_tmpl_allIter;
 
         fileBase.nBasisORI_mode = mode(nBasisORI_allIter);
         fileBase.nBasisORI_mode_pct = mean(nBasisORI_allIter == mode(nBasisORI_allIter));
@@ -265,7 +255,7 @@ if ~exist(nameFile_R, 'file')
 
         % Find the most frequently selected basis family across iterations
         % For ORI
-        strVec = string(data_compIV.basisFxnORI_tmpl_allIter(:));
+        strVec = string(data_compDV.basisFxnORI_tmpl_allIter(:));
         [uniqueVals, ~, groupIdx] = unique(strVec);
         counts = accumarray(groupIdx, 1);
         [~, idxMax] = max(counts);
@@ -273,7 +263,7 @@ if ~exist(nameFile_R, 'file')
         fileBase.basisFxnORI_mode_pct = counts(idxMax) / numel(strVec);
 
         % For SF
-        strVec = string(data_compIV.basisFxnSF_tmpl_allIter(:));
+        strVec = string(data_compDV.basisFxnSF_tmpl_allIter(:));
         [uniqueVals, ~, groupIdx] = unique(strVec);
         counts = accumarray(groupIdx, 1);
         [~, idxMax] = max(counts);
@@ -281,7 +271,7 @@ if ~exist(nameFile_R, 'file')
         fileBase.basisFxnSF_mode_pct = counts(idxMax) / numel(strVec);
 
         % Modal L2 ridge regularization setting across iterations.
-        strVec = string(data_compIV.ridge_tmpl_allIter(:));
+        strVec = string(data_compDV.ridge_tmpl_allIter(:));
         [uniqueVals, ~, groupIdx] = unique(strVec);
         counts = accumarray(groupIdx, 1);
         [~, idxMax] = max(counts);
@@ -289,10 +279,10 @@ if ~exist(nameFile_R, 'file')
         fileBase.ridge_mode_pct = counts(idxMax) / numel(strVec);
 
         % Modal ORI width setting across iterations.
-        if isfield(data_compIV, 'basisWidthORI_tmpl_allIter')
-            vals = data_compIV.basisWidthORI_tmpl_allIter(:);
+        if isfield(data_compDV, 'basisWidthORI_tmpl_allIter')
+            vals = data_compDV.basisWidthORI_tmpl_allIter(:);
         else
-            vals = data_compIV.basisWidthScaleORI_tmpl_allIter(:);
+            vals = data_compDV.basisWidthScaleORI_tmpl_allIter(:);
         end
         strVec = string(vals);
         [uniqueVals, ~, groupIdx] = unique(strVec);
@@ -302,10 +292,10 @@ if ~exist(nameFile_R, 'file')
         fileBase.basisWidthORI_mode_pct = counts(idxMax) / numel(strVec);
 
         % Modal SF width setting across iterations.
-        if isfield(data_compIV, 'basisWidthSF_tmpl_allIter')
-            vals = data_compIV.basisWidthSF_tmpl_allIter(:);
+        if isfield(data_compDV, 'basisWidthSF_tmpl_allIter')
+            vals = data_compDV.basisWidthSF_tmpl_allIter(:);
         else
-            vals = data_compIV.basisWidthScaleSF_tmpl_allIter(:);
+            vals = data_compDV.basisWidthScaleSF_tmpl_allIter(:);
         end
         strVec = string(vals);
         [uniqueVals, ~, groupIdx] = unique(strVec);
@@ -315,7 +305,7 @@ if ~exist(nameFile_R, 'file')
         fileBase.basisWidthSF_mode_pct = counts(idxMax) / numel(strVec);
 
         % Modal SF asymmetry setting across iterations.
-        vals = data_compIV.asymSF_rightLeftRatio_tmpl_allIter(:);
+        vals = data_compDV.asymSF_rightLeftRatio_tmpl_allIter(:);
         strVec = string(vals);
         [uniqueVals, ~, groupIdx] = unique(strVec);
         counts = accumarray(groupIdx, 1);
@@ -346,7 +336,7 @@ if ~exist(nameFile_R, 'file')
             pC_data_iter = nan(nIter_probe,1);
             pA_data_iter = nan(nIter_probe,1);
 
-            nBins_curve = numel(pred_metrics_allIter_probe{1}.metrics.IV_allBins);
+            nBins_curve = numel(pred_metrics_allIter_probe{1}.metrics.DV_allBins);
             DV_allBins_iter = nan(nIter_probe, nBins_curve);
             nTrials_allBins_iter = nan(nIter_probe, nBins_curve);
             pYES_data_curve_iter = nan(nIter_probe, nBins_curve);
@@ -358,7 +348,7 @@ if ~exist(nameFile_R, 'file')
                 pC_data_iter(iIter) = mean(pred_metrics_allIter_probe{iIter}.metrics.pC_data_allBins, 'omitnan');
                 pA_data_iter(iIter) = mean(pred_metrics_allIter_probe{iIter}.metrics.pA_data_allBins, 'omitnan');
 
-                DV_allBins_iter(iIter, :) = pred_metrics_allIter_probe{iIter}.metrics.IV_allBins;
+                DV_allBins_iter(iIter, :) = pred_metrics_allIter_probe{iIter}.metrics.DV_allBins;
                 nTrials_allBins_iter(iIter, :) = pred_metrics_allIter_probe{iIter}.metrics.nTrials_allBins;
                 pYES_data_curve_iter(iIter, :) = pred_metrics_allIter_probe{iIter}.metrics.pYES_data_allBins;
                 pC_data_curve_iter(iIter, :) = pred_metrics_allIter_probe{iIter}.metrics.pC_data_allBins;
@@ -461,7 +451,7 @@ if ~exist(nameFile_R, 'file')
             pC_pred_iter = nan(nIter_fit,1);
             pA_pred_iter = nan(nIter_fit,1);
 
-            nBins_curve = numel(pred_metrics_allIter{1}.metrics.IV_allBins);
+            nBins_curve = numel(pred_metrics_allIter{1}.metrics.DV_allBins);
             pYES_pred_curve_iter = nan(nIter_fit, nBins_curve);
             pC_pred_curve_iter = nan(nIter_fit, nBins_curve);
             pA_pred_curve_iter = nan(nIter_fit, nBins_curve);
@@ -716,6 +706,41 @@ for iFold_tmp = 1:numel(folderInfo_tmp)
     truth_tmp = load(nameFile_truth_tmp);
     nLL_tmp = S_tmp.nLL_tmpl_allIter(:);
     nLL_tmp = nLL_tmp(isfinite(nLL_tmp));
+
+    % New OOD_sim names no longer encode basis hyperparameters.
+    % Fall back to compDV iteration fields when name parsing returns NaN.
+    if ~isfinite(nBasisORI_tmp) && isfield(S_tmp, 'nBasisORI_tmpl_allIter')
+        vals = S_tmp.nBasisORI_tmpl_allIter(:);
+        vals = vals(isfinite(vals));
+        if ~isempty(vals), nBasisORI_tmp = mode(vals); end
+    end
+    if ~isfinite(nBasisSF_tmp) && isfield(S_tmp, 'nBasisSF_tmpl_allIter')
+        vals = S_tmp.nBasisSF_tmpl_allIter(:);
+        vals = vals(isfinite(vals));
+        if ~isempty(vals), nBasisSF_tmp = mode(vals); end
+    end
+    if ~isfinite(basisWidthORI_tmp)
+        if isfield(S_tmp, 'basisWidthORI_tmpl_allIter')
+            vals = S_tmp.basisWidthORI_tmpl_allIter(:);
+        elseif isfield(S_tmp, 'basisWidthScaleORI_tmpl_allIter')
+            vals = S_tmp.basisWidthScaleORI_tmpl_allIter(:);
+        else
+            vals = [];
+        end
+        vals = vals(isfinite(vals));
+        if ~isempty(vals), basisWidthORI_tmp = mode(vals); end
+    end
+    if ~isfinite(basisWidthSF_tmp)
+        if isfield(S_tmp, 'basisWidthSF_tmpl_allIter')
+            vals = S_tmp.basisWidthSF_tmpl_allIter(:);
+        elseif isfield(S_tmp, 'basisWidthScaleSF_tmpl_allIter')
+            vals = S_tmp.basisWidthScaleSF_tmpl_allIter(:);
+        else
+            vals = [];
+        end
+        vals = vals(isfinite(vals));
+        if ~isempty(vals), basisWidthSF_tmp = mode(vals); end
+    end
 
     [margORI_true_tmp, margSF_true_tmp, margORI_est_iter_norm_tmp, margSF_est_iter_norm_tmp] = ...
         fxn_extract_normalized_tuning_curves(truth_tmp, S_tmp, nORI, nSF);
@@ -2518,9 +2543,6 @@ close(h);
 fprintf('DONE\n\n')
 
 
-
-
-
 % %% Figure 6B: parameter-pair correlations
 % fprintf('\n%s: Fig 6B: Parameter-pair correlations\n', string(datetime('now')))
 %
@@ -2974,53 +2996,20 @@ function info = fxn_parse_nameIO(nameIO)
 
 info = struct();
 
-% New format (current):
-% IO_cN.._cG.._nT.._Nm.._Na.._Ns.._cSDT.._whiten.._wDV.._Bsim..
-tok = regexp(nameIO, ['^IO_cN([\d\.]+)_cG([\d\.]+)_nT([A-Za-z0-9\.]+)' ...
-    '_Nm(-?[\d\.]+)_Na(-?[\d\.]+)_Ns(-?[\d\.]+)_cSDT(-?[\d\.]+)' ...
-    '_whiten(-?[\d\.]+)_wDV(\d+)_Bsim(\d+)$'], 'tokens', 'once');
+% Current format from OOD_sim.m:
+% IO_Bsim.._cN.._cG.._nT.._Nm.._Na.._Ns.._cSDT..
+tok = regexp(nameIO, ['^IO_Bsim(\d+)_cN([\d\.]+)_cG([\d\.]+)_nT([A-Za-z0-9\.]+)' ...
+    '_Nm(-?[\d\.]+)_Na(-?[\d\.]+)_Ns(-?[\d\.]+)_cSDT(-?[\d\.]+)$'], 'tokens', 'once');
 
-if ~isempty(tok)
-    info.noiseCST = str2double(tok{1}) / 100;
-    info.gaborCST = str2double(tok{2}) / 100;
-    info.nTrials = fxn_parse_num2exp(tok{3});
-    info.Nmul_true = fxn_parse_num2exp(tok{4});
-    info.Nadd_true = fxn_parse_num2exp(tok{5});
-    info.Nshared_true = fxn_parse_num2exp(tok{6});
-    info.cSDT_true = str2double(tok{7});
-    info.lambda_whiten = str2double(tok{8});
-    info.flag_whitenDV = str2double(tok{9});
-    info.iModelB_sim = str2double(tok{10});
-    info.flag_regressType = nan; % not encoded in the new naming scheme
-    return
-end
+info.iModelB_sim = str2double(tok{1});
+info.noiseCST = str2double(tok{2}) / 100;
+info.gaborCST = str2double(tok{3}) / 100;
+info.nTrials = fxn_parse_num2exp(tok{4});
+info.Nmul_true = fxn_parse_num2exp(tok{5});
+info.Nadd_true = fxn_parse_num2exp(tok{6});
+info.Nshared_true = fxn_parse_num2exp(tok{7});
+info.cSDT_true = str2double(tok{8});
 
-% Legacy format(s):
-% IO_cN.._cG.._nT.._Nm.._Na.._Ns.._cSDT.._cont.._whiten.._R.._.._B..
-% IO_cN.._cG.._nT.._Nm.._Na.._Ns.._cSDT.._cont.._whiten.._wDV.._R.._.._B..
-tok = regexp(nameIO, ['^IO_cN([\d\.]+)_cG([\d\.]+)_nT([A-Za-z0-9\.]+)' ...
-    '_Nm(-?[\d\.]+)_Na(-?[\d\.]+)_Ns(-?[\d\.]+)_cSDT(-?[\d\.]+)' ...
-    '_cont-?[\d\.]+_whiten(-?[\d\.]+)_(?:wDV(\d+)_)?R(\d+)_\d+\d+_B(\d+)$'], 'tokens', 'once');
-
-if isempty(tok)
-    return
-end
-
-info.noiseCST = str2double(tok{1}) / 100;
-info.gaborCST = str2double(tok{2}) / 100;
-info.nTrials = fxn_parse_num2exp(tok{3});
-info.Nmul_true = fxn_parse_num2exp(tok{4});
-info.Nadd_true = fxn_parse_num2exp(tok{5});
-info.Nshared_true = fxn_parse_num2exp(tok{6});
-info.cSDT_true = str2double(tok{7});
-info.lambda_whiten = str2double(tok{8});
-if isempty(tok{9})
-    info.flag_whitenDV = nan;
-else
-    info.flag_whitenDV = str2double(tok{9});
-end
-info.flag_regressType = str2double(tok{10});
-info.iModelB_sim = str2double(tok{11});
 end
 
 function val = parse_num_from_name_basisRelevant(nameStr, key)
@@ -3042,7 +3031,7 @@ end
 nameStr = char(nameStr);
 numExpr = '[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?';
 
-% First try the current canonical OOD_sim format.
+% First try the basis-tagged naming format.
 % Captures: bORI count, bORI width, bSF count, bSF width.
 tokBasis = regexp(nameStr, ['_bORI(\d+)_(' numExpr ')_bSF(\d+)_(' numExpr ')(?:_|$)'], 'tokens', 'once');
 
@@ -3084,7 +3073,7 @@ function x = fxn_parse_num2exp(str_in)
 x = str2double(strrep(str_in, 'p', '.'));
 end
 
-function [margORI_true, margSF_true, margORI_est_iter_norm, margSF_est_iter_norm] = fxn_extract_normalized_tuning_curves(truth, data_compIV, nORI, nSF)
+function [margORI_true, margSF_true, margORI_est_iter_norm, margSF_est_iter_norm] = fxn_extract_normalized_tuning_curves(truth, data_compDV, nORI, nSF)
 
 template_true_vec = truth.template_true(:)';
 template_true_2D = reshape(template_true_vec, [nORI, nSF]);
@@ -3101,7 +3090,7 @@ if isfinite(mxSF_true) && mxSF_true ~= 0
     margSF_true = margSF_true ./ mxSF_true;
 end
 
-template_est = data_compIV.template_tmpl_allIter;
+template_est = data_compDV.template_tmpl_allIter;
 if ndims(template_est) == 3
     template_est = reshape(template_est, size(template_est, 1), []);
 end
@@ -3126,7 +3115,7 @@ for iIter = 1:nIter_est
 end
 end
 
-function [template_rmse_iter, template_R2_iter] = fxn_templateRecovery_simPlot2Style_iter(truth, data_compIV, nIter)
+function [template_rmse_iter, template_R2_iter] = fxn_templateRecovery_simPlot2Style_iter(truth, data_compDV, nIter)
 
 if isfield(truth, 'template_true_raw')
     template_true = truth.template_true_raw(:)';
@@ -3137,7 +3126,7 @@ else
 end
 
 template_true = template_true / max(template_true);
-template_est = data_compIV.template_tmpl_allIter;
+template_est = data_compDV.template_tmpl_allIter;
 if ndims(template_est) == 3
     template_est = reshape(template_est, size(template_est,1), []);
 end

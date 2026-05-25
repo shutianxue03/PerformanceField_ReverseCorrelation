@@ -11,10 +11,10 @@ project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 param_file="${project_root}/Data_job_params/OOD_sim_params.tsv"
 array_script="${project_root}/Codes/shell_Sim.sh"
 
-# Settings
-batch_size=4999        # number of array tasks per submitted batch
-max_running=250        # Slurm array throttle:
-sleep_seconds=2       # small pause between sbatch calls
+# Settings; override with environment variables when needed.
+batch_size="${BATCH_SIZE:-4999}"        # number of array tasks per submitted batch
+max_running="${MAX_RUNNING:-250}"       # Slurm array throttle
+sleep_seconds="${SLEEP_SECONDS:-2}"     # small pause between sbatch calls
 
 if [[ ! -f "${param_file}" ]]; then
   echo "Error: cannot find parameter file:"

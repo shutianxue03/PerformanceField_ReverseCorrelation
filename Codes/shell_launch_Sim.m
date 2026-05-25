@@ -2,13 +2,16 @@
 noiseCST = .2;
 gaborCST = .3;
 nTrials = 4e3;
-nIter = 10;
+nIter = 24;
 cSDT_true = 0;
 
-iModelB_sim = 6;
+for iModelB_sim = [5] % 5=Nmul only; 6=Nadd only; 7=Nshared only
 
-Nmul_true = .5;
-for Nadd_true = [1]
-    Nshared_true = 1;
-    OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, cSDT_true, iModelB_sim, nIter)
+    for Nmul_true = .5
+        for Nadd_true = [1]
+            for Nshared_true = 0
+                OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, cSDT_true, iModelB_sim, nIter)
+            end
+        end
+    end
 end

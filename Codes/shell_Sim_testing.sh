@@ -34,7 +34,6 @@ for((i=${start}; i<${end}; i++)); do
        Nadd_true \
        Nshared_true \
        cSDT_true \
-       lambda_whiten \
        iModelB_sim \
        nIter <<< "${line}"
     matlab -batch "try, OOD_sim(${noiseCST}, ${gaborCST}, ${nTrials}, ${Nmul_true}, ${Nadd_true}, ${Nshared_true}, ${cSDT_true}, ${iModelB_sim}, ${nIter}); catch ME, disp(getReport(ME,'extended')); exit(1); end; exit(0);"
