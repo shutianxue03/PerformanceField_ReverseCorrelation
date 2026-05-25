@@ -1,4 +1,4 @@
-function OOD_NOM_Human(isubj, iLocComb, lambda_whiten, nIter, nJob, iJob)
+function OOD_NOM_Human(isubj, iLocComb, lambda_whiten, nIter, nJob, iJob) %#ok<INUSD>
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % OOD_NOM_Human.m
 %
@@ -44,10 +44,8 @@ fprintf(' - Location combo = L%d [%s]\n', iLocComb, locLabel);
 fprintf(' - nIter = %d | nJob = %d | iJob = %d\n', nIter, nJob, iJob);
 fprintf(' - Fit ModelA = %s\n', strjoin(string(iModelA_fit_all), ' '));
 fprintf(' - Fit ModelB = %s\n', strjoin(string(iModelB_fit_all), ' '));
-fprintf(' - Whitening strength (lambda) = %.3g\n', lambda_whiten);
-
 %% Part 1: compute DVs/templates (A1 + A2)
-OOD_NOM_Trialwise_compDV_A12(isubj, iLocComb, lambda_whiten, nIter, nJob, iJob)
+OOD_NOM_Trialwise_compDV_A12(isubj, iLocComb, nIter, nJob, iJob)
 
 %% Part 2: fit NOM for all A/B combinations
 for iModelA_fit = iModelA_fit_all

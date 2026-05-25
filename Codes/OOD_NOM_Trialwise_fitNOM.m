@@ -169,6 +169,7 @@ end
 
 %% Preallocate outputs
 nParams = length(namesModelBparams{iModelB_fit});
+params_est_norm_allIter = nan(nIter, nParams);
 params_est_allIter = nan(nIter, nParams);
 nLL_train_allIter = nan(nIter, 1);
 nLL_test_allIter = nLL_train_allIter;
@@ -189,6 +190,14 @@ parfor iIter = 1:nIter
     % Extract the training and test set
     data_train = data_train_allIter{iIter}; % (for estimating params)
     data_test = data_test_allIter{iIter}; % for predicting metrics and calculating nLL
+
+    DV_scaleFactor = 1;
+    if isfield(data_train, 'DV_scaleFactor') && ~isempty(data_train.DV_scaleFactor)
+        DV_scaleFactor = data_train.DV_scaleFactor;
+    end
+    if ~isfinite(DV_scaleFactor) || DV_scaleFactor <= 0
+        DV_scaleFactor = 1;
+    end
 
     %% Objective function for optimizer: nLL from trial-wise pYES + pairwise pA
     switch flag_fittingStep
@@ -386,7 +395,8 @@ parfor iIter = 1:nIter
     %% Compile
     nLL_train_allIter(iIter) = nLL_train;
     nLL_test_allIter(iIter) = nLL_test;
-    params_est_allIter(iIter, :) = params_est(:).';
+    params_est_norm_allIter(iIter, :) = params_est(:).';
+    params_est_allIter(iIter, :) = denormParams(params_est, iModelB_fit, DV_scaleFactor);
     pred_metrics_allIter{iIter} = pred_test;
 
 end % end of iIter
@@ -394,7 +404,7 @@ end % end of iIter
 fprintf('\n\n%s: All iterations done.\n\n', datetime('now'))
 
 %% Save results (append onto *_compDV.mat)
-save(nameFile_fitNOM, 'params_est_allIter', 'nLL_train_allIter', 'nLL_test_allIter', 'pred_metrics_allIter');
+save(nameFile_fitNOM, 'params_est_allIter', 'params_est_norm_allIter', 'nLL_train_allIter', 'nLL_test_allIter', 'pred_metrics_allIter');
 
 fprintf('%s: Outputs saved.\n\n', datetime('now'))
 
@@ -404,6 +414,35 @@ if flag_plot_allIter
     NOMplot_fitNOM;
     %-------------------%
     fprintf('\n\n%s: Plots created.\n\n', datetime('now'))
+end
+
+%% helper
+function params_raw = denormParams(params_norm, iModelB_fit, DV_scaleFactor)
+% Convert fitted parameters from normalized-DV units back to raw-DV units.
+% Scale-only normalization keeps M unchanged while scaling additive/shared
+% noise and criterion by the DV scale factor.
+params_raw = params_norm(:)';
+
+switch iModelB_fit
+    case 1 % [M, Nadd, Nshared, criterion]
+        params_raw([2, 3, 4]) = params_raw([2, 3, 4]) .* DV_scaleFactor;
+    case 2 % [Nadd, Nshared, criterion]
+        params_raw([1, 2, 3]) = params_raw([1, 2, 3]) .* DV_scaleFactor;
+    case 3 % [M, Nshared, criterion]
+        params_raw([2, 3]) = params_raw([2, 3]) .* DV_scaleFactor;
+    case 4 % [M, Nadd, criterion]
+        params_raw([2, 3]) = params_raw([2, 3]) .* DV_scaleFactor;
+    case 5 % [M, criterion]
+        params_raw(2) = params_raw(2) .* DV_scaleFactor;
+    case 6 % [Nadd, criterion]
+        params_raw([1, 2]) = params_raw([1, 2]) .* DV_scaleFactor;
+    case 7 % [Nshared, criterion]
+        params_raw([1, 2]) = params_raw([1, 2]) .* DV_scaleFactor;
+    case 8 % [criterion]
+        params_raw(1) = params_raw(1) .* DV_scaleFactor;
+    otherwise
+        error('denormParams: Unknown iModelB_fit = %d', iModelB_fit);
+end
 end
 close all;
 

@@ -1,4 +1,4 @@
-function OOD_NOM_Trialwise_compDV_A12(isubj, iLocComb, lambda_whiten, nIter, nJob, iJob)
+function OOD_NOM_Trialwise_compDV_A12(isubj, iLocComb, nIter, nJob, iJob)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % OOD_NOM_Trialwise_compDV.m
 %
@@ -48,18 +48,16 @@ RandStream.setGlobalStream(stream);
 % fprintf('%s: seed determined.\n\n', datetime('now'))
 
 %% General parameters
-DVType = 1; % 1=sum of the dot product/convolution; 2=max; 3=normalized
-templateType = 1; % (1) raw (2) reconstructed kernel (3) mirrored template
-itype_template = 2; % 1=estimate template from PRS trials, ABS trials, or BOTH trials
+str_DVType = 'sum'; % 1=sum of the dot product/convolution; 2=max; 3=normalized
+str_templateType = 'raw'; % (1) raw (2) reconstructed kernel (3) mirrored template
+str_itype_template = 'ABS'; % 1=estimate template from PRS trials, ABS trials, or BOTH trials
+flag_normDV = 1; % 1=scale-only DV normalization from training-set SD; 0=raw DV
 flag_PatchMode = 1; % if flag_PatchMode == 1, patchMode = 'T'; else, patchMode = 'N'; end
 flag_plot_template = 0;
 
 ratio_split = [.8, .15, .05]; % proportion of trials in template set (for RC), training set (for estimating parameters) and test set (for metric predictions)
 assert(abs(sum(ratio_split)-1)<1e-10)
 ORI_bound = [5, 14]; % orientation window, passed to fxn_getDV_v3
-
-% whiten features
-eps_whiten = 1e-3;  % floor for eigenvalues
 
 % Setting for multivariate regression with smoothing
 % 1=Univariate; 2=MultiSmooth and Univariate
@@ -105,7 +103,7 @@ lbSF = lb_full_all{iFamily_SF};
 flag_plot_tuning = 0;
 
 iSess_start = 1; % first session included
-convolveType = 1; % DV from 1=cross-correlation; 2=convolution (fxn_getDV_v3)
+str_convolveType = 'dot'; % DV from 1=cross-correlation; 2=convolution (fxn_getDV_v3)
 % flag_standEnergy = 1; % 1=z-score energy before RC
 flag_plot_compDV = 1; % plot DV distributions and kernels at the end
 if strcmp(str_envir,'HPC'), flag_plot_compDV = 0; end % don't plot when running on HPC
@@ -180,13 +178,14 @@ fprintf(['\nSubject/IO name: %s ' ...
     '\n - Template derived from %s trials', ...
     '\n - Energy source: %d (1=TARGET, 2=NOISE)', ...
     '\n - Convolve type: %s', ...
-    '\n - DV type: %s\n\n'], ...
+    '\n - DV type: %s', ...
+    '\n - Normalize DV (scale-only): %d\n\n'], ...
     subjName, ...
     iLocComb, namesLocComb{iLocComb}, ...
     nIter, ...
     nblocks, nORI, nSF, ...
-    namesType{itype_template}, flag_PatchMode, ...
-    namesConvolveType{convolveType}, namesDVType{DVType});
+    str_itype_template, flag_PatchMode, ...
+    str_convolveType, str_DVType, flag_normDV);
 
 %% Choose energy source for NOM
 switch flag_PatchMode
@@ -252,7 +251,7 @@ fprintf('%s: Filter banks (nORI=%d, nSF=%d) created and saved.\n\n', datetime('n
 %% Define the IDEAL template (ORI x SF)
 % The ideal template is the energy of the gabor at the averaged CST across signal-prs trials
 gaborCST = mean(cst_nonrand(cst_nonrand>0));
-templateType_true = 1; % doesn't matter much for the IO Gabor template
+str_templateType_true = 'raw'; % doesn't matter much for the IO Gabor template
 stim.gaborCST = gaborCST;
 
 template_gabor_ideal = exp_CreateGabor(stim, stim.gaborCST);
@@ -261,15 +260,15 @@ template_ideal = SX_RC4_Energy_parfor(stim.mask, {template_gabor_ideal}, filter_
 %--------------------------------------------%
 template_ideal = squeeze(template_ideal); % remove singleton dim
 %--------------------------------------------%
-template_ideal = fxn_getTemplate(template_ideal, templateType_true, 0);
+template_ideal = fxn_getTemplate(template_ideal, str_templateType_true, 0);
 %--------------------------------------------%
 
 % Do L2 normalization
 % ENSURE this step is consistent with OOD_xx_compDV_A12 when creating the ideal template
-% template_true = template_true / norm(template_true(:));
-template_ideal = template_ideal - min(template_ideal(:));
-template_ideal = template_ideal ./ max(template_ideal(:));
-template_ideal = 0.1 * template_ideal;
+template_true = template_true / norm(template_true(:));
+% template_ideal = template_ideal - min(template_ideal(:));
+% template_ideal = template_ideal ./ max(template_ideal(:));
+% template_ideal = 0.1 * template_ideal;
 
 fprintf('%s: Ideal template created and scaled.\n\n', datetime('now'))
 
@@ -314,7 +313,6 @@ margSF_allIter = nan(nIter, 2, nSF);
 margPred_SF_allIter = nan(nIter, 2, nSF);
 margParams_SF_allIter = nan(nIter, 2, length(namesParams_all{iFamily_SF}));
 margR2_SF_allIter = nan(nIter, 2);
-DVcorr_converted_allIter = nan(nIter, 2);   % 1=template set, 2=full set
 
 fprintf('%s: A1 Started running %d iterations.\n\n', datetime('now'), nIter)
 
@@ -361,23 +359,20 @@ parfor iIter = 1:nIter
     RT_test_rand = R.RT_test_rand;
 
     %% [A1] 2. Select which trials to use to estimate the template (TEMPLATE set)
-    [useIdx_full, useIdx_tmpl] = selectTemplateIndices(itype_template, iPRS_full_rand, iPRS_tmpl_rand);
+    [useIdx_full, useIdx_tmpl] = selectTemplateIndices(str_itype_template, iPRS_full_rand, iPRS_tmpl_rand);
 
     % sel for "selected"
     e3D_tmpl_rand_sel = e3D_tmpl_rand(useIdx_tmpl, :, :);
     resp_tmpl_rand_sel = resp_tmpl_rand(useIdx_tmpl);
-    % iPRS_tmpl_rand_sel = iPRS_tmpl_rand(useIdx_tmpl);
+    iPRS_tmpl_rand_sel = iPRS_tmpl_rand(useIdx_tmpl);
 
     e3D_full_rand_sel = e3D_full_rand(useIdx_full, :, :);
     resp_full_rand_sel = resp_full_rand(useIdx_full);
-    % iPRS_full_rand_sel = iPRS_full_rand(useIdx_full);
+    iPRS_full_rand_sel = iPRS_full_rand(useIdx_full);
 
-    %% [A1] 2b. Build fixed transform from ABS template trials only
-    Tfix = fxn_buildFixedTransformFromABS(e3D_tmpl_rand, iPRS_tmpl_rand, lambda_whiten, eps_whiten);
-
-    % Apply the transform ONLY to inputs of RC template estimation.
-    e3D_tmpl_forRC = applyFixedTransform(e3D_tmpl_rand_sel, Tfix);
-    e3D_full_forRC = applyFixedTransform(e3D_full_rand_sel, Tfix);
+    %% [A1] 2b. Z-score ABS template trials only
+    e3D_tmpl_forRC = fxn_zscoreABS(e3D_tmpl_rand, iPRS_tmpl_rand);
+    e3D_full_forRC = fxn_zscoreABS(e3D_full_rand, iPRS_full_rand);
 
     %% [A1] 3. Estimate template from whitened energy
     % RC regression operates in the transformed (whitened) space.
@@ -400,8 +395,8 @@ parfor iIter = 1:nIter
     % Estimate template in whitened space via regression
     switch flag_regressType
         case 1  % Univariate
-            template_tmpl_white = SX_sim07_RC(e3D_tmpl_forRC, resp_tmpl_rand_sel);
-            template_full_white = SX_sim07_RC(e3D_full_forRC, resp_full_rand_sel);
+            template_tmpl = SX_sim07_RC(e3D_tmpl_forRC, resp_tmpl_rand_sel);
+            template_full = SX_sim07_RC(e3D_full_forRC, resp_full_rand_sel);
 
         case 2  % Multivariate + smoothing
             basisCfg_thisIter = basisCfg;
@@ -411,7 +406,7 @@ parfor iIter = 1:nIter
             out = SX_RC_selectBasis_cv(e3D_tmpl_forRC, resp_tmpl_rand_sel, axisORI, axisSF, basisCfg_thisIter);
 
             % Store the outputs of the best fit
-            template_tmpl_white = out.template2D;
+            template_tmpl = out.template2D;
             nLL_cv_mean_tmpl = out.bestRes.nLL_mean; % This is the mean held-out nLL across CV folds for the selected model, so primary for model quality
             pseudoR2_Tjur_tmpl = out.pseudoR2_Tjur;
             % nLL_tmpl = out.nLL; % This is training nLL from the best fit, so only secondary
@@ -428,48 +423,13 @@ parfor iIter = 1:nIter
 
             % Same thing for the full set, but just the best template
             out = SX_RC_selectBasis_cv(e3D_full_forRC, resp_full_rand_sel, axisORI, axisSF, basisCfg_thisIter);
-            template_full_white = out.template2D;
+            template_full = out.template2D;
 
     end % switch
 
-    %% [A1] 3b. Convert estimated template back to RAW channel-energy space
-    % The DV is computed with raw energy times a raw-space template, so
-    % undo the (z-score + whitening) mapping that was applied to RC inputs.
-    template_tmpl_raw = fxn_convertTemp2Raw(template_tmpl_white, Tfix);
-    template_full_raw = fxn_convertTemp2Raw(template_full_white, Tfix);
-
-    % Diagnostic check for the conversion algebra.
-    % If the inverse mapping is correct, the dot product in whitened space
-    % should match the equivalent dot product in z-scored space.
-    DVcorr_converted = fxn_checkConvertedDVConsistency(e3D_tmpl_rand_sel, e3D_tmpl_forRC, template_tmpl_white, Tfix);
-
-    % Testing: do NOT inverse-whitene the estimated template
-    template_tmpl_raw = template_tmpl_white;
-    template_full_raw = template_full_white;
-
     %% [A1] 4. Regularize the derived template
-    template_full_raw = fxn_getTemplate(template_full_raw, templateType, flag_plot_template);
-    template_tmpl_raw = fxn_getTemplate(template_tmpl_raw, templateType, flag_plot_template);
-
-    %% [A1] Check how channel correlation affects template estimation
-    % -----PCA-based template recovery =====
-    if flag_plot_compDV
-        % NOMplot_PCA
-    end
-
-    % ----- Debug: check whether channels are too correlated thus redundant
-    % !!!! Generate one figure per iteration !!!!
-    if flag_plot_compDV
-        % NOMplot_checkChannelCorr
-    end
-
-    % ----- Compare the univariate regression and multivariation regression with smoothing
-    % One of the two may not be generated; need to pause and generate manually
-    if flag_plot_compDV
-        % template_smooth = template_full_raw;
-        % template_noSmoothing = SX_sim07_RC(e3D_full_rand_norm, resp_full_rand_sel);
-        % RCplot_compTempSmoothing
-    end
+    template_full = fxn_getTemplate(template_full, str_templateType, flag_plot_template);
+    template_tmpl = fxn_getTemplate(template_tmpl, str_templateType, flag_plot_template);
 
     %% [A1] 5. Marginalization, fit tuning functions, and calculate DV
 
@@ -485,21 +445,21 @@ parfor iIter = 1:nIter
 
         switch iDataset
             case 1
-                template_use_raw = template_tmpl_raw;
+                template_inUse = template_tmpl;
             case 2
-                template_use_raw = template_full_raw;
+                template_inUse = template_full;
         end
 
         % Calculate separability
-        templateType_recon = 2; % 2=reconstructed template
+        templateType_recon = 'reconstructed';
         %--------------------------------------------%
-        template_recon = fxn_getTemplate(template_use_raw, templateType_recon, flag_plot_template);
+        template_recon = fxn_getTemplate(template_inUse, templateType_recon, flag_plot_template);
         %--------------------------------------------%
-        sep = corr(template_use_raw(:), template_recon(:));
+        sep = corr(template_inUse(:), template_recon(:));
 
         % Marginalize the template into 1D ORI and SF profiles
-        margORI = mean(template_use_raw, 2)';
-        margSF = mean(template_use_raw, 1);
+        margORI = mean(template_inUse, 2)';
+        margSF = mean(template_inUse, 1);
 
         % Fitting
         if any(isnan(margORI)), error('ALERT: NaN in margORI!'), end
@@ -537,14 +497,13 @@ parfor iIter = 1:nIter
         %% [A1] 6. Metrics, DV, binning, data structs (tmpl split only)
         if iDataset == 1
 
-
             % DV is ALWAYS computed from RAW channel energy times the
             % raw-space template. No basis-projection override.
             [data_train, data_test, metrics] = fxn_compDV_packData( ...
                 d_full, d_tmpl, d_train, d_test, ...
                 e3D_train_rand, e3D_test_rand, ...
-                template_use_raw, convolveType, DVType, ORI_bound, nBins, ...
-                [], []);
+                template_inUse, str_convolveType, str_DVType, ORI_bound, nBins, ...
+                [], [], flag_normDV);
             data_train_allIter{iIter} = data_train;
             data_test_allIter{iIter}  = data_test;
             data_metrics_allIter(iIter, :, :) = metrics;
@@ -552,10 +511,9 @@ parfor iIter = 1:nIter
     end % iDataset
 
     %% [A1] Store template-related values
-    template_tmpl_allIter(iIter, :, :) = template_tmpl_raw;
-    template_full_allIter(iIter, :, :) = template_full_raw;
-    DVcorr_converted_allIter(iIter, :) = DVcorr_converted;
-    
+    template_tmpl_allIter(iIter, :, :) = template_tmpl;
+    template_full_allIter(iIter, :, :) = template_full;
+
     nBasisORI_tmpl_allIter(iIter, :) = nBasisORI_tmpl;
     nBasisSF_tmpl_allIter(iIter, :) = nBasisSF_tmpl;
     basisFxnORI_tmpl_allIter{iIter} = basisFxnORI_tmpl;
@@ -569,7 +527,7 @@ parfor iIter = 1:nIter
     nLL_tmpl_allIter(iIter) = nLL_cv_mean_tmpl;
     pseudoR2_Tjur_tmpl_allIter(iIter) = pseudoR2_Tjur_tmpl;
 
-end % end parfor iIter
+end % parfor iIter
 
 fprintf('\n\n%s: A1 All iterations done.\n\n', datetime('now'))
 
@@ -663,7 +621,7 @@ parfor iIter = 1:nIter
     % To keep parity with A1's `selectTemplateIndices` plumbing (some
     % downstream code references *_sel variables), compute them but do NOT
     % build/apply any whitening transform on the DV inputs.
-    [useIdx_full, useIdx_tmpl] = selectTemplateIndices(itype_template, iPRS_full_rand, iPRS_tmpl_rand);
+    [useIdx_full, useIdx_tmpl] = selectTemplateIndices(str_itype_template, iPRS_full_rand, iPRS_tmpl_rand);
 
     e3D_tmpl_rand_sel = e3D_tmpl_rand(useIdx_tmpl, :, :);
     cst_tmpl_rand_sel = cst_tmpl_rand(useIdx_tmpl);
@@ -682,8 +640,8 @@ parfor iIter = 1:nIter
     [data_train, data_test, metrics] = fxn_compDV_packData( ...
         d_full, d_tmpl, d_train, d_test, ...
         e3D_train_rand, e3D_test_rand, ...
-        template_use, convolveType, DVType, ORI_bound, nBins, ...
-        [], []);
+        template_use, str_convolveType, str_DVType, ORI_bound, nBins, ...
+        [], [], flag_normDV);
     data_train_allIter{iIter} = data_train;
     data_test_allIter{iIter}  = data_test;
     data_metrics_allIter(iIter, :, :) = metrics;
@@ -705,10 +663,32 @@ fprintf('\n\n%s: A2 Outputs saved.\n\n', datetime('now'))
 end
 
 %% HELPER
+function e3D_z = fxn_zscoreABS(e3D_rand, iPRS_rand_sel)
+idxABS = (iPRS_rand_sel == 0);
+% assert(any(idxABS), 'No ABS trials available for fixed transform estimation.');
+
+nTrials_all = size(e3D_rand, 1);
+assert(numel(iPRS_rand_sel) == nTrials_all, 'iPRS_allT length must match size(e3D_allT,1).');
+
+[nTrials_abs, nORI, nSF] = size(e3D_rand(idxABS, :, :));
+e3D_allAbs = reshape(e3D_rand(idxABS, :, :), [nTrials_abs, nORI * nSF]);
+
+%Per-channel mean and SD from ABS trials only
+mu_abs = mean(e3D_allAbs, 1);
+sigma_abs = std(e3D_allAbs, [], 1);
+sigma_abs(~isfinite(sigma_abs) | sigma_abs < 1e-8) = 1e-8;
+
+% Z-score ABS trials (used for whitening matrix estimation only)
+e3D_z = (e3D_allAbs - mu_abs) ./ sigma_abs;
+e3D_z = reshape(e3D_z, [nTrials_abs, nORI,  nSF]);
+
+end
+
+%%
 function [data_train, data_test, metrics] = fxn_compDV_packData( ...
     d_full, d_tmpl, d_train, d_test, ...
     e3D_train_base, e3D_test_base, ...
-    template_notNormed, convolveType, DVType, ORI_bound, nBins, DV_train_override, DV_test_override)
+    template_notNormed, convolveType, DVType, ORI_bound, nBins, DV_train_override, DV_test_override, flag_normDV)
 % e3D_train_base and e3D_test_base must already be centered: E_raw - mu0
 
 % 1. Compute behavioral metrics
@@ -724,12 +704,30 @@ criterion_z_test  = metrics_test(2);
 % 2. Compute decision variable in transformed coordinate system.
 flag_permT = 0;
 if nargin >= 13 && ~isempty(DV_train_override) && ~isempty(DV_test_override)
-    DV_train = DV_train_override(:);
-    DV_test = DV_test_override(:);
+    DV_train_raw = DV_train_override(:);
+    DV_test_raw = DV_test_override(:);
 else
-    DV_train = fxn_getDV_v3(e3D_train_base, template_notNormed, convolveType, DVType, flag_permT, ORI_bound);
-    DV_test  = fxn_getDV_v3(e3D_test_base,  template_notNormed, convolveType, DVType, flag_permT, ORI_bound);
+    DV_train_raw = fxn_getDV_v3(e3D_train_base, template_notNormed, convolveType, DVType, flag_permT, ORI_bound);
+    DV_test_raw  = fxn_getDV_v3(e3D_test_base,  template_notNormed, convolveType, DVType, flag_permT, ORI_bound);
 end
+
+if nargin < 15
+    flag_normDV = 0;
+end
+
+DV_scaleFactor = 1;
+if flag_normDV
+    DV_scaleFactor = std(DV_train_raw);
+    if ~isfinite(DV_scaleFactor) || DV_scaleFactor < 1e-8
+        DV_scaleFactor = max(abs(DV_train_raw));
+    end
+    if ~isfinite(DV_scaleFactor) || DV_scaleFactor < 1e-8
+        DV_scaleFactor = 1;
+    end
+end
+
+DV_train = DV_train_raw ./ DV_scaleFactor;
+DV_test  = DV_test_raw  ./ DV_scaleFactor;
 
 nData_train = length(DV_train);
 nData_test  = length(DV_test);
@@ -760,6 +758,8 @@ data_train.iPair               = d_train.iPair;
 data_train.respC               = d_train.respC;
 data_train.RT                  = d_train.RT;
 data_train.metrics_sim         = metrics_train; % keep field name 'metrics_sim'
+data_train.flag_normDV         = logical(flag_normDV);
+data_train.DV_scaleFactor      = DV_scaleFactor;
 
 data_test = struct();
 data_test.criterion_z         = criterion_z_test;
@@ -778,92 +778,24 @@ data_test.iPair               = d_test.iPair;
 data_test.respC               = d_test.respC;
 data_test.RT                  = d_test.RT;
 data_test.metrics_sim         = metrics_test; % keep field name 'metrics_sim'
+data_test.flag_normDV         = logical(flag_normDV);
+data_test.DV_scaleFactor      = DV_scaleFactor;
 end
 
 %%
 function [useIdx_full, useIdx_tmpl] = selectTemplateIndices(itype_template, iPRS_full_rand, iPRS_tmpl_rand)
 % Shared selector for template/full trial subsets used by A1 and A2.
 switch itype_template
-    case 1 % PRS trials only
+    case 'PRS' % PRS trials only
         useIdx_full = (iPRS_full_rand == 1);
         useIdx_tmpl = (iPRS_tmpl_rand == 1);
-    case 2 % ABS trials only
+    case 'ABS' % ABS trials only
         useIdx_full = (iPRS_full_rand == 0);
         useIdx_tmpl = (iPRS_tmpl_rand == 0);
-    otherwise % 3 = both PRS and ABS
+    case 'BOTH' % 3 = both PRS and ABS
         useIdx_full = true(size(iPRS_full_rand));
         useIdx_tmpl = true(size(iPRS_tmpl_rand));
 end
-end
-
-%%
-function e3D_out = applyFixedTransform(e3D_in, Tfix)
-% Apply per-channel z-scoring and (optionally) the whitening matrix Q.
-% Used ONLY as a preconditioner for RC template estimation.
-%   x_z     = (x_raw - mu_abs) ./ sigma_abs
-%   x_white = (x_z   - mu_cov_abs) * Q             (only if useWhiten)
-[nTrials, nORI, nSF] = size(e3D_in);
-X = reshape(e3D_in, [nTrials, nORI * nSF]);
-X_z = (X - Tfix.mu_abs) ./ Tfix.sigma_abs;
-
-if Tfix.useWhiten
-    Xw = bsxfun(@minus, X_z, Tfix.mu_cov_abs) * Tfix.Q;
-    e3D_out = reshape(Xw, [nTrials, nORI, nSF]);
-else
-    e3D_out = reshape(X_z, [nTrials, nORI, nSF]);
-end
-end
-
-%%
-function template_converted = fxn_convertTemp2Raw(template_white, Tfix)
-% Map an RC-estimated template from the whitened/z-scored space
-
-% Inverse mapping implemented below.
-sigma_vec = Tfix.sigma_abs(:);
-sigma_vec(~isfinite(sigma_vec) | sigma_vec < 1e-8) = 1e-8;
-
-temp_white_vec = template_white(:);
-if Tfix.useWhiten
-    % Q is symmetric SPD-like; Q * t_white inverts the (Q \ t_z) forward step.
-    t_z = Tfix.Q * temp_white_vec;
-else
-    t_z = temp_white_vec;
-end
-t_raw = t_z ./ sigma_vec;
-template_converted = reshape(t_raw, size(template_white));
-end
-
-%%
-function dvCorr = fxn_checkConvertedDVConsistency(e3D_raw, e3D_white, template_white, Tfix)
-% Check that the template conversion is algebraically consistent.
-%
-% Whitening case:
-%   E_white = (E_z - mu_cov_abs) * Q
-%   t_z     = Q * t_white
-% so
-%   DV_white = E_white * t_white
-%   DV_z     = (E_z - mu_cov_abs) * t_z
-%
-% No-whitening case:
-%   E_white == E_z and t_z == t_white.
-
-[nTrials, nORI, nSF] = size(e3D_raw);
-e3D_raw = reshape(e3D_raw, [nTrials, nORI * nSF]);
-e3D_white = reshape(e3D_white, [nTrials, nORI * nSF]);
-
-e3D_converted = (e3D_raw - Tfix.mu_abs) ./ Tfix.sigma_abs;
-template_white = template_white(:);
-
-DV_white = e3D_white * template_white;
-
-if Tfix.useWhiten
-    template_converted = Tfix.Q * template_white;
-    DV_converted = bsxfun(@minus, e3D_converted, Tfix.mu_cov_abs) * template_converted;
-else
-    DV_converted = e3D_converted * template_white;
-end
-
-dvCorr = corr(DV_white, DV_converted);
 end
 
 %%

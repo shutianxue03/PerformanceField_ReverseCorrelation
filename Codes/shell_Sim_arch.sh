@@ -3,7 +3,6 @@
 # Created by Shutian Xue on 07/16/2025
 # Last modified by Shutian Xue on 04/04/2026
 # Description: Run one simulation job in Slurm
-# Updated to match OOD_sim signature.
 # ============================================================
 
 #SBATCH --nodes=1
@@ -72,7 +71,7 @@ try
     fprintf('Nadd_true        = %g\\n', Nadd_true);
     fprintf('Nshared_true     = %g\\n', Nshared_true);
     fprintf('cSDT_true        = %g\\n', cSDT_true);
-    fprintf('lambda_whiten    = %g\\n', lambda_whiten);
+    fprintf('lambda_whiten    = %g [ignored]\\n', lambda_whiten);
     fprintf('flag_regressType = %g\\n', flag_regressType);
     fprintf('flag_incluCrit   = %g\\n', flag_incluCrit);
     fprintf('C_contribution   = %g\\n', C_contribution);
@@ -89,7 +88,6 @@ try
         Nadd_true, ...
         Nshared_true, ...
         cSDT_true, ...
-        lambda_whiten, ...
         iModelB_sim, ...
         nIter);
 

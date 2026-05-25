@@ -1,4 +1,4 @@
-function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, cSDT_true, lambda_whiten, iModelB_sim, nIter)
+function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, cSDT_true, iModelB_sim, nIter)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Script name: OOD_sim.m
@@ -62,9 +62,9 @@ nJob = 1;
 iJob = 1;
 pC_filter = [.6, .8]; % Only proceed with compDV/fitNOM if simulated pC falls within this range; otherwise, discard this simulation and try again with different random seed or parameters.
 
-templateType_true = 1; % 1 = raw;
-DVType_true = 1; % 1 = sum of dot product;
-convolveType_true = 1; % 1 = dot product; 2 = convolution (for fxn_getDV_v3)
+str_templateType_true = 'raw'; % see 'fxn_getTemplate' for other options
+str_DVType_true = 'sum'; % see 'fxn_getDV_v3' for other options
+str_convolveType_true = 'dot'; % see 'fxn_getDV_v3' for other options
 flag_permT = 0; %1=permute the input template per trial
 flag_plotDist = 1;
 if strcmp(str_envir, 'HPC'), flag_plotDist = 0; end % don't plot when running on HPC
@@ -81,16 +81,14 @@ fprintf(' - Fitted with ModelA = %s (1=Data-derived template; 2=ideal template)\
 fprintf(' - Fitted with ModelB = %s (1=full, 2=No Nmul, 3=No Nadd, 4=No Nshared, 5=Nmul-only, 6=Nadd-only, 7=Nshared-only, 8=criterion-only)\n', strjoin(string(iModelB_fit_all), ' '));
 fprintf(' - SDT Criterion=%.1f \n', cSDT_true);
 fprintf(' - Contribution of criterion loss =%.1f \n', C_contribution);
-fprintf(' - Whitening strength (lambda): %.1f \n', lambda_whiten);
 fprintf(' - Regression type (1=Univariate; 2=Multi+smoothing): %d \n\n', flag_regressType);
 
 % Define IO name & folders %
 % Define the IO name
-nameIO = sprintf('IO_Bsim%d_cN%.0f_cG%.0f_nT%s_Nm%.1f_Na%.1f_Ns%.1f_cSDT%.1f_whiten%.1f', ...
+nameIO = sprintf('IO_Bsim%d_cN%.0f_cG%.0f_nT%s_Nm%.1f_Na%.1f_Ns%.1f_cSDT%.1f', ...
     iModelB_sim, ...
     noiseCST*100, gaborCST*100, format_num2exp(nTrials), ...
-    Nmul_true, Nadd_true, Nshared_true, cSDT_true, ...
-    lambda_whiten);
+    Nmul_true, Nadd_true, Nshared_true, cSDT_true);
 
 % Folder to save IO data (energy + behav)
 nameFolder_Data_OOD_IO = sprintf('%s/%s', nameFolder_Data_OOD, nameIO);
@@ -160,16 +158,16 @@ template_true = SX_RC4_Energy_parfor(stim.mask, {template_gabor_true}, filter_si
 %--------------------------------------------%
 template_true = squeeze(template_true); % remove singleton dim
 %--------------------------------------------%
-template_true = fxn_getTemplate(template_true, templateType_true, 0);
+template_true = fxn_getTemplate(template_true, str_templateType_true, 0);
 %--------------------------------------------%
 
 % Do L2 normalization
 % ENSURE this step is consistent with OOD_xx_compDV_A12 when creating the ideal template
-% template_true = template_true / norm(template_true(:));
-template_true = template_true - min(template_true(:));
-template_true = template_true ./ max(template_true(:));
-template_true = 0.1 * template_true;
-fprintf('%s: Ground-truth template created and scaled.\n\n', datetime('now'))
+template_true = template_true / norm(template_true(:));
+% template_true = template_true - min(template_true(:));
+% template_true = template_true ./ max(template_true(:));
+% template_true = 0.1 * template_true;
+% fprintf('%s: Ground-truth template created and scaled.\n\n', datetime('now'))
 
 %% Preallocate sim arrays
 nMetrics = 11;
@@ -244,7 +242,7 @@ dv_space_used        = 'raw_energy_raw_template';
 
 ORI_bound = [5, 14]; % orientation window passed to fxn_getDV_v3
 
-DV_target_sim_allT = fxn_getDV_v3(e3D_target_allT, template_true, convolveType_true, DVType_true, flag_permT, ORI_bound);
+DV_target_sim_allT = fxn_getDV_v3(e3D_target_allT, template_true, str_convolveType_true, str_DVType_true, flag_permT, ORI_bound);
 
 assert(~any(isnan(DV_target_sim_allT)), 'DV_target contains NaN');
 
@@ -353,7 +351,7 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
     if isempty(dir(nameFolder_Data_NOM_IO)), mkdir(nameFolder_Data_NOM_IO); end
 
     % Save only variables used by simPlot4_VaryOneDim.m in one atomic write.
-    save(sprintf('%s/truth.mat', nameFolder_Data_OOD_IO), '*_true', 'dv_space_used', 'mu_cov_DV', 'sigma_cov_DV', 'W_white_DV', 'lambda_whiten', 'beta_true_basis');
+    save(sprintf('%s/truth.mat', nameFolder_Data_OOD_IO), '*_true', 'dv_space_used', 'mu_cov_DV', 'sigma_cov_DV', 'W_white_DV', 'beta_true_basis');
     fprintf('\n\n%s: truth.mat saved (template_true, criterion_DV_true).\n\n', datetime('now'))
 
     % Save the target-energy tensor
@@ -367,7 +365,7 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
     %% Step 1: Estimate the template and compute DV
     % Step 1: compute DVs, templates, and test-set metrics
     %----------------------------%
-    OOD_NOM_Trialwise_compDV_A12({nameIO, criterion_DV_true}, iLocComb, lambda_whiten, nIter, nJob, iJob)
+    OOD_NOM_Trialwise_compDV_A12({nameIO, criterion_DV_true}, iLocComb, nIter, nJob, iJob)
     %----------------------------%
 
     %% Step 2: fit NOM parameters and predict metrics

@@ -34,9 +34,9 @@ end
 
 %% set template type
 switch templateType
-    case 1, template = template_raw;% (1) the 2D kernel (raw)
-    case 2, template = template_recon; % (2) the reconstructed 2D kernel
-    case 3, template = template_mirrored; % (3) the mirrored 2D kernel
-    case 4, template = template_rm; % (4) the % mirror and reconstruct the template
-    case 5, template = energy2D_gabor;
+    case 'raw', template = template_raw;% (1) the 2D kernel (raw)
+    case 'reconstructed', template = template_recon; % (2) the reconstructed 2D kernel
+    case 'mirrored', template = template_mirrored; % (3) the mirrored 2D kernel
+    case 'mr', template = template_rm; % (4) the % mirror and reconstruct the template
+    % case '', template = energy2D_gabor;
 end

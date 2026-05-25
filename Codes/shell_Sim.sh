@@ -104,7 +104,7 @@ cd "${script_dir}"
 
 module load matlab/2025b
 
-matlab -batch "try, OOD_sim(${noiseCST}, ${gaborCST}, ${nTrials}, ${Nmul_true}, ${Nadd_true}, ${Nshared_true}, ${cSDT_true}, ${lambda_whiten}, ${iModelB_sim}, ${nIter}, ${nBasisORI}, ${basisWidthORI}, ${nBasisSF}, ${basisWidthSF}); catch ME, disp(getReport(ME,'extended')); exit(1); end; exit(0);"
+matlab -batch "try, OOD_sim(${noiseCST}, ${gaborCST}, ${nTrials}, ${Nmul_true}, ${Nadd_true}, ${Nshared_true}, ${cSDT_true}, ${iModelB_sim}, ${nIter}); catch ME, disp(getReport(ME,'extended')); exit(1); end; exit(0);"
 
 echo "======================================"
 echo "Finished: $(date)"

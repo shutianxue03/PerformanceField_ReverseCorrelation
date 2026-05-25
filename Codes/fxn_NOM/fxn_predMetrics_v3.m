@@ -26,14 +26,14 @@ function [pYES_pred_allT, pA_pred_allPairs, consistency_allPairs, Cz_fit] = fxn_
 lambda = 0; % Set lapse rate at 0
 
 % Default values (in case a component is absent in a reduced model)
-M = 0;
+alpha_mul = 0;
 sigmaAdd = 0;
 sigmaShared = 0;
 criterion = 0;
 
 switch iModelB
     case 1 % FullModel: Multi + Additive + Shared
-        M = params_est(1);
+        alpha_mul = params_est(1);
         sigmaAdd = params_est(2);
         sigmaShared = params_est(3);
         criterion = params_est(4);
@@ -44,19 +44,19 @@ switch iModelB
         criterion = params_est(3);
 
     case 3 % NoAddN: Multi + Shared (no additive var)
-        M = params_est(1);
+        alpha_mul = params_est(1);
         % sigmaAdd = 0;
         sigmaShared = params_est(2);
         criterion = params_est(3);
 
     case 4 % NoSharedN: Multi + Additive (no shared var)
-        M = params_est(1);
+        alpha_mul = params_est(1);
         sigmaAdd = params_est(2);
         % sigmaShared = 0;
         criterion = params_est(3);
 
     case 5 % JustMultiN: Multiplicative only
-        M = params_est(1);
+        alpha_mul = params_est(1);
         criterion = params_est(2);
 
     case 6 % JustAddN: Additive only
@@ -93,7 +93,7 @@ end
 varConst = sigmaShared^2 + sigmaAdd^2;
 
 % Trial-wise total noise SD (constant + Multi)
-sigma_pred_allT = sqrt(varConst + (M .* DV_allT).^2 ); % nTrials x 1
+sigma_pred_allT = sqrt(varConst + (alpha_mul .* DV_allT).^2 ); % nTrials x 1
 
 % Avoid exactly zero variance (mvncdf & normcdf can be unhappy)
 sigma_pred_allT = max(sigma_pred_allT, 1e-6);
@@ -153,8 +153,8 @@ for iUnik = 1:nPairs
     mu_passB = DV_allT(indPassB) - criterion;
 
     % Total variance per pass (constant (shared + private) + multiplicative)
-    var_total_passA = varConst + (M * DV_allT(indPassA))^2;
-    var_total_passB = varConst + (M * DV_allT(indPassB))^2;
+    var_total_passA = varConst + (alpha_mul * DV_allT(indPassA))^2;
+    var_total_passB = varConst + (alpha_mul * DV_allT(indPassB))^2;
 
     % Enforce strictly positive variances
     var_total_passA = max(var_total_passA, 1e-10);
@@ -162,7 +162,7 @@ for iUnik = 1:nPairs
 
     % Covariance comes only from the shared constant noise
     CovAB = sigmaShared^2;
-    
+
     % --- CAP: enforce positive definiteness ---
     % Need CovAB^2 < varA * varB; sufficient to enforce CovAB < min(varA,varB)."
     CovAB = min(CovAB, 0.999 * sqrt(var_total_passA* var_total_passB));

@@ -46,8 +46,8 @@ for iTrial = 1:nTrials
     end
 
     switch convolveType
-        case 1, tempCovE = template.*e2D; % cross-correlation
-        case 2 , tempCovE = conv2(template, e2D, 'same'); % convolution
+        case 'dot', tempCovE = template.*e2D; % cross-correlation
+        case 'conv', tempCovE = conv2(template, e2D, 'same'); % convolution
     end
 
     % get the channel at which max value is found
@@ -58,8 +58,8 @@ for iTrial = 1:nTrials
     %     quickPlot_tempCovE, waitforbuttonpress
     % decide the format of DV_allT
     switch DV_allTType
-        case 1, DV_allT(iTrial) = sum(tempCovE(:));
-        case 2, DV_allT(iTrial) = max_;
-        case 3, DV_allT(iTrial) = max_/(sum(tempCovE(:))); if sum(tempCovE(:)) == 0, error('ALERT: The suppressDV_allTe drDV_allTe is 0.'); end% SS stands for the estimated semi-saturation factor
+        case 'sum', DV_allT(iTrial) = sum(tempCovE(:));
+        case 'max', DV_allT(iTrial) = max_;
+        case 'Normalization', DV_allT(iTrial) = max_/(sum(tempCovE(:))); if sum(tempCovE(:)) == 0, error('ALERT: The suppressDV_allTe drDV_allTe is 0.'); end% SS stands for the estimated semi-saturation factor
     end
 end % end of itrial
