@@ -36,6 +36,8 @@ else
     str_envir = 'Local';
 end
 
+% nameFolder_server = '/Volumes/server/Users/purplab/EXPERIMENTS/1_Current_Experiments/Shutian_server/PF_RC';
+
 %% Define names of folders to load/save data
 % Keep Data/Figures parallel to Codes under the PF_RC project root.
 nameFolder_Data = sprintf('%s/Data', nameFolder_server) ;
@@ -148,9 +150,9 @@ NOMp1_lb = 0;
 NOMp2_lb = 0;
 NOMp3_lb  = 0;
 
-NOMp1_ub = 1;     % multi noise
-NOMp2_ub = 5;   % (private) additive noise
-NOMp3_ub = 5; % (shared) additive noise
+NOMp1_ub = 2;     % multi noise
+NOMp2_ub = 10;   % (private) additive noise
+NOMp3_ub = 10; % (shared) additive noise
 
 % Midpoint initial guesses
 NOMp1_0 = mean([NOMp1_lb,  NOMp1_ub]);

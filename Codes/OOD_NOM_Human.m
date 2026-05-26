@@ -1,4 +1,5 @@
-function OOD_NOM_Human(isubj, iLocComb, lambda_whiten, nIter, nJob, iJob) %#ok<INUSD>
+function OOD_NOM_Human(isubj, iLocComb, flag_normDV, nIter, nJob, iJob)
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % OOD_NOM_Human.m
 %
@@ -30,22 +31,19 @@ iModelA_fit_all = 1:2;
 iModelB_fit_all = 1:7;
 
 % Human-readable subject name for logging.
-    subjList = {'YK', 'SP', 'SX', 'LS', 'RE', 'MD', 'AS', 'HL', 'FH', 'HA', 'CS', 'DT', 'DU', 'RC', 'SR'};
-    subjName = subjList{isubj};
+subjList = {'YK', 'SP', 'SX', 'LS', 'RE', 'MD', 'AS', 'HL', 'FH', 'HA', 'CS', 'DT', 'DU', 'RC', 'SR'};
+subjName = subjList{isubj};
 
-% Print run info.
-fprintf(' - Subject = %s\n', subjName);
-if iscell(namesLocComb) && numel(namesLocComb) >= iLocComb
-    locLabel = namesLocComb{iLocComb};
-else
-    locLabel = 'NA';
-end
-fprintf(' - Location combo = L%d [%s]\n', iLocComb, locLabel);
+%% Print run info.
+fprintf(' - Subject = %s\n', subjName);    
+fprintf(' - Location combo = L%d [%s]\n', iLocComb, namesLocComb{iLocComb});
 fprintf(' - nIter = %d | nJob = %d | iJob = %d\n', nIter, nJob, iJob);
+fprintf(' - Normalize DV (scale-only) = %d\n', flag_normDV);
 fprintf(' - Fit ModelA = %s\n', strjoin(string(iModelA_fit_all), ' '));
 fprintf(' - Fit ModelB = %s\n', strjoin(string(iModelB_fit_all), ' '));
+
 %% Part 1: compute DVs/templates (A1 + A2)
-OOD_NOM_Trialwise_compDV_A12(isubj, iLocComb, nIter, nJob, iJob)
+OOD_NOM_Trialwise_compDV_A12(isubj, iLocComb, nIter, nJob, iJob, flag_normDV)
 
 %% Part 2: fit NOM for all A/B combinations
 for iModelA_fit = iModelA_fit_all
@@ -54,10 +52,8 @@ for iModelA_fit = iModelA_fit_all
     end
 end
 
-% End timing.
+%% End timing.
 time_end = datetime('now');
 fprintf('%s: OOD_NOM_Human done.\n\n', time_end)
 elapsed = time_end - time_start;
 fprintf('Time used: %s\n\n\n\n', char(elapsed));
-
-end

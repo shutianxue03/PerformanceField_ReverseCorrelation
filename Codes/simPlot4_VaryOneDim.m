@@ -19,8 +19,8 @@
 clear; clc; close all;
 set(0, 'DefaultFigureVisible', 'off');
 
-%% settings
-str_part = '0525';
+%% Settings
+str_part = '0526';
 iModelA_fit = [1]; %1=use data-derived template; 2=use true template
 nBfit = 7;          % number of B-model variants to evaluate (each uses a different internal-noise structure)
 nBins_Part4 = 3; % define bins for collapsing parameter recovery points; use 3 for main text, 5 for Supp
@@ -600,7 +600,7 @@ setting.fig1_pct_fields = {'nBasisORI_mode_pct', 'nBasisSF_mode_pct', 'basisFxnO
 setting.fig1_pct_labels = {'ORI mode selection rate', 'SF mode selection rate', 'ORI basis family mode selection rate', 'SF basis family mode selection rate',  'ORI width mode selection rate', 'SF width mode selection rate', 'Ridge mode selection rate', 'SF asymmetry mode selection rate'};
 
 setting.varFields = {'Nmul_true', 'Nadd_true', 'Nshared_true', 'gaborCST', 'cSDT_true'};
-setting.varNames  = {'Nmul', 'Nadd', 'Nshared', 'signalCST', 'Cz'};
+setting.varNames  = {'Nmul', 'Nadd', 'Nshared', 'signalCST', 'SDT criterion'};
 
 setting.fig1_varFields = setting.varFields;
 setting.fig1_varNames  = setting.varNames;
@@ -645,380 +645,380 @@ R = fxn_attach_medians_from_iter(R, namesMetrics_behav);
 fprintf('\n%s: Median/CI fields extracted for all metrics.\n', string(datetime('now')))
 
 %% Temporary check: Basis-hyperparameter combos vs template-estimation nLL
-% This is a standalone diagnostic block. It does not change any core outputs.
-% It is designed to run with only the setup code above "%% find IO folders".
-fprintf('\n%s: Fig temp: Hyperparameters combo...', string(datetime('now')))
-
-iModelA_tmp = iModelA_fit(1);
-
-% Standalone-safe output paths (do not depend on later plotting sections).
-if ~exist('nameFolder_Output', 'var') || isempty(nameFolder_Output)
-    error('nameFolder_Output is undefined. Run the setup code above "%% find IO folders" first.');
-end
-if ~exist(nameFolder_Output, 'dir')
-    mkdir(nameFolder_Output);
-end
-
-if ~exist('nameFolder_Figures', 'var') || isempty(nameFolder_Figures)
-    nameFolder_Figures_tmp = nameFolder_Output;
-else
-    nameFolder_Figures_tmp = fullfile(nameFolder_Figures, sprintf('IO_%s_A%d', str_part, iModelA_tmp));
-    if ~exist(nameFolder_Figures_tmp, 'dir')
-        mkdir(nameFolder_Figures_tmp);
-    end
-end
-
-folderInfo_tmp = dir(nameFolder_Data_NOM_Trialwise);
-folderInfo_tmp = folderInfo_tmp([folderInfo_tmp.isdir]);
-folderInfo_tmp = folderInfo_tmp(~ismember({folderInfo_tmp.name}, {'.', '..'}));
-
-T_tmp = table();
-comboPlot_tmp = struct('combo', {}, 'nameIO', {}, 'nBasisORI', {}, 'basisWidthORI', {}, ...
-    'nBasisSF', {}, 'basisWidthSF', {}, 'margORI_true', {}, 'margSF_true', {}, ...
-    'margORI_est_med', {}, 'margSF_est_med', {});
-
-for iFold_tmp = 1:numel(folderInfo_tmp)
-    fprintf('%d/%d\n', iFold_tmp, numel(folderInfo_tmp))
-    nameIO_tmp = folderInfo_tmp(iFold_tmp).name;
-    folderNOM_tmp = fullfile(folderInfo_tmp(iFold_tmp).folder, folderInfo_tmp(iFold_tmp).name);
-    folderOOD_tmp = fullfile(nameFolder_Data_OOD, nameIO_tmp);
-
-    nBasisORI_tmp = parse_num_from_name_basisRelevant(nameIO_tmp, 'nBasisORI');
-    nBasisSF_tmp = parse_num_from_name_basisRelevant(nameIO_tmp, 'nBasisSF');
-    basisWidthORI_tmp = parse_num_from_name_basisRelevant(nameIO_tmp, 'basisWidthORI');
-    basisWidthSF_tmp = parse_num_from_name_basisRelevant(nameIO_tmp, 'basisWidthSF');
-
-    fileInfo_tmp = dir(fullfile(folderNOM_tmp, sprintf('n*_A%d_compDV.mat', iModelA_tmp)));
-    fileInfo_tmp = fileInfo_tmp(~contains({fileInfo_tmp.name}, 'min'));
-    if isempty(fileInfo_tmp)
-        continue
-    end
-
-    nameFile_truth_tmp = fullfile(folderOOD_tmp, 'truth.mat');
-    if ~exist(nameFile_truth_tmp, 'file')
-        continue
-    end
-
-    % Load the file
-    [~, iNewest_tmp] = max([fileInfo_tmp.datenum]);
-    compFile_tmp = fullfile(fileInfo_tmp(iNewest_tmp).folder, fileInfo_tmp(iNewest_tmp).name);
-    S_tmp = load(compFile_tmp);
-    truth_tmp = load(nameFile_truth_tmp);
-    nLL_tmp = S_tmp.nLL_tmpl_allIter(:);
-    nLL_tmp = nLL_tmp(isfinite(nLL_tmp));
-
-    % New OOD_sim names no longer encode basis hyperparameters.
-    % Fall back to compDV iteration fields when name parsing returns NaN.
-    if ~isfinite(nBasisORI_tmp) && isfield(S_tmp, 'nBasisORI_tmpl_allIter')
-        vals = S_tmp.nBasisORI_tmpl_allIter(:);
-        vals = vals(isfinite(vals));
-        if ~isempty(vals), nBasisORI_tmp = mode(vals); end
-    end
-    if ~isfinite(nBasisSF_tmp) && isfield(S_tmp, 'nBasisSF_tmpl_allIter')
-        vals = S_tmp.nBasisSF_tmpl_allIter(:);
-        vals = vals(isfinite(vals));
-        if ~isempty(vals), nBasisSF_tmp = mode(vals); end
-    end
-    if ~isfinite(basisWidthORI_tmp)
-        if isfield(S_tmp, 'basisWidthORI_tmpl_allIter')
-            vals = S_tmp.basisWidthORI_tmpl_allIter(:);
-        elseif isfield(S_tmp, 'basisWidthScaleORI_tmpl_allIter')
-            vals = S_tmp.basisWidthScaleORI_tmpl_allIter(:);
-        else
-            vals = [];
-        end
-        vals = vals(isfinite(vals));
-        if ~isempty(vals), basisWidthORI_tmp = mode(vals); end
-    end
-    if ~isfinite(basisWidthSF_tmp)
-        if isfield(S_tmp, 'basisWidthSF_tmpl_allIter')
-            vals = S_tmp.basisWidthSF_tmpl_allIter(:);
-        elseif isfield(S_tmp, 'basisWidthScaleSF_tmpl_allIter')
-            vals = S_tmp.basisWidthScaleSF_tmpl_allIter(:);
-        else
-            vals = [];
-        end
-        vals = vals(isfinite(vals));
-        if ~isempty(vals), basisWidthSF_tmp = mode(vals); end
-    end
-
-    [margORI_true_tmp, margSF_true_tmp, margORI_est_iter_norm_tmp, margSF_est_iter_norm_tmp] = ...
-        fxn_extract_normalized_tuning_curves(truth_tmp, S_tmp, nORI, nSF);
-
-    % Fill the matrix
-    row_tmp = table();
-    row_tmp.nameIO = string(nameIO_tmp);
-    row_tmp.nBasisORI = nBasisORI_tmp;
-    row_tmp.nBasisSF = nBasisSF_tmp;
-    row_tmp.basisWidthORI = basisWidthORI_tmp;
-    row_tmp.basisWidthSF = basisWidthSF_tmp;
-    row_tmp.nLL_med_file = median(nLL_tmp, 'omitnan');
-    row_tmp.nLL_mean_file = mean(nLL_tmp, 'omitnan');
-    row_tmp.nLL_sem_file = std(nLL_tmp, 'omitnan') / sqrt(numel(nLL_tmp));
-    row_tmp.nIter_valid = numel(nLL_tmp);
-
-    if all(isfinite([nBasisORI_tmp, basisWidthORI_tmp, nBasisSF_tmp, basisWidthSF_tmp]))
-        row_tmp.combo = string(sprintf('o%d_wO%.3g_s%d_wS%.3g', nBasisORI_tmp, basisWidthORI_tmp, nBasisSF_tmp, basisWidthSF_tmp));
-    else
-        row_tmp.combo = "unparsed";
-    end
-
-    T_tmp = [T_tmp; row_tmp]; %#ok<AGROW>
-
-    if row_tmp.combo ~= "unparsed"
-        comboPlot_tmp(end+1).combo = row_tmp.combo; %#ok<AGROW>
-        comboPlot_tmp(end).nameIO = string(nameIO_tmp);
-        comboPlot_tmp(end).nBasisORI = nBasisORI_tmp;
-        comboPlot_tmp(end).basisWidthORI = basisWidthORI_tmp;
-        comboPlot_tmp(end).nBasisSF = nBasisSF_tmp;
-        comboPlot_tmp(end).basisWidthSF = basisWidthSF_tmp;
-        comboPlot_tmp(end).margORI_true = margORI_true_tmp;
-        comboPlot_tmp(end).margSF_true = margSF_true_tmp;
-        if isempty(margORI_est_iter_norm_tmp)
-            comboPlot_tmp(end).margORI_est_med = nan(1, numel(margORI_true_tmp));
-        else
-            [comboPlot_tmp(end).margORI_est_med, ~, ~] = getCI(margORI_est_iter_norm_tmp, 1, 1);
-        end
-        if isempty(margSF_est_iter_norm_tmp)
-            comboPlot_tmp(end).margSF_est_med = nan(1, numel(margSF_true_tmp));
-        else
-            [comboPlot_tmp(end).margSF_est_med, ~, ~] = getCI(margSF_est_iter_norm_tmp, 1, 1);
-        end
-    end
-end % iFold_temp
-
-T_plot_tmp = T_tmp(T_tmp.combo ~= "unparsed", :);
-
-% Summary by combo
-G_tmp = groupsummary(T_plot_tmp, 'combo', {'median', 'mean', 'std'}, 'nLL_med_file');
-G_tmp = sortrows(G_tmp, 'median_nLL_med_file', 'ascend');
-
-save(fullfile(nameFolder_Output, 'Temp_basisCombo_nLL.mat'), 'T_tmp', 'T_plot_tmp', 'G_tmp', 'comboPlot_tmp');
-fprintf('\n%s: data extracted, compiled and saved.\n', string(datetime('now')))
-
-% Build ORI heatmap: x=nBasisORI, y=basisWidthORI (collapse over SF settings)
-uBasisORI_tmp = unique(T_plot_tmp.nBasisORI);
-uWidthORI_tmp = unique(T_plot_tmp.basisWidthORI);
-M_ori_tmp = nan(numel(uWidthORI_tmp), numel(uBasisORI_tmp));
-for ix_tmp = 1:numel(uBasisORI_tmp)
-    for iy_tmp = 1:numel(uWidthORI_tmp)
-        idx_tmp = T_plot_tmp.nBasisORI == uBasisORI_tmp(ix_tmp) & T_plot_tmp.basisWidthORI == uWidthORI_tmp(iy_tmp);
-        if any(idx_tmp)
-            M_ori_tmp(iy_tmp, ix_tmp) = median(T_plot_tmp.nLL_med_file(idx_tmp), 'omitnan');
-        end
-    end
-end
-
-% Build SF heatmap: x=nBasisSF, y=basisWidthSF (collapse over ORI settings)
-uBasisSF_tmp = unique(T_plot_tmp.nBasisSF);
-uWidthSF_tmp = unique(T_plot_tmp.basisWidthSF);
-M_sf_tmp = nan(numel(uWidthSF_tmp), numel(uBasisSF_tmp));
-for ix_tmp = 1:numel(uBasisSF_tmp)
-    for iy_tmp = 1:numel(uWidthSF_tmp)
-        idx_tmp = T_plot_tmp.nBasisSF == uBasisSF_tmp(ix_tmp) & T_plot_tmp.basisWidthSF == uWidthSF_tmp(iy_tmp);
-        if any(idx_tmp)
-            M_sf_tmp(iy_tmp, ix_tmp) = median(T_plot_tmp.nLL_med_file(idx_tmp), 'omitnan');
-        end
-    end
-end
-
-% Panel-specific color scales (ORI and SF use independent ranges).
-vals_ori_tmp = M_ori_tmp(isfinite(M_ori_tmp));
-if isempty(vals_ori_tmp)
-    clim_ori_tmp = [0, 1];
-else
-    clim_ori_tmp = [min(vals_ori_tmp), max(vals_ori_tmp)];
-    if clim_ori_tmp(1) == clim_ori_tmp(2)
-        clim_ori_tmp = clim_ori_tmp + [-eps, eps];
-    end
-end
-
-vals_sf_tmp = M_sf_tmp(isfinite(M_sf_tmp));
-if isempty(vals_sf_tmp)
-    clim_sf_tmp = [0, 1];
-else
-    clim_sf_tmp = [min(vals_sf_tmp), max(vals_sf_tmp)];
-    if clim_sf_tmp(1) == clim_sf_tmp(2)
-        clim_sf_tmp = clim_sf_tmp + [-eps, eps];
-    end
-end
-
-% Plot
-h_tmp = figure('Position', [120 120 1400 620], 'Color', 'w');
-tlo_tmp = tiledlayout(1, 2, 'TileSpacing', 'compact', 'Padding', 'compact'); %#ok<NASGU>
-
-% Left: ORI heatmap
-ax1_tmp = nexttile; hold on;
-imagesc(M_ori_tmp);
-set(ax1_tmp, 'YDir', 'normal', ...
-    'XTick', 1:numel(uBasisORI_tmp), 'XTickLabel', string(uBasisORI_tmp), ...
-    'YTick', 1:numel(uWidthORI_tmp), 'YTickLabel', compose('%.2g', uWidthORI_tmp));
-xlabel('nBasisORI');
-ylabel('basisWidthORI');
-title('ORI hyperparameters');
-axis square;
-colormap(ax1_tmp, turbo);
-clim(ax1_tmp, clim_ori_tmp);
-cb1_tmp = colorbar;
-cb1_tmp.Label.String = 'Median template-estimation nLL';
-
-for iy_tmp = 1:size(M_ori_tmp, 1)
-    for ix_tmp = 1:size(M_ori_tmp, 2)
-        v_tmp = M_ori_tmp(iy_tmp, ix_tmp);
-        if isfinite(v_tmp)
-            frac_tmp = (v_tmp - clim_ori_tmp(1)) / max(clim_ori_tmp(2) - clim_ori_tmp(1), eps);
-            txtColor_tmp = [0 0 0];
-            if frac_tmp > 0.55
-                txtColor_tmp = [1 1 1];
-            end
-            text(ix_tmp, iy_tmp, sprintf('%.2f', v_tmp), ...
-                'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle', ...
-                'Color', txtColor_tmp, 'FontSize', 10, 'FontWeight', 'bold');
-        end
-    end
-end
-grid on; box on;
-
-% Right: SF heatmap
-ax2_tmp = nexttile; hold on;
-imagesc(M_sf_tmp);
-set(ax2_tmp, 'YDir', 'normal', ...
-    'XTick', 1:numel(uBasisSF_tmp), 'XTickLabel', string(uBasisSF_tmp), ...
-    'YTick', 1:numel(uWidthSF_tmp), 'YTickLabel', compose('%.2g', uWidthSF_tmp));
-xlabel('nBasisSF');
-ylabel('basisWidthSF');
-title('SF hyperparameters');
-axis square;
-colormap(ax2_tmp, turbo);
-clim(ax2_tmp, clim_sf_tmp);
-cb2_tmp = colorbar;
-cb2_tmp.Label.String = 'Median template-estimation nLL';
-
-for iy_tmp = 1:size(M_sf_tmp, 1)
-    for ix_tmp = 1:size(M_sf_tmp, 2)
-        v_tmp = M_sf_tmp(iy_tmp, ix_tmp);
-        if isfinite(v_tmp)
-            frac_tmp = (v_tmp - clim_sf_tmp(1)) / max(clim_sf_tmp(2) - clim_sf_tmp(1), eps);
-            txtColor_tmp = [0 0 0];
-            if frac_tmp > 0.55
-                txtColor_tmp = [1 1 1];
-            end
-            text(ix_tmp, iy_tmp, sprintf('%.2f', v_tmp), ...
-                'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle', ...
-                'Color', txtColor_tmp, 'FontSize', 10, 'FontWeight', 'bold');
-        end
-    end
-end
-grid on; box on;
-
-sgtitle(sprintf('Temporary check: nLL heatmaps by basis dimensions (N=%d files)', height(T_plot_tmp)));
-set(findall(gcf, '-property', 'FontSize'), 'FontSize', 12);
-
-saveas(h_tmp, fullfile(nameFolder_Figures_tmp, 'FigTMP_basisCombo_nLL.png'));
-close(h_tmp);
-
-% Part 2: Plot tuning overlays by basis combo
-% Layout: rows = basisWidth levels, columns = nBasis levels (separate figures for ORI and SF)
-if ~isempty(comboPlot_tmp)
-    % ---- collect unique axis levels ----
-    uNORI_tmp  = unique([comboPlot_tmp.nBasisORI]);
-    uWORI_tmp  = unique([comboPlot_tmp.basisWidthORI]);
-    uNSF_tmp   = unique([comboPlot_tmp.nBasisSF]);
-    uWSF_tmp   = unique([comboPlot_tmp.basisWidthSF]);
-
-    nColORI_tmp = numel(uNORI_tmp);
-    nRowORI_tmp = numel(uWORI_tmp);
-    nColSF_tmp  = numel(uNSF_tmp);
-    nRowSF_tmp  = numel(uWSF_tmp);
-
-    % ---- Figure A: ORI tuning ----
-    h_oriTuning_tmp = figure('Position', [80 80 max(400, 320*nColORI_tmp) max(320, 220*nRowORI_tmp)], 'Color', 'w');
-    tiledlayout(nRowORI_tmp, nColORI_tmp, 'TileSpacing', 'compact', 'Padding', 'compact');
-
-    for iRow_tmp = 1:nRowORI_tmp
-        for iCol_tmp = 1:nColORI_tmp
-            wORI_tmp = uWORI_tmp(iRow_tmp);
-            nORI_key_tmp = uNORI_tmp(iCol_tmp);
-
-            % find entries matching this (nBasisORI, basisWidthORI) cell; collapse over SF params
-            mask_tmp = abs([comboPlot_tmp.nBasisORI] - nORI_key_tmp) < 1e-9 & ...
-                       abs([comboPlot_tmp.basisWidthORI] - wORI_tmp) < 1e-9;
-            entries_tmp = comboPlot_tmp(mask_tmp);
-
-            axORI_tmp = nexttile; hold(axORI_tmp, 'on');
-            if ~isempty(entries_tmp)
-                yTrue_tmp = mean(vertcat(entries_tmp.margORI_true), 1, 'omitnan');
-                mat_tmp = vertcat(entries_tmp.margORI_est_med);
-                yEst_tmp = nan(1, size(mat_tmp, 2));
-                for iCh_tmp = 1:size(mat_tmp, 2)
-                    v_tmp = mat_tmp(:, iCh_tmp); v_tmp = v_tmp(isfinite(v_tmp));
-                    if ~isempty(v_tmp), [yEst_tmp(iCh_tmp), ~, ~] = getCI(v_tmp, 2, 1); end
-                end
-                plot(axis_tuning{1}, yTrue_tmp, 'r-', 'LineWidth', setting.trueWidth);
-                plot(axis_tuning{1}, yEst_tmp,  'k-', 'LineWidth', setting.lineWidth);
-            end
-            fxn_style_ax(axORI_tmp, setting);
-            xticks(axORI_tmp, axisTicks_tuning{1}); xticklabels(axORI_tmp, axisTL_tuning{1});
-            ylim(axORI_tmp, [-0.2 1]);
-            if iRow_tmp == nRowORI_tmp, xlabel(axORI_tmp, namesFeature{1}); end
-            if iCol_tmp == 1, ylabel(axORI_tmp, sprintf('wORI=%.3g', wORI_tmp)); end
-            title(axORI_tmp, sprintf('nORI=%d', nORI_key_tmp));
-            if iRow_tmp == 1 && iCol_tmp == 1
-                % legend(axORI_tmp, {'True','Est'}, 'Location','south','Box','off','FontSize',setting.fontSize);
-            end
-        end % iCol_tmp
-    end % iRow_tmp
-    sgtitle(sprintf('Temp: ORI tuning (rows=basisWidthORI, cols=nBasisORI)'));
-    set(findall(gcf, '-property', 'FontSize'), 'FontSize', 12);
-    saveas(h_oriTuning_tmp, fullfile(nameFolder_Figures_tmp, 'FigTMP_basisCombo_tuningORI.png'));
-    close(h_oriTuning_tmp);
-
-    % ---- Figure B: SF tuning ----
-    h_sfTuning_tmp = figure('Position', [80 80 max(400, 320*nColSF_tmp) max(320, 220*nRowSF_tmp)], 'Color', 'w');
-    tiledlayout(nRowSF_tmp, nColSF_tmp, 'TileSpacing', 'compact', 'Padding', 'compact');
-
-    for iRow_tmp = 1:nRowSF_tmp
-        for iCol_tmp = 1:nColSF_tmp
-            wSF_tmp = uWSF_tmp(iRow_tmp);
-            nSF_key_tmp = uNSF_tmp(iCol_tmp);
-
-            mask_tmp = abs([comboPlot_tmp.nBasisSF] - nSF_key_tmp) < 1e-9 & ...
-                       abs([comboPlot_tmp.basisWidthSF] - wSF_tmp) < 1e-9;
-            entries_tmp = comboPlot_tmp(mask_tmp);
-
-            axSF_tmp = nexttile; hold(axSF_tmp, 'on');
-            if ~isempty(entries_tmp)
-                yTrue_tmp = mean(vertcat(entries_tmp.margSF_true), 1, 'omitnan');
-                mat_tmp = vertcat(entries_tmp.margSF_est_med);
-                yEst_tmp = nan(1, size(mat_tmp, 2));
-                for iCh_tmp = 1:size(mat_tmp, 2)
-                    v_tmp = mat_tmp(:, iCh_tmp); v_tmp = v_tmp(isfinite(v_tmp));
-                    if ~isempty(v_tmp), [yEst_tmp(iCh_tmp), ~, ~] = getCI(v_tmp, 2, 1); end
-                end
-                plot(axis_tuning{2}, yTrue_tmp, 'r-', 'LineWidth', setting.trueWidth);
-                plot(axis_tuning{2}, yEst_tmp,  'k-', 'LineWidth', setting.lineWidth);
-            end
-            fxn_style_ax(axSF_tmp, setting);
-            xticks(axSF_tmp, axisTicks_tuning{2}); xticklabels(axSF_tmp, axisTL_tuning{2});
-            ylim(axSF_tmp, [-0.2 1]);
-            if iRow_tmp == nRowSF_tmp, xlabel(axSF_tmp, namesFeature{2}); end
-            if iCol_tmp == 1, ylabel(axSF_tmp, sprintf('wSF=%.3g', wSF_tmp)); end
-            title(axSF_tmp, sprintf('nSF=%d', nSF_key_tmp));
-            if iRow_tmp == 1 && iCol_tmp == 1
-                % legend(axSF_tmp, {'True','Est'}, 'Location','south','Box','off','FontSize',setting.fontSize);
-            end
-        end
-    end
-    sgtitle(sprintf('Temp: SF tuning (rows=basisWidthSF, cols=nBasisSF)'));
-    set(findall(gcf, '-property', 'FontSize'), 'FontSize', 12);
-    saveas(h_sfTuning_tmp, fullfile(nameFolder_Figures_tmp, 'FigTMP_basisCombo_tuningSF.png'));
-    close(h_sfTuning_tmp);
-end
-
+% % This is a standalone diagnostic block. It does not change any core outputs.
+% % It is designed to run with only the setup code above "%% find IO folders".
+% fprintf('\n%s: Fig temp: Hyperparameters combo...', string(datetime('now')))
+%
+% iModelA_tmp = iModelA_fit(1);
+%
+% % Standalone-safe output paths (do not depend on later plotting sections).
+% if ~exist('nameFolder_Output', 'var') || isempty(nameFolder_Output)
+%     error('nameFolder_Output is undefined. Run the setup code above "%% find IO folders" first.');
+% end
+% if ~exist(nameFolder_Output, 'dir')
+%     mkdir(nameFolder_Output);
+% end
+%
+% if ~exist('nameFolder_Figures', 'var') || isempty(nameFolder_Figures)
+%     nameFolder_Figures_tmp = nameFolder_Output;
+% else
+%     nameFolder_Figures_tmp = fullfile(nameFolder_Figures, sprintf('IO_%s_A%d', str_part, iModelA_tmp));
+%     if ~exist(nameFolder_Figures_tmp, 'dir')
+%         mkdir(nameFolder_Figures_tmp);
+%     end
+% end
+%
+% folderInfo_tmp = dir(nameFolder_Data_NOM_Trialwise);
+% folderInfo_tmp = folderInfo_tmp([folderInfo_tmp.isdir]);
+% folderInfo_tmp = folderInfo_tmp(~ismember({folderInfo_tmp.name}, {'.', '..'}));
+%
+% T_tmp = table();
+% comboPlot_tmp = struct('combo', {}, 'nameIO', {}, 'nBasisORI', {}, 'basisWidthORI', {}, ...
+%     'nBasisSF', {}, 'basisWidthSF', {}, 'margORI_true', {}, 'margSF_true', {}, ...
+%     'margORI_est_med', {}, 'margSF_est_med', {});
+%
+% for iFold_tmp = 1:numel(folderInfo_tmp)
+%     fprintf('%d/%d\n', iFold_tmp, numel(folderInfo_tmp))
+%     nameIO_tmp = folderInfo_tmp(iFold_tmp).name;
+%     folderNOM_tmp = fullfile(folderInfo_tmp(iFold_tmp).folder, folderInfo_tmp(iFold_tmp).name);
+%     folderOOD_tmp = fullfile(nameFolder_Data_OOD, nameIO_tmp);
+%
+%     nBasisORI_tmp = parse_num_from_name_basisRelevant(nameIO_tmp, 'nBasisORI');
+%     nBasisSF_tmp = parse_num_from_name_basisRelevant(nameIO_tmp, 'nBasisSF');
+%     basisWidthORI_tmp = parse_num_from_name_basisRelevant(nameIO_tmp, 'basisWidthORI');
+%     basisWidthSF_tmp = parse_num_from_name_basisRelevant(nameIO_tmp, 'basisWidthSF');
+%
+%     fileInfo_tmp = dir(fullfile(folderNOM_tmp, sprintf('n*_A%d_compDV.mat', iModelA_tmp)));
+%     fileInfo_tmp = fileInfo_tmp(~contains({fileInfo_tmp.name}, 'min'));
+%     if isempty(fileInfo_tmp)
+%         continue
+%     end
+%
+%     nameFile_truth_tmp = fullfile(folderOOD_tmp, 'truth.mat');
+%     if ~exist(nameFile_truth_tmp, 'file')
+%         continue
+%     end
+%
+%     % Load the file
+%     [~, iNewest_tmp] = max([fileInfo_tmp.datenum]);
+%     compFile_tmp = fullfile(fileInfo_tmp(iNewest_tmp).folder, fileInfo_tmp(iNewest_tmp).name);
+%     S_tmp = load(compFile_tmp);
+%     truth_tmp = load(nameFile_truth_tmp);
+%     nLL_tmp = S_tmp.nLL_tmpl_allIter(:);
+%     nLL_tmp = nLL_tmp(isfinite(nLL_tmp));
+%
+%     % New OOD_sim names no longer encode basis hyperparameters.
+%     % Fall back to compDV iteration fields when name parsing returns NaN.
+%     if ~isfinite(nBasisORI_tmp) && isfield(S_tmp, 'nBasisORI_tmpl_allIter')
+%         vals = S_tmp.nBasisORI_tmpl_allIter(:);
+%         vals = vals(isfinite(vals));
+%         if ~isempty(vals), nBasisORI_tmp = mode(vals); end
+%     end
+%     if ~isfinite(nBasisSF_tmp) && isfield(S_tmp, 'nBasisSF_tmpl_allIter')
+%         vals = S_tmp.nBasisSF_tmpl_allIter(:);
+%         vals = vals(isfinite(vals));
+%         if ~isempty(vals), nBasisSF_tmp = mode(vals); end
+%     end
+%     if ~isfinite(basisWidthORI_tmp)
+%         if isfield(S_tmp, 'basisWidthORI_tmpl_allIter')
+%             vals = S_tmp.basisWidthORI_tmpl_allIter(:);
+%         elseif isfield(S_tmp, 'basisWidthScaleORI_tmpl_allIter')
+%             vals = S_tmp.basisWidthScaleORI_tmpl_allIter(:);
+%         else
+%             vals = [];
+%         end
+%         vals = vals(isfinite(vals));
+%         if ~isempty(vals), basisWidthORI_tmp = mode(vals); end
+%     end
+%     if ~isfinite(basisWidthSF_tmp)
+%         if isfield(S_tmp, 'basisWidthSF_tmpl_allIter')
+%             vals = S_tmp.basisWidthSF_tmpl_allIter(:);
+%         elseif isfield(S_tmp, 'basisWidthScaleSF_tmpl_allIter')
+%             vals = S_tmp.basisWidthScaleSF_tmpl_allIter(:);
+%         else
+%             vals = [];
+%         end
+%         vals = vals(isfinite(vals));
+%         if ~isempty(vals), basisWidthSF_tmp = mode(vals); end
+%     end
+%
+%     [margORI_true_tmp, margSF_true_tmp, margORI_est_iter_norm_tmp, margSF_est_iter_norm_tmp] = ...
+%         fxn_extract_normalized_tuning_curves(truth_tmp, S_tmp, nORI, nSF);
+%
+%     % Fill the matrix
+%     row_tmp = table();
+%     row_tmp.nameIO = string(nameIO_tmp);
+%     row_tmp.nBasisORI = nBasisORI_tmp;
+%     row_tmp.nBasisSF = nBasisSF_tmp;
+%     row_tmp.basisWidthORI = basisWidthORI_tmp;
+%     row_tmp.basisWidthSF = basisWidthSF_tmp;
+%     row_tmp.nLL_med_file = median(nLL_tmp, 'omitnan');
+%     row_tmp.nLL_mean_file = mean(nLL_tmp, 'omitnan');
+%     row_tmp.nLL_sem_file = std(nLL_tmp, 'omitnan') / sqrt(numel(nLL_tmp));
+%     row_tmp.nIter_valid = numel(nLL_tmp);
+%
+%     if all(isfinite([nBasisORI_tmp, basisWidthORI_tmp, nBasisSF_tmp, basisWidthSF_tmp]))
+%         row_tmp.combo = string(sprintf('o%d_wO%.3g_s%d_wS%.3g', nBasisORI_tmp, basisWidthORI_tmp, nBasisSF_tmp, basisWidthSF_tmp));
+%     else
+%         row_tmp.combo = "unparsed";
+%     end
+%
+%     T_tmp = [T_tmp; row_tmp]; %#ok<AGROW>
+%
+%     if row_tmp.combo ~= "unparsed"
+%         comboPlot_tmp(end+1).combo = row_tmp.combo; %#ok<AGROW>
+%         comboPlot_tmp(end).nameIO = string(nameIO_tmp);
+%         comboPlot_tmp(end).nBasisORI = nBasisORI_tmp;
+%         comboPlot_tmp(end).basisWidthORI = basisWidthORI_tmp;
+%         comboPlot_tmp(end).nBasisSF = nBasisSF_tmp;
+%         comboPlot_tmp(end).basisWidthSF = basisWidthSF_tmp;
+%         comboPlot_tmp(end).margORI_true = margORI_true_tmp;
+%         comboPlot_tmp(end).margSF_true = margSF_true_tmp;
+%         if isempty(margORI_est_iter_norm_tmp)
+%             comboPlot_tmp(end).margORI_est_med = nan(1, numel(margORI_true_tmp));
+%         else
+%             [comboPlot_tmp(end).margORI_est_med, ~, ~] = getCI(margORI_est_iter_norm_tmp, 1, 1);
+%         end
+%         if isempty(margSF_est_iter_norm_tmp)
+%             comboPlot_tmp(end).margSF_est_med = nan(1, numel(margSF_true_tmp));
+%         else
+%             [comboPlot_tmp(end).margSF_est_med, ~, ~] = getCI(margSF_est_iter_norm_tmp, 1, 1);
+%         end
+%     end
+% end % iFold_temp
+%
+% T_plot_tmp = T_tmp(T_tmp.combo ~= "unparsed", :);
+%
+% % Summary by combo
+% G_tmp = groupsummary(T_plot_tmp, 'combo', {'median', 'mean', 'std'}, 'nLL_med_file');
+% G_tmp = sortrows(G_tmp, 'median_nLL_med_file', 'ascend');
+%
 % save(fullfile(nameFolder_Output, 'Temp_basisCombo_nLL.mat'), 'T_tmp', 'T_plot_tmp', 'G_tmp', 'comboPlot_tmp');
-fprintf('\n%s: saved figure.\n', string(datetime('now')))
+% fprintf('\n%s: data extracted, compiled and saved.\n', string(datetime('now')))
+%
+% % Build ORI heatmap: x=nBasisORI, y=basisWidthORI (collapse over SF settings)
+% uBasisORI_tmp = unique(T_plot_tmp.nBasisORI);
+% uWidthORI_tmp = unique(T_plot_tmp.basisWidthORI);
+% M_ori_tmp = nan(numel(uWidthORI_tmp), numel(uBasisORI_tmp));
+% for ix_tmp = 1:numel(uBasisORI_tmp)
+%     for iy_tmp = 1:numel(uWidthORI_tmp)
+%         idx_tmp = T_plot_tmp.nBasisORI == uBasisORI_tmp(ix_tmp) & T_plot_tmp.basisWidthORI == uWidthORI_tmp(iy_tmp);
+%         if any(idx_tmp)
+%             M_ori_tmp(iy_tmp, ix_tmp) = median(T_plot_tmp.nLL_med_file(idx_tmp), 'omitnan');
+%         end
+%     end
+% end
+%
+% % Build SF heatmap: x=nBasisSF, y=basisWidthSF (collapse over ORI settings)
+% uBasisSF_tmp = unique(T_plot_tmp.nBasisSF);
+% uWidthSF_tmp = unique(T_plot_tmp.basisWidthSF);
+% M_sf_tmp = nan(numel(uWidthSF_tmp), numel(uBasisSF_tmp));
+% for ix_tmp = 1:numel(uBasisSF_tmp)
+%     for iy_tmp = 1:numel(uWidthSF_tmp)
+%         idx_tmp = T_plot_tmp.nBasisSF == uBasisSF_tmp(ix_tmp) & T_plot_tmp.basisWidthSF == uWidthSF_tmp(iy_tmp);
+%         if any(idx_tmp)
+%             M_sf_tmp(iy_tmp, ix_tmp) = median(T_plot_tmp.nLL_med_file(idx_tmp), 'omitnan');
+%         end
+%     end
+% end
+%
+% % Panel-specific color scales (ORI and SF use independent ranges).
+% vals_ori_tmp = M_ori_tmp(isfinite(M_ori_tmp));
+% if isempty(vals_ori_tmp)
+%     clim_ori_tmp = [0, 1];
+% else
+%     clim_ori_tmp = [min(vals_ori_tmp), max(vals_ori_tmp)];
+%     if clim_ori_tmp(1) == clim_ori_tmp(2)
+%         clim_ori_tmp = clim_ori_tmp + [-eps, eps];
+%     end
+% end
+%
+% vals_sf_tmp = M_sf_tmp(isfinite(M_sf_tmp));
+% if isempty(vals_sf_tmp)
+%     clim_sf_tmp = [0, 1];
+% else
+%     clim_sf_tmp = [min(vals_sf_tmp), max(vals_sf_tmp)];
+%     if clim_sf_tmp(1) == clim_sf_tmp(2)
+%         clim_sf_tmp = clim_sf_tmp + [-eps, eps];
+%     end
+% end
+%
+% % Plot
+% h_tmp = figure('Position', [120 120 1400 620], 'Color', 'w');
+% tlo_tmp = tiledlayout(1, 2, 'TileSpacing', 'compact', 'Padding', 'compact'); %#ok<NASGU>
+%
+% % Left: ORI heatmap
+% ax1_tmp = nexttile; hold on;
+% imagesc(M_ori_tmp);
+% set(ax1_tmp, 'YDir', 'normal', ...
+%     'XTick', 1:numel(uBasisORI_tmp), 'XTickLabel', string(uBasisORI_tmp), ...
+%     'YTick', 1:numel(uWidthORI_tmp), 'YTickLabel', compose('%.2g', uWidthORI_tmp));
+% xlabel('nBasisORI');
+% ylabel('basisWidthORI');
+% title('ORI hyperparameters');
+% axis square;
+% colormap(ax1_tmp, turbo);
+% clim(ax1_tmp, clim_ori_tmp);
+% cb1_tmp = colorbar;
+% cb1_tmp.Label.String = 'Median template-estimation nLL';
+%
+% for iy_tmp = 1:size(M_ori_tmp, 1)
+%     for ix_tmp = 1:size(M_ori_tmp, 2)
+%         v_tmp = M_ori_tmp(iy_tmp, ix_tmp);
+%         if isfinite(v_tmp)
+%             frac_tmp = (v_tmp - clim_ori_tmp(1)) / max(clim_ori_tmp(2) - clim_ori_tmp(1), eps);
+%             txtColor_tmp = [0 0 0];
+%             if frac_tmp > 0.55
+%                 txtColor_tmp = [1 1 1];
+%             end
+%             text(ix_tmp, iy_tmp, sprintf('%.2f', v_tmp), ...
+%                 'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle', ...
+%                 'Color', txtColor_tmp, 'FontSize', 10, 'FontWeight', 'bold');
+%         end
+%     end
+% end
+% grid on; box on;
+%
+% % Right: SF heatmap
+% ax2_tmp = nexttile; hold on;
+% imagesc(M_sf_tmp);
+% set(ax2_tmp, 'YDir', 'normal', ...
+%     'XTick', 1:numel(uBasisSF_tmp), 'XTickLabel', string(uBasisSF_tmp), ...
+%     'YTick', 1:numel(uWidthSF_tmp), 'YTickLabel', compose('%.2g', uWidthSF_tmp));
+% xlabel('nBasisSF');
+% ylabel('basisWidthSF');
+% title('SF hyperparameters');
+% axis square;
+% colormap(ax2_tmp, turbo);
+% clim(ax2_tmp, clim_sf_tmp);
+% cb2_tmp = colorbar;
+% cb2_tmp.Label.String = 'Median template-estimation nLL';
+%
+% for iy_tmp = 1:size(M_sf_tmp, 1)
+%     for ix_tmp = 1:size(M_sf_tmp, 2)
+%         v_tmp = M_sf_tmp(iy_tmp, ix_tmp);
+%         if isfinite(v_tmp)
+%             frac_tmp = (v_tmp - clim_sf_tmp(1)) / max(clim_sf_tmp(2) - clim_sf_tmp(1), eps);
+%             txtColor_tmp = [0 0 0];
+%             if frac_tmp > 0.55
+%                 txtColor_tmp = [1 1 1];
+%             end
+%             text(ix_tmp, iy_tmp, sprintf('%.2f', v_tmp), ...
+%                 'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle', ...
+%                 'Color', txtColor_tmp, 'FontSize', 10, 'FontWeight', 'bold');
+%         end
+%     end
+% end
+% grid on; box on;
+%
+% sgtitle(sprintf('Temporary check: nLL heatmaps by basis dimensions (N=%d files)', height(T_plot_tmp)));
+% set(findall(gcf, '-property', 'FontSize'), 'FontSize', 12);
+%
+% saveas(h_tmp, fullfile(nameFolder_Figures_tmp, 'FigTMP_basisCombo_nLL.png'));
+% close(h_tmp);
+%
+% % Part 2: Plot tuning overlays by basis combo
+% % Layout: rows = basisWidth levels, columns = nBasis levels (separate figures for ORI and SF)
+% if ~isempty(comboPlot_tmp)
+%     % ---- collect unique axis levels ----
+%     uNORI_tmp  = unique([comboPlot_tmp.nBasisORI]);
+%     uWORI_tmp  = unique([comboPlot_tmp.basisWidthORI]);
+%     uNSF_tmp   = unique([comboPlot_tmp.nBasisSF]);
+%     uWSF_tmp   = unique([comboPlot_tmp.basisWidthSF]);
+%
+%     nColORI_tmp = numel(uNORI_tmp);
+%     nRowORI_tmp = numel(uWORI_tmp);
+%     nColSF_tmp  = numel(uNSF_tmp);
+%     nRowSF_tmp  = numel(uWSF_tmp);
+%
+%     % ---- Figure A: ORI tuning ----
+%     h_oriTuning_tmp = figure('Position', [80 80 max(400, 320*nColORI_tmp) max(320, 220*nRowORI_tmp)], 'Color', 'w');
+%     tiledlayout(nRowORI_tmp, nColORI_tmp, 'TileSpacing', 'compact', 'Padding', 'compact');
+%
+%     for iRow_tmp = 1:nRowORI_tmp
+%         for iCol_tmp = 1:nColORI_tmp
+%             wORI_tmp = uWORI_tmp(iRow_tmp);
+%             nORI_key_tmp = uNORI_tmp(iCol_tmp);
+%
+%             % find entries matching this (nBasisORI, basisWidthORI) cell; collapse over SF params
+%             mask_tmp = abs([comboPlot_tmp.nBasisORI] - nORI_key_tmp) < 1e-9 & ...
+%                        abs([comboPlot_tmp.basisWidthORI] - wORI_tmp) < 1e-9;
+%             entries_tmp = comboPlot_tmp(mask_tmp);
+%
+%             axORI_tmp = nexttile; hold(axORI_tmp, 'on');
+%             if ~isempty(entries_tmp)
+%                 yTrue_tmp = mean(vertcat(entries_tmp.margORI_true), 1, 'omitnan');
+%                 mat_tmp = vertcat(entries_tmp.margORI_est_med);
+%                 yEst_tmp = nan(1, size(mat_tmp, 2));
+%                 for iCh_tmp = 1:size(mat_tmp, 2)
+%                     v_tmp = mat_tmp(:, iCh_tmp); v_tmp = v_tmp(isfinite(v_tmp));
+%                     if ~isempty(v_tmp), [yEst_tmp(iCh_tmp), ~, ~] = getCI(v_tmp, 2, 1); end
+%                 end
+%                 plot(axis_tuning{1}, yTrue_tmp, 'r-', 'LineWidth', setting.trueWidth);
+%                 plot(axis_tuning{1}, yEst_tmp,  'k-', 'LineWidth', setting.lineWidth);
+%             end
+%             fxn_style_ax(axORI_tmp, setting);
+%             xticks(axORI_tmp, axisTicks_tuning{1}); xticklabels(axORI_tmp, axisTL_tuning{1});
+%             ylim(axORI_tmp, [-0.2 1]);
+%             if iRow_tmp == nRowORI_tmp, xlabel(axORI_tmp, namesFeature{1}); end
+%             if iCol_tmp == 1, ylabel(axORI_tmp, sprintf('wORI=%.3g', wORI_tmp)); end
+%             title(axORI_tmp, sprintf('nORI=%d', nORI_key_tmp));
+%             if iRow_tmp == 1 && iCol_tmp == 1
+%                 % legend(axORI_tmp, {'True','Est'}, 'Location','south','Box','off','FontSize',setting.fontSize);
+%             end
+%         end % iCol_tmp
+%     end % iRow_tmp
+%     sgtitle(sprintf('Temp: ORI tuning (rows=basisWidthORI, cols=nBasisORI)'));
+%     set(findall(gcf, '-property', 'FontSize'), 'FontSize', 12);
+%     saveas(h_oriTuning_tmp, fullfile(nameFolder_Figures_tmp, 'FigTMP_basisCombo_tuningORI.png'));
+%     close(h_oriTuning_tmp);
+%
+%     % ---- Figure B: SF tuning ----
+%     h_sfTuning_tmp = figure('Position', [80 80 max(400, 320*nColSF_tmp) max(320, 220*nRowSF_tmp)], 'Color', 'w');
+%     tiledlayout(nRowSF_tmp, nColSF_tmp, 'TileSpacing', 'compact', 'Padding', 'compact');
+%
+%     for iRow_tmp = 1:nRowSF_tmp
+%         for iCol_tmp = 1:nColSF_tmp
+%             wSF_tmp = uWSF_tmp(iRow_tmp);
+%             nSF_key_tmp = uNSF_tmp(iCol_tmp);
+%
+%             mask_tmp = abs([comboPlot_tmp.nBasisSF] - nSF_key_tmp) < 1e-9 & ...
+%                        abs([comboPlot_tmp.basisWidthSF] - wSF_tmp) < 1e-9;
+%             entries_tmp = comboPlot_tmp(mask_tmp);
+%
+%             axSF_tmp = nexttile; hold(axSF_tmp, 'on');
+%             if ~isempty(entries_tmp)
+%                 yTrue_tmp = mean(vertcat(entries_tmp.margSF_true), 1, 'omitnan');
+%                 mat_tmp = vertcat(entries_tmp.margSF_est_med);
+%                 yEst_tmp = nan(1, size(mat_tmp, 2));
+%                 for iCh_tmp = 1:size(mat_tmp, 2)
+%                     v_tmp = mat_tmp(:, iCh_tmp); v_tmp = v_tmp(isfinite(v_tmp));
+%                     if ~isempty(v_tmp), [yEst_tmp(iCh_tmp), ~, ~] = getCI(v_tmp, 2, 1); end
+%                 end
+%                 plot(axis_tuning{2}, yTrue_tmp, 'r-', 'LineWidth', setting.trueWidth);
+%                 plot(axis_tuning{2}, yEst_tmp,  'k-', 'LineWidth', setting.lineWidth);
+%             end
+%             fxn_style_ax(axSF_tmp, setting);
+%             xticks(axSF_tmp, axisTicks_tuning{2}); xticklabels(axSF_tmp, axisTL_tuning{2});
+%             ylim(axSF_tmp, [-0.2 1]);
+%             if iRow_tmp == nRowSF_tmp, xlabel(axSF_tmp, namesFeature{2}); end
+%             if iCol_tmp == 1, ylabel(axSF_tmp, sprintf('wSF=%.3g', wSF_tmp)); end
+%             title(axSF_tmp, sprintf('nSF=%d', nSF_key_tmp));
+%             if iRow_tmp == 1 && iCol_tmp == 1
+%                 % legend(axSF_tmp, {'True','Est'}, 'Location','south','Box','off','FontSize',setting.fontSize);
+%             end
+%         end
+%     end
+%     sgtitle(sprintf('Temp: SF tuning (rows=basisWidthSF, cols=nBasisSF)'));
+%     set(findall(gcf, '-property', 'FontSize'), 'FontSize', 12);
+%     saveas(h_sfTuning_tmp, fullfile(nameFolder_Figures_tmp, 'FigTMP_basisCombo_tuningSF.png'));
+%     close(h_sfTuning_tmp);
+% end
+%
+% % save(fullfile(nameFolder_Output, 'Temp_basisCombo_nLL.mat'), 'T_tmp', 'T_plot_tmp', 'G_tmp', 'comboPlot_tmp');
+% fprintf('\n%s: saved figure.\n', string(datetime('now')))
 
-%% Figure 0: condition composition overview from compiled R
+%% Figure 0: Condition composition overview from compiled R
 % Keep one row per simulated condition to avoid duplication across fitted B models.
 fprintf('\n%s: Fig 0: Condition composition...', string(datetime('now')))
 
@@ -1062,7 +1062,7 @@ for iPanel = 1:numel(fig0Fields)
         % Bsim panel: one bar per B level, each with its own shade
         b = bar(xPos, counts_prop, 0.75);
         b.FaceColor = 'flat';
-        b.EdgeColor = 'k';
+        b.EdgeColor = 'w';
         b.LineWidth = 0.5;
         for ib = 1:numel(uVals)
             b.CData(ib, :) = bsim_color(uVals(ib));
@@ -1172,7 +1172,7 @@ close(h);
 fprintf('DONE\n\n')
 
 %% Figure 2: Template recovery
-%    Use one representative Bsim/Bfit because these are file-level
+% Use one representative Bsim/Bfit because these are file-level
 
 fprintf('\n%s: Fig 2: Template recovery...', string(datetime('now')))
 
@@ -1192,13 +1192,15 @@ for iCol = 1:nVars
     fig2Cache(iCol).vLevels = vLevels;
     fig2Cache(iCol).rmse_all = fxn_collapse_scalar_by_x_iterCI(  R_fig2, vField, 'template_rmse_iter', vLevels, setting.scalarCollapseFcn);
 
-    [xAxisORI, yTrueORI, curvesORI] = fxn_collapse_tuning_panel(R_fig2, vField, vLevels, 'ORI');
-    [xAxisSF,  yTrueSF,  curvesSF]  = fxn_collapse_tuning_panel(R_fig2, vField, vLevels, 'SF');
+    [xAxisORI, yTrueORI, yTrueORI_sem, curvesORI] = fxn_collapse_tuning_panel(R_fig2, vField, vLevels, 'ORI');
+    [xAxisSF,  yTrueSF,  yTrueSF_sem,  curvesSF]  = fxn_collapse_tuning_panel(R_fig2, vField, vLevels, 'SF');
     fig2Cache(iCol).tuning(1).xAxis = xAxisORI;
     fig2Cache(iCol).tuning(1).yTrue = yTrueORI;
+    fig2Cache(iCol).tuning(1).yTrue_sem = yTrueORI_sem;
     fig2Cache(iCol).tuning(1).curves = curvesORI;
     fig2Cache(iCol).tuning(2).xAxis = xAxisSF;
     fig2Cache(iCol).tuning(2).yTrue = yTrueSF;
+    fig2Cache(iCol).tuning(2).yTrue_sem = yTrueSF_sem;
     fig2Cache(iCol).tuning(2).curves = curvesSF;
 end % for iCol
 
@@ -1259,8 +1261,8 @@ for iCol = 1:nVars
         xlim([xMin_al - buf_al, xMax_al + buf_al]);
     end
     xlabel(vName);
-    ylim([0.1 0.14]);
-    yticks(0.1:0.01:0.14);
+    ylim([0.1 0.3]);
+    yticks(0.1:0.1:0.3);
     title(vName);
     if iCol == 1
         ylabel('2D Template RMSE');
@@ -1271,6 +1273,7 @@ for iCol = 1:nVars
         nexttile(iRow*nVars + iCol); hold on;
 
         yTrue = fig2Cache(iCol).tuning(iRow).yTrue;
+        yTrueSem = fig2Cache(iCol).tuning(iRow).yTrue_sem;
         curves = fig2Cache(iCol).tuning(iRow).curves;
         if ~isempty(yTrue)
             yTrueFinite = yTrue(isfinite(yTrue));
@@ -1281,8 +1284,18 @@ for iCol = 1:nVars
             end
             if isfinite(yTrueScale) && yTrueScale ~= 0
                 yTrueNorm = yTrue / yTrueScale;
+                yTrueSemNorm = yTrueSem / yTrueScale;
             else
                 yTrueNorm = yTrue;
+                yTrueSemNorm = yTrueSem;
+            end
+            idxBandTrue = isfinite(axis_tuning{iRow}) & isfinite(yTrueNorm) & isfinite(yTrueSemNorm);
+            if any(idxBandTrue)
+                xb = axis_tuning{iRow}(idxBandTrue);
+                ybLo = yTrueNorm(idxBandTrue) - yTrueSemNorm(idxBandTrue);
+                ybHi = yTrueNorm(idxBandTrue) + yTrueSemNorm(idxBandTrue);
+                fill([xb, fliplr(xb)], [ybLo, fliplr(ybHi)], 'r', ...
+                    'FaceAlpha', 0.12, 'EdgeColor', 'none', 'HandleVisibility', 'off');
             end
             hTrue = plot(axis_tuning{iRow}, yTrueNorm, 'r-', 'LineWidth', setting.trueWidth);
             xIdx = 1:numel(yTrueNorm);
@@ -1304,6 +1317,7 @@ for iCol = 1:nVars
                 nLeg = nLeg + 1;
                 cLev = repmat(grayVals(iLev), 1, 3);
                 yLev = curves(iLev).y;
+                yLevSem = curves(iLev).sem;
                 yLevFinite = yLev(isfinite(yLev));
                 if ~isempty(yLevFinite)
                     yLevScale = max(yLevFinite);
@@ -1312,8 +1326,18 @@ for iCol = 1:nVars
                 end
                 if isfinite(yLevScale) && yLevScale ~= 0
                     yLevNorm = yLev / yLevScale;
+                    yLevSemNorm = yLevSem / yLevScale;
                 else
                     yLevNorm = yLev;
+                    yLevSemNorm = yLevSem;
+                end
+                idxBandLev = isfinite(axis_tuning{iRow}) & isfinite(yLevNorm) & isfinite(yLevSemNorm);
+                if any(idxBandLev)
+                    xbLev = axis_tuning{iRow}(idxBandLev);
+                    ybLevLo = yLevNorm(idxBandLev) - yLevSemNorm(idxBandLev);
+                    ybLevHi = yLevNorm(idxBandLev) + yLevSemNorm(idxBandLev);
+                    fill([xbLev, fliplr(xbLev)], [ybLevLo, fliplr(ybLevHi)], cLev, ...
+                        'FaceAlpha', 0.10, 'EdgeColor', 'none', 'HandleVisibility', 'off');
                 end
                 legH(nLeg) = plot(axis_tuning{iRow}, yLevNorm, 'LineWidth', setting.lineWidth, 'Color', cLev);
                 rmse = fxn_curve_rmse(xIdx, yTrueNorm, xIdx, yLevNorm);
@@ -1606,38 +1630,37 @@ for iRow_metric = 1:nMetric_fig3
         end
 
         % Add legend for dot size
-        if isFirstPanel && ~isempty(Cdata.x)
-            axPos = get(axMain, 'Position');
-            axDot = axes('Parent', h, 'Position', axPos, 'Color', 'none', 'Visible', 'off', ...
-                'HitTest', 'off', 'HandleVisibility', 'off');
-            hold(axDot, 'on');
-            refN = [10, 100, 1000];
-            if isfinite(dot_nMin) && isfinite(dot_nMax) && dot_nMax > dot_nMin
-                fracRef = (refN - dot_nMin) / (dot_nMax - dot_nMin);
-                fracRef = min(max(fracRef, 0), 1);
-                dotSizesRef = dot_sMin + (dot_sMax - dot_sMin) * (fracRef .^ setting.fig4_markerSizeExp);
-            else
-                dotSizesRef = [dot_sMin, (dot_sMin + dot_sMax) / 2, dot_sMax];
-            end
-            hDot1 = scatter(axDot, nan, nan, dotSizesRef(1)^2, 'o', 'MarkerEdgeColor', 'k', 'MarkerFaceColor', 'w', 'LineWidth', setting.lineWidth);
-            hDot2 = scatter(axDot, nan, nan, dotSizesRef(2)^2, 'o', 'MarkerEdgeColor', 'k', 'MarkerFaceColor', 'w', 'LineWidth', setting.lineWidth);
-            hDot3 = scatter(axDot, nan, nan, dotSizesRef(3)^2, 'o', 'MarkerEdgeColor', 'k', 'MarkerFaceColor', 'w', 'LineWidth', setting.lineWidth);
-            legDot = legend(axDot, [hDot1 hDot2 hDot3], {'10', '100', '1000'}, 'Location', 'northwest', 'FontSize', setting.fontSize-2, 'Box', 'off');
-            title(legDot, 'Dot size');
+        % if isFirstPanel && ~isempty(Cdata.x)
+        %     axPos = get(axMain, 'Position');
+        %     axDot = axes('Parent', h, 'Position', axPos, 'Color', 'none', 'Visible', 'off', 'HitTest', 'off', 'HandleVisibility', 'off');
+        %     hold(axDot, 'on');
+        %     refN = [10, 100, 1000];
+        %     if isfinite(dot_nMin) && isfinite(dot_nMax) && dot_nMax > dot_nMin
+        %         fracRef = (refN - dot_nMin) / (dot_nMax - dot_nMin);
+        %         fracRef = min(max(fracRef, 0), 1);
+        %         dotSizesRef = dot_sMin + (dot_sMax - dot_sMin) * (fracRef .^ setting.fig4_markerSizeExp);
+        %     else
+        %         dotSizesRef = [dot_sMin, (dot_sMin + dot_sMax) / 2, dot_sMax];
+        %     end
+        %     hDot1 = scatter(axDot, nan, nan, dotSizesRef(1)^2, 'o', 'MarkerEdgeColor', 'k', 'MarkerFaceColor', 'w', 'LineWidth', setting.lineWidth);
+        %     hDot2 = scatter(axDot, nan, nan, dotSizesRef(2)^2, 'o', 'MarkerEdgeColor', 'k', 'MarkerFaceColor', 'w', 'LineWidth', setting.lineWidth);
+        %     hDot3 = scatter(axDot, nan, nan, dotSizesRef(3)^2, 'o', 'MarkerEdgeColor', 'k', 'MarkerFaceColor', 'w', 'LineWidth', setting.lineWidth);
+        %     legDot = legend(axDot, [hDot1 hDot2 hDot3], {'10', '100', '1000'}, 'Location', 'northwest', 'FontSize', setting.fontSize-2, 'Box', 'off');
+        %     title(legDot, 'Dot size');
+        % end % if
 
-        end
     end % iCol_Bsim
 end % iRow_metric
 
 sgtitle('Fig 3: metric recovery', 'FontWeight', 'bold');
-% set(findall(gcf,'-property','FontSize'), 'FontSize', 5);
+set(findall(gcf,'-property','FontSize'), 'FontSize', 14);
 
 saveas(h, fullfile(nameFolder_Figures_part4, 'FigS3_metricRecovery.png'));
 close(h);
 fprintf('DONE\n\n')
 
 %% Figure 4: Parameter recovery
-%    Only matched pairs Bsim = Bfit
+% Only matched pairs Bsim = Bfit
 
 fprintf('\n%s: Fig 4: Parameter recovery...', string(datetime('now')))
 
@@ -1661,6 +1684,19 @@ czMin_fig4 = min(cSDT_unik);
 czMax_fig4 = max(cSDT_unik);
 sigMin_fig4 = min(gaborCST_unik);
 sigMax_fig4 = max(gaborCST_unik);
+
+% Use one shared criterion bin-edge set across all matched-model panels.
+idxDiag_fig4 = [R.iModelB_sim] == [R.iModelB_fit];
+criterionTrue_diag_fig4 = [R(idxDiag_fig4).criterion_DV_true]';
+criterionTrue_diag_fig4 = criterionTrue_diag_fig4(isfinite(criterionTrue_diag_fig4));
+criterionBinEdges_fig4 = [];
+if ~isempty(criterionTrue_diag_fig4)
+    cMin_fig4 = min(criterionTrue_diag_fig4);
+    cMax_fig4 = max(criterionTrue_diag_fig4);
+    if cMin_fig4 ~= cMax_fig4
+        criterionBinEdges_fig4 = linspace(cMin_fig4, cMax_fig4, nBins_Part4 + 1);
+    end
+end
 
 % Precompute RMSE heatmaps per parameter across (fit model x sim model).
 nParam_fig4 = numel(setting.fig4_paramNames);
@@ -1696,7 +1732,7 @@ for iParam_fig4 = 1:nParam_fig4
 end
 
 h = figure('Position', [0 0 2e3 9e2]);
-tiledlayout(numel(setting.fig4_paramNames), 1 + numel(Bfit_unik), 'TileSpacing', 'compact', 'Padding', 'compact');
+tiledlayout(numel(setting.fig4_paramNames),  numel(Bfit_unik), 'TileSpacing', 'compact', 'Padding', 'compact');
 ax_fig4_last = gobjects(1);
 
 xTickLabels_fig4 = arrayfun(@(k) sprintf('M%d', k), Bsim_unik, 'UniformOutput', false);
@@ -1709,66 +1745,78 @@ for iRow_param = 1:numel(setting.fig4_paramNames)
     % ------------------------------------------------------------------ %
     % Leftmost column: heatmap of mean RMSE
     % ------------------------------------------------------------------ %
-    M_heatmap_fig4 = squeeze(M_paramRMSE_fig4(iRow_param, :, :));
-    axHeat_fig4 = nexttile;
-    hold(axHeat_fig4, 'on');
-
-    finVals_fig4 = M_heatmap_fig4(isfinite(M_heatmap_fig4));
-    if ~isempty(finVals_fig4)
-        q_fig4 = prctile(finVals_fig4, [2.5 97.5]);
-        cLo_fig4 = q_fig4(1);
-        cHi_fig4 = q_fig4(2);
-        if ~isfinite(cLo_fig4) || ~isfinite(cHi_fig4) || cLo_fig4 >= cHi_fig4
-            cLo_fig4 = min(finVals_fig4);
-            cHi_fig4 = max(finVals_fig4);
-        end
-        if cLo_fig4 == cHi_fig4
-            cLo_fig4 = cLo_fig4 - eps;
-            cHi_fig4 = cHi_fig4 + eps;
-        end
-    else
-        cLo_fig4 = 0;
-        cHi_fig4 = 1;
-    end
-    M_heatmap_disp_fig4 = min(max(M_heatmap_fig4, cLo_fig4), cHi_fig4);
-
-    imagesc(axHeat_fig4, 1:nSim_fig4, 1:nFit_fig4, M_heatmap_disp_fig4);
-    set(axHeat_fig4, 'YDir', 'normal', ...
-        'XTick', 1:nSim_fig4, 'XTickLabel', xTickLabels_fig4, ...
-        'YTick', 1:nFit_fig4, 'YTickLabel', yTickLabels_fig4, ...
-        'XLim', [0.5, nSim_fig4+0.5], 'YLim', [0.5, nFit_fig4+0.5]);
-    xlabel(axHeat_fig4, 'Generating model');
-    ylabel(axHeat_fig4, 'Fitting model');
-    title(axHeat_fig4, sprintf('%s RMSE', pTitle));
-    axis(axHeat_fig4, 'square');
-    clim(axHeat_fig4, [cLo_fig4 cHi_fig4]);
-    cbar_fig4 = colorbar(axHeat_fig4, 'Location', 'eastoutside');
-    fxn_set_colorbar_ticks(cbar_fig4, cLo_fig4, cHi_fig4);
-
-    % Red box on diagonal (matched models)
-    nDiag_fig4 = min(nFit_fig4, nSim_fig4);
-    for iDiag_fig4 = 1:nDiag_fig4
-        rectangle('Parent', axHeat_fig4, 'Position', [iDiag_fig4-0.5, iDiag_fig4-0.5, 1, 1], ...
-            'EdgeColor', 'r', 'LineWidth', 2.5, 'LineStyle', '-');
-    end
-
-    % Black dashed box on lowest RMSE per sim-model column
-    for iSim_hm = 1:nSim_fig4
-        colVals_hm = M_heatmap_fig4(:, iSim_hm);
-        finMask_hm = isfinite(colVals_hm);
-        if ~any(finMask_hm), continue; end
-        finIdx_hm = find(finMask_hm);
-        [~, iLoc_hm] = min(colVals_hm(finMask_hm));
-        bestRow_hm = finIdx_hm(iLoc_hm);
-        rectangle('Parent', axHeat_fig4, 'Position', [iSim_hm-0.5, bestRow_hm-0.5, 1, 1], ...
-            'EdgeColor', 'k', 'LineWidth', 2.5, 'LineStyle', '--');
-    end
+    % M_heatmap_fig4 = squeeze(M_paramRMSE_fig4(iRow_param, :, :));
+    % axHeat_fig4 = nexttile;
+    % hold(axHeat_fig4, 'on');
+    %
+    % finVals_fig4 = M_heatmap_fig4(isfinite(M_heatmap_fig4));
+    % if ~isempty(finVals_fig4)
+    %     q_fig4 = prctile(finVals_fig4, [2.5 97.5]);
+    %     cLo_fig4 = q_fig4(1);
+    %     cHi_fig4 = q_fig4(2);
+    %     if ~isfinite(cLo_fig4) || ~isfinite(cHi_fig4) || cLo_fig4 >= cHi_fig4
+    %         cLo_fig4 = min(finVals_fig4);
+    %         cHi_fig4 = max(finVals_fig4);
+    %     end
+    %     if cLo_fig4 == cHi_fig4
+    %         cLo_fig4 = cLo_fig4 - eps;
+    %         cHi_fig4 = cHi_fig4 + eps;
+    %     end
+    % else
+    %     cLo_fig4 = 0;
+    %     cHi_fig4 = 1;
+    % end
+    % M_heatmap_disp_fig4 = min(max(M_heatmap_fig4, cLo_fig4), cHi_fig4);
+    %
+    % hImg_fig4 = imagesc(axHeat_fig4, 1:nSim_fig4, 1:nFit_fig4, M_heatmap_disp_fig4);
+    % set(hImg_fig4, 'AlphaData', isfinite(M_heatmap_disp_fig4));
+    % set(axHeat_fig4, 'Color', [0.88, 0.88, 0.88]);
+    % set(axHeat_fig4, 'YDir', 'normal', ...
+    %     'XTick', 1:nSim_fig4, 'XTickLabel', xTickLabels_fig4, ...
+    %     'YTick', 1:nFit_fig4, 'YTickLabel', yTickLabels_fig4, ...
+    %     'XLim', [0.5, nSim_fig4+0.5], 'YLim', [0.5, nFit_fig4+0.5]);
+    % xlabel(axHeat_fig4, 'Generating model');
+    % ylabel(axHeat_fig4, 'Fitting model');
+    % title(axHeat_fig4, sprintf('%s RMSE', pTitle));
+    % axis(axHeat_fig4, 'square');
+    % clim(axHeat_fig4, [cLo_fig4 cHi_fig4]);
+    % cbar_fig4 = colorbar(axHeat_fig4, 'Location', 'eastoutside');
+    % fxn_set_colorbar_ticks(cbar_fig4, cLo_fig4, cHi_fig4);
+    %
+    % % Explicitly annotate unavailable model-parameter cells.
+    % [iNanRow_fig4, iNanCol_fig4] = find(~isfinite(M_heatmap_fig4));
+    % for iNan_fig4 = 1:numel(iNanRow_fig4)
+    %     text(axHeat_fig4, iNanCol_fig4(iNan_fig4), iNanRow_fig4(iNan_fig4), 'NA', ...
+    %         'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle', ...
+    %         'Color', [0.25, 0.25, 0.25], 'FontSize', 8, 'FontWeight', 'bold');
+    % end
+    %
+    % % Red box on diagonal (matched models)
+    % nDiag_fig4 = min(nFit_fig4, nSim_fig4);
+    % for iDiag_fig4 = 1:nDiag_fig4
+    %     if ~isfinite(M_heatmap_fig4(iDiag_fig4, iDiag_fig4)), continue; end
+    %     rectangle('Parent', axHeat_fig4, 'Position', [iDiag_fig4-0.5, iDiag_fig4-0.5, 1, 1], ...
+    %         'EdgeColor', 'r', 'LineWidth', 2.5, 'LineStyle', '-');
+    % end
+    %
+    % % Black dashed box on lowest RMSE per sim-model column
+    % for iSim_hm = 1:nSim_fig4
+    %     colVals_hm = M_heatmap_fig4(:, iSim_hm);
+    %     finMask_hm = isfinite(colVals_hm);
+    %     if ~any(finMask_hm), continue; end
+    %     finIdx_hm = find(finMask_hm);
+    %     [~, iLoc_hm] = min(colVals_hm(finMask_hm));
+    %     bestRow_hm = finIdx_hm(iLoc_hm);
+    %     rectangle('Parent', axHeat_fig4, 'Position', [iSim_hm-0.5, bestRow_hm-0.5, 1, 1], ...
+    %         'EdgeColor', 'k', 'LineWidth', 2.5, 'LineStyle', '--');
+    % end
 
     % ------------------------------------------------------------------ %
     % Right columns: scatter plots
     % ------------------------------------------------------------------ %
     for iCol_Bsimfit = 1:numel(Bfit_unik)
         Bsimfit = Bfit_unik(iCol_Bsimfit);
+        panelTitle = sprintf('M%d %s', Bsimfit, namesModelB{Bsimfit});
 
         nexttile; hold on;
 
@@ -1777,18 +1825,27 @@ for iRow_param = 1:numel(setting.fig4_paramNames)
 
         % skip parameters absent in reduced models
         if strcmp(pName, 'Nshared') && ~any(strcmp(namesModelBparams_short{Bsimfit}, 'Nshared'))
+            if iRow_param == 1
+                title(panelTitle);
+            end
             axis off; continue
         end
         if strcmp(pName, 'Nmul') && ~any(strcmp(namesModelBparams_short{Bsimfit}, 'Nmul'))
+            if iRow_param == 1
+                title(panelTitle);
+            end
             axis off; continue
         end
         if strcmp(pName, 'Nadd') && ~any(strcmp(namesModelBparams_short{Bsimfit}, 'Nadd'))
+            if iRow_param == 1
+                title(panelTitle);
+            end
             axis off; continue
         end
 
         % Define x/y limits and ticks from the values actually plotted.
         if strcmp(pName, 'criterion_DV')
-            P_axi = fxn_collect_fig4_panel_points(Rsub, pName, gaborCST_unik, cSDT_unik, setting.scalarCollapseFcn, nBins_Part4);
+            P_axi = fxn_collect_fig4_panel_points(Rsub, pName, gaborCST_unik, cSDT_unik, setting.scalarCollapseFcn, nBins_Part4, criterionBinEdges_fig4);
             axisVals = [P_axi.x(:); P_axi.y(:)];
             tickVals = unique(axisVals(isfinite(axisVals)));
         else
@@ -1824,7 +1881,7 @@ for iRow_param = 1:numel(setting.fig4_paramNames)
         % one series per (signalCST x cSDT_true)
         for iSig = 1:numel(gaborCST_unik)
             for iCz = 1:numel(cSDT_unik)
-                S = fxn_collapse_param_byLevel(  Rsub, pName,  setting.scalarCollapseFcn, nBins_Part4, gaborCST_unik(iSig), cSDT_unik(iCz));
+                S = fxn_collapse_param_byLevel(  Rsub, pName,  setting.scalarCollapseFcn, nBins_Part4, gaborCST_unik(iSig), cSDT_unik(iCz), criterionBinEdges_fig4);
 
                 if isempty(S.x), continue; end
 
@@ -1874,439 +1931,77 @@ for iRow_param = 1:numel(setting.fig4_paramNames)
         if iCol_Bsimfit == 1
             ylabel(pTitle);
         end
-        Ppanel = fxn_collect_fig4_panel_points(  Rsub, pName, gaborCST_unik, cSDT_unik, setting.scalarCollapseFcn, nBins_Part4);
+        Ppanel = fxn_collect_fig4_panel_points(  Rsub, pName, gaborCST_unik, cSDT_unik, setting.scalarCollapseFcn, nBins_Part4, criterionBinEdges_fig4);
         [rho_panel, ~, ~, rmse_panel] = fxn_param_recovery_stats(Ppanel.x, Ppanel.y);
         % title(sprintf('M(sim/gen)=%d %s \nr=%.2f | RMSE=%.3f', Bsimfit, namesModelB{Bsimfit}, rho_panel, rmse_panel));
         if iRow_param==1
-            title(sprintf('M%d %s', Bsimfit, namesModelB{Bsimfit}));
+            title(panelTitle);
         end
         ax_fig4_last = gca;
     end % iCol_Bsimfit
 end % iRow_param
 
 sgtitle('Fig 4: Parameter recovery | Matched model pairs', 'FontWeight', 'bold');
-set(findall(gcf, '-property', 'fontsize'), 'fontsize', 13)
+set(findall(gcf, '-property', 'fontsize'), 'fontsize', 18)
 saveas(h, fullfile(nameFolder_Figures_part4, 'FigS4_paramRecovery.png'));
 close(h);
 fprintf('DONE\n\n')
 
-%% Figure 5: Parameter-pair correlation summary by signalCST x cSDT
-fprintf('\n%s: Fig 5: Parameter-pair correlation summary...', string(datetime('now')))
 
-% Fixed 6 parameter-pair columns from the canonical set used in Fig 5.
-pairParams_fig5 = {'Nmul', 'Nadd', 'Nshared', 'criterion_DV'};
-pairLabels_fig5 = {'N_{mul}', 'N_{add}', 'N_{shared}', 'Criterion DV'};
-pairIdx_fig5 = nchoosek(1:numel(pairParams_fig5), 2);
-pairIdx_fig5 = pairIdx_fig5([1, 2, 4, 3, 5, 6], :); % rearrange so all xx-cDV pairs are last
-nCols_fig5 = size(pairIdx_fig5, 1); % expected = 6
-
-% One row per matched model (Bfit = Bsim), expected 7 rows.
-Bdiag_fig5 = intersect(Bfit_unik(:)', Bsim_unik(:)');
-nRows_fig5 = numel(Bdiag_fig5);
-
-nSig_fig5 = numel(gaborCST_unik);
-nCz_fig5 = numel(cSDT_unik);
-nBars_fig5 = nSig_fig5 * nCz_fig5;
-xBar_fig5 = 1:nBars_fig5;
-nPerm_fig5 = 5000;
-
-% For labeling and indexing bars: one per signalCST x cSDT combination
-barLabels_fig5 = cell(1, nBars_fig5);
-barSigIdx_fig5 = nan(1, nBars_fig5);
-barCzIdx_fig5 = nan(1, nBars_fig5);
-iBar_fig5 = 0;
-for iCz = 1:nCz_fig5
-    for iSig = 1:nSig_fig5
-        iBar_fig5 = iBar_fig5 + 1;
-        barSigIdx_fig5(iBar_fig5) = iSig;
-        barCzIdx_fig5(iBar_fig5) = iCz;
-        barLabels_fig5{iBar_fig5} = sprintf('G%g|C%g', gaborCST_unik(iSig), cSDT_unik(iCz));
-    end
-end
-
-% Create a struct to hold all permutation results
-permFile_fig5 = fullfile(nameFolder_Figures_part4, 'FigS5_paramCorr_summaryBars_permNull.mat');
-cacheLoaded_fig5 = false;
-
-% Precompute bar colors once because they only depend on signalCST and cSDT level.
-czMin_fig5 = min(cSDT_unik);
-czMax_fig5 = max(cSDT_unik);
-sigMin_fig5 = min(gaborCST_unik);
-sigMax_fig5 = max(gaborCST_unik);
-barColors_fig5 = nan(nBars_fig5, 3);
-for iBar = 1:nBars_fig5
-    czVal = cSDT_unik(barCzIdx_fig5(iBar));
-    sigVal = gaborCST_unik(barSigIdx_fig5(iBar));
-
-    if czMax_fig5 > czMin_fig5
-        czNorm = (czVal - czMin_fig5) / (czMax_fig5 - czMin_fig5);
-    else
-        czNorm = 0.5;
-    end
-
-    if sigMax_fig5 > sigMin_fig5
-        sigNorm = (sigVal - sigMin_fig5) / (sigMax_fig5 - sigMin_fig5);
-    else
-        sigNorm = 0.5;
-    end
-
-    hCol = (1 - czNorm) * (2 / 3);
-    sCol = 0.25 + 0.70 * sigNorm;
-    vCol = 0.98 - 0.13 * sigNorm;
-    barColors_fig5(iBar, :) = hsv2rgb([hCol, sCol, vCol]);
-end
-
-% load the cached permutation results if they exist, otherwise compute and save them
-cacheLoaded_fig5 = false;
-if exist(permFile_fig5, 'file')
-    % fprintf('\n Loading cached permStats_fig5 from %s\n', permFile_fig5);
-    load(permFile_fig5, 'permStats_fig5');
-    % Validate cache dimensions against current data
-    if size(permStats_fig5.observedMean, 3) ~= nBars_fig5
-        fprintf('\n Cache nBars mismatch (%d vs %d). Recomputing...\n', size(permStats_fig5.observedMean, 3), nBars_fig5);
-        clear permStats_fig5;
-    else
-        cacheLoaded_fig5 = true;
-    end
-end
-if ~cacheLoaded_fig5
-    fprintf('\n Computing permutation nulls for Fig 5 (nPerm = %d)...\n', nPerm_fig5);
-    % Create a struct to hold all permutation results
-    permStats_fig5 = struct();
-    permStats_fig5.nPerm = nPerm_fig5;
-    permStats_fig5.fitModels = Bdiag_fig5;
-    permStats_fig5.pairIdx = pairIdx_fig5;
-    permStats_fig5.pairParams = {pairParams_fig5};
-    permStats_fig5.barSigIdx = barSigIdx_fig5;
-    permStats_fig5.barCzIdx = barCzIdx_fig5;
-    permStats_fig5.barSigVal = gaborCST_unik(barSigIdx_fig5);
-    permStats_fig5.barCzVal = cSDT_unik(barCzIdx_fig5);
-    permStats_fig5.observedMean = nan(nCols_fig5, nRows_fig5, nBars_fig5);
-    permStats_fig5.observedSem = nan(nCols_fig5, nRows_fig5, nBars_fig5);
-    permStats_fig5.nRep = nan(nCols_fig5, nRows_fig5, nBars_fig5);
-    permStats_fig5.null68 = nan(nCols_fig5, nRows_fig5, nBars_fig5, 2);
-    permStats_fig5.null95 = nan(nCols_fig5, nRows_fig5, nBars_fig5, 2);
-    permStats_fig5.permP = nan(nCols_fig5, nRows_fig5, nBars_fig5);
-    permStats_fig5.sig95 = false(nCols_fig5, nRows_fig5, nBars_fig5);
-
-    % Precompute matched-model subsets and bar membership once because they do not depend on parameter pair.
-    Rdiag_fig5 = cell(1, nRows_fig5);
-    rowGroups_fig5 = cell(nRows_fig5, nBars_fig5);
-    for iModel = 1:nRows_fig5
-        Rdiag_fig5{iModel} = R([R.iModelB_sim] == Bdiag_fig5(iModel) & [R.iModelB_fit] == Bdiag_fig5(iModel)); % only matched models are included in the correlation summary
-        if isempty(Rdiag_fig5{iModel})
-            continue;
-        end
-        gaborVals_fig5 = [Rdiag_fig5{iModel}.gaborCST];
-        cSDTVals_fig5 = [Rdiag_fig5{iModel}.cSDT_true];
-        for iB = 1:nBars_fig5
-            rowGroups_fig5{iModel, iB} = find(gaborVals_fig5 == gaborCST_unik(barSigIdx_fig5(iB)) &  cSDTVals_fig5 == cSDT_unik(barCzIdx_fig5(iB)));
-        end
-    end % iModel
-
-    for iPair = 1:nCols_fig5   % row = param pair
-        iP1 = pairIdx_fig5(iPair, 1);
-        iP2 = pairIdx_fig5(iPair, 2);
-        p1 = pairParams_fig5{iP1};
-        p2 = pairParams_fig5{iP2};
-
-        if strcmp(p1, 'criterion_DV')
-            f1 = 'criterion_DV_est_allIter';
-        else
-            f1 = sprintf('%s_est_allIter', p1);
-        end
-
-        if strcmp(p2, 'criterion_DV')
-            f2 = 'criterion_DV_est_allIter';
-        else
-            f2 = sprintf('%s_est_allIter', p2);
-        end
-
-        for iModel = 1:nRows_fig5   % col = model variant
-            fprintf('Processing pair %d/%d, model %d/%d...\n', iPair, nCols_fig5, iModel, nRows_fig5);
-            fitModel = Bdiag_fig5(iModel);
-            Rsub = Rdiag_fig5{iModel};
-
-            % Skip non-identifiable pair/model combos: if either parameter is not
-            % part of this reduced model, the pairwise correlation is undefined.
-            modelParamNames_fig5 = namesModelBparams_short{fitModel};
-            hasP1_fig5 = strcmp(p1, 'criterion_DV') || any(strcmp(modelParamNames_fig5, p1));
-            hasP2_fig5 = strcmp(p2, 'criterion_DV') || any(strcmp(modelParamNames_fig5, p2));
-
-            if ~(hasP1_fig5 && hasP2_fig5)
-                continue;
-            end
-
-            yMean = nan(nBars_fig5, 1);
-            ySem  = nan(nBars_fig5, 1);
-            nRep  = zeros(nBars_fig5, 1);
-            null68_fig5 = nan(nBars_fig5, 2);
-            null95_fig5 = nan(nBars_fig5, 2);
-            permP_fig5 = nan(nBars_fig5, 1);
-
-            for iB = 1:nBars_fig5 % loop over signalCST x cSDT bars
-
-                % Get row indices for this signalCST x cSDT condition in this model
-                idxRows = rowGroups_fig5{iModel, iB};
-
-                rVals = nan(numel(idxRows), 1);
-                rNull = nan(nPerm_fig5, numel(idxRows));
-
-                % Loop over rows (matched model instances) for this signalCST x cSDT condition, collect r values and null distributions.
-                parfor iRR = 1:numel(idxRows)
-                    rIdx = idxRows(iRR);
-
-                    xTmp = Rsub(rIdx).(f1);
-                    yTmp = Rsub(rIdx).(f2);
-                    xIter = xTmp(:);
-                    yIter = yTmp(:);
-
-                    nItCommon = min(numel(xIter), numel(yIter));
-                    if nItCommon < 2
-                        continue;
-                    end
-                    xIter = xIter(1:nItCommon);
-                    yIter = yIter(1:nItCommon);
-
-                    if numel(xIter) < 2 || numel(yIter) < 2
-                        continue;
-                    end
-
-                    xi = xIter;
-                    yi = yIter;
-                    if numel(unique(xi)) < 2 || numel(unique(yi)) < 2
-                        continue;
-                    end
-                    %---------------------%
-                    Sperm_fig5 = fxn_perm_corr(xi, yi, nPerm_fig5);
-                    %---------------------%
-
-                    rVals(iRR) = Sperm_fig5.rObs;
-                    rNull(:, iRR) = Sperm_fig5.rPerm;
-                end % iRR
-
-                % Compute observed mean r, SEM, and null distribution percentiles for this bar.
-                [yMean(iB), ~, ~, ySem(iB)] = getCI(rVals, 2, 1);
-                nRep(iB) = numel(rVals);
-
-                nullMean_fig5 = mean(rNull, 2, 'omitnan');
-                [~, null68_fig5(iB, 1), null68_fig5(iB, 2)] = getCI(nullMean_fig5, 1, 1);
-                [~, null95_fig5(iB, 1), null95_fig5(iB, 2)] = getCI(nullMean_fig5, 1, 1, 0.95);
-                permP_fig5(iB) = (sum(abs(nullMean_fig5) >= abs(yMean(iB))) + 1) / (numel(nullMean_fig5) + 1);
-            end % for iB
-
-            % Skip non-existent panels (e.g., reduced models)
-            if all(~isfinite(yMean))
-                continue;
-            end
-            sig95_fig5 = isfinite(yMean) & isfinite(null95_fig5(:, 1)) & isfinite(null95_fig5(:, 2)) &  (yMean < null95_fig5(:, 1) | yMean > null95_fig5(:, 2));
-
-            permStats_fig5.observedMean(iPair, iModel, :) = yMean;
-            permStats_fig5.observedSem(iPair, iModel, :) = ySem;
-            permStats_fig5.nRep(iPair, iModel, :) = nRep;
-            permStats_fig5.null68(iPair, iModel, :, :) = reshape(null68_fig5, [1 1 nBars_fig5 2]);
-            permStats_fig5.null95(iPair, iModel, :, :) = reshape(null95_fig5, [1 1 nBars_fig5 2]);
-            permStats_fig5.permP(iPair, iModel, :) = permP_fig5;
-            permStats_fig5.sig95(iPair, iModel, :) = sig95_fig5;
-
-        end % iModel
-    end % iPair
-
-    save(permFile_fig5, 'permStats_fig5');
-    cacheLoaded_fig5 = true;
-end % if exist(permFile_fig5)
-
-% PLOTTING
-if cacheLoaded_fig5
-    h = figure('Position', [80 80 330*nRows_fig5 210*nCols_fig5]);
-    tiledlayout(nCols_fig5, nRows_fig5, 'TileSpacing', 'compact', 'Padding', 'compact');
-
-    for iPair = 1:nCols_fig5
-        for iModel = 1:nRows_fig5
-            nexttile((iPair-1)*nRows_fig5 + iModel); hold on;
-
-            yMean = squeeze(permStats_fig5.observedMean(iPair, iModel, :));
-            ySem = squeeze(permStats_fig5.observedSem(iPair, iModel, :));
-            nRep = squeeze(permStats_fig5.nRep(iPair, iModel, :));
-            sig95_fig5 = squeeze(permStats_fig5.sig95(iPair, iModel, :));
-
-            if all(~isfinite(yMean))
-                % text(0.5, 0.5, 'N/A', 'Units', 'normalized', 'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle');
-                axis off;
-                continue;
-            end
-
-            nRepGood = nRep;
-            dotSize_fig5 = nan(nBars_fig5, 1);
-            if any(nRepGood ~= nRepGood(1))
-                dotSize_fig5 = 80 + 240 * (nRepGood - min(nRepGood)) / max(max(nRepGood) - min(nRepGood), eps);
-            else
-                dotSize_fig5(:) = 180;
-            end
-
-            % Plot data dots
-            scatter(xBar_fig5, yMean, dotSize_fig5, barColors_fig5, 'filled', 'MarkerEdgeColor', 'w', 'LineWidth', 1.1);
-
-            % Plot error bars
-            for iPt = 1:numel(xBar_fig5)
-                errorbar(xBar_fig5(iPt), yMean(iPt), ySem(iPt), 'LineStyle', 'none', 'Color', 'k', 'LineWidth', 1.2, 'CapSize', 0);
-            end
-
-            % Add aestercks
-            for iStar = find(sig95_fig5(:))'
-                if yMean(iStar) >= 0
-                    yStar = min(0.95, yMean(iStar) + max(ySem(iStar), 0.03) + 0.05);
-                    starAlign = 'bottom';
-                else
-                    yStar = max(-0.95, yMean(iStar) - max(ySem(iStar), 0.03) - 0.05);
-                    starAlign = 'top';
-                end
-                text(xBar_fig5(iStar), yStar, '*', 'HorizontalAlignment', 'center', 'VerticalAlignment', starAlign, 'FontSize', 15, 'FontWeight', 'bold', 'Color', 'k');
-            end
-
-            yline(0, 'k-', 'LineWidth', 0.8);
-            xlim([0.4, nBars_fig5 + 0.6]);
-            ylim([-1, 1]);
-            if iModel==1
-                yticks([-1,0,1])
-                ylabel('Pearson''s r')
-            else
-                yticks([])
-            end
-            for iSep = 1:max(nCz_fig5 - 1, 0)
-                xline(iSep * nSig_fig5 + 0.5, '-', 'Color', [0.7 0.7 0.7], 'LineWidth', 0.9);
-            end
-            xticks([]);
-            fxn_style_ax(gca, setting);
-            set(gca, 'YGrid', 'off');
-        end
-    end
-
-    sgtitle('Fig 5: r by signalCST x cSDT | rows: param pair, cols: model variant (Bfit=Bsim)', 'FontWeight', 'bold');
-    set(findall(h,'-property','FontSize'), 'FontSize', 18);
-    saveas(h, fullfile(nameFolder_Figures_part4, 'FigS5_paramCorr_summaryBars.png'));
-    close(h);
-end
-
-% ── Color legend: rows = signalCST, cols = cSDT ──────────────────────
-czMin_leg = min(cSDT_unik);    czMax_leg = max(cSDT_unik);
-sigMin_leg = min(gaborCST_unik); sigMax_leg = max(gaborCST_unik);
-
-sqSz  = 52;   % pixels per square
-sqGap = 0.18; % adjustable gap between squares (0 to <1, in cell units)
-marg  = 60;   % margin for axis labels
-figW  = marg + nCz_fig5  * sqSz + marg;
-figH  = marg + nSig_fig5 * sqSz + marg;
-
-hLeg = figure('Position', [100 100 figW figH]);
-axLeg = axes('Parent', hLeg);
-hold(axLeg, 'on');
-
-for iSig = 1:nSig_fig5
-    sigVal = gaborCST_unik(iSig);
-    if sigMax_leg > sigMin_leg
-        sigNorm = (sigVal - sigMin_leg) / (sigMax_leg - sigMin_leg);
-    else
-        sigNorm = 0.5;
-    end
-
-    for iCz = 1:nCz_fig5
-        czVal = cSDT_unik(iCz);
-        if czMax_leg > czMin_leg
-            czNorm = (czVal - czMin_leg) / (czMax_leg - czMin_leg);
-        else
-            czNorm = 0.5;
-        end
-
-        hCol  = (1 - czNorm) * (2/3);          % blue -> red
-        sCol  = 0.25 + 0.70 * sigNorm;
-        vCol  = 0.98 - 0.13 * sigNorm;
-        faceC = hsv2rgb([hCol, sCol, vCol]);
-
-        % iSig=1 → top row; flip y so row 1 is at top
-        yBot = nSig_fig5 - iSig + sqGap / 2;
-        yTop = nSig_fig5 - iSig + 1 - sqGap / 2;
-        xL   = iCz - 1 + sqGap / 2;
-        xR   = iCz - sqGap / 2;
-        patch(axLeg, [xL xR xR xL], [yBot yBot yTop yTop], faceC,  'EdgeColor', 'none');
-    end
-end
-
-% Show tick labels, but hide tick marks themselves.
-set(axLeg, 'XTick', (0.5 : 1 : nCz_fig5 - 0.5),  'XTickLabel', arrayfun(@num2str, cSDT_unik(:)', 'UniformOutput', false));
-set(axLeg, 'YTick', (0.5 : 1 : nSig_fig5 - 0.5),  'YTickLabel', arrayfun(@num2str, fliplr(gaborCST_unik(:)'), 'UniformOutput', false));
-axLeg.XAxisLocation = 'top';
-xlabel(axLeg, 'SDT criterion');
-ylabel(axLeg, 'Signal contrast');
-% title(axLeg, 'Color key: bar fill color');
-xlim(axLeg, [0, nCz_fig5]);
-ylim(axLeg, [0, nSig_fig5]);
-axis(axLeg, 'equal');
-set(axLeg, 'TickLength', [0 0]);
-axLeg.XRuler.Axle.Visible = 'off';
-axLeg.YRuler.Axle.Visible = 'off';
-box(axLeg, 'off');
-% fxn_style_ax(axLeg, setting);
-set(findall(hLeg, '-property', 'FontSize'), 'FontSize', 20);
-
-saveas(hLeg, fullfile(nameFolder_Figures_part4, 'FigS5_paramCorr_legend.png'));
-close(hLeg);
-fprintf('DONE\n\n')
-
-%% Figure 6: Model recovery
-fprintf('\n%s: Fig 6: Model recovery...', string(datetime('now')))
+%% Figure 5: Model recovery
+fprintf('\n%s: Fig 5: Model recovery...', string(datetime('now')))
 
 % Precompute index lookups once to avoid repeated struct filtering.
-nSim_fig6 = numel(Bsim_unik);
-nFit_fig6 = numel(Bfit_unik);
-simAll_fig6 = [R.iModelB_sim]; simAll_fig6 = simAll_fig6(:);
-fitAll_fig6 = [R.iModelB_fit]; fitAll_fig6 = fitAll_fig6(:);
+nSim_fig5 = numel(Bsim_unik);
+nFit_fig5 = numel(Bfit_unik);
+simAll_fig5 = [R.iModelB_sim]; simAll_fig5 = simAll_fig5(:);
+fitAll_fig5 = [R.iModelB_fit]; fitAll_fig5 = fitAll_fig5(:);
 
 if isfield(R, 'nameIO')
-    datasetIDs_fig6 = string({R.nameIO})';
+    datasetIDs_fig5 = string({R.nameIO})';
 else
-    datasetIDs_fig6 = string(arrayfun(@(r) sprintf('Nm%g_Na%g_Ns%g_G%g_cSDT%g',  r.Nmul_true, r.Nadd_true, r.Nshared_true, r.gaborCST, r.cSDT_true), R, 'UniformOutput', false))';
+    datasetIDs_fig5 = string(arrayfun(@(r) sprintf('Nm%g_Na%g_Ns%g_G%g_cSDT%g',  r.Nmul_true, r.Nadd_true, r.Nshared_true, r.gaborCST, r.cSDT_true), R, 'UniformOutput', false))';
 end
 
-idsPerSim_fig6 = cell(nSim_fig6, 1);
-rowsPerSimCondFit_fig6 = cell(nSim_fig6, 1);
-rowsPerSimFit_fig6 = cell(nSim_fig6, nFit_fig6);
+idsPerSim_fig5 = cell(nSim_fig5, 1);
+rowsPerSimCondFit_fig5 = cell(nSim_fig5, 1);
+rowsPerSimFit_fig5 = cell(nSim_fig5, nFit_fig5);
 
-for iSim_fig6 = 1:nSim_fig6
-    simVal_fig6 = Bsim_unik(iSim_fig6);
-    idxSimRows_fig6 = find(simAll_fig6 == simVal_fig6);
-    idsSim_fig6 = unique(datasetIDs_fig6(idxSimRows_fig6));
-    idsPerSim_fig6{iSim_fig6} = idsSim_fig6;
+for iSim_fig5 = 1:nSim_fig5
+    simVal_fig5 = Bsim_unik(iSim_fig5);
+    idxSimRows_fig5 = find(simAll_fig5 == simVal_fig5);
+    idsSim_fig5 = unique(datasetIDs_fig5(idxSimRows_fig5));
+    idsPerSim_fig5{iSim_fig5} = idsSim_fig5;
 
-    rowsCell_fig6 = cell(numel(idsSim_fig6), nFit_fig6);
-    for iID_fig6 = 1:numel(idsSim_fig6)
-        idxCondRows_fig6 = idxSimRows_fig6(datasetIDs_fig6(idxSimRows_fig6) == idsSim_fig6(iID_fig6));
-        fitCond_fig6 = fitAll_fig6(idxCondRows_fig6);
-        for iFit_fig6 = 1:nFit_fig6
-            rowsCell_fig6{iID_fig6, iFit_fig6} = idxCondRows_fig6(fitCond_fig6 == Bfit_unik(iFit_fig6));
+    rowsCell_fig5 = cell(numel(idsSim_fig5), nFit_fig5);
+    for iID_fig5 = 1:numel(idsSim_fig5)
+        idxCondRows_fig5 = idxSimRows_fig5(datasetIDs_fig5(idxSimRows_fig5) == idsSim_fig5(iID_fig5));
+        fitCond_fig5 = fitAll_fig5(idxCondRows_fig5);
+        for iFit_fig5 = 1:nFit_fig5
+            rowsCell_fig5{iID_fig5, iFit_fig5} = idxCondRows_fig5(fitCond_fig5 == Bfit_unik(iFit_fig5));
         end
     end
-    rowsPerSimCondFit_fig6{iSim_fig6} = rowsCell_fig6;
+    rowsPerSimCondFit_fig5{iSim_fig5} = rowsCell_fig5;
 
-    for iFit_fig6 = 1:nFit_fig6
-        rowsPerSimFit_fig6{iSim_fig6, iFit_fig6} = idxSimRows_fig6(fitAll_fig6(idxSimRows_fig6) == Bfit_unik(iFit_fig6));
+    for iFit_fig5 = 1:nFit_fig5
+        rowsPerSimFit_fig5{iSim_fig5, iFit_fig5} = idxSimRows_fig5(fitAll_fig5(idxSimRows_fig5) == Bfit_unik(iFit_fig5));
     end
 end
 
 % Win rate: for each condition, compute fraction of iterations won by each fit model,
 % then average across conditions.
-W_bestNLL = nan(nFit_fig6, nSim_fig6);
+W_bestNLL = nan(nFit_fig5, nSim_fig5);
 if ~isempty(R) && isfield(R, 'nLL_test_allIter')
-    for iSim_wr = 1:nSim_fig6
-        % fprintf('Computing win rates for Bsim=%d/%d...\n', iSim_wr, nSim_fig6);
-        rowsCell_wr = rowsPerSimCondFit_fig6{iSim_wr};
+    for iSim_wr = 1:nSim_fig5
+        % fprintf('Computing win rates for Bsim=%d/%d...\n', iSim_wr, nSim_fig5);
+        rowsCell_wr = rowsPerSimCondFit_fig5{iSim_wr};
         nCond_wr = size(rowsCell_wr, 1);
-        winRatePerCond_wr = nan(nFit_fig6, nCond_wr);
+        winRatePerCond_wr = nan(nFit_fig5, nCond_wr);
 
         for iID_wr = 1:nCond_wr
             nIter_wr = 0;
-            nllRows_wr = cell(1, nFit_fig6);
-            for iFit_wr = 1:nFit_fig6
+            nllRows_wr = cell(1, nFit_fig5);
+            for iFit_wr = 1:nFit_fig5
                 rows_wr = rowsCell_wr{iID_wr, iFit_wr};
                 if isempty(rows_wr), continue; end
                 v_wr = R(rows_wr(1)).nLL_test_allIter(:)'; % preserve original first-match behavior
@@ -2315,8 +2010,8 @@ if ~isempty(R) && isfield(R, 'nLL_test_allIter')
             end
             if nIter_wr == 0, continue; end
 
-            nllMat_wr = nan(nFit_fig6, nIter_wr);
-            for iFit_wr = 1:nFit_fig6
+            nllMat_wr = nan(nFit_fig5, nIter_wr);
+            for iFit_wr = 1:nFit_fig5
                 v_wr = nllRows_wr{iFit_wr};
                 if isempty(v_wr), continue; end
                 nllMat_wr(iFit_wr, 1:numel(v_wr)) = v_wr;
@@ -2325,7 +2020,7 @@ if ~isempty(R) && isfield(R, 'nLL_test_allIter')
             [minVals_wr, bestIdx_wr] = min(nllMat_wr, [], 1);
             validCol_wr = isfinite(minVals_wr);
             if any(validCol_wr)
-                wins_wr = accumarray(bestIdx_wr(validCol_wr)', 1, [nFit_fig6, 1], @sum, 0);
+                wins_wr = accumarray(bestIdx_wr(validCol_wr)', 1, [nFit_fig5, 1], @sum, 0);
                 winRatePerCond_wr(:, iID_wr) = wins_wr / sum(validCol_wr);
             end
         end
@@ -2338,14 +2033,14 @@ if ~isempty(R) && isfield(R, 'nLL_test_allIter')
 end
 
 % Placeholders for RMSE for metrics and params
-M_curveRMSE = nan(nFit_fig6, nSim_fig6);
-M_paramRMSE = nan(nFit_fig6, nSim_fig6);
+M_curveRMSE = nan(nFit_fig5, nSim_fig5);
+M_paramRMSE = nan(nFit_fig5, nSim_fig5);
 
-for iSim = 1:nSim_fig6
-    for iFit = 1:nFit_fig6
+for iSim = 1:nSim_fig5
+    for iFit = 1:nFit_fig5
         fitModel = Bfit_unik(iFit);
-        rowsSimFit_fig6 = rowsPerSimFit_fig6{iSim, iFit};
-        Rsub = R(rowsSimFit_fig6);
+        rowsSimFit_fig5 = rowsPerSimFit_fig5{iSim, iFit};
+        Rsub = R(rowsSimFit_fig5);
         if isempty(Rsub), continue; end
 
         % metric RMSE
@@ -2355,6 +2050,7 @@ for iSim = 1:nSim_fig6
 
         % parameter RMSE
         rmseParamFields = strcat(namesModelBparams_short{fitModel}, '_rmse');
+        rmseParamFields = {'Nmul_rmse', 'Nadd_rmse', 'Nshared_rmse'}; % override to include all possible params, even if some models don't have them (will be filtered out by isfinite later)
         rmseParamVals = [];
         for iFld = 1:numel(rmseParamFields)
             vals = [Rsub.(rmseParamFields{iFld})]';
@@ -2365,17 +2061,17 @@ for iSim = 1:nSim_fig6
 end
 
 % ---------- delta NLL matrix (median ΔnLL from best fit, aggregated across all conditions) ----------
-M_deltaNLL = nan(nFit_fig6, nSim_fig6);
+M_deltaNLL = nan(nFit_fig5, nSim_fig5);
 
 if ~isempty(R) && isfield(R, 'nLL_med')
-    for iSim_dn = 1:nSim_fig6
-        rowsCell_dn = rowsPerSimCondFit_fig6{iSim_dn};
+    for iSim_dn = 1:nSim_fig5
+        rowsCell_dn = rowsPerSimCondFit_fig5{iSim_dn};
         nCond_dn = size(rowsCell_dn, 1);
-        deltaVals_dn = cell(nFit_fig6, 1);
+        deltaVals_dn = cell(nFit_fig5, 1);
 
         for iICond_dn = 1:nCond_dn
-            scores_dn = nan(nFit_fig6, 1);
-            for iFit_dn = 1:nFit_fig6
+            scores_dn = nan(nFit_fig5, 1);
+            for iFit_dn = 1:nFit_fig5
                 rows_dn = rowsCell_dn{iICond_dn, iFit_dn};
                 vals_dn = [R(rows_dn).nLL_med]';
                 if isempty(vals_dn)
@@ -2388,14 +2084,14 @@ if ~isempty(R) && isfield(R, 'nLL_med')
             if ~any(isfinite(scores_dn)), continue; end
             bestScore_dn = min(scores_dn);
 
-            for iFit_dn = 1:nFit_fig6
+            for iFit_dn = 1:nFit_fig5
                 if isfinite(scores_dn(iFit_dn))
                     deltaVals_dn{iFit_dn}(end+1, 1) = scores_dn(iFit_dn) - bestScore_dn; %#ok<AGROW>
                 end
             end
         end
 
-        for iFit_dn = 1:nFit_fig6
+        for iFit_dn = 1:nFit_fig5
             [M_deltaNLL(iFit_dn, iSim_dn), ~, ~] = getCI(deltaVals_dn{iFit_dn}, 2, 1);
         end
     end
@@ -2404,29 +2100,29 @@ end
 % Layout: 2x2
 %   (1,1) Win rate      (1,2) Metric RMSE
 %   (2,1) Median ΔnLL   (2,2) Param RMSE
-panels_fig6 = {  W_bestNLL,   'Win rate (% iters, avg over conds)',  [0 1];  M_deltaNLL,  'ΔNLL from the best model', [ 0 160];  M_curveRMSE, 'Metrics RMSE',            [0.05, 0.07];  M_paramRMSE, 'Parameters RMSE',             [1 2.8] };
+panels_fig5 = {  W_bestNLL,   'Win rate (% iters, avg over conds)',  [0 1];  M_deltaNLL,  'ΔNLL from the best model', [ 0 160];  M_curveRMSE, 'Metrics RMSE',            [0.05, 0.07];  M_paramRMSE, 'Parameters RMSE',             [1 2.8] };
 
 % tile order in a 2x2 tiledlayout (row-major): (1,1),(1,2),(2,1),(2,2)
 % desired: WinRate, MetricRMSE, DeltaNLL, ParamRMSE
-tileOrder = [1, 3, 2, 4]; % index into panels_fig6
+tileOrder = [1, 3, 2, 4]; % index into panels_fig5
 
 h = figure('Position', [100 100 900 700]);
 tlo = tiledlayout(2, 2, 'TileSpacing', 'loose', 'Padding', 'loose');
 
 % Use model names for axis ticks when available.
-xTickLabels_fig6 = arrayfun(@(k) sprintf('M%d', k), Bsim_unik, 'UniformOutput', false);
-yTickLabels_fig6 = arrayfun(@(k) sprintf('M%d', k), Bfit_unik, 'UniformOutput', false);
+xTickLabels_fig5 = arrayfun(@(k) sprintf('M%d', k), Bsim_unik, 'UniformOutput', false);
+yTickLabels_fig5 = arrayfun(@(k) sprintf('M%d', k), Bfit_unik, 'UniformOutput', false);
 if exist('namesModelB', 'var') && ~isempty(namesModelB)
     for iLab = 1:numel(Bsim_unik)
         k = Bsim_unik(iLab);
         if k >= 1 && k <= numel(namesModelB)
-            xTickLabels_fig6{iLab} = char(string(namesModelB{k}));
+            xTickLabels_fig5{iLab} = char(string(namesModelB{k}));
         end
     end
     for iLab = 1:numel(Bfit_unik)
         k = Bfit_unik(iLab);
         if k >= 1 && k <= numel(namesModelB)
-            yTickLabels_fig6{iLab} = char(string(namesModelB{k}));
+            yTickLabels_fig5{iLab} = char(string(namesModelB{k}));
         end
     end
 end
@@ -2435,11 +2131,11 @@ end
 nTiltes=4;
 % fprintf('Plotting %d tiles in order: %s\n', nTiltes);
 for iTile = 1:nTiltes
-    % fprintf('Plotting tile %d/%d: %s...\n', iTile, nTiltes, panels_fig6{tileOrder(iTile), 2});
+    % fprintf('Plotting tile %d/%d: %s...\n', iTile, nTiltes, panels_fig5{tileOrder(iTile), 2});
     iPan = tileOrder(iTile);
-    M_plot   = panels_fig6{iPan, 1};
-    ttl_plot = panels_fig6{iPan, 2};
-    clim_fix = panels_fig6{iPan, 3};
+    M_plot   = panels_fig5{iPan, 1};
+    ttl_plot = panels_fig5{iPan, 2};
+    clim_fix = panels_fig5{iPan, 3};
     isWinRatePanel = (iPan == 1);
 
     if isWinRatePanel
@@ -2470,7 +2166,7 @@ for iTile = 1:nTiltes
 
     nexttile; hold on;
     imagesc(1:numel(Bsim_unik), 1:numel(Bfit_unik), M_plot_disp);
-    set(gca, 'YDir', 'normal',  'XTick', 1:numel(Bsim_unik), 'XTickLabel', xTickLabels_fig6,  'YTick', 1:numel(Bfit_unik), 'YTickLabel', yTickLabels_fig6,  'XLim', [0.5, numel(Bsim_unik)+0.5],  'YLim', [0.5, numel(Bfit_unik)+0.5]);
+    set(gca, 'YDir', 'normal',  'XTick', 1:numel(Bsim_unik), 'XTickLabel', xTickLabels_fig5,  'YTick', 1:numel(Bfit_unik), 'YTickLabel', yTickLabels_fig5,  'XLim', [0.5, numel(Bsim_unik)+0.5],  'YLim', [0.5, numel(Bfit_unik)+0.5]);
     xlabel('Generating model'); ylabel('Fitting model');
     title(ttl_plot);
     % fxn_style_ax(gca, setting);
@@ -2479,8 +2175,8 @@ for iTile = 1:nTiltes
     % Color axis uses clipped 95% interval range for this panel.
     clim([cLo cHi]);
     % show colorbar
-    cbar_fig6 = colorbar('Location', 'eastoutside');
-    fxn_set_colorbar_ticks(cbar_fig6, cLo, cHi);
+    cbar_fig5 = colorbar('Location', 'eastoutside');
+    fxn_set_colorbar_ticks(cbar_fig5, cLo, cHi);
 
     % Annotate values with adaptive font color (low → white, high → black)
     % fprintf('    Annotating values for tile %d/%d...\n', iTile, nTiltes);
@@ -2503,7 +2199,6 @@ for iTile = 1:nTiltes
             text(iSim_ann, iFit_ann, txtVal,  'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle',  'FontSize', 8, 'Color', txtClr);
         end
     end
-
 
     % Highlight diagonal cells (matched sim/fit model) with thick red borders
     nDiag = min(numel(Bfit_unik), numel(Bsim_unik));
@@ -2533,462 +2228,375 @@ for iTile = 1:nTiltes
 
 end % for iTile
 
-sgtitle('Fig 6: Model recovery', 'FontWeight', 'bold');
-% fprintf('Saving figure...\n');
-nameFile_fig6 = fullfile(nameFolder_Figures_part4, 'FigS6_modelRecovery.png');
-saveas(h, nameFile_fig6);
-% fprintf('Closing figure...\n');
+set(findall(hLeg, '-property', 'FontSize'), 'FontSize', 22);
+sgtitle('Fig 5: Model recovery', 'FontWeight', 'bold');
+nameFile_fig5 = fullfile(nameFolder_Figures_part4, 'FigS5_modelRecovery.png');
+saveas(h, nameFile_fig5);
 close(h);
-
 fprintf('DONE\n\n')
 
+%% Figure 6: Parameter-pair correlation summary by signalCST x cSDT
+fprintf('\n%s: Fig 6: Parameter-pair correlation summary...', string(datetime('now')))
 
-% %% Figure 6B: parameter-pair correlations
-% fprintf('\n%s: Fig 6B: Parameter-pair correlations\n', string(datetime('now')))
-%
-% for iFit = 1:numel(Bfit_unik)
-%     fprintf('Processing fit model %d/%d...\n', iFit, numel(Bfit_unik));
-%     fitModel = Bfit_unik(iFit);
-%
-%     % Use matched pairs to keep one coherent parameterization per model.
-%     Rsub = R([R.iModelB_sim] == fitModel & [R.iModelB_fit] == fitModel);
-%     if isempty(Rsub), continue; end
-%
-%     pNames_all = namesModelBparams_short{fitModel};
-%     % Use per-iteration estimate arrays as source for dots
-%     iterFields = cell(size(pNames_all));
-%     for iP = 1:numel(pNames_all)
-%         if strcmp(pNames_all{iP}, 'criterion_DV')
-%             iterFields{iP} = 'criterion_DV_est_allIter';
-%         else
-%             iterFields{iP} = sprintf('%s_est_allIter', pNames_all{iP});
-%         end
-%     end
-%
-%     keepParam = false(size(pNames_all));
-%     for iP = 1:numel(pNames_all)
-%         if ~isfield(Rsub, iterFields{iP}), continue; end
-%         vals = vertcat(Rsub.(iterFields{iP}));
-%         keepParam(iP) = any(isfinite(vals(:)));
-%     end
-%
-%     pNames = pNames_all(keepParam);
-%     iterFields = iterFields(keepParam);
-%     nParam = numel(pNames);
-%     if nParam < 2, continue; end
-%
-%     sigVals_all = [Rsub.gaborCST]';
-%     czVals_all  = [Rsub.cSDT_true]';
-%     [isSig, sigIdx_all] = ismember(sigVals_all, gaborCST_unik);
-%     [isCz,  czIdx_all]  = ismember(czVals_all,  cSDT_unik);
-%     validGroupBase = isfinite(sigVals_all) & isfinite(czVals_all) & isSig & isCz;
-%
-%     groupRows = cell(numel(gaborCST_unik), numel(cSDT_unik));
-%     for iSig = 1:numel(gaborCST_unik)
-%         for iCz = 1:numel(cSDT_unik)
-%             groupRows{iSig, iCz} = find(validGroupBase & sigIdx_all == iSig & czIdx_all == iCz);
-%         end
-%     end
-%
-%     % Grayscale color per condition based on sumsqr(Nmul_true, Nadd_true, Nshared_true).
-%     % Black = highest sumsqr, light gray = lowest.
-%     inFields_gray = {'Nmul_true', 'Nadd_true', 'Nshared_true'};
-%     sumsqr_cond = zeros(numel(Rsub), 1);
-%     for iGF = 1:numel(inFields_gray)
-%         if isfield(Rsub, inFields_gray{iGF})
-%             v = [Rsub.(inFields_gray{iGF})]';
-%             v(~isfinite(v)) = 0;
-%             sumsqr_cond = sumsqr_cond + v .^ 2;
-%         end
-%     end
-%     sq_min = min(sumsqr_cond);
-%     sq_max = max(sumsqr_cond);
-%     if sq_max > sq_min
-%         sq_norm = (sumsqr_cond - sq_min) / (sq_max - sq_min);
-%     else
-%         sq_norm = zeros(size(sumsqr_cond));
-%     end
-%     lightGrayVal = 0.78;
-%     % normVal=1 → black (0), normVal=0 → light gray (lightGrayVal)
-%     condGrayColor = (1 - sq_norm) * lightGrayVal .* ones(numel(Rsub), 3);
-%
-%     pairIdx = nchoosek(1:nParam, 2);
-%     nPairs  = size(pairIdx, 1);
-%     nCols   = min(3, nPairs);
-%     nRows   = ceil(nPairs / nCols);
-%
-%     h = figure('Position', [100 100 420*nCols 320*nRows]);
-%     tiledlayout(nRows, nCols, 'TileSpacing', 'compact', 'Padding', 'compact');
-%
-%     for iPair = 1:nPairs
-%         iP1 = pairIdx(iPair, 1);
-%         iP2 = pairIdx(iPair, 2);
-%
-%         nexttile; hold on;
-%
-%         % Collect all iter values pooled across conditions for overall r
-%         xPool = [];
-%         yPool = [];
-%
-%         for iSig = 1:numel(gaborCST_unik)
-%             for iCz = 1:numel(cSDT_unik)
-%                 idxRows = groupRows{iSig, iCz};
-%                 if isempty(idxRows), continue; end
-%
-%                 mkr = setting.marker_signal{iSig};
-%
-%                 for iRow = 1:numel(idxRows)
-%                     rIdx = idxRows(iRow);
-%                     col  = condGrayColor(rIdx, :);
-%                     xIter = Rsub(rIdx).(iterFields{iP1})(:);
-%                     yIter = Rsub(rIdx).(iterFields{iP2})(:);
-%                     xi = xIter;
-%                     yi = yIter;
-%                     xPool = [xPool; xi]; %#ok<AGROW>
-%                     yPool = [yPool; yi]; %#ok<AGROW>
-%
-%                     % dots: one per iteration
-%                     plot(xi, yi, mkr,  'LineStyle', 'none',  'MarkerSize', max(setting.markerSize - 2, 4), 'MarkerFaceColor', col,  'MarkerEdgeColor', 'w',  'LineWidth', 0.5);
-%
-%                     % regression line per condition
-%                     if numel(xi) >= 2 && numel(unique(xi)) >= 2
-%                         pfit_cond = polyfit(xi, yi, 1);
-%                         xfit_cond = linspace(min(xi), max(xi), 60);
-%                         plot(xfit_cond, polyval(pfit_cond, xfit_cond), '-',  'Color', col, 'LineWidth', 1.4);
-%                     end
-%                 end
-%             end
-%         end
-%
-%         if numel(xPool) >= 2
-%             [r_val, p_val] = corr(xPool, yPool);
-%             title(sprintf('%s vs %s | r=%.2f, p=%.3g', pNames{iP1}, pNames{iP2}, r_val, p_val));
-%         else
-%             title(sprintf('%s vs %s', pNames{iP1}, pNames{iP2}));
-%         end
-%
-%         axis square;
-%         xlabel(sprintf('Est. %s', pNames{iP1}));
-%         ylabel(sprintf('Est. %s', pNames{iP2}));
-%         fxn_style_ax(gca, setting);
-%     end
-%
-%     % Figure-level legends: grayscale = sumsqr(IN params), marker = signalCST
-%     axBase = gca;
-%     pos = axBase.Position;
-%
-%     % Build a few representative grayscale legend entries
-%     axColor = axes('Position', pos, 'Color', 'none', 'Visible', 'off',  'HitTest', 'off', 'HandleVisibility', 'off');
-%     hold(axColor, 'on');
-%     sq_unik_sorted = unique(sumsqr_cond);
-%     nGrayLeg = min(numel(sq_unik_sorted), 5);
-%     legIdxGray = round(linspace(1, numel(sq_unik_sorted), nGrayLeg));
-%     hGray = gobjects(nGrayLeg, 1);
-%     grayLegLabels = cell(nGrayLeg, 1);
-%     for iGL = 1:nGrayLeg
-%         sqVal = sq_unik_sorted(legIdxGray(iGL));
-%         normGL = (sq_max > sq_min) * (sqVal - sq_min) / max(sq_max - sq_min, eps);
-%         grayGL = (1 - normGL) * lightGrayVal;
-%         hGray(iGL) = plot(axColor, nan, nan, 'o',  'LineStyle', 'none',  'MarkerFaceColor', grayGL * [1 1 1],  'MarkerEdgeColor', grayGL * [1 1 1],  'MarkerSize', 7);
-%         grayLegLabels{iGL} = sprintf('%.3g', sqVal);
-%     end
-%     leg1 = legend(axColor, hGray, grayLegLabels,  'Location', 'northeast', 'Box', 'on', 'FontSize', max(setting.fontSize - 1, 8));
-%     title(leg1, 'Total internal var.');
-%
-%     axSig = axes('Position', pos, 'Color', 'none', 'Visible', 'off',  'HitTest', 'off', 'HandleVisibility', 'off');
-%     hold(axSig, 'on');
-%     hSig = gobjects(numel(gaborCST_unik), 1);
-%     for iSig = 1:numel(gaborCST_unik)
-%         hSig(iSig) = plot(axSig, nan, nan,  'LineStyle', 'none',  'Marker', setting.marker_signal{iSig},  'MarkerFaceColor', 'w',  'MarkerEdgeColor', 'k',  'MarkerSize', 7);
-%     end
-%     leg2 = legend(axSig, hSig,  arrayfun(@(x) sprintf('%g', x), gaborCST_unik, 'UniformOutput', false),  'Location', 'southeast', 'Box', 'on', 'FontSize', max(setting.fontSize - 1, 8));
-%     title(leg2, 'signalCST');
-%
-%     sgtitle(sprintf('Fig 6B: parameter-pair correlations | Bfit=Bsim=%d', fitModel), 'FontWeight', 'bold');
-%     saveas(h, fullfile(nameFolder_Figures_part4, sprintf('FigS6B_paramCorr_B%d.png', fitModel)));
-%     close(h);
-% end % iModelB_fit
-%
-% %% Figure 7: Full vs. reduced models—Iteration-level ΔnLL distributions (Generating model is the full model B1)
-% %    For each reduced model Br, shows the per-iteration distribution of
-% %    ΔnLL(Br − B1) aggregated across conditions.
-% %    A positive ΔnLL means B1 fits the held-out data better on that iteration.
-% %    If distributions straddle 0, B1 barely wins and identifiability is weak.
-%
-% fprintf('\n%s: Fig 7: Iteration-level delta-nLL distributions\n', string(datetime('now')))
-%
-% Br_fig7 = setdiff(Bfit_unik, 1); % reduced models to compare against B1
-% nReduced_f7 = numel(Br_fig7);
-%
-% if ~isfield(R, 'nLL_test_allIter') || ~any([R.iModelB_sim] == 1) || nReduced_f7 == 0
-%     fprintf('Skipping Fig 7: nLL_test_allIter not available or no B1-simulated data.\n');
-% else
-%     if isfield(R, 'nameIO')
-%         datasetIDs_f7 = string({R.nameIO});
-%     else
-%         datasetIDs_f7 = string(arrayfun(@(r) sprintf('Nm%g_Na%g_Ns%g_G%g_cSDT%g',  r.Nmul_true, r.Nadd_true, r.Nshared_true, r.gaborCST, r.cSDT_true), R, 'UniformOutput', false));
-%     end
-%     idxSim1_f7 = [R.iModelB_sim] == 1;
-%     idsSim1_f7 = unique(datasetIDs_f7(idxSim1_f7));
-%     nConds_f7  = numel(idsSim1_f7);
-%
-%     dnLL_iter_allConds = cell(nReduced_f7, nConds_f7);
-%     for iCond = 1:nConds_f7
-%         idxCond = idxSim1_f7 & datasetIDs_f7 == idsSim1_f7(iCond);
-%         Rcond   = R(idxCond);
-%         if isempty(Rcond), continue; end
-%
-%         idxB1 = find([Rcond.iModelB_fit] == 1, 1);
-%         if isempty(idxB1) || isempty(Rcond(idxB1).nLL_test_allIter), continue; end
-%         nll_B1 = Rcond(idxB1).nLL_test_allIter(:);
-%
-%         for iR = 1:nReduced_f7
-%             Br      = Br_fig7(iR);
-%             idxBr   = find([Rcond.iModelB_fit] == Br, 1);
-%             if isempty(idxBr) || isempty(Rcond(idxBr).nLL_test_allIter), continue; end
-%             nll_Br  = Rcond(idxBr).nLL_test_allIter(:);
-%             nIt     = min(numel(nll_B1), numel(nll_Br));
-%             dnLL_iter_allConds{iR, iCond} = nll_Br(1:nIt) - nll_B1(1:nIt);
-%         end
-%     end
-%
-%     h = figure('Position', [100 100 280*nReduced_f7 480]);
-%     tiledlayout(1, nReduced_f7, 'TileSpacing', 'loose', 'Padding', 'loose');
-%
-%     for iR = 1:nReduced_f7
-%         Br = Br_fig7(iR);
-%         nexttile; hold on;
-%
-%         condMeds = nan(nConds_f7, 1);
-%         for iCond = 1:nConds_f7
-%             v = dnLL_iter_allConds{iR, iCond};
-%             if ~isempty(v), condMeds(iCond) = median(v, 'omitnan'); end
-%         end
-%
-%         idx = isfinite(condMeds);
-%         if any(idx)
-%             xJit = 1 + 0.12 * (rand(sum(idx), 1) - 0.5);
-%             scatter(xJit, condMeds(idx), 28, [0.5 0.5 0.5], 'filled', 'MarkerFaceAlpha', 0.5);
-%             [gMed, ~, ~, gSEM] = getCI(condMeds(idx), 1, 1);
-%             errorbar(1, gMed, gSEM, 'ko',  'MarkerFaceColor', 'k', 'MarkerSize', 7, 'LineWidth', 1.8, 'CapSize', 0);
-%             winRate_f7 = mean(condMeds(idx) > 0);
-%             text(1.35, gMed, sprintf('win=%.0f%%', winRate_f7*100),  'FontSize', setting.fontSize, 'VerticalAlignment', 'middle');
-%         end
-%
-%         yline(0, 'k--', 'LineWidth', 1.2);
-%         xlim([0.5 1.8]); xticks([]);
-%         ylabel('\Delta nLL (B_r - B_1) per condition median');
-%         title(sprintf('B%d - B1', Br));
-%         fxn_style_ax(gca, setting);
-%     end
-%
-%     sgtitle('Fig 7: Full vs. reduced models\Delta nLL distributions | Bsim=Full model', 'FontWeight', 'bold');
-%     saveas(h, fullfile(nameFolder_Figures_part4, 'FigS7_dnLL_distributions.png'));
-%     close(h);
-% end
-%
-% %% Figure 8: ΔnLL vs true omitted parameter value (Generating model is the full model B1)
-% %    For each reduced model Br, plots per-condition median ΔnLL(Br − B1) on the
-% %    y-axis against the true value of the parameter Br omits on the x-axis.
-% %    Expected: ΔnLL should increase as the omitted parameter grows away from 0.
-% %    Weak or flat relationship = identifiability problem even with large true parameter.
-%
-% fprintf('\n%s: Fig 8: delta-nLL vs true omitted parameter\n', string(datetime('now')))
-%
-% omitB_fig8      = [2,              3,            4,          5,          5,              6,          6,              7,          7        ];
-% omitParam_fig8  = {'Nshared',     'Nmul',       'Nadd',     'Nadd',     'Nshared',      'Nmul',     'Nshared',      'Nmul',     'Nadd'   };
-% trueField_fig8  = {'Nshared_true','Nmul_true',  'Nadd_true','Nadd_true','Nshared_true', 'Nmul_true','Nshared_true', 'Nmul_true','Nadd_true'};
-%
-% keepPair = ismember(omitB_fig8, Bfit_unik);
-% omitB_fig8     = omitB_fig8(keepPair);
-% omitParam_fig8 = omitParam_fig8(keepPair);
-% trueField_fig8 = trueField_fig8(keepPair);
-% nPairs_f8 = numel(omitB_fig8);
-%
-% if ~isfield(R, 'nLL_test_allIter') || ~any([R.iModelB_sim] == 1) || nPairs_f8 == 0
-%     fprintf('Skipping Fig 8: nLL_test_allIter not available or no valid model pairs.\n');
-% else
-%     if isfield(R, 'nameIO')
-%         datasetIDs_f8 = string({R.nameIO});
-%     else
-%         datasetIDs_f8 = string(arrayfun(@(r) sprintf('Nm%g_Na%g_Ns%g_G%g_cSDT%g',  r.Nmul_true, r.Nadd_true, r.Nshared_true, r.gaborCST, r.cSDT_true), R, 'UniformOutput', false));
-%     end
-%     idxSim1_f8 = [R.iModelB_sim] == 1;
-%     idsSim1_f8 = unique(datasetIDs_f8(idxSim1_f8));
-%
-%     paletteSrc = lines(max(nPairs_f8, 3));
-%
-%     h = figure('Position', [100 100 380*nPairs_f8 420]);
-%     tiledlayout(1, nPairs_f8, 'TileSpacing', 'loose', 'Padding', 'loose');
-%
-%     for iP = 1:nPairs_f8
-%         Br          = omitB_fig8(iP);
-%         tField      = trueField_fig8{iP};
-%         pLabel      = omitParam_fig8{iP};
-%
-%         xvals = nan(numel(idsSim1_f8), 1);
-%         yvals = nan(numel(idsSim1_f8), 1);
-%
-%         for iCond = 1:numel(idsSim1_f8)
-%             idxCond = idxSim1_f8 & datasetIDs_f8 == idsSim1_f8(iCond);
-%             Rcond   = R(idxCond);
-%             if isempty(Rcond), continue; end
-%
-%             if isfield(Rcond, tField), xvals(iCond) = Rcond(1).(tField); end
-%
-%             idxB1 = find([Rcond.iModelB_fit] == 1, 1);
-%             idxBr = find([Rcond.iModelB_fit] == Br, 1);
-%             if isempty(idxB1) || isempty(idxBr), continue; end
-%             nll_B1 = Rcond(idxB1).nLL_test_allIter(:);
-%             nll_Br = Rcond(idxBr).nLL_test_allIter(:);
-%             if isempty(nll_B1) || isempty(nll_Br), continue; end
-%             nIt = min(numel(nll_B1), numel(nll_Br));
-%             yvals(iCond) = median(nll_Br(1:nIt) - nll_B1(1:nIt), 'omitnan');
-%         end
-%
-%         idx = isfinite(xvals) & isfinite(yvals);
-%         nexttile; hold on;
-%
-%         scatter(xvals(idx), yvals(idx), 40, paletteSrc(iP, :),  'filled', 'MarkerFaceAlpha', 0.75);
-%
-%         if sum(idx) >= 3 && range(xvals(idx)) > eps(max(abs(xvals(idx)))) * numel(xvals(idx))
-%             pCoef = polyfit(xvals(idx) - mean(xvals(idx)), yvals(idx), 1);
-%             xFit  = linspace(min(xvals(idx)), max(xvals(idx)), 60);
-%             plot(xFit, polyval(pCoef, xFit - mean(xvals(idx))), '-', 'Color', paletteSrc(iP,:), 'LineWidth', 1.8);
-%             [rho_f8, ~] = corr(xvals(idx), yvals(idx));
-%             text(0.05, 0.92, sprintf('r = %.2f', rho_f8), 'Units', 'normalized',  'FontSize', setting.fontSize, 'Color', paletteSrc(iP,:));
-%         end
-%
-%         yline(0, 'k--', 'LineWidth', 1.2);
-%         xlabel(sprintf('True %s', pLabel));
-%         ylabel(sprintf('\\Delta nLL median (B%d - B1)', Br));
-%         title(sprintf('B%d vs B1 | omitted: %s', Br, pLabel));
-%         fxn_style_ax(gca, setting);
-%     end
-%
-%     sgtitle('Fig 8: \Delta nLL vs true omitted parameter | Bsim=B1', 'FontWeight', 'bold');
-%     saveas(h, fullfile(nameFolder_Figures_part4, 'FigS8_dnLL_vs_trueParam.png'));
-%     close(h);
-% end
-%
-% %% Figure 9: Correlate template RMSE with each parameter's RMSE across simulating conditions
-%
-% fprintf('\n%s: Fig 9: Template RMSE vs parameter RMSE correlations\n', string(datetime('now')))
-%
-% % Use matched pairs (Bsim == Bfit) only, so each row is a consistent condition.
-% % For each panel: scatter template_rmse (x) vs that parameter's RMSE (y) and annotate r.
-% % Panels 1-4: RMSE of fitted noise params + DV criterion (never excluded).
-% % Panel 5:    True SDT criterion |cSDT_true| — shows if criterion bias predicts template error.
-%
-% % --- RMSE-based panels (one per fitted parameter) ---
-% rmseParamNames_fig9  = {'Nmul',       'Nadd',       'Nshared',       'criterion_DV'};
-% rmseParamLabels_fig9 = {'N_{mul}',    'N_{add}',    'N_{shared}',    'Criterion DV'};
-%
-% % Keep only those with at least one finite value; criterion_DV is always kept.
-% Rmatch_fig9 = R([R.iModelB_sim] == [R.iModelB_fit]);
-% keepRmse_fig9 = false(1, numel(rmseParamNames_fig9));
-% for iP9 = 1:numel(rmseParamNames_fig9)
-%     fld = sprintf('%s_rmse', rmseParamNames_fig9{iP9});
-%     if strcmp(rmseParamNames_fig9{iP9}, 'criterion_DV')
-%         keepRmse_fig9(iP9) = true;   % never exclude criterion DV
-%     elseif isfield(Rmatch_fig9, fld) && any(isfinite([Rmatch_fig9.(fld)]))
-%         keepRmse_fig9(iP9) = true;
-%     end
-% end
-% rmseParamNames_fig9  = rmseParamNames_fig9(keepRmse_fig9);
-% rmseParamLabels_fig9 = rmseParamLabels_fig9(keepRmse_fig9);
-%
-% nPanels_fig9 = numel(rmseParamNames_fig9) + 1;   % +1 for SDT criterion panel
-% nCols_fig9   = min(nPanels_fig9, 3);
-% nRows_fig9   = ceil(nPanels_fig9 / nCols_fig9);
-% cmap_fig9    = lines(numel(Bfit_unik));
-%
-% h = figure('Position', [100 100 380*nCols_fig9 320*nRows_fig9]);
-% tiledlayout(nRows_fig9, nCols_fig9, 'TileSpacing', 'compact', 'Padding', 'compact');
-%
-% % --- Panels: template RMSE vs each parameter RMSE ---
-% for iP9 = 1:numel(rmseParamNames_fig9)
-%     pName9    = rmseParamNames_fig9{iP9};
-%     pLabel9   = rmseParamLabels_fig9{iP9};
-%     rmseField = sprintf('%s_rmse', pName9);
-%
-%     nexttile; hold on;
-%
-%     hLines_fig9 = gobjects(numel(Bfit_unik), 1);
-%     for iBfit9 = 1:numel(Bfit_unik)
-%         fitModel9 = Bfit_unik(iBfit9);
-%         Rsub9 = R([R.iModelB_sim] == fitModel9 & [R.iModelB_fit] == fitModel9);
-%         if isempty(Rsub9) || ~isfield(Rsub9, rmseField), continue; end
-%
-%         x9 = [Rsub9.template_rmse]';
-%         y9 = [Rsub9.(rmseField)]';
-%         idx9 = isfinite(x9) & isfinite(y9);
-%         if sum(idx9) < 2, continue; end
-%
-%         col9 = cmap_fig9(iBfit9, :);
-%         hLines_fig9(iBfit9) = scatter(x9(idx9), y9(idx9), 28, col9,  'filled', 'MarkerFaceAlpha', 0.65);
-%
-%         if numel(unique(x9(idx9))) >= 2
-%             pCoef9 = polyfit(x9(idx9), y9(idx9), 1);
-%             xFit9  = linspace(min(x9(idx9)), max(x9(idx9)), 80);
-%             plot(xFit9, polyval(pCoef9, xFit9), '-', 'Color', col9,  'LineWidth', 1.6, 'HandleVisibility', 'off');
-%         end
-%
-%         [r9, ~] = corr(x9(idx9), y9(idx9));
-%         hLines_fig9(iBfit9).DisplayName = sprintf('B%d: r = %.2f', fitModel9, r9);
-%     end % iBfit9
-%
-%     xlabel('Template RMSE');
-%     ylabel(sprintf('%s RMSE', pLabel9));
-%     title(sprintf('Template RMSE vs %s RMSE', pLabel9));
-%     fxn_style_ax(gca, setting);
-%     set(gca, 'YGrid', 'off');
-%     axis square;
-%     validH9 = hLines_fig9(isgraphics(hLines_fig9));
-%     if ~isempty(validH9)
-%         legend(validH9, 'Location', 'best', 'Box', 'off', 'FontSize', max(setting.fontSize-1,7));
-%     end
-% end % iP9
-%
-% % --- Final panel: template RMSE vs true SDT criterion |cSDT_true| ---
-% nexttile; hold on;
-% hLines_sdt = gobjects(numel(Bfit_unik), 1);
-% for iBfit9 = 1:numel(Bfit_unik)
-%     fitModel9 = Bfit_unik(iBfit9);
-%     Rsub9 = R([R.iModelB_sim] == fitModel9 & [R.iModelB_fit] == fitModel9);
-%     if isempty(Rsub9) || ~isfield(Rsub9, 'cSDT_true'), continue; end
-%
-%     x9   = [Rsub9.template_rmse]';
-%     y9   = abs([Rsub9.cSDT_true]');
-%     idx9 = isfinite(x9) & isfinite(y9);
-%     if sum(idx9) < 2, continue; end
-%
-%     col9 = cmap_fig9(iBfit9, :);
-%     hLines_sdt(iBfit9) = scatter(x9(idx9), y9(idx9), 28, col9,  'filled', 'MarkerFaceAlpha', 0.65);
-%
-%     if numel(unique(x9(idx9))) >= 2
-%         pCoef9 = polyfit(x9(idx9), y9(idx9), 1);
-%         xFit9  = linspace(min(x9(idx9)), max(x9(idx9)), 80);
-%         plot(xFit9, polyval(pCoef9, xFit9), '-', 'Color', col9,  'LineWidth', 1.6, 'HandleVisibility', 'off');
-%     end
-%
-%     [r9, ~] = corr(x9(idx9), y9(idx9));
-%     hLines_sdt(iBfit9).DisplayName = sprintf('B%d r=%.2f', fitModel9, r9);
-% end
-% xlabel('Template RMSE');
-% ylabel('|SDT criterion| (|Cz_{true}|)');
-% title('Template RMSE vs SDT criterion');
-% fxn_style_ax(gca, setting);
-% set(gca, 'YGrid', 'off');
-% axis square;
-% validH_sdt = hLines_sdt(isgraphics(hLines_sdt));
-% if ~isempty(validH_sdt)
-%     legend(validH_sdt, 'Location', 'best', 'Box', 'off', 'FontSize', max(setting.fontSize-1,7));
-% end
-%
-% sgtitle('Fig 9: Template RMSE vs Parameter RMSE | Matched Bsim=Bfit', 'FontWeight', 'bold');
-% saveas(h, fullfile(nameFolder_Figures_part4, 'FigS9_Corr_tempRMSE_paramRMSE.png'));
-% close(h);
+% Fixed 6 parameter-pair columns from the canonical set used in Fig 6.
+pairParams_fig6 = {'Nmul', 'Nadd', 'Nshared', 'criterion_DV'};
+pairLabels_fig6 = {'N_{mul}', 'N_{add}', 'N_{shared}', 'Criterion DV'};
+pairIdx_fig6 = nchoosek(1:numel(pairParams_fig6), 2);
+pairIdx_fig6 = pairIdx_fig6([1, 2, 4, 3, 5, 6], :); % rearrange so all xx-cDV pairs are last
+nCols_fig6 = size(pairIdx_fig6, 1); % expected = 6
+
+% One row per matched model (Bfit = Bsim), expected 7 rows.
+Bdiag_fig6 = intersect(Bfit_unik(:)', Bsim_unik(:)');
+nRows_fig6 = numel(Bdiag_fig6);
+
+nSig_fig6 = numel(gaborCST_unik);
+nCz_fig6 = numel(cSDT_unik);
+nBars_fig6 = nSig_fig6 * nCz_fig6;
+xBar_fig6 = 1:nBars_fig6;
+nPerm_fig6 = 5000;
+
+% For labeling and indexing bars: one per signalCST x cSDT combination
+barLabels_fig6 = cell(1, nBars_fig6);
+barSigIdx_fig6 = nan(1, nBars_fig6);
+barCzIdx_fig6 = nan(1, nBars_fig6);
+iBar_fig6 = 0;
+for iCz = 1:nCz_fig6
+    for iSig = 1:nSig_fig6
+        iBar_fig6 = iBar_fig6 + 1;
+        barSigIdx_fig6(iBar_fig6) = iSig;
+        barCzIdx_fig6(iBar_fig6) = iCz;
+        barLabels_fig6{iBar_fig6} = sprintf('G%g|C%g', gaborCST_unik(iSig), cSDT_unik(iCz));
+    end
+end
+
+% Create a struct to hold all permutation results
+permFile_fig6 = fullfile(nameFolder_Figures_part4, 'FigS6_paramCorr_summaryBars_permNull.mat');
+cacheLoaded_fig6 = false;
+
+% Precompute bar colors once because they only depend on signalCST and cSDT level.
+czMin_fig6 = min(cSDT_unik);
+czMax_fig6 = max(cSDT_unik);
+sigMin_fig6 = min(gaborCST_unik);
+sigMax_fig6 = max(gaborCST_unik);
+barColors_fig6 = nan(nBars_fig6, 3);
+for iBar = 1:nBars_fig6
+    czVal = cSDT_unik(barCzIdx_fig6(iBar));
+    sigVal = gaborCST_unik(barSigIdx_fig6(iBar));
+
+    if czMax_fig6 > czMin_fig6
+        czNorm = (czVal - czMin_fig6) / (czMax_fig6 - czMin_fig6);
+    else
+        czNorm = 0.5;
+    end
+
+    if sigMax_fig6 > sigMin_fig6
+        sigNorm = (sigVal - sigMin_fig6) / (sigMax_fig6 - sigMin_fig6);
+    else
+        sigNorm = 0.5;
+    end
+
+    hCol = (1 - czNorm) * (2 / 3);
+    sCol = 0.25 + 0.70 * sigNorm;
+    vCol = 0.98 - 0.13 * sigNorm;
+    barColors_fig6(iBar, :) = hsv2rgb([hCol, sCol, vCol]);
+end
+
+% load the cached permutation results if they exist, otherwise compute and save them
+cacheLoaded_fig6 = false;
+if exist(permFile_fig6, 'file')
+    % fprintf('\n Loading cached permStats_fig6 from %s\n', permFile_fig6);
+    load(permFile_fig6, 'permStats_fig6');
+    % Validate cache dimensions against current data
+    if size(permStats_fig6.observedMean, 3) ~= nBars_fig6
+        fprintf('\n Cache nBars mismatch (%d vs %d). Recomputing...\n', size(permStats_fig6.observedMean, 3), nBars_fig6);
+        clear permStats_fig6;
+    else
+        cacheLoaded_fig6 = true;
+    end
+end
+if ~cacheLoaded_fig6
+    fprintf('\n Computing permutation nulls for Fig 6 (nPerm = %d)...\n', nPerm_fig6);
+    % Create a struct to hold all permutation results
+    permStats_fig6 = struct();
+    permStats_fig6.nPerm = nPerm_fig6;
+    permStats_fig6.fitModels = Bdiag_fig6;
+    permStats_fig6.pairIdx = pairIdx_fig6;
+    permStats_fig6.pairParams = {pairParams_fig6};
+    permStats_fig6.barSigIdx = barSigIdx_fig6;
+    permStats_fig6.barCzIdx = barCzIdx_fig6;
+    permStats_fig6.barSigVal = gaborCST_unik(barSigIdx_fig6);
+    permStats_fig6.barCzVal = cSDT_unik(barCzIdx_fig6);
+    permStats_fig6.observedMean = nan(nCols_fig6, nRows_fig6, nBars_fig6);
+    permStats_fig6.observedSem = nan(nCols_fig6, nRows_fig6, nBars_fig6);
+    permStats_fig6.nRep = nan(nCols_fig6, nRows_fig6, nBars_fig6);
+    permStats_fig6.null68 = nan(nCols_fig6, nRows_fig6, nBars_fig6, 2);
+    permStats_fig6.null95 = nan(nCols_fig6, nRows_fig6, nBars_fig6, 2);
+    permStats_fig6.permP = nan(nCols_fig6, nRows_fig6, nBars_fig6);
+    permStats_fig6.sig95 = false(nCols_fig6, nRows_fig6, nBars_fig6);
+
+    % Precompute matched-model subsets and bar membership once because they do not depend on parameter pair.
+    Rdiag_fig6 = cell(1, nRows_fig6);
+    rowGroups_fig6 = cell(nRows_fig6, nBars_fig6);
+    for iModel = 1:nRows_fig6
+        Rdiag_fig6{iModel} = R([R.iModelB_sim] == Bdiag_fig6(iModel) & [R.iModelB_fit] == Bdiag_fig6(iModel)); % only matched models are included in the correlation summary
+        if isempty(Rdiag_fig6{iModel})
+            continue;
+        end
+        gaborVals_fig6 = [Rdiag_fig6{iModel}.gaborCST];
+        cSDTVals_fig6 = [Rdiag_fig6{iModel}.cSDT_true];
+        for iB = 1:nBars_fig6
+            rowGroups_fig6{iModel, iB} = find(gaborVals_fig6 == gaborCST_unik(barSigIdx_fig6(iB)) &  cSDTVals_fig6 == cSDT_unik(barCzIdx_fig6(iB)));
+        end
+    end % iModel
+
+    for iPair = 1:nCols_fig6   % row = param pair
+        iP1 = pairIdx_fig6(iPair, 1);
+        iP2 = pairIdx_fig6(iPair, 2);
+        p1 = pairParams_fig6{iP1};
+        p2 = pairParams_fig6{iP2};
+
+        if strcmp(p1, 'criterion_DV')
+            f1 = 'criterion_DV_est_allIter';
+        else
+            f1 = sprintf('%s_est_allIter', p1);
+        end
+
+        if strcmp(p2, 'criterion_DV')
+            f2 = 'criterion_DV_est_allIter';
+        else
+            f2 = sprintf('%s_est_allIter', p2);
+        end
+
+        for iModel = 1:nRows_fig6   % col = model variant
+            fprintf('Processing pair %d/%d, model %d/%d...\n', iPair, nCols_fig6, iModel, nRows_fig6);
+            fitModel = Bdiag_fig6(iModel);
+            Rsub = Rdiag_fig6{iModel};
+
+            % Skip non-identifiable pair/model combos: if either parameter is not
+            % part of this reduced model, the pairwise correlation is undefined.
+            modelParamNames_fig6 = namesModelBparams_short{fitModel};
+            hasP1_fig6 = strcmp(p1, 'criterion_DV') || any(strcmp(modelParamNames_fig6, p1));
+            hasP2_fig6 = strcmp(p2, 'criterion_DV') || any(strcmp(modelParamNames_fig6, p2));
+
+            if ~(hasP1_fig6 && hasP2_fig6)
+                continue;
+            end
+
+            yMean = nan(nBars_fig6, 1);
+            ySem  = nan(nBars_fig6, 1);
+            nRep  = zeros(nBars_fig6, 1);
+            null68_fig6 = nan(nBars_fig6, 2);
+            null95_fig6 = nan(nBars_fig6, 2);
+            permP_fig6 = nan(nBars_fig6, 1);
+
+            for iB = 1:nBars_fig6 % loop over signalCST x cSDT bars
+
+                % Get row indices for this signalCST x cSDT condition in this model
+                idxRows = rowGroups_fig6{iModel, iB};
+
+                rVals = nan(numel(idxRows), 1);
+                rNull = nan(nPerm_fig6, numel(idxRows));
+
+                % Loop over rows (matched model instances) for this signalCST x cSDT condition, collect r values and null distributions.
+                parfor iRR = 1:numel(idxRows)
+                    rIdx = idxRows(iRR);
+
+                    xTmp = Rsub(rIdx).(f1);
+                    yTmp = Rsub(rIdx).(f2);
+                    xIter = xTmp(:);
+                    yIter = yTmp(:);
+
+                    nItCommon = min(numel(xIter), numel(yIter));
+                    if nItCommon < 2
+                        continue;
+                    end
+                    xIter = xIter(1:nItCommon);
+                    yIter = yIter(1:nItCommon);
+
+                    if numel(xIter) < 2 || numel(yIter) < 2
+                        continue;
+                    end
+
+                    xi = xIter;
+                    yi = yIter;
+                    if numel(unique(xi)) < 2 || numel(unique(yi)) < 2
+                        continue;
+                    end
+                    %---------------------%
+                    Sperm_fig6 = fxn_perm_corr(xi, yi, nPerm_fig6);
+                    %---------------------%
+
+                    rVals(iRR) = Sperm_fig6.rObs;
+                    rNull(:, iRR) = Sperm_fig6.rPerm;
+                end % iRR
+
+                % Compute observed mean r, SEM, and null distribution percentiles for this bar.
+                [yMean(iB), ~, ~, ySem(iB)] = getCI(rVals, 2, 1);
+                nRep(iB) = numel(rVals);
+
+                nullMean_fig6 = mean(rNull, 2, 'omitnan');
+                [~, null68_fig6(iB, 1), null68_fig6(iB, 2)] = getCI(nullMean_fig6, 1, 1);
+                [~, null95_fig6(iB, 1), null95_fig6(iB, 2)] = getCI(nullMean_fig6, 1, 1, 0.95);
+                permP_fig6(iB) = (sum(abs(nullMean_fig6) >= abs(yMean(iB))) + 1) / (numel(nullMean_fig6) + 1);
+            end % for iB
+
+            % Skip non-existent panels (e.g., reduced models)
+            if all(~isfinite(yMean))
+                continue;
+            end
+            sig95_fig6 = isfinite(yMean) & isfinite(null95_fig6(:, 1)) & isfinite(null95_fig6(:, 2)) &  (yMean < null95_fig6(:, 1) | yMean > null95_fig6(:, 2));
+
+            permStats_fig6.observedMean(iPair, iModel, :) = yMean;
+            permStats_fig6.observedSem(iPair, iModel, :) = ySem;
+            permStats_fig6.nRep(iPair, iModel, :) = nRep;
+            permStats_fig6.null68(iPair, iModel, :, :) = reshape(null68_fig6, [1 1 nBars_fig6 2]);
+            permStats_fig6.null95(iPair, iModel, :, :) = reshape(null95_fig6, [1 1 nBars_fig6 2]);
+            permStats_fig6.permP(iPair, iModel, :) = permP_fig6;
+            permStats_fig6.sig95(iPair, iModel, :) = sig95_fig6;
+
+        end % iModel
+    end % iPair
+
+    save(permFile_fig6, 'permStats_fig6');
+    cacheLoaded_fig6 = true;
+end % if exist(permFile_fig6)
+
+% PLOTTING
+if cacheLoaded_fig6
+    h = figure('Position', [80 80 330*nRows_fig6 210*nCols_fig6]);
+    tiledlayout(nCols_fig6, nRows_fig6, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+    for iPair = 1:nCols_fig6
+        for iModel = 1:nRows_fig6
+            nexttile((iPair-1)*nRows_fig6 + iModel); hold on;
+
+            yMean = squeeze(permStats_fig6.observedMean(iPair, iModel, :));
+            ySem = squeeze(permStats_fig6.observedSem(iPair, iModel, :));
+            nRep = squeeze(permStats_fig6.nRep(iPair, iModel, :));
+            sig95_fig6 = squeeze(permStats_fig6.sig95(iPair, iModel, :));
+
+            if all(~isfinite(yMean))
+                % text(0.5, 0.5, 'N/A', 'Units', 'normalized', 'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle');
+                axis off;
+                continue;
+            end
+
+            nRepGood = nRep;
+            dotSize_fig6 = nan(nBars_fig6, 1);
+            if any(nRepGood ~= nRepGood(1))
+                dotSize_fig6 = 80 + 240 * (nRepGood - min(nRepGood)) / max(max(nRepGood) - min(nRepGood), eps);
+            else
+                dotSize_fig6(:) = 180;
+            end
+
+            % Plot data dots
+            scatter(xBar_fig6, yMean, dotSize_fig6, barColors_fig6, 'filled', 'MarkerEdgeColor', 'w', 'LineWidth', 1.1);
+
+            % Plot error bars
+            for iPt = 1:numel(xBar_fig6)
+                errorbar(xBar_fig6(iPt), yMean(iPt), ySem(iPt), 'LineStyle', 'none', 'Color', 'k', 'LineWidth', 1.2, 'CapSize', 0);
+            end
+
+            % Add aestercks
+            for iStar = find(sig95_fig6(:))'
+                if yMean(iStar) >= 0
+                    yStar = min(0.95, yMean(iStar) + max(ySem(iStar), 0.03) + 0.05);
+                    starAlign = 'bottom';
+                else
+                    yStar = max(-0.95, yMean(iStar) - max(ySem(iStar), 0.03) - 0.05);
+                    starAlign = 'top';
+                end
+                text(xBar_fig6(iStar), yStar, '*', 'HorizontalAlignment', 'center', 'VerticalAlignment', starAlign, 'FontSize', 15, 'FontWeight', 'bold', 'Color', 'k');
+            end
+
+            yline(0, 'k-', 'LineWidth', 0.8);
+            xlim([0.4, nBars_fig6 + 0.6]);
+            ylim([-1, 1]);
+            if iModel==1
+                yticks([-1,0,1])
+                ylabel('Pearson''s r')
+            else
+                yticks([])
+            end
+            for iSep = 1:max(nCz_fig6 - 1, 0)
+                xline(iSep * nSig_fig6 + 0.5, '-', 'Color', [0.7 0.7 0.7], 'LineWidth', 0.9);
+            end
+            xticks([]);
+            fxn_style_ax(gca, setting);
+            set(gca, 'YGrid', 'off');
+        end
+    end
+
+    sgtitle('Fig 6: r by signalCST x cSDT | rows: param pair, cols: model variant (Bfit=Bsim)', 'FontWeight', 'bold');
+    set(findall(h,'-property','FontSize'), 'FontSize', 20);
+    saveas(h, fullfile(nameFolder_Figures_part4, 'FigS6_paramCorr_summaryBars.png'));
+    close(h);
+end
+
+% ── Color legend: rows = signalCST, cols = cSDT ──────────────────────
+czMin_leg = min(cSDT_unik);    czMax_leg = max(cSDT_unik);
+sigMin_leg = min(gaborCST_unik); sigMax_leg = max(gaborCST_unik);
+
+sqSz  = 52;   % pixels per square
+sqGap = 0.18; % adjustable gap between squares (0 to <1, in cell units)
+marg  = 60;   % margin for axis labels
+figW  = marg + nCz_fig6  * sqSz + marg;
+figH  = marg + nSig_fig6 * sqSz + marg;
+
+hLeg = figure('Position', [100 100 figW figH]);
+axLeg = axes('Parent', hLeg);
+hold(axLeg, 'on');
+
+for iSig = 1:nSig_fig6
+    sigVal = gaborCST_unik(iSig);
+    if sigMax_leg > sigMin_leg
+        sigNorm = (sigVal - sigMin_leg) / (sigMax_leg - sigMin_leg);
+    else
+        sigNorm = 0.5;
+    end
+
+    for iCz = 1:nCz_fig6
+        czVal = cSDT_unik(iCz);
+        if czMax_leg > czMin_leg
+            czNorm = (czVal - czMin_leg) / (czMax_leg - czMin_leg);
+        else
+            czNorm = 0.5;
+        end
+
+        hCol  = (1 - czNorm) * (2/3);          % blue -> red
+        sCol  = 0.25 + 0.70 * sigNorm;
+        vCol  = 0.98 - 0.13 * sigNorm;
+        faceC = hsv2rgb([hCol, sCol, vCol]);
+
+        % iSig=1 → top row; flip y so row 1 is at top
+        yBot = nSig_fig6 - iSig + sqGap / 2;
+        yTop = nSig_fig6 - iSig + 1 - sqGap / 2;
+        xL   = iCz - 1 + sqGap / 2;
+        xR   = iCz - sqGap / 2;
+        patch(axLeg, [xL xR xR xL], [yBot yBot yTop yTop], faceC,  'EdgeColor', 'none');
+    end
+end
+
+% Show tick labels, but hide tick marks themselves.
+set(axLeg, 'XTick', (0.5 : 1 : nCz_fig6 - 0.5),  'XTickLabel', arrayfun(@num2str, cSDT_unik(:)', 'UniformOutput', false));
+set(axLeg, 'YTick', (0.5 : 1 : nSig_fig6 - 0.5),  'YTickLabel', arrayfun(@num2str, fliplr(gaborCST_unik(:)'), 'UniformOutput', false));
+axLeg.XAxisLocation = 'top';
+xlabel(axLeg, 'SDT criterion');
+ylabel(axLeg, 'Signal contrast');
+% title(axLeg, 'Color key: bar fill color');
+xlim(axLeg, [0, nCz_fig6]);
+ylim(axLeg, [0, nSig_fig6]);
+axis(axLeg, 'equal');
+set(axLeg, 'TickLength', [0 0]);
+axLeg.XRuler.Axle.Visible = 'off';
+axLeg.YRuler.Axle.Visible = 'off';
+box(axLeg, 'off');
+% fxn_style_ax(axLeg, setting);
+set(findall(hLeg, '-property', 'FontSize'), 'FontSize', 20);
+
+saveas(hLeg, fullfile(nameFolder_Figures_part4, 'FigS6_paramCorr_legend.png'));
+close(hLeg);
+fprintf('DONE\n\n')
 
 %% Local helpers  (only functions used 2+ times)
 
@@ -3429,10 +3037,11 @@ S.n = n;
 end
 
 
-function [xAxis, yTrue, curves] = fxn_collapse_tuning_panel(Rin, vField, vLevels, domainName)
+function [xAxis, yTrue, yTrueSem, curves] = fxn_collapse_tuning_panel(Rin, vField, vLevels, domainName)
 xAxis = [];
 yTrue = [];
-curves = struct('level', {}, 'y', {}, 'n', {});
+yTrueSem = [];
+curves = struct('level', {}, 'y', {}, 'sem', {}, 'n', {});
 
 if isempty(Rin), return; end
 
@@ -3453,6 +3062,7 @@ xAxis = 1:nCh;
 
 T = vertcat(Rin.(fieldTrue));
 yTrue = mean(T, 1, 'omitnan');
+yTrueSem = std(T, 0, 1, 'omitnan') ./ sqrt(sum(isfinite(T), 1));
 
 for i = 1:numel(vLevels)
     idx = [Rin.(vField)] == vLevels(i);
@@ -3473,15 +3083,23 @@ for i = 1:numel(vLevels)
     end
 
     y = nan(1, size(yRow, 2));
+    ySem = nan(1, size(yRow, 2));
     for iCh = 1:size(yRow, 2)
         idxRows = isfinite(yRow(:, iCh));
         if any(idxRows)
             [y(iCh), ~, ~] = getCI(yRow(idxRows, iCh), 2, 1);
+            nEff = sum(idxRows);
+            if nEff > 1
+                ySem(iCh) = std(yRow(idxRows, iCh), 0, 1, 'omitnan') / sqrt(nEff);
+            elseif nEff == 1
+                ySem(iCh) = 0;
+            end
         end
     end
 
     curves(end+1).level = vLevels(i); %#ok<AGROW>
     curves(end).y = y;
+    curves(end).sem = ySem;
     curves(end).n = sum(any(isfinite(yRow), 2));
 end
 end
@@ -3895,7 +3513,12 @@ else
     b = bar(1:nCat, pctMat, 0.7, 'stacked');
     for iGrp = 1:nGrp
         b(iGrp).FaceColor = groupCmap(iGrp, :);
-        b(iGrp).EdgeColor = 'none';
+        if showLegend
+            b(iGrp).EdgeColor = 'w';
+            b(iGrp).LineWidth = 0.75;
+        else
+            b(iGrp).EdgeColor = 'none';
+        end
     end
     if showLegend
         legend(b, cellstr(uGrp), 'Location', 'northeast', 'FontSize', 7, 'Box', 'off');
@@ -3924,11 +3547,14 @@ else
 end
 end
 
-function P = fxn_collect_fig4_panel_points(Rsub, pName, gaborCST_unik, cSDT_unik, collapseFcn, nBins_Part4)
+function P = fxn_collect_fig4_panel_points(Rsub, pName, gaborCST_unik, cSDT_unik, collapseFcn, nBins_Part4, criterionBinEdges)
 P = struct('x', [], 'y', [], 'sem', [], 'n', []);
+if nargin < 7
+    criterionBinEdges = [];
+end
 for iSig = 1:numel(gaborCST_unik)
     for iCz = 1:numel(cSDT_unik)
-        S = fxn_collapse_param_byLevel(  Rsub, pName,  collapseFcn, nBins_Part4, gaborCST_unik(iSig), cSDT_unik(iCz));
+        S = fxn_collapse_param_byLevel(  Rsub, pName,  collapseFcn, nBins_Part4, gaborCST_unik(iSig), cSDT_unik(iCz), criterionBinEdges);
         if isempty(S.x), continue; end
         P.x = [P.x; S.x(:)]; %#ok<AGROW>
         P.y = [P.y; S.y(:)]; %#ok<AGROW>
@@ -3953,7 +3579,7 @@ bias = mean(y(:) - x(:), 'omitnan');
 rmse = sqrt(mean((y(:) - x(:)).^2, 'omitnan'));
 end
 
-function S = fxn_collapse_param_byLevel(Rin, pName, collapseFcn, nBins_Part4, signalVal, czVal)
+function S = fxn_collapse_param_byLevel(Rin, pName, collapseFcn, nBins_Part4, signalVal, czVal, criterionBinEdges)
 % Keep the examined parameter levels separate.
 % Collapse only across the other parameters.
 % Filter by signalCST x cSDT_true when signalVal/czVal are supplied.
@@ -3961,6 +3587,10 @@ function S = fxn_collapse_param_byLevel(Rin, pName, collapseFcn, nBins_Part4, si
 % then on the set of medians to get mean and SEM.
 
 S = struct('x', [], 'y', [], 'sem', [], 'n', []);
+
+if nargin < 7
+    criterionBinEdges = [];
+end
 
 if nargin >= 6
     idx = [Rin.gaborCST] == signalVal & [Rin.cSDT_true] == czVal;
@@ -3972,7 +3602,7 @@ if isempty(Rsub), return; end
 
 switch pName
     case 'criterion_DV'
-        S = fxn_bin_criterion_values(Rsub, nBins_Part4, collapseFcn);
+        S = fxn_bin_criterion_values(Rsub, nBins_Part4, collapseFcn, criterionBinEdges);
         return
     otherwise
         xField  = sprintf('%s_true', pName);
@@ -4014,12 +3644,16 @@ S.sem = sem_out;
 S.n  = n_out;
 end
 
-function S = fxn_bin_criterion_values(Rsub, nBins_Part4, collapseFcn)
+function S = fxn_bin_criterion_values(Rsub, nBins_Part4, collapseFcn, criterionBinEdges)
 % Bin criterion values and aggregate using dual getCI calls.
 % First getCI: per-record estimates → medians
 % Second getCI: per-bin medians → mean and SEM
 
 S = struct('x', [], 'y', [], 'sem', [], 'n', []);
+
+if nargin < 4
+    criterionBinEdges = [];
+end
 
 xvals_all  = [Rsub.criterion_DV_true]';
 yvals_all  = [Rsub.criterion_DV_est_med]';
@@ -4041,10 +3675,18 @@ if xMin == xMax
     return
 end
 
-binEdges = linspace(xMin, xMax, nBins_Part4 + 1);
+if isempty(criterionBinEdges)
+    binEdges = linspace(xMin, xMax, nBins_Part4 + 1);
+else
+    binEdges = criterionBinEdges(:)';
+end
+nBins_use = numel(binEdges) - 1;
+if nBins_use < 1
+    return
+end
 binCtrs = round((binEdges(1:end-1) + binEdges(2:end)) / 2);
 binIdx = discretize(xvals_all, binEdges);
-binIdx(xvals_all == xMax) = nBins_Part4;
+binIdx(xvals_all == binEdges(end)) = nBins_use;
 
 uCtrs = unique(binCtrs(:));
 x_out  = nan(numel(uCtrs), 1);
