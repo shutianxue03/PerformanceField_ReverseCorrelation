@@ -1,3 +1,4 @@
+
 % SX_analysis5_NOM_Trialwise.m
 % Author: Shutian Xue
 % Purpose: This script compiles, analyzes and plots boostrapped data for each observer saved Data_NOM_Trialwise
@@ -15,11 +16,16 @@ SX_RC1_setting
 set(0, 'DefaultFigureVisible', 'off') % avoid printing figures on the desktop
 
 % Define the settings for the analysis
-iModelA_sim_all = [1:2]; % 1=RC-derived template, 2=use IO template, 2=randomize template,
-iModelB_sim_all = [1:4]; % see SX_RC1_setting for namesModelB
-nIter = 200; % Number of iterations
-nJob = 5;
+nIter = 100; % Number of iterations
+nJob = 1;
 nIterxJob = nIter*nJob;
+iModelA_fit_all = [1:2]; % 1=RC-derived template, 2=use IO template, 2=randomize template,
+iModelB_fit_all = [1:7]; % see SX_RC1_setting for namesModelB
+
+% Define model families for tuning curves
+iFamily_ORI = 10; %1=scaled Gaussian
+iFamily_SF = 14; % 2=log parabola
+iFamily_perF = [iFamily_ORI, iFamily_SF];
 
 % Define confidence intervals for bootstrapping
 CI95 = .95;
@@ -36,11 +42,6 @@ iLocGroups_all = {[6,7], [5,3], [6,3], [6,5], [1,8]} ; nGroups = length(iLocGrou
 % iLocGroups_all = {[6,3]} ; nGroups = length(iLocGroups_all);
 iLocSingle_all = 1:5; nLocSingle = length(iLocSingle_all);
 iLocSingle_allSets = {[6,5,3], [2,4,5,3], [1,6,5,3], [1,2,4,5,3]};
-
-% Define model families for tuning curves
-iFamily_ORI = 1; %1=scaled Gaussian
-iFamily_SF = 2; % 2=log parabola
-iFamily_perF = [iFamily_ORI, iFamily_SF];
 
 % Define the number of bins for the NOM analysis
 namesMetrics_prob = {'pYES', 'pA'}; nMetrics_prob = length(namesMetrics_prob); namesMetrics_prob_full = {sprintf('Predicted detection prob.\nMeasured detection rate'), sprintf('Predicted consistency prob.\nMeasured resp. consistency')};
@@ -59,9 +60,9 @@ iDataset_plotNOM = 1; % 1=test set, 2=full; search for metrics_allCond
 NOM_mode = 2; % 1= aggregate model, 2 = trial-wise model
 flag_subjIsHuman = 1; % 1=human subject, 0=IO data
 
-iModelA_all = iModelA_sim_all;
-iModelB_all = iModelB_sim_all;
- 
+iModelA_all = iModelA_fit_all;
+iModelB_all = iModelB_fit_all;
+
 for iRun=4%[1,3,4]
     % Define subject list
     if flag_subjIsHuman
@@ -142,260 +143,283 @@ for iRun=4%[1,3,4]
 
     %% (Time-consuming!) Compile data from boostrapped data
 
-    % % Preallocate arrays for storing results across all conditions
-    % metrics_allCond = nan(nModelsA, nLocComb8, nSubj, nIter * nJob, nDatasets, nMetrics); % nDatasets: 1=Full; 2=Test; metrics come from data_metrics_allIter in OOD_NOM_Trialwise_compDV_A12.m
-    % template_tmpl_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nORI, nSF);
-    % template_full_allCond = template_tmpl_allCond;
-    % DV_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob, nBins);
-    % nTrials_allCond = DV_allCond;
-    % metric_data_allCond = nan(nModelsA, nModelsB, nLocComb8, nMetrics_prob, nSubj, nIter * nJob, nBins); % "nMetrics" is predefined in this script
-    % metric_pred_allCond = metric_data_allCond;
-    % nLL_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob);
-    % params_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob, 3); % 3=Pre-allocate for max params
-    % R2_NOM_allCond = nan(nModelsA, nModelsB, nLocComb8, nMetrics_prob, nSubj, nIter * nJob);
-    % R2_w_NOM_allCond = R2_NOM_allCond;
-    % 
-    % % Fitting tuning curves
-    % % nDatasets: 1=Full; 2=Template or test
-    % sep_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob, nDatasets);
-    % margORI_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob, nDatasets, nORI);
-    % margPred_ORI_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob, nDatasets, nORI);
-    % margParams_ORI_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob, nDatasets, length(namesParams_all{iFamily_ORI}));
-    % margR2_ORI_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob, nDatasets);
-    % margTunC_ORI_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob, nDatasets, length(namesTunC_unit_perF{iFamily_ORI, 2}));
-    % 
-    % margSF_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob, nDatasets, nSF);
-    % margPred_SF_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob, nDatasets, nSF);
-    % margParams_SF_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob, nDatasets, length(namesParams_all{iFamily_SF}));
-    % margR2_SF_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob, nDatasets);
-    % margTunC_SF_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob, nDatasets, length(namesTunC_unit_perF{iFamily_SF, 2}));
-    % 
-    % % The main analysis loop for all conditions for each subject (Models x Loc x Metrics)
-    % fprintf('\n ===== START COMPILING ===== \n\n')
-    % for iJob = 1:nJob
-    %     idxIter = (iJob-1)*nIter+1: iJob*nIter;
-    %     fprintf('\n\n === Job %d/%d === ', iJob, nJob)
-    % 
-    %     % Loop through each model (1=RC-derived template; 2=ideal template)
-    %     for iModelA = iModelA_all %1:nModelsA
-    %         fprintf('\n\n == Model A%d == ', iModelA)
-    % 
-    %         % Loop through each model variant ()
-    %         for iModelB = iModelB_all %1:nModelsB
-    %             fprintf('\n Model B%d: ', iModelB)
-    %             nParamsB = length(namesModelBparams{iModelB});
-    % 
-    %             % Loop through each SINGLE location
-    %             for iLocSingle = iLocSingle_all
-    %                 fprintf(' L%d ', iLocSingle)
-    % 
-    %                 % Loop through each subject
-    %                 for isubj = 1:nSubj
-    % 
-    %                     subjName = subjList{isubj};
-    % 
-    %                     if flag_subjIsHuman
-    %                         % nameFolder_NOM_save = sprintf('%s/%s', nameFolder_Data_NOM_Trialwise, nameIO);
-    %                         nameFolder_NOM_save = sprintf('%s/%s/L%d', nameFolder_Data_NOM_Trialwise, subjName, iLocSingle); % MUST match OOD_NOM_Trialwise_compDV_A12.m
-    %                     else
-    %                         % nameFolder_NOM_save = sprintf('%s/ORI%dSF%d/%s/L%d', nameFolder_NOM0, nORI, nSF, subjName, iLocComb);
-    %                         nameFolder_NOM_save = sprintf('%s/%s', nameFolder_Data_NOM_Trialwise, subjName); % MUST match OOD_NOM_Trialwise_compDV_A12.m
-    %                     end
-    % 
-    %                     % Load DVs / templates from stage A (compDV)
-    %                     nameFile_compDV = sprintf('%s/n%d_J%d_A%d_compDV.mat', nameFolder_NOM_save, nIter, iJob, iModelA);
-    %                     % if isempty(dir(nameFile_compDV)), error('ALERT: File %s does not exist!', nameFile_compDV); end
-    %                     if isempty(dir(nameFile_compDV))
-    %                         fprintf(' "%sL%dA%d" ', subjName, iLocSingle, iModelA)
-    %                     else
-    %                         load(nameFile_compDV, '*_allIter')
-    %                     end
-    % 
-    %                     % Load predictions
-    %                     nameFile_fitNOM = sprintf('%s/n%d_J%d_A%dB%d.mat', nameFolder_NOM_save, nIter, iJob, iModelA, iModelB);
-    %                     % if isempty(dir(nameFile_fitNOM)), error('ALERT: File %s does not exist!', nameFile_fitNOM); end
-    %                     if isempty(dir(nameFile_fitNOM))
-    %                         fprintf(' "%sL%dA%dB%d" ', subjName, iLocSingle, iModelA, iModelB)
-    %                     else
-    %                         load(nameFile_fitNOM, '*_allIter')
-    %                     end
-    % 
-    %                     % Loaded *measured* metrics of the full set and test set.
-    %                     % In OOD_NOM_Trialwise_compDV_A12, rows are [full; tmpl; train; test].
-    %                     metrics_allCond(iModelA, iLocSingle, isubj, idxIter, :, :) = data_metrics_allIter(:, [4,1], :); % keep [test, full] ordering used downstream here
-    % 
-    %                     % Pre-allocate temporary arrays for this subject and model
-    %                     DV_allIter = nan(nIter, nBins); % DV for each bin
-    %                     nTrials_allIter = DV_allIter; % Trial count for each bin
-    %                     metric_data_allIter = nan(nMetrics_prob, nIter, nBins); % Measured data for each bin
-    %                     metric_pred_allIter = metric_data_allIter; % Predicted data for each bin
-    %                     margTuningC_ORI_allIter = nan(nIter, nDatasets, length(namesTunC_unit_perF{iFamily_ORI, 2}));
-    %                     margTuningC_SF_allIter = nan(nIter, nDatasets, length(namesTunC_unit_perF{iFamily_SF, 2}));
-    % 
-    %                     % Loop through each iteration (within the job)
-    %                     for iIter = 1:nIter
-    % 
-    %                         % Extract the binned decision variable.
-    %                         DV_allIter(iIter, :) = pred_metrics_allIter{iIter}.metrics.DV_allBins;
-    % 
-    %                         % Extract the number of trials per bin
-    %                         nTrials_allIter(iIter, :) = pred_metrics_allIter{iIter}.metrics.nTrials_allBins;
-    % 
-    %                         % Extract metrics (data and predictions) per bin
-    %                         pred_metrics = pred_metrics_allIter{iIter}.metrics; % Extract once for faster access
-    %                         for iMetric_prob = 1:nMetrics_prob
-    %                             switch namesMetrics_prob{iMetric_prob}
-    %                                 case 'pYES'
-    %                                     metric_data_allIter(iMetric_prob, iIter, :) = pred_metrics.pYES_data_allBins;
-    %                                     metric_pred_allIter(iMetric_prob, iIter, :) = pred_metrics.pYES_pred_allBins;
-    %                                 case 'pA'
-    %                                     metric_data_allIter(iMetric_prob, iIter, :) = pred_metrics.pA_data_allBins;
-    %                                     metric_pred_allIter(iMetric_prob, iIter, :) = pred_metrics.pA_pred_allBins;
-    %                                 case 'pC'
-    %                                     metric_data_allIter(iMetric_prob, iIter, :) = pred_metrics.pC_data_allBins;
-    %                                     metric_pred_allIter(iMetric_prob, iIter, :) = pred_metrics.pC_pred_allBins;
-    %                             end
-    %                         end % iMetric
-    %                         % Calculate information critertion based on nLL
-    %                         nData = sum(nTrials_allIter(iIter, :));
-    % 
-    %                         % Compute tuning characteristics based on the fitted parameters
-    %                         for iDataset=1:2 % needs to match OOD_NOM_Trialwise_compDV_A12 (template/full tuning outputs)
-    %                             % ORI
-    %                             iFeature= 1;
-    %                             %======================%
-    %                             margTuningC_ORI_allIter(iIter, iDataset, :) = fxn_getTuningC(axis_tuning{iFeature}, iFeature, iFamily_ORI, squeeze(margPred_ORI_allIter(iIter, iDataset, :)), squeeze(margParams_ORI_allIter(iIter, iDataset, :)));
-    %                             % %======================%
-    % 
-    %                             % SF
-    %                             iFeature=2;
-    %                             %======================%
-    %                             margTuningC_SF_allIter(iIter, iDataset, :) = fxn_getTuningC(axis_tuning{iFeature}, iFeature, iFamily_SF, squeeze(margPred_SF_allIter(iIter, iDataset, :)), squeeze(margParams_SF_allIter(iIter, iDataset, :)));
-    %                             %======================%
-    %                         end
-    %                     end % end of iIter
-    % 
-    %                     % Calculate R2 for NOM prediction (for pYES and pA)
-    %                     R2_NOM_allIter = nan(nMetrics_prob, nIter);
-    %                     R2_w_NOM_allIter = R2_NOM_allIter;
-    %                     for iMetric_prob = 1:nMetrics_prob
-    %                         for iIter = 1:nIter
-    %                             nData = squeeze(nTrials_allIter(iIter, :));
-    %                             metric_data = squeeze(metric_data_allIter(iMetric_prob, iIter, :)); % ground truth
-    %                             metric_pred = squeeze(metric_pred_allIter(iMetric_prob, iIter, :)); % prediction
-    %                             % Remove NaNs if any
-    %                             valid = ~(isnan(metric_data) | isnan(metric_pred));
-    %                             metric_data = metric_data(valid);
-    %                             metric_pred = metric_pred(valid);
-    % 
-    %                             % With weighting
-    %                             metric_ave = sum(nData .* metric_data) / sum(nData);
-    %                             SSres_w = sum(nData .* (metric_data - metric_pred).^2);
-    %                             SStot_w = sum(nData .* (metric_data - metric_ave).^2);
-    %                             if SStot_w == 0, R2_w = NaN; else, R2_w = 1 - SSres_w/SStot_w; end
-    % 
-    %                             % No weighting
-    %                             SSres = sum((metric_data - metric_pred).^2);
-    %                             SStot = sum((metric_data - mean(metric_data)).^2);
-    %                             if SStot == 0, R2 = NaN; else, R2 = 1 - SSres/SStot; end
-    % 
-    %                             R2_NOM_allIter(iMetric_prob, iIter) = R2;
-    %                             R2_w_NOM_allIter(iMetric_prob, iIter) = R2_w;
-    %                         end
-    %                     end
-    % 
-    %                     % Store results
-    %                     % Templates
-    %                     [template_tmpl_med, ~, ~, template_tmpl_sem] = getCI(template_tmpl_allIter, 1, 1);
-    %                     [template_full_med, ~, ~, template_full_sem] = getCI(template_full_allIter, 1, 1);
-    %                     template_tmpl_allCond(iModelA, iModelB, iLocSingle, isubj, :, :) = template_tmpl_med;
-    %                     template_full_allCond(iModelA, iModelB, iLocSingle, isubj, :, :) = template_full_med;
-    % 
-    %                     % Tuning functions: marg, predictions, estimated parameters and separability
-    %                     sep_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :) = sep_allIter;
-    % 
-    %                     margORI_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :, :) = margORI_allIter; % directly loaded
-    %                     margR2_ORI_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :) = margR2_ORI_allIter; % directly loaded
-    %                     margPred_ORI_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :, :) = margPred_ORI_allIter; % directly loaded
-    %                     margParams_ORI_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :, :) = margParams_ORI_allIter; % directly loaded
-    %                     margTunC_ORI_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :, :) = margTuningC_ORI_allIter; % derived above
-    % 
-    %                     margSF_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :, :) = margSF_allIter; % directly loaded
-    %                     margR2_SF_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :) = margR2_SF_allIter; % directly loaded
-    %                     margPred_SF_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :, :) = margPred_SF_allIter; % directly loaded
-    %                     margParams_SF_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :, :) = margParams_SF_allIter; % directly loaded
-    %                     margTunC_SF_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :, :) = margTuningC_SF_allIter; % derived above
-    % 
-    %                     % NOM: IVs, predictions, nLL and parameters
-    %                     DV_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :) = DV_allIter;
-    %                     nTrials_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :) = nTrials_allIter;
-    %                     metric_data_allCond(iModelA, iModelB, iLocSingle, :, isubj, idxIter, :) = metric_data_allIter;
-    %                     metric_pred_allCond(iModelA, iModelB, iLocSingle, :, isubj, idxIter, :) = metric_pred_allIter;
-    %                     nLL_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter) = nLL_test_allIter;
-    %                     % IC_nLL_allCond is compiled above
-    %                     params_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, 1:nParamsB) = params_est_allIter;
-    %                     R2_NOM_allCond(iModelA, iModelB, iLocSingle, :, isubj, idxIter) = R2_NOM_allIter;
-    %                     R2_w_NOM_allCond(iModelA, iModelB, iLocSingle, :, isubj, idxIter) = R2_w_NOM_allIter;
-    % 
-    %                     clear *_allIter
-    % 
-    %                 end % isubj
-    %             end % iLocComb
-    %         end % iModelB
-    %     end % iModelA
-    % end % iJob
-    % fprintf('\n\n ==== NOM outputs compiled ====\n\n')
-    % 
-    % % Build combined locations by averaging single-location outputs
-    % meanOverLoc = @(X, locDim, locOld) mean(X, locDim, 'omitnan');
-    % 
-    % for iMap = 6:8 % 6=HM, 7=VM, 8=Peri
-    %     switch iMap
-    %         case 6, locOld = [2 4]; % 6 (HM) = 2 (left) and 4 (right)
-    %         case 7, locOld = [3 5]; % 7 (VM) = 3 (upper) and 5 (lower)
-    %         case 8, locOld = 2:5; % 8 (Perifovea) = 2 to 5
-    %     end
-    % 
-    %     % locDim = 2
-    %     metrics_allCond(:,iMap,:,:,:,:) = meanOverLoc(metrics_allCond(:,locOld,:,:,:,:), 2, locOld);
-    % 
-    %     % locDim = 3
-    %     template_tmpl_allCond(:,:,iMap,:,:,:) = meanOverLoc(template_tmpl_allCond(:,:,locOld,:,:,:), 3, locOld);
-    %     template_full_allCond(:,:,iMap,:,:,:) = meanOverLoc(template_full_allCond(:,:,locOld,:,:,:), 3, locOld);
-    % 
-    %     DV_allCond(:,:,iMap,:,:,:) = meanOverLoc(DV_allCond(:,:,locOld,:,:,:), 3, locOld);
-    %     nTrials_allCond(:,:,iMap,:,:,:) = meanOverLoc(nTrials_allCond(:,:,locOld,:,:,:), 3, locOld);
-    % 
-    %     metric_data_allCond(:,:,iMap,:,:,:,:) = meanOverLoc(metric_data_allCond(:,:,locOld,:,:,:,:), 3, locOld);
-    %     metric_pred_allCond(:,:,iMap,:,:,:,:) = meanOverLoc(metric_pred_allCond(:,:,locOld,:,:,:,:), 3, locOld);
-    % 
-    %     nLL_allCond(:,:,iMap,:,:) = meanOverLoc(nLL_allCond(:,:,locOld,:,:), 3, locOld);
-    %     params_allCond(:,:,iMap,:,:,:) = meanOverLoc(params_allCond(:,:,locOld,:,:,:), 3, locOld);
-    %     % IC_nLL_allCond(:,:,iMap,:,:,:) = meanOverLoc(IC_nLL_allCond(:,:,locOld,:,:,:), 3, locOld);
-    %     R2_NOM_allCond(:,:,iMap,:,:,:) = meanOverLoc(R2_NOM_allCond(:,:,locOld,:,:,:), 3, locOld);
-    %     R2_w_NOM_allCond(:,:,iMap,:,:,:) = meanOverLoc(R2_w_NOM_allCond(:,:,locOld,:,:,:), 3, locOld);
-    % 
-    %     sep_allCond(:,:,iMap,:,:,:) = meanOverLoc(sep_allCond(:,:,locOld,:,:,:), 3, locOld);
-    % 
-    %     margORI_allCond(:,:,iMap,:,:,:,:) = meanOverLoc(margORI_allCond(:,:,locOld,:,:,:,:), 3, locOld);
-    %     margPred_ORI_allCond(:,:,iMap,:,:,:,:) = meanOverLoc(margPred_ORI_allCond(:,:,locOld,:,:,:,:), 3, locOld);
-    %     margParams_ORI_allCond(:,:,iMap,:,:,:,:) = meanOverLoc(margParams_ORI_allCond(:,:,locOld,:,:,:,:), 3, locOld);
-    %     margR2_ORI_allCond(:,:,iMap,:,:,:) = meanOverLoc(margR2_ORI_allCond(:,:,locOld,:,:,:), 3, locOld);
-    %     margTunC_ORI_allCond(:,:,iMap,:,:,:,:) = meanOverLoc(margTunC_ORI_allCond(:,:,locOld,:,:,:,:), 3, locOld);
-    % 
-    %     margSF_allCond(:,:,iMap,:,:,:,:) = meanOverLoc(margSF_allCond(:,:,locOld,:,:,:,:), 3, locOld);
-    %     margPred_SF_allCond(:,:,iMap,:,:,:,:) = meanOverLoc(margPred_SF_allCond(:,:,locOld,:,:,:,:), 3, locOld);
-    %     margParams_SF_allCond(:,:,iMap,:,:,:,:) = meanOverLoc(margParams_SF_allCond(:,:,locOld,:,:,:,:), 3, locOld);
-    %     margR2_SF_allCond(:,:,iMap,:,:,:) = meanOverLoc(margR2_SF_allCond(:,:,locOld,:,:,:), 3, locOld);
-    %     margTunC_SF_allCond(:,:,iMap,:,:,:,:) = meanOverLoc(margTunC_SF_allCond(:,:,locOld,:,:,:,:), 3, locOld);
-    % end
-    % 
-    % fprintf('\n\n ==== Combined locations (6,7,8) created by averaging single locations ==== \n\n');
-    % 
-    % %%% Save the organized data for all subjects
-    % save(nameFolder_Data_SaveCompile, '*_allCond')
-    % clear *_allCond
-    % fprintf('\n\n ==== *_allCond saved and cleared ==== \n\n');
+    % Preallocate arrays for storing results across all conditions
+    metrics_allCond = nan(nModelsA, nLocComb8, nSubj, nIter * nJob, nDatasets, nMetrics); % nDatasets: 1=Full; 2=Test; metrics come from data_metrics_allIter in OOD_NOM_Trialwise_compDV_A12.m
+    template_tmpl_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nORI, nSF);
+    template_full_allCond = template_tmpl_allCond;
+    DV_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob, nBins);
+    nTrials_allCond = DV_allCond;
+    metric_data_allCond = nan(nModelsA, nModelsB, nLocComb8, nMetrics_prob, nSubj, nIter * nJob, nBins); % "nMetrics" is predefined in this script
+    metric_pred_allCond = metric_data_allCond;
+    nLL_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob);
+    params_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob, 3); % 3=Pre-allocate for max params
+    R2_NOM_allCond = nan(nModelsA, nModelsB, nLocComb8, nMetrics_prob, nSubj, nIter * nJob);
+    R2_w_NOM_allCond = R2_NOM_allCond;
+
+    % Fitting tuning curves
+    % nDatasets: 1=Full; 2=Template or test
+    sep_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob, nDatasets);
+    margORI_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob, nDatasets, nORI);
+    margPred_ORI_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob, nDatasets, nORI);
+    margParams_ORI_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob, nDatasets, length(namesParams_all{iFamily_ORI}));
+    margR2_ORI_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob, nDatasets);
+    margTunC_ORI_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob, nDatasets, length(namesTunC_unit_perF{iFamily_ORI, 2}));
+
+    margSF_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob, nDatasets, nSF);
+    margPred_SF_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob, nDatasets, nSF);
+    margParams_SF_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob, nDatasets, length(namesParams_all{iFamily_SF}));
+    margR2_SF_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob, nDatasets);
+    margTunC_SF_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob, nDatasets, length(namesTunC_unit_perF{iFamily_SF, 2}));
+
+    % The main analysis loop for all conditions for each subject (Models x Loc x Metrics)
+    fprintf('\n ===== START COMPILING ===== \n\n')
+    for iJob = 1:nJob
+        idxIter = (iJob-1)*nIter+1: iJob*nIter;
+        fprintf('\n\n === Job %d/%d === ', iJob, nJob)
+
+        % Loop through each model (1=RC-derived template; 2=ideal template)
+        for iModelA = iModelA_all %1:nModelsA
+            fprintf('\n\n == Model A%d == ', iModelA)
+
+            % Loop through each model variant ()
+            for iModelB = iModelB_all %1:nModelsB
+                fprintf('\n Model B%d: ', iModelB)
+                nParamsB = length(namesModelBparams{iModelB});
+
+                % Loop through each SINGLE location
+                for iLocSingle = iLocSingle_all
+                    fprintf(' L%d ', iLocSingle)
+
+                    % Loop through each subject
+                    for isubj = 1:nSubj
+
+                        subjName = subjList{isubj};
+
+                        if flag_subjIsHuman
+                            % nameFolder_NOM_save = sprintf('%s/%s', nameFolder_Data_NOM_Trialwise, nameIO);
+                            nameFolder_NOM_save = sprintf('%s/%s/L%d', nameFolder_Data_NOM_Trialwise, subjName, iLocSingle); % MUST match OOD_NOM_Trialwise_compDV_A12.m
+                        else
+                            % nameFolder_NOM_save = sprintf('%s/ORI%dSF%d/%s/L%d', nameFolder_NOM0, nORI, nSF, subjName, iLocComb);
+                            nameFolder_NOM_save = sprintf('%s/%s', nameFolder_Data_NOM_Trialwise, subjName); % MUST match OOD_NOM_Trialwise_compDV_A12.m
+                        end
+
+                        % Load DVs / templates from stage A (compDV)
+                        nameFile_compDV = sprintf('%s/n%d_J%d_A%d_compDV.mat', nameFolder_NOM_save, nIter, iJob, iModelA);
+                        if isempty(dir(nameFile_compDV))
+                            fprintf(' "%sL%dA%d" ', subjName, iLocSingle, iModelA)
+                            continue
+                        end
+                        S_compDV = load(nameFile_compDV, 'data_metrics_allIter', 'metrics_allIter', '*_allIter');
+                        if isfield(S_compDV, 'data_metrics_allIter')
+                            data_metrics_allIter = S_compDV.data_metrics_allIter;
+                        elseif isfield(S_compDV, 'metrics_allIter')
+                            data_metrics_allIter = S_compDV.metrics_allIter;
+                        else
+                            fprintf(' "MissingMetrics:%sL%dA%d" ', subjName, iLocSingle, iModelA)
+                            continue
+                        end
+
+                        % Load predictions
+                        nameFile_fitNOM = sprintf('%s/n%d_J%d_A%dB%d.mat', nameFolder_NOM_save, nIter, iJob, iModelA, iModelB);
+                        if isempty(dir(nameFile_fitNOM))
+                            fprintf(' "%sL%dA%dB%d" ', subjName, iLocSingle, iModelA, iModelB)
+                            continue
+                        end
+                        S_fitNOM = load(nameFile_fitNOM, 'pred_metrics_allIter', 'nLL_test_allIter', 'params_est_allIter', '*_allIter');
+                        if ~isfield(S_fitNOM, 'pred_metrics_allIter')
+                            fprintf(' "MissingPredMetrics:%sL%dA%dB%d" ', subjName, iLocSingle, iModelA, iModelB)
+                            continue
+                        end
+                        pred_metrics_allIter = S_fitNOM.pred_metrics_allIter;
+                        if isfield(S_fitNOM, 'nLL_test_allIter')
+                            nLL_test_allIter = S_fitNOM.nLL_test_allIter;
+                        end
+                        if isfield(S_fitNOM, 'params_est_allIter')
+                            params_est_allIter = S_fitNOM.params_est_allIter;
+                        end
+
+                        % Keep dependent arrays consistent with the current iJob.
+                        if size(data_metrics_allIter, 1) ~= nIter
+                            fprintf(' "BadMetricsSize:%sL%dA%d" ', subjName, iLocSingle, iModelA)
+                            continue
+                        end
+
+                        % Loaded *measured* metrics of the full set and test set.
+                        % In OOD_NOM_Trialwise_compDV_A12, rows are [full; tmpl; train; test].
+                        metrics_allCond(iModelA, iLocSingle, isubj, idxIter, :, :) = data_metrics_allIter(:, [4,1], :); % keep [test, full] ordering used downstream here
+
+                        % Pre-allocate temporary arrays for this subject and model
+                        DV_allIter = nan(nIter, nBins); % DV for each bin
+                        nTrials_allIter = DV_allIter; % Trial count for each bin
+                        metric_data_allIter = nan(nMetrics_prob, nIter, nBins); % Measured data for each bin
+                        metric_pred_allIter = metric_data_allIter; % Predicted data for each bin
+                        margTuningC_ORI_allIter = nan(nIter, nDatasets, length(namesTunC_unit_perF{iFamily_ORI, 2}));
+                        margTuningC_SF_allIter = nan(nIter, nDatasets, length(namesTunC_unit_perF{iFamily_SF, 2}));
+
+                        % Loop through each iteration (within the job)
+                        for iIter = 1:nIter
+
+                            % Extract the binned decision variable.
+                            DV_allIter(iIter, :) = pred_metrics_allIter{iIter}.metrics.DV_allBins;
+
+                            % Extract the number of trials per bin
+                            nTrials_allIter(iIter, :) = pred_metrics_allIter{iIter}.metrics.nTrials_allBins;
+
+                            % Extract metrics (data and predictions) per bin
+                            pred_metrics = pred_metrics_allIter{iIter}.metrics; % Extract once for faster access
+                            for iMetric_prob = 1:nMetrics_prob
+                                switch namesMetrics_prob{iMetric_prob}
+                                    case 'pYES'
+                                        metric_data_allIter(iMetric_prob, iIter, :) = pred_metrics.pYES_data_allBins;
+                                        metric_pred_allIter(iMetric_prob, iIter, :) = pred_metrics.pYES_pred_allBins;
+                                    case 'pA'
+                                        metric_data_allIter(iMetric_prob, iIter, :) = pred_metrics.pA_data_allBins;
+                                        metric_pred_allIter(iMetric_prob, iIter, :) = pred_metrics.pA_pred_allBins;
+                                    case 'pC'
+                                        metric_data_allIter(iMetric_prob, iIter, :) = pred_metrics.pC_data_allBins;
+                                        metric_pred_allIter(iMetric_prob, iIter, :) = pred_metrics.pC_pred_allBins;
+                                end
+                            end % iMetric
+                            % Calculate information critertion based on nLL
+                            nData = sum(nTrials_allIter(iIter, :));
+
+                            % Compute tuning characteristics based on the fitted parameters
+                            for iDataset=1:2 % needs to match OOD_NOM_Trialwise_compDV_A12 (template/full tuning outputs)
+                                % ORI
+                                iFeature= 1;
+                                %======================%
+                                margTuningC_ORI_allIter(iIter, iDataset, :) = fxn_getTuningC(axis_tuning{iFeature}, iFeature, iFamily_ORI, squeeze(margPred_ORI_allIter(iIter, iDataset, :)), squeeze(margParams_ORI_allIter(iIter, iDataset, :)));
+                                % %======================%
+
+                                % SF
+                                iFeature=2;
+                                %======================%
+                                margTuningC_SF_allIter(iIter, iDataset, :) = fxn_getTuningC(axis_tuning{iFeature}, iFeature, iFamily_SF, squeeze(margPred_SF_allIter(iIter, iDataset, :)), squeeze(margParams_SF_allIter(iIter, iDataset, :)));
+                                %======================%
+                            end
+                        end % end of iIter
+
+                        % Calculate R2 for NOM prediction (for pYES and pA)
+                        R2_NOM_allIter = nan(nMetrics_prob, nIter);
+                        R2_w_NOM_allIter = R2_NOM_allIter;
+                        for iMetric_prob = 1:nMetrics_prob
+                            for iIter = 1:nIter
+                                nData = squeeze(nTrials_allIter(iIter, :));
+                                metric_data = squeeze(metric_data_allIter(iMetric_prob, iIter, :)); % ground truth
+                                metric_pred = squeeze(metric_pred_allIter(iMetric_prob, iIter, :)); % prediction
+                                % Remove NaNs if any
+                                valid = ~(isnan(metric_data) | isnan(metric_pred));
+                                metric_data = metric_data(valid);
+                                metric_pred = metric_pred(valid);
+
+                                % With weighting
+                                metric_ave = sum(nData .* metric_data) / sum(nData);
+                                SSres_w = sum(nData .* (metric_data - metric_pred).^2);
+                                SStot_w = sum(nData .* (metric_data - metric_ave).^2);
+                                if SStot_w == 0, R2_w = NaN; else, R2_w = 1 - SSres_w/SStot_w; end
+
+                                % No weighting
+                                SSres = sum((metric_data - metric_pred).^2);
+                                SStot = sum((metric_data - mean(metric_data)).^2);
+                                if SStot == 0, R2 = NaN; else, R2 = 1 - SSres/SStot; end
+
+                                R2_NOM_allIter(iMetric_prob, iIter) = R2;
+                                R2_w_NOM_allIter(iMetric_prob, iIter) = R2_w;
+                            end
+                        end
+
+                        % Store results
+                        % Templates
+                        [template_tmpl_med, ~, ~, template_tmpl_sem] = getCI(template_tmpl_allIter, 1, 1);
+                        [template_full_med, ~, ~, template_full_sem] = getCI(template_full_allIter, 1, 1);
+                        template_tmpl_allCond(iModelA, iModelB, iLocSingle, isubj, :, :) = template_tmpl_med;
+                        template_full_allCond(iModelA, iModelB, iLocSingle, isubj, :, :) = template_full_med;
+
+                        % Tuning functions: marg, predictions, estimated parameters and separability
+                        sep_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :) = sep_allIter;
+
+                        margORI_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :, :) = margORI_allIter; % directly loaded
+                        margR2_ORI_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :) = margR2_ORI_allIter; % directly loaded
+                        margPred_ORI_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :, :) = margPred_ORI_allIter; % directly loaded
+                        margParams_ORI_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :, :) = margParams_ORI_allIter; % directly loaded
+                        margTunC_ORI_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :, :) = margTuningC_ORI_allIter; % derived above
+
+                        margSF_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :, :) = margSF_allIter; % directly loaded
+                        margR2_SF_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :) = margR2_SF_allIter; % directly loaded
+                        margPred_SF_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :, :) = margPred_SF_allIter; % directly loaded
+                        margParams_SF_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :, :) = margParams_SF_allIter; % directly loaded
+                        margTunC_SF_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :, :) = margTuningC_SF_allIter; % derived above
+
+                        % NOM: IVs, predictions, nLL and parameters
+                        DV_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :) = DV_allIter;
+                        nTrials_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :) = nTrials_allIter;
+                        metric_data_allCond(iModelA, iModelB, iLocSingle, :, isubj, idxIter, :) = metric_data_allIter;
+                        metric_pred_allCond(iModelA, iModelB, iLocSingle, :, isubj, idxIter, :) = metric_pred_allIter;
+                        nLL_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter) = nLL_test_allIter;
+                        % IC_nLL_allCond is compiled above
+                        params_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, 1:nParamsB) = params_est_allIter;
+                        R2_NOM_allCond(iModelA, iModelB, iLocSingle, :, isubj, idxIter) = R2_NOM_allIter;
+                        R2_w_NOM_allCond(iModelA, iModelB, iLocSingle, :, isubj, idxIter) = R2_w_NOM_allIter;
+
+                        clear *_allIter
+
+                    end % isubj
+                end % iLocComb
+            end % iModelB
+        end % iModelA
+    end % iJob
+    fprintf('\n\n ==== NOM outputs compiled ====\n\n')
+
+    % Build combined locations by averaging single-location outputs
+    meanOverLoc = @(X, locDim, locOld) mean(X, locDim, 'omitnan');
+
+    for iMap = 6:8 % 6=HM, 7=VM, 8=Peri
+        switch iMap
+            case 6, locOld = [2 4]; % 6 (HM) = 2 (left) and 4 (right)
+            case 7, locOld = [3 5]; % 7 (VM) = 3 (upper) and 5 (lower)
+            case 8, locOld = 2:5; % 8 (Perifovea) = 2 to 5
+        end
+
+        % locDim = 2
+        metrics_allCond(:,iMap,:,:,:,:) = meanOverLoc(metrics_allCond(:,locOld,:,:,:,:), 2, locOld);
+
+        % locDim = 3
+        template_tmpl_allCond(:,:,iMap,:,:,:) = meanOverLoc(template_tmpl_allCond(:,:,locOld,:,:,:), 3, locOld);
+        template_full_allCond(:,:,iMap,:,:,:) = meanOverLoc(template_full_allCond(:,:,locOld,:,:,:), 3, locOld);
+
+        DV_allCond(:,:,iMap,:,:,:) = meanOverLoc(DV_allCond(:,:,locOld,:,:,:), 3, locOld);
+        nTrials_allCond(:,:,iMap,:,:,:) = meanOverLoc(nTrials_allCond(:,:,locOld,:,:,:), 3, locOld);
+
+        metric_data_allCond(:,:,iMap,:,:,:,:) = meanOverLoc(metric_data_allCond(:,:,locOld,:,:,:,:), 3, locOld);
+        metric_pred_allCond(:,:,iMap,:,:,:,:) = meanOverLoc(metric_pred_allCond(:,:,locOld,:,:,:,:), 3, locOld);
+
+        nLL_allCond(:,:,iMap,:,:) = meanOverLoc(nLL_allCond(:,:,locOld,:,:), 3, locOld);
+        params_allCond(:,:,iMap,:,:,:) = meanOverLoc(params_allCond(:,:,locOld,:,:,:), 3, locOld);
+        % IC_nLL_allCond(:,:,iMap,:,:,:) = meanOverLoc(IC_nLL_allCond(:,:,locOld,:,:,:), 3, locOld);
+        R2_NOM_allCond(:,:,iMap,:,:,:) = meanOverLoc(R2_NOM_allCond(:,:,locOld,:,:,:), 3, locOld);
+        R2_w_NOM_allCond(:,:,iMap,:,:,:) = meanOverLoc(R2_w_NOM_allCond(:,:,locOld,:,:,:), 3, locOld);
+
+        sep_allCond(:,:,iMap,:,:,:) = meanOverLoc(sep_allCond(:,:,locOld,:,:,:), 3, locOld);
+
+        margORI_allCond(:,:,iMap,:,:,:,:) = meanOverLoc(margORI_allCond(:,:,locOld,:,:,:,:), 3, locOld);
+        margPred_ORI_allCond(:,:,iMap,:,:,:,:) = meanOverLoc(margPred_ORI_allCond(:,:,locOld,:,:,:,:), 3, locOld);
+        margParams_ORI_allCond(:,:,iMap,:,:,:,:) = meanOverLoc(margParams_ORI_allCond(:,:,locOld,:,:,:,:), 3, locOld);
+        margR2_ORI_allCond(:,:,iMap,:,:,:) = meanOverLoc(margR2_ORI_allCond(:,:,locOld,:,:,:), 3, locOld);
+        margTunC_ORI_allCond(:,:,iMap,:,:,:,:) = meanOverLoc(margTunC_ORI_allCond(:,:,locOld,:,:,:,:), 3, locOld);
+
+        margSF_allCond(:,:,iMap,:,:,:,:) = meanOverLoc(margSF_allCond(:,:,locOld,:,:,:,:), 3, locOld);
+        margPred_SF_allCond(:,:,iMap,:,:,:,:) = meanOverLoc(margPred_SF_allCond(:,:,locOld,:,:,:,:), 3, locOld);
+        margParams_SF_allCond(:,:,iMap,:,:,:,:) = meanOverLoc(margParams_SF_allCond(:,:,locOld,:,:,:,:), 3, locOld);
+        margR2_SF_allCond(:,:,iMap,:,:,:) = meanOverLoc(margR2_SF_allCond(:,:,locOld,:,:,:), 3, locOld);
+        margTunC_SF_allCond(:,:,iMap,:,:,:,:) = meanOverLoc(margTunC_SF_allCond(:,:,locOld,:,:,:,:), 3, locOld);
+    end
+
+    fprintf('\n\n ==== Combined locations (6,7,8) created by averaging single locations ==== \n\n');
+
+    %%% Save the organized data for all subjects
+    save(nameFolder_Data_SaveCompile, '*_allCond')
+    clear *_allCond
+    fprintf('\n\n ==== *_allCond saved and cleared ==== \n\n');
 
     %% Compile behavioral data (revise this part later, as the behav should also come from resampled data (metric_data_allCond), not from the raw data)
     CS_allSubj = nan(nSubj, nLocComb8); % 8 is max number of combined locs,see namesLocComb
@@ -453,7 +477,7 @@ for iRun=4%[1,3,4]
     namesMetrics_behav = {'CS', 'pA', 'dprime', 'criterion', 'pC', 'RT'}; nMetrics_behav = length(namesMetrics_behav);
     namesMetrics_behav_long = {'Contrast sensitivity', 'Resp. consisteny', 'Dprime', 'Criterion', 'Accuracy', 'Resp. time'};
     [d70,~] = SX_sim06_SDT(.7, .3);
-    
+
     sz_wd_perBar = 180;
     nBars = 2;
     sz_fig = [nBars*sz_wd_perBar, 300+nchoosek(nBars,2)*50];
@@ -1220,7 +1244,7 @@ for iRun=4%[1,3,4]
     for iSet = 1:numel(iLocSingle_allSets)
 
         iLocCorr_all = iLocSingle_allSets{iSet};
-       
+
         % Obtain CS (x-axis)
         X_allSubj = CS_allSubj(:, iLocCorr_all);
         x_ticks = linspace(1.5, 3.5, 5); % EE
@@ -1729,13 +1753,13 @@ for iRun=4%[1,3,4]
     x_width = 0.4; % total width of the table block
     y_base = 0.05;
     y_height = 0.35;
-    
+
     lineStyle_all = {'-', '--', ':', '-.'};
     namesPlotMode = {'Full', 'NoShared', 'NoMulti', 'NoAdd', 'AllModels', 'DataOnly'};
     namesModelB_plot = {'Full model', 'No $\sigma_{shared}$', 'No $\sigma_{mul}$', 'No $\sigma_{add}$'};
     szScaling = 10; %if any(iLocComb==[6,7]), scalingF=100; elseif iLocComb==8, scalingF=200; else, scalingF=50; end
     szBase = 5;
-    sz_font = 22; % full model: xx; reduced models: 15 
+    sz_font = 22; % full model: xx; reduced models: 15
     wd = 2;
 
     for iSet = 1:numel(iLocSingle_allSets)
@@ -2824,8 +2848,8 @@ for iRun=4%[1,3,4]
     flag_plotIdvdCI = 1;
     flag_plotUnikSymbol = 0;
     iLocCorr_all = [6,5,3];
-    
-    
+
+
     for iModelB_NOMplot = iModelB_plot_all
         nNOMparams = length(namesModelBparams{iModelB_NOMplot});
 
@@ -3074,4 +3098,3 @@ for iRun=4%[1,3,4]
 
 
 end% iRun
-
