@@ -302,11 +302,11 @@ end
 xticks(1:nCond); xticklabels([])
 % if ~isempty(x_ticklabels), xticklabels(x_ticklabels), end
 if ~isnan(y_ticks)
-    yticks(y_ticks);
-    ylim(y_ticks([1, end]));
+    % yticks(y_ticks);
+    % ylim(y_ticks([1, end]));
 end
 if ~isnan(y_ticklabels)
-    yticklabels(y_ticklabels);
+    % yticklabels(y_ticklabels);
 end
 
 if flag_plotIDVD

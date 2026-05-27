@@ -378,10 +378,10 @@ for iCond = 1:nCond
 end
 
 %% ---------------- axes formatting ----------------
-if ~isnan(x_ticks), xticks(x_ticks); xlim(x_ticks([1 end])); end
-if ~isnan(y_ticks), yticks(y_ticks); ylim(y_ticks([1 end])); end
-if ~isnan(x_ticklabels), xticklabels(x_ticklabels); end
-if ~isnan(y_ticklabels), yticklabels(y_ticklabels); end
+% if ~isnan(x_ticks), xticks(x_ticks); xlim(x_ticks([1 end])); end
+% if ~isnan(y_ticks), yticks(y_ticks); ylim(y_ticks([1 end])); end
+% if ~isnan(x_ticklabels), xticklabels(x_ticklabels); end
+% if ~isnan(y_ticklabels), yticklabels(y_ticklabels); end
 
 axis square
 ax = gca;

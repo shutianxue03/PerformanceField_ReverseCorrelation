@@ -37,8 +37,8 @@ if nargin == 4
 end
 
 if ~isnan(caxisLim)
-caxis(caxisLim) % make sure this is at the end!!
-ch.Ticks = round(linspace(caxisLim(1), caxisLim(2), 4), 2);
+    caxis(caxisLim) % make sure this is at the end!!
+    ch.Ticks = round(linspace(caxisLim(1), caxisLim(2), 4), 2);
 end
 ch.FontSize = sz_colorbar;
 

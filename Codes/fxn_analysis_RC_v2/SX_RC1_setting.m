@@ -47,6 +47,9 @@ nameFolder_Data_NOM_Trialwise = sprintf('%s/Data_NOM_Trialwise_%d%d', nameFolder
 % Define names of folders to save figures (on the server)
 nameFolder_Figures = sprintf('%s/Figures', nameFolder_server);
 
+% Define names of folders to save outputs (on the server)
+nameFolder_Outputs = sprintf('%s/Outputs', nameFolder_server);
+
 %% Define the function to normalize Gabor SD
 fxn_getSigma_SPdomain = @(SF) 3 * sqrt(2*log(2)) / (2 * pi * SF);
 % fxn_getSigma_SPdomain = @(SF) SF;
@@ -242,7 +245,7 @@ namesParams_all = {
     {'gain1', 'gain2', 'sigma1', 'sigma_r', 'baseline'}, ...                          % M8 difference of gaussians, to fit ori
     {'peak SF', 'gain', 'width', 'baseline'}, ... % M9: gaussian for SF
     {'gain', 'kappa', 'baseline'}, ... % M10:
-    {'peak ORI', 'gain', 'kappa', 'baseline'}, ... % M11: Gaussian with the mean free to vary
+    {'peak ORI', 'gain', 'width', 'baseline'}, ... % M11: Gaussian with the mean free to vary
     {'peakSF1', 'gain1', 'width1','base2', 'peakSF2', 'gain2', 'width2', 'base2'}, ... % M12: double peak
     {'gain1', 'gain2', 'sigma1', 'sigma_r', 'power', 'baseline'}, ... % M13, raised DoG
     {'peak SF', 'gain', 'width left', 'width right', 'baseline'}}; % M14, asymmetric Gaussian (SF)
@@ -270,7 +273,7 @@ ub_full_all = {
     [ORI_gain_ub, 1, ORI_width_ub, 1e2, ORI_base_ub], ... % M8, DoG 'gain1', 'gain2', 'sigma1', sigma_ratio, 'baseline'},
     [2, 1, 2, 1], ...
     [.5, 10, .2], ... % M10, von Mises, {gain, kappa, base}
-    [ORI_gain_ub, ORI_width_ub, ORI_base_ub], ... % M11, Gaussian
+    [20, ORI_gain_ub, ORI_width_ub, ORI_base_ub], ... % M11, Gaussian with free mean [peak, gain, width, baseline]
     [SF_peak_ub, SF_gain_ub, SF_width_ub, SF_base_ub, SF_peak_ub, SF_gain_ub, SF_width_ub, SF_base_ub], ... % M12 double peak
     [ORI_gain_ub, 1, ORI_width_ub, 1e2, 10, ORI_base_ub], ... % M13, raised DoG
     [SF_peak_ub, SF_gain_ub, SF_width_ub, SF_width_ub, SF_base_ub]}; % M14, asymmetric Gaussian (SF)
@@ -341,15 +344,27 @@ namesTunC_unit_perF{3,1} = {'peak SF (cpd)', 'Gain (a.u.)', 'Sigma (cpd)', 'base
 namesTunC_unit_perF{3,2} = {'peak SF (cpd)', 'amplitude (a.u.)', 'width (octaves)', 'baseline (a.u.)', 'Truncation (a.u.)'};
 namesTunC_unit_perF{8,1} = {'Gain 1 (a.u.)', 'Gain 2 (a.u.)', 'Sigma 1 (deg)', 'ratio (a.u.)', 'baseline (a.u.)'};
 namesTunC_unit_perF{8,2} = {'Pref ORI (deg)', 'amplitude (a.u.)', 'trough ori (deg)', 'trough mag. (a.u.)', 'width (deg)', 'baseline (a.u.)'};
+namesTunC_unit_perF{10,1} = {'Gain (a.u.)', 'kappa (a.u.)', 'baseline (a.u.)'};
+namesTunC_unit_perF{10,2} = {'amplitude (a.u.)', 'width (º)', 'baseline (a.u.)'};
+namesTunC_unit_perF{11,1} = {'peak ORI (deg)', 'Gain (a.u.)', 'Sigma (deg)', 'baseline (a.u.)'};
+namesTunC_unit_perF{11,2} = {'amplitude (a.u.)', 'width (º)', 'baseline (a.u.)'};
 namesTunC_unit_perF{12,2} = {'peak SF1 (cpd)', 'amplitude 1 (a.u.)', 'width 1 (octaves)', 'peak SF2 (cpd)', 'amplitude 2 (a.u.)', 'width 2 (octaves)'};
 namesTunC_unit_perF{13,2} = {'amplitude (a.u.)', 'trough ori (deg)', 'trough mag, (a.u.)', 'width (deg)', 'baseline (a.u.)'};
-namesTunC_unit_perF{14,2} = {'peak SF (cpd)', 'amplitude (a.u.)', 'width left (octaves)', 'width right (octaves)', 'baseline (a.u.)'};
+namesTunC_unit_perF{14,2} = {'peak SF (cpd)', 'amplitude (a.u.)', 'width (octaves)', 'baseline (a.u.)'};
 
 namesTunC_noUnit{1,1} = {'Gain', 'Sigma', 'baseline'};
 namesTunC_noUnit{1,2} = {'amplitude', 'width', 'baseline'};
 namesTunC_noUnit{2,1} = {'peak SF', 'Gain', 'Sigma', 'baseline'};
 namesTunC_noUnit{2,2} = {'peak SF', 'amplitude', 'width', 'baseline'};
-namesTunC_noUnit{14,2} = {'peak SF', 'amplitude', 'width left', 'width right', 'baseline'};
+namesTunC_noUnit{3,2} = {'peak SF', 'amplitude', 'width', 'baseline', 'Truncation'};
+namesTunC_noUnit{8,2} = {'Pref ORI', 'amplitude', 'trough ori', 'trough mag.', 'width', 'baseline'};
+namesTunC_noUnit{10,1} = {'Gain', 'kappa', 'baseline'};
+namesTunC_noUnit{10,2} = {'amplitude', 'width', 'baseline'};
+namesTunC_noUnit{11,1} = {'peak ORI', 'Gain', 'Sigma', 'baseline'};
+namesTunC_noUnit{11,2} = {'amplitude', 'width', 'baseline'};
+namesTunC_noUnit{12,2} = {'peak SF1', 'amplitude 1', 'width 1', 'peak SF2', 'amplitude 2', 'width 2'};
+namesTunC_noUnit{13,2} = {'amplitude', 'trough ori', 'trough mag.', 'width', 'baseline'};
+namesTunC_noUnit{14,2} = {'peak SF', 'amplitude', 'width', 'baseline'};
 
 
 % Colors

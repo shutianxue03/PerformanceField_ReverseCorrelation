@@ -23,6 +23,8 @@ function tuningC = fxn_getTuningC(x, iFeature, iFamily, pred, params)
 %   10/9. full width (in cpd): on linear scale
 
 nFilters = length(x);
+x = x(:)';
+pred = pred(:)';
 
 if iFeature == 1
     switch iFamily
@@ -34,6 +36,12 @@ if iFeature == 1
             width_ORI = params(2)*sqrt(log(2)); % half width at half height; no "2" because my gaussian function is exp(-((x-mu)/sigma).^2);
 
             % compile
+            tuningC = [peakAmp_ORI, width_ORI, bottom_ORI];
+
+        case {10, 11} % von Mises ORI / Gaussian with free mean
+            % Keep output schema consistent with namesTunC_unit_perF{1,2}
+            % = [amplitude, width, baseline]
+            [peakAmp_ORI, width_ORI, bottom_ORI] = get_ORI_amp_width_baseline_from_curve(x, pred);
             tuningC = [peakAmp_ORI, width_ORI, bottom_ORI];
 
         case 8 % DoG
@@ -67,7 +75,13 @@ if iFeature == 1
 
 
 else % iF=2, SF
-    x_ln = linspace(1,4, 1e3);
+    xMin = min(x(isfinite(x)));
+    xMax = max(x(isfinite(x)));
+    if isempty(xMin) || isempty(xMax) || ~isfinite(xMin) || ~isfinite(xMax) || xMin == xMax
+        x_ln = linspace(1, 4, 1e3);
+    else
+        x_ln = linspace(xMin, xMax, 1e3);
+    end
 
     switch iFamily
         case 12
@@ -151,6 +165,21 @@ else % iF=2, SF
             trunc_SF = pred(1);
             tuningC = [peakSF, peakAmp, width_full_oct, baseline, trunc_SF];%, ...
             %                 width_L_SF, width_R_SF, bottom_SF, pred_half, width_full_ln];
+
+        case 14
+            % Asymmetric Gaussian in linear SF space:
+            % y = gain*exp(-((x-peakSF)/width_side)^2) + base
+            peakSF = params(1);
+            peakAmp = max(pred);
+            baseline = params(5);
+
+            [width_left_oct, width_right_oct] = getSFbandwidth_asym_gaussian_oct(params);
+            % Report full SF bandwidth in octaves by combining left/right widths.
+            width_full_oct = width_left_oct + width_right_oct;
+            tuningC = [peakSF, peakAmp, width_full_oct, baseline];
+
+        otherwise
+            error('fxn_getTuningC: unsupported SF family iFamily=%d', iFamily);
     end
 end % if ifeature==1
 
@@ -167,6 +196,67 @@ for ii = 1:length(x_all)
 end
 [~, ix] = min(dev);
 x = x_all(ix);
+end
+
+function [peakAmp, width_half, baseline] = get_ORI_amp_width_baseline_from_curve(x, pred)
+idx = isfinite(x) & isfinite(pred);
+x = x(idx);
+pred = pred(idx);
+if isempty(x)
+    peakAmp = nan;
+    width_half = nan;
+    baseline = nan;
+    return
+end
+
+[peakAmp, iPk] = max(pred);
+baseline = min(pred);
+xPk = x(iPk);
+yHalf = baseline + 0.5 * (peakAmp - baseline);
+
+% Estimate half-width on the right side in x-units using linear interpolation.
+width_half = nan;
+if iPk < numel(x)
+    xR = x(iPk:end);
+    yR = pred(iPk:end);
+    iCross = find(yR <= yHalf, 1, 'first');
+    if ~isempty(iCross)
+        if iCross == 1
+            xHalf = xPk;
+        else
+            x1 = xR(iCross-1); y1 = yR(iCross-1);
+            x2 = xR(iCross);   y2 = yR(iCross);
+            if y2 ~= y1
+                t = (yHalf - y1) / (y2 - y1);
+                xHalf = x1 + t * (x2 - x1);
+            else
+                xHalf = x2;
+            end
+        end
+        width_half = abs(xHalf - xPk);
+    end
+end
+end
+
+function [width_left_oct, width_right_oct] = getSFbandwidth_asym_gaussian_oct(params)
+peakSF = params(1);
+width_left = params(3);
+width_right = params(4);
+
+% For y = base + gain * exp(-((x-peak)/w)^2), half-height offset is w*sqrt(log(2)).
+deltaL = width_left * sqrt(log(2));
+deltaR = width_right * sqrt(log(2));
+fL = peakSF - deltaL;
+fR = peakSF + deltaR;
+
+if peakSF <= 0 || fL <= 0 || fR <= 0
+    width_left_oct = nan;
+    width_right_oct = nan;
+    return
+end
+
+width_left_oct = log2(peakSF / fL);
+width_right_oct = log2(fR / peakSF);
 end
 
 
@@ -227,48 +317,3 @@ width_full_oct = log2(fR / fL);
 width_full_cpd = fR - fL;
 
 end
-
-
-% function [width_full_oct, width_full_cpd, fL, fR] = getSFbandwidth(params)
-% % getSFbandwidth  Bandwidth (FWHH) for SF tuning in OCTAVES and CPD
-% %
-% % Model in code:
-% %   Ksf(f) = base + gain * 10.^(-(log10(f/peakSF)/width).^2)
-% %
-% % params = [peakSF, gain, width, base]
-% %
-% % Outputs:
-% %   width_full_oct : full width at half height in octaves
-% %   width_full_cpd : full width at half height in cycles/deg (linear scale)
-% %   fL, fR         : half-height frequencies (left/right), in cpd
-%
-% peakSF = params(1);
-% w      = params(3);
-%
-% % Half-height constant for base-10 log-parabola:
-% % 10^(-(log10(f/f0)/w)^2) = 1/2  ->  (log10(f/f0)/w)^2 = log10(2)
-% c = sqrt(log10(2));
-%
-% fL = peakSF * 10^(-w * c);
-% fR = peakSF * 10^(+w * c);
-%
-% width_full_oct = log2(fR / fL);   % octaves
-% width_full_cpd = fR - fL;         % linear bandwidth (cpd)
-%
-% end
-%
-%
-% % function [width_full_log, width_full_ln] = getSFbandwidth(params, pred_true, x_)
-% % [pred_max, imax] = max(pred_true);
-% % % SF-width
-% % pred_min = min(pred_true);
-% % pred_half = (pred_max - pred_min)/2 + pred_min; % the y coordinate of the width
-% % x_half_L_SF = params(1) * 10^(-(params(3)*sqrt(-log10((pred_half-params(4))/params(2))))); % linear scale
-% % x_half_R_SF = params(1) * 10^(params(3)*sqrt(-log10((pred_half-params(4))/params(2)))); % linear scale
-% % % get bandiwdth in octave unit (on log scale)
-% % width_full_log = log2(x_half_R_SF/x_half_L_SF);
-% % % get bandiwdth in cpd unit (on linear scale)
-% % width_L_SF = x_(imax)-x_half_L_SF; % left, linear scale
-% % width_R_SF = x_half_R_SF-x_(imax); % right, linear scale
-% % width_full_ln = width_L_SF + width_R_SF; % linear scale
-% % end
