@@ -1,5 +1,6 @@
 # MATLAB data
 *.mat
+*.out
 
 # Images
 *.png

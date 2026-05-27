@@ -143,11 +143,11 @@ for iRun=4%[1,3,4]
     %% (Time-consuming!) Compile data from boostrapped data
 
     % % Preallocate arrays for storing results across all conditions
-    % metrics_allCond = nan(nModelsA, nLocComb8, nSubj, nIter * nJob, nDatasets, nMetrics); % nDatasets: 1=Full; 2=Test; 11=number of metrics saved in OOD_xx_compIV.m; see "fxn_getMetrics"
+    % metrics_allCond = nan(nModelsA, nLocComb8, nSubj, nIter * nJob, nDatasets, nMetrics); % nDatasets: 1=Full; 2=Test; metrics come from data_metrics_allIter in OOD_NOM_Trialwise_compDV_A12.m
     % template_tmpl_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nORI, nSF);
     % template_full_allCond = template_tmpl_allCond;
-    % IV_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob, nBins);
-    % nTrials_allCond = IV_allCond;
+    % DV_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob, nBins);
+    % nTrials_allCond = DV_allCond;
     % metric_data_allCond = nan(nModelsA, nModelsB, nLocComb8, nMetrics_prob, nSubj, nIter * nJob, nBins); % "nMetrics" is predefined in this script
     % metric_pred_allCond = metric_data_allCond;
     % nLL_allCond = nan(nModelsA, nModelsB, nLocComb8, nSubj, nIter * nJob);
@@ -196,19 +196,19 @@ for iRun=4%[1,3,4]
     % 
     %                     if flag_subjIsHuman
     %                         % nameFolder_NOM_save = sprintf('%s/%s', nameFolder_Data_NOM_Trialwise, nameIO);
-    %                         nameFolder_NOM_save = sprintf('%s/%s/L%d', nameFolder_Data_NOM_Trialwise, subjName, iLocSingle); % MUST be the same as OOD_NOM_Trialwise_compIV.m, Line 61
+    %                         nameFolder_NOM_save = sprintf('%s/%s/L%d', nameFolder_Data_NOM_Trialwise, subjName, iLocSingle); % MUST match OOD_NOM_Trialwise_compDV_A12.m
     %                     else
     %                         % nameFolder_NOM_save = sprintf('%s/ORI%dSF%d/%s/L%d', nameFolder_NOM0, nORI, nSF, subjName, iLocComb);
-    %                         nameFolder_NOM_save = sprintf('%s/%s', nameFolder_Data_NOM_Trialwise, subjName); % MUST be the same as OOD_NOM_Trialwise_compIV.m, Line 68
+    %                         nameFolder_NOM_save = sprintf('%s/%s', nameFolder_Data_NOM_Trialwise, subjName); % MUST match OOD_NOM_Trialwise_compDV_A12.m
     %                     end
     % 
-    %                     % Load IVs and derived templates
-    %                     nameFile_compIV = sprintf('%s/n%d_J%d_A%d_compIV.mat', nameFolder_NOM_save, nIter, iJob, iModelA);
-    %                     % if isempty(dir(nameFile_compIV)), error('ALERT: File %s does not exist!', nameFile_compIV); end
-    %                     if isempty(dir(nameFile_compIV))
+    %                     % Load DVs / templates from stage A (compDV)
+    %                     nameFile_compDV = sprintf('%s/n%d_J%d_A%d_compDV.mat', nameFolder_NOM_save, nIter, iJob, iModelA);
+    %                     % if isempty(dir(nameFile_compDV)), error('ALERT: File %s does not exist!', nameFile_compDV); end
+    %                     if isempty(dir(nameFile_compDV))
     %                         fprintf(' "%sL%dA%d" ', subjName, iLocSingle, iModelA)
     %                     else
-    %                         load(nameFile_compIV, '*_allIter')
+    %                         load(nameFile_compDV, '*_allIter')
     %                     end
     % 
     %                     % Load predictions
@@ -220,13 +220,13 @@ for iRun=4%[1,3,4]
     %                         load(nameFile_fitNOM, '*_allIter')
     %                     end
     % 
-    %                     % Loaded *measured* metrics of the full set and test set
-    %                     % "metrics" are defined in OOD_xx_compIV: metrics = [metrics_full; metrics_tmpl; metrics_tmpl; metrics_test];
-    %                     metrics_allCond(iModelA, iLocSingle, isubj, idxIter, :, :) = data_metrics_allIter(:, [4,1], :); % see OOD_xx_compIV.m search for "data_metrics_allIter"
+    %                     % Loaded *measured* metrics of the full set and test set.
+    %                     % In OOD_NOM_Trialwise_compDV_A12, rows are [full; tmpl; train; test].
+    %                     metrics_allCond(iModelA, iLocSingle, isubj, idxIter, :, :) = data_metrics_allIter(:, [4,1], :); % keep [test, full] ordering used downstream here
     % 
     %                     % Pre-allocate temporary arrays for this subject and model
-    %                     IV_allIter = nan(nIter, nBins); % IV for each bin
-    %                     nTrials_allIter = IV_allIter; % Trial count for each bin
+    %                     DV_allIter = nan(nIter, nBins); % DV for each bin
+    %                     nTrials_allIter = DV_allIter; % Trial count for each bin
     %                     metric_data_allIter = nan(nMetrics_prob, nIter, nBins); % Measured data for each bin
     %                     metric_pred_allIter = metric_data_allIter; % Predicted data for each bin
     %                     margTuningC_ORI_allIter = nan(nIter, nDatasets, length(namesTunC_unit_perF{iFamily_ORI, 2}));
@@ -235,8 +235,8 @@ for iRun=4%[1,3,4]
     %                     % Loop through each iteration (within the job)
     %                     for iIter = 1:nIter
     % 
-    %                         % Extract IV per bin
-    %                         IV_allIter(iIter, :) = pred_metrics_allIter{iIter}.metrics.IV_allBins;
+    %                         % Extract the binned decision variable.
+    %                         DV_allIter(iIter, :) = pred_metrics_allIter{iIter}.metrics.DV_allBins;
     % 
     %                         % Extract the number of trials per bin
     %                         nTrials_allIter(iIter, :) = pred_metrics_allIter{iIter}.metrics.nTrials_allBins;
@@ -260,7 +260,7 @@ for iRun=4%[1,3,4]
     %                         nData = sum(nTrials_allIter(iIter, :));
     % 
     %                         % Compute tuning characteristics based on the fitted parameters
-    %                         for iDataset=1:2 % needs to matchOOD_xx_compIV ("for iDataset = 1:2")
+    %                         for iDataset=1:2 % needs to match OOD_NOM_Trialwise_compDV_A12 (template/full tuning outputs)
     %                             % ORI
     %                             iFeature= 1;
     %                             %======================%
@@ -327,7 +327,7 @@ for iRun=4%[1,3,4]
     %                     margTunC_SF_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :, :) = margTuningC_SF_allIter; % derived above
     % 
     %                     % NOM: IVs, predictions, nLL and parameters
-    %                     IV_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :) = IV_allIter;
+    %                     DV_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :) = DV_allIter;
     %                     nTrials_allCond(iModelA, iModelB, iLocSingle, isubj, idxIter, :) = nTrials_allIter;
     %                     metric_data_allCond(iModelA, iModelB, iLocSingle, :, isubj, idxIter, :) = metric_data_allIter;
     %                     metric_pred_allCond(iModelA, iModelB, iLocSingle, :, isubj, idxIter, :) = metric_pred_allIter;
@@ -363,7 +363,7 @@ for iRun=4%[1,3,4]
     %     template_tmpl_allCond(:,:,iMap,:,:,:) = meanOverLoc(template_tmpl_allCond(:,:,locOld,:,:,:), 3, locOld);
     %     template_full_allCond(:,:,iMap,:,:,:) = meanOverLoc(template_full_allCond(:,:,locOld,:,:,:), 3, locOld);
     % 
-    %     IV_allCond(:,:,iMap,:,:,:) = meanOverLoc(IV_allCond(:,:,locOld,:,:,:), 3, locOld);
+    %     DV_allCond(:,:,iMap,:,:,:) = meanOverLoc(DV_allCond(:,:,locOld,:,:,:), 3, locOld);
     %     nTrials_allCond(:,:,iMap,:,:,:) = meanOverLoc(nTrials_allCond(:,:,locOld,:,:,:), 3, locOld);
     % 
     %     metric_data_allCond(:,:,iMap,:,:,:,:) = meanOverLoc(metric_data_allCond(:,:,locOld,:,:,:,:), 3, locOld);
@@ -547,7 +547,7 @@ for iRun=4%[1,3,4]
     if isempty(dir(nameFolder_Fig_NOM_Template)), mkdir(nameFolder_Fig_NOM_Template), end
 
     for iDataset = 1:nDatasets
-        switch iDataset % needs to matchOOD_xx_compIV ("for iDataset = 1:2")
+        switch iDataset % needs to match OOD_NOM_Trialwise_compDV_A12 (1=template, 2=full)
             case 1
                 template_med_allSubj = squeeze(template_tmpl_allCond(iModelA_plot, iModelB_plot, :, :, :, :)); % ... nLoc x nSubj x nORI x nSF
             case 2
@@ -1708,7 +1708,18 @@ for iRun=4%[1,3,4]
     clc, fprintf('\n\n 14/24 Plotting STARTED......\n\n')
 
     % Load data
-    load(nameFolder_Data_SaveCompile, 'IV_allCond', 'nTrials_allCond', 'metric_*_allCond', 'R2_NOM_allCond')
+    S_nom = load(nameFolder_Data_SaveCompile, 'DV_allCond', 'nTrials_allCond', 'metric_data_allCond', 'metric_pred_allCond', 'R2_NOM_allCond');
+    if isfield(S_nom, 'DV_allCond')
+        DV_allCond = S_nom.DV_allCond;
+    else
+        legacyDVField = ['I' 'V_allCond'];
+        S_legacy = load(nameFolder_Data_SaveCompile, legacyDVField);
+        DV_allCond = S_legacy.(legacyDVField);
+    end
+    nTrials_allCond = S_nom.nTrials_allCond;
+    metric_data_allCond = S_nom.metric_data_allCond;
+    metric_pred_allCond = S_nom.metric_pred_allCond;
+    R2_NOM_allCond = S_nom.R2_NOM_allCond;
 
     % Define folder for saving figures for each model A and model B
     nameFolder_Fig_NOM_metrics = sprintf('%s/NOMmetrics_A%d_group', nameFolder_Fig_NOM_Trialwise, iModelA_plot);
@@ -1788,7 +1799,7 @@ for iRun=4%[1,3,4]
                         % --------------------------
                         % 1) Extract to [nBins x nSubj x nIter] (robust to extra singleton dims)
                         % --------------------------
-                        DV_raw = squeeze(IV_allCond(iModelA_plot, iModelB, locID, :, :, :)); % -> [nBins x nSubj x nIter] (expected)
+                        DV_raw = squeeze(DV_allCond(iModelA_plot, iModelB, locID, :, :, :)); % -> [nBins x nSubj x nIter] (expected)
                         nTrials_raw = squeeze(nTrials_allCond(iModelA_plot, iModelB, locID, :, :, :));
                         data_raw = squeeze(metric_data_allCond(iModelA_plot, iModelB, locID, iMetric_prob, :, :, :));
                         pred_raw = squeeze(metric_pred_allCond(iModelA_plot, iModelB, locID, iMetric_prob, :, :, :));
@@ -1803,7 +1814,7 @@ for iRun=4%[1,3,4]
                         % --------------------------
                         % 2) Within-subject summary across iterations (median over iter) -> [nBins x nSubj]
                         % --------------------------
-                        IV_medPerSubj = median(DV_raw, 3, 'omitnan');
+                        DV_medPerSubj = median(DV_raw, 3, 'omitnan');
                         nTrials_medPerSubj = median(nTrials_raw, 3, 'omitnan');
                         data_medPerSubj = median(data_raw, 3, 'omitnan');
                         pred_medPerSubj = median(pred_raw, 3, 'omitnan');
@@ -1824,7 +1835,7 @@ for iRun=4%[1,3,4]
                         parfor iBoot = 1:nBoot
                             % idindRandx = randi(nSubj, [1, nSubj]); % resample subjects with replacement
                             indRandBoot = double(indRand_allBoot(iBoot,:));
-                            DV_allBoot(iBoot,:) = mean(IV_medPerSubj(:,indRandBoot), 2, 'omitnan').';
+                            DV_allBoot(iBoot,:) = mean(DV_medPerSubj(:,indRandBoot), 2, 'omitnan').';
                             nTrials_allBoot(iBoot,:) = mean(nTrials_medPerSubj(:,indRandBoot), 2, 'omitnan').';
                             data_allBoot(iBoot,:) = mean(data_medPerSubj(:,indRandBoot), 2, 'omitnan').';
                             pred_allBoot(iBoot,:) = mean(pred_medPerSubj(:,indRandBoot), 2, 'omitnan').';
@@ -1894,7 +1905,7 @@ for iRun=4%[1,3,4]
                         % Plot prediction (optional): median + 68% CI shaded band
                         % --------------------------
                         if flag_plotPred
-                            % Shaded band (y uncertainty only; x is IV_ave)
+                            % Shaded band (y uncertainty only; x is DV_ave)
                             patch([DV_ave; flipud(DV_ave)], [pred_lb; flipud(pred_ub)], cLoc, 'FaceAlpha', .15, 'LineStyle', 'none', 'HandleVisibility', 'off');
 
                             % Median line
@@ -2035,7 +2046,20 @@ for iRun=4%[1,3,4]
     iModelB_all_plot = 1;
 
     % Load data
-    load(nameFolder_Data_SaveCompile, 'params_allCond', 'IV_allCond', 'nTrials_allCond', 'metric_data_allCond', 'metric_pred_allCond', 'R2_*NOM_allCond')
+    S_nom = load(nameFolder_Data_SaveCompile, 'params_allCond', 'DV_allCond', 'nTrials_allCond', 'metric_data_allCond', 'metric_pred_allCond', 'R2_NOM_allCond', 'R2_w_NOM_allCond');
+    params_allCond = S_nom.params_allCond;
+    if isfield(S_nom, 'DV_allCond')
+        DV_allCond = S_nom.DV_allCond;
+    else
+        legacyDVField = ['I' 'V_allCond'];
+        S_legacy = load(nameFolder_Data_SaveCompile, legacyDVField);
+        DV_allCond = S_legacy.(legacyDVField);
+    end
+    nTrials_allCond = S_nom.nTrials_allCond;
+    metric_data_allCond = S_nom.metric_data_allCond;
+    metric_pred_allCond = S_nom.metric_pred_allCond;
+    R2_NOM_allCond = S_nom.R2_NOM_allCond;
+    R2_w_NOM_allCond = S_nom.R2_w_NOM_allCond;
 
     % Define folder for saving figures for each model A and model B
     nameFolder_Fig_NOM_metrics = sprintf('%s/NOMmetrics_A%d_idvd', nameFolder_Fig_NOM_Trialwise, iModelA_plot);
@@ -2070,7 +2094,7 @@ for iRun=4%[1,3,4]
                 for iModelB = iModelB_all_plot
 
                     % Compute medians and CIs
-                    [IV_allBins, ~, ~, IV_allBins_neg, IV_allBins_pos] = getCI(IV_allCond(iModelA_plot, iModelB, iLocSingle, isubj, :, :), 1, 5);
+                    [DV_allBins, ~, ~, DV_allBins_neg, DV_allBins_pos] = getCI(DV_allCond(iModelA_plot, iModelB, iLocSingle, isubj, :, :), 1, 5);
                     [nTrials_allBins, nTrials_allBins_lb, nTrials_allBins_ub] = getCI(nTrials_allCond(iModelA_plot, iModelB, iLocSingle, isubj, :, :), 1, 5);
                     [data_allBins, ~, ~, data_allBins_neg, data_allBins_pos] = getCI(metric_data_allCond(iModelA_plot, iModelB, iLocSingle, iMetric_prob, isubj, :, :), 1, 6);
                     [pred_allBins, pred_allBins_lb, pred_allBins_ub] = getCI(metric_pred_allCond(iModelA_plot, iModelB, iLocSingle, iMetric_prob, isubj, :, :), 1, 6);
@@ -2078,7 +2102,7 @@ for iRun=4%[1,3,4]
                     [R2_NOM_med, R2_NOM_lb, R2_NOM_ub] = getCI(R2_NOM_allCond(iModelA_plot, iModelB, iLocSingle, iMetric_prob, isubj, :), 1, 6, .95);
 
 
-                    x = squeeze(IV_allCond(iModelA_plot, iModelB, iLocSingle, isubj, :, :));
+                    x = squeeze(DV_allCond(iModelA_plot, iModelB, iLocSingle, isubj, :, :));
                     n = squeeze(nTrials_allCond(iModelA_plot, iModelB, iLocSingle, iMetric_prob, isubj, :, :));
                     p = squeeze(metric_pred_allCond(iModelA_plot, iModelB, iLocSingle, iMetric_prob, isubj, :, :));
                     d = squeeze(metric_data_allCond(iModelA_plot, iModelB, iLocSingle, iMetric_prob, isubj, :, :));
@@ -2110,12 +2134,12 @@ for iRun=4%[1,3,4]
                     if iModelB==1, color_pred = colors_comb(iLocSingle, :); lw = 3;
                     else, color_pred='k'; lw = 1;
                     end
-                    patch([IV_allBins; flip(IV_allBins)], [pred_allBins_lb; flip(pred_allBins_ub)], ones(1, 3) / 2, 'FaceAlpha', .3, 'linestyle', 'none', 'handlevisibility', 'off')
-                    plot(IV_allBins, pred_allBins, 'lineStyle', lineStyle_all{iModelB}, 'color', color_pred, 'linewidth', lw)
+                    patch([DV_allBins; flip(DV_allBins)], [pred_allBins_lb; flip(pred_allBins_ub)], ones(1, 3) / 2, 'FaceAlpha', .3, 'linestyle', 'none', 'handlevisibility', 'off')
+                    plot(DV_allBins, pred_allBins, 'lineStyle', lineStyle_all{iModelB}, 'color', color_pred, 'linewidth', lw)
 
                     % Plot measurement
-                    errorbar(IV_allBins, data_allBins, IV_allBins_neg, IV_allBins_pos, '.', 'horizontal', 'CapSize', 0, 'color', colors_comb(iLocSingle, :), 'handlevisibility', 'off', 'linewidth', lw)
-                    errorbar(IV_allBins, data_allBins, data_allBins_neg, data_allBins_pos, '.', 'vertical', 'CapSize', 0, 'color', colors_comb(iLocSingle, :), 'handlevisibility', 'off', 'linewidth', lw)
+                    errorbar(DV_allBins, data_allBins, DV_allBins_neg, DV_allBins_pos, '.', 'horizontal', 'CapSize', 0, 'color', colors_comb(iLocSingle, :), 'handlevisibility', 'off', 'linewidth', lw)
+                    errorbar(DV_allBins, data_allBins, data_allBins_neg, data_allBins_pos, '.', 'vertical', 'CapSize', 0, 'color', colors_comb(iLocSingle, :), 'handlevisibility', 'off', 'linewidth', lw)
 
                     yline(.5, 'k--');
 
@@ -2123,7 +2147,7 @@ for iRun=4%[1,3,4]
                     for iBin = 1:nBins
                         % if isubj>nMarkersMax, facecolor=colors_comb(iLocComb, :); else, facecolor='w'; end
                         facecolor = 'w';
-                        plot(IV_allBins(iBin), data_allBins(iBin), 'o', 'markeredgecolor', colors_comb(iLocSingle, :), ...
+                        plot(DV_allBins(iBin), data_allBins(iBin), 'o', 'markeredgecolor', colors_comb(iLocSingle, :), ...
                             'markerfacecolor', facecolor, 'MarkerSize', nTrials_allBins(iBin) / szScaling + 5, 'LineWidth', 1, 'LineStyle', 'none', 'handlevisibility', 'off')
                     end
 

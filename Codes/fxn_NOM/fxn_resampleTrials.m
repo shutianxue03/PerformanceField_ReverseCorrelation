@@ -53,7 +53,7 @@ RT_test_rand = [];
 iLoc = iLoc_all;
 
 % Collect data for this location
-e3D_nonrand = []
+e3D_nonrand = [];
 iPRS_nonrand = [];
 iPair_nonrand = [];
 resp_nonrand = [];

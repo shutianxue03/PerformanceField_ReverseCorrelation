@@ -1,157 +1,93 @@
-# Model Simulation README (`OOD_sim.m`)
+# Model Simulation README
 
-This document covers the model-simulation pipeline driven by `OOD_sim.m`.
+This file summarizes the current simulation pipeline driven by `OOD_sim.m`.
 
-## What this pipeline does
-
-`OOD_sim.m` simulates trial-wise observer behavior using a noisy observer model (NOM), then runs the same analysis/fitting pipeline used for empirical data:
-
-1. Generate simulated stimuli and ORI×SF energy.
-2. Build clean decision variables (DV) from a ground-truth template.
-3. Add internal noise (multiplicative/additive/shared).
-4. Set criterion to match a target criterion in z-space (`Cz_true`).
-5. Generate binary responses and behavioral metrics.
-6. Run:
-   - `OOD_NOM_Trialwise_compIV` (template + IV computation),
-   - `OOD_NOM_Trialwise_fitNOM` (parameter fitting + predicted metrics).
-
----
-
-## Main entry point
-
-- `OOD_sim.m`
+## Entry point
 
 ```matlab
-OOD_sim(noiseCST, gaborCST, nTrials, ...
-    Nmul_true, Nadd_true, Nshared_true, Cz_true, ...
-    lambda_whiten, flag_regressType, flag_incluCrit, C_contribution, ...
-    iModelA_sim, iModelB_sim, nIter)
+OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true, cSDT_true, iModelB_sim, nIter)
 ```
 
----
+## What it does
 
-## Input arguments (recommended interpretation)
+`OOD_sim.m`:
 
-- `noiseCST`: external noise contrast (0-1).
-- `gaborCST`: signal (Gabor) contrast (0-1).
-- `nTrials`: total number of trials (must be even; code uses pair structure).
-- `Nmul_true`: multiplicative internal noise scale.
-- `Nadd_true`: additive internal noise SD.
-- `Nshared_true`: shared internal noise SD across passes.
-- `Cz_true`: criterion in SDT z-units (target criterion).
-- `lambda_whiten`: whitening shrinkage used in `OOD_NOM_Trialwise_compIV`.
-- `flag_regressType`: regression mode in compIV.
-  - `1`: univariate
-  - `2`: multivariate + smoothing
-- `flag_incluCrit`: whether criterion is included as a fitted NOM parameter.
-  - `0`: fit noise params only
-  - `1`: fit noise params + criterion
-- `C_contribution`: weight for criterion mismatch term in objective.
-- `iModelA_sim`: template mode for fitting stage.
-  - `1`: RC-derived template
-  - `2`: ideal (true) template
-  - (`3` exists in settings as randomized template)
-- `iModelB_sim`: NOM variant for both simulation/fitting.
-  - `1`: full (multi + add + shared)
-  - `2`: no shared
-  - `3`: no multiplicative
-  - `4`: no additive
-  - (fit stage also supports reduced models 5/6/7)
-- `nIter`: number of resampling iterations in compIV/fitNOM.
+1. simulates stimuli and ORI x SF energy,
+2. builds a ground-truth template and clean decision variable (DV),
+3. adds internal noise,
+4. generates responses and behavioral summaries,
+5. runs the same downstream NOM pipeline used for human data:
+   - `OOD_NOM_Trialwise_compDV_A12`
+   - `OOD_NOM_Trialwise_fitNOM`
 
----
+## Inputs
 
-## Required setup before running
+- `noiseCST`: external noise contrast.
+- `gaborCST`: signal contrast.
+- `nTrials`: total number of trials. Must be even.
+- `Nmul_true`: multiplicative internal noise.
+- `Nadd_true`: additive internal noise.
+- `Nshared_true`: shared internal noise across passes.
+- `cSDT_true`: criterion in SDT units.
+- `iModelB_sim`: simulation model family.
+  - `1`: full
+  - `2`: no `Nmul`
+  - `3`: no `Nadd`
+  - `4`: no `Nshared`
+  - `5`: `Nmul` only
+  - `6`: `Nadd` only
+  - `7`: `Nshared` only
+- `nIter`: number of resampling iterations for the downstream NOM pipeline.
 
-1. Open MATLAB in the `Codes` directory.
-2. Check environment paths in `fxn_analysis_RC_v2/SX_RC1_setting.m`.
-   - This file defines `nameFolder_server` and `str_envir`.
-   - For local runs, make sure local path is active.
-3. Ensure target output directories are writable (they are auto-created if missing):
-   - `Data/Data_OOD_<nORI><nSF>/...`
-   - `Data/Data_NOM_Trialwise_<nORI><nSF>/...`
-   - `Figures/IO/...`
-4. If using parallel loops, start a MATLAB parallel pool if desired.
-
----
-
-## Minimal run example
-
-From `Codes/`:
+## Minimal example
 
 ```matlab
-OOD_sim( ...
-    0.2, ...      % noiseCST
-    0.2, ...      % gaborCST
-    4000, ...     % nTrials
-    0.1, ...      % Nmul_true
-    10, ...       % Nadd_true
-    0, ...        % Nshared_true
-    -0.5, ...     % Cz_true
-    0.5, ...      % lambda_whiten
-    1, ...        % flag_regressType
-    1, ...        % flag_incluCrit
-    1.0, ...      % C_contribution
-    1, ...        % iModelA_sim
-    1, ...        % iModelB_sim
-    20);          % nIter
+OOD_sim(0.2, 0.3, 10000, 0.2, 1, 0.5, 0, 1, 50)
 ```
 
----
+## Setup
 
-## Key outputs
+Before running:
 
-For each simulation condition, `OOD_sim.m` creates an IO name like:
+1. Check paths and environment settings in `fxn_analysis_RC_v2/SX_RC1_setting.m`.
+2. Make sure output folders are writable.
+3. Start MATLAB from the project root or from `Codes/`.
 
-`IO_cNxx_cGxx_nT..._Nm..._Na..._Ns..._Cz..._cont..._whiten..._R..._B...`
+## Main outputs
 
-and writes to:
+For each simulation condition, the code creates one IO folder under the project data directories.
 
-- `Data_OOD.../<nameIO>/`
-  - `truth.mat` (true template + criterion in DV units)
-  - `behavMeas.mat` (`dataMatrix`, `metrics_sim`)
-  - temporary `energy_T_<nORI>_<nSF>.mat` (deleted at end to save space)
-- `Data_NOM_Trialwise.../<nameIO>/`
-  - `n<nIter>_J<iJob>_A<iModelA>_compIV.mat`
-  - `n<nIter>_J<iJob>_A<iModelA>B<iModelB>.mat` (fit results)
-- `Figures/IO/<nameIO>/`
-  - distribution/performance and fit summary figures (unless suppressed on HPC)
+- `Data_.../IO.../truth.mat`
+  - true template and simulation truth values
+- `Data_.../IO.../behavMeas.mat`
+  - `dataMatrix`, `metrics_sim`, and related simulation outputs
+- `Data_.../Data_NOM_Trialwise.../IO.../`
+  - `n<nIter>_J<iJob>_A1_compDV.mat`
+  - `n<nIter>_J<iJob>_A2_compDV.mat`
+  - `n<nIter>_J<iJob>_A<iModelA>B<iModelB>.mat`
 
----
+## Notes
 
-## Data conventions used in simulation
+- The code uses a paired two-pass design.
+- `flag_normDV` is handled inside `OOD_sim.m` and the downstream compDV step.
+- The downstream fitting stage uses the saved DV-based outputs, not the older IV-based files.
+- On HPC, plotting is reduced or suppressed automatically.
 
-- Two-pass paired design:
-  - `nPairs = nTrials / 2`
-  - pass A is simulated, then copied to pass B at stimulus/energy level
-  - shared noise creates across-pass correlation in noisy DV
-- `dataMatrix` follows project conventions (trial, session, PRS/ABS, pass, pair, response, contrast, etc.).
-- Behavioral metrics saved in `metrics_sim`:
-  - `[dprime, criterion_z, pC, pHit, pFA, pA, pYES]`
+## Batch runs
 
----
+Simulation batch parameters are generated by:
 
-## Pipeline dependencies
+- `shell_Sim_make_param_table.sh`
 
-- Simulation + stimulus:
-  - `exp_CreateFilteredNoise`, `exp_CreateGabor`, `exp_CreateCircularApertureSin`
-- Energy/filtering:
-  - `SX_sim02_setFilters`, `SX_RC4_Energy_parfor`
-- IV/template:
-  - `fxn_getIV_v3`, `fxn_getTemplate`
-- SDT/metrics:
-  - `SX_sim06_SDT`
-- Downstream fitting:
-  - `OOD_NOM_Trialwise_compIV`
-  - `OOD_NOM_Trialwise_fitNOM`
+Current table columns are:
 
----
+```text
+noiseCST    gaborCST    nTrials    Nmul_true    Nadd_true    Nshared_true    cSDT_true    iModelB_sim    nIter
+```
 
-## Notes and practical tips
+## Analyze simulated data
 
-- `nTrials` must be even.
-- Keep `rng(1)` for reproducible simulation unless you intentionally vary seeds.
-- If running on HPC, plotting is automatically suppressed in several scripts.
-- Model B consistency: simulation currently fits with the same `iModelB_sim` by default.
-- Temporary energy files are deleted at the end of `OOD_sim.m`; if debugging compIV inputs, comment out that deletion step.
+To analyze the saved simulation outputs, run:
+
+- `simPlot4_VaryOneDim.m`
 
