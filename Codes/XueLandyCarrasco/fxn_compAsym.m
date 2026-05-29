@@ -1,5 +1,5 @@
-function basicFxn_compAsym_permutation(asymX_allIter_allSubj, asymY_allIter_allSubj, nBins, y_ticks, sz_fig, str_title, str_ylabel)
-% basicFxn_compAsym_permutation
+function fxn_compAsym(asymX_allIter_allSubj, asymY_allIter_allSubj, nBins, y_ticks, sz_fig, str_title, str_ylabel)
+
 %
 % asymX_allIter_allSubj: delta contrast [nSubj x nIter]
 % asymY_allIter_allSubj: delta parameter [nSubj x nIter]

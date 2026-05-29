@@ -40,10 +40,10 @@ nTunC_SF = length(namesTunC_SF_unit);
 % Define confidence intervals for bootstrapping
 CI95 = .95;
 CI68 = 0.68; % shaded band
-nPerm = 1e4; % the same as all basicFxn_xx
-nBoot = 1e4; % the same as all basicFxn_xx
-seedPerm = 1; % the same as all basicFxn_xx
-seedBoot = 2; % the same as all basicFxn_xx
+nPerm = 1e4; % the same as all fxn_xx
+nBoot = 1e4; % the same as all fxn_xx
+seedPerm = 1; % the same as all fxn_xx
+seedBoot = 2; % the same as all fxn_xx
 flag_UseRUseRho = 'useR'; % useR or useRho for correlation analysis (for both drawCorr and drawCorrAsym)
 
 % Define locations and their combinations
@@ -496,7 +496,7 @@ for iRun=4%[1,3,4]
 
             str_title = sprintf('n=%d %s nIter=%d L%d%d', nSubj, namesMetrics_behav{iMetric_prob}, nIterxJob, iLocPair_all);
             %------------------------------%
-            basicFxn_drawBars_permutation(data_allIter_allSubj, ref, colors_comb(iLocPair_all, :), namesLocComb(iLocPair_all), x_ticks, x_ticks, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj)
+            fxn_drawBars(data_allIter_allSubj, ref, colors_comb(iLocPair_all, :), namesLocComb(iLocPair_all), x_ticks, x_ticks, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj)
             %------------------------------%
             ylabel(namesMetrics_behav_long{iMetric_prob})
             saveas(gcf, sprintf('%s/n%d_L%d%d_%s.png', nameFolder_Fig_behav, nSubj, iLocPair_all, namesMetrics_behav{iMetric_prob}))
@@ -545,7 +545,7 @@ for iRun=4%[1,3,4]
 
             str_title = sprintf('n=%d %s nIter=%d L%s', nSubj, namesMetrics_behav{iMetric_prob}, nIterxJob, strjoin(string(iLocSingle_perSet), ''));
             %------------------------------%
-            basicFxn_drawBars_permutation(data_allIter_allSubj, ref, colors_comb(iLocSingle_perSet, :), namesLocComb(iLocSingle_perSet), x_ticks, x_ticks, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj)
+            fxn_drawBars(data_allIter_allSubj, ref, colors_comb(iLocSingle_perSet, :), namesLocComb(iLocSingle_perSet), x_ticks, x_ticks, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj)
             % ------------------------------%
             ylabel(namesMetrics_behav_long{iMetric_prob})
 
@@ -653,7 +653,7 @@ for iRun=4%[1,3,4]
         % sep_allIter_allSubj: [nLoc x nSubj x nIter]
         sep_allIter_allSubj = squeeze(sep_allCond(iModelA_plot, iModelB_plot, iLocSingle_perSet, :, :, iDataset_plotRC));
 
-        % Reformat to match basicFxn_drawBars_permutation:
+        % Reformat to match fxn_drawBars:
         % data_allIter_allSubj: [nIter x nSubj x nCond], where nCond = nLoc
         data_allIter_allSubj = permute(sep_allIter_allSubj, [3 2 1]); % [nIter x nSubj x nLoc]
 
@@ -681,7 +681,7 @@ for iRun=4%[1,3,4]
         str_title = sprintf('n%d nIter=%d [A%dB%d] L%s %s', nSubj, nIterxJob, iModelA_plot, iModelB_plot, str_loc, str_dataset);
 
         % -------------------%
-        basicFxn_drawBars_permutation(data_allIter_allSubj, ref, colors, x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj);
+        fxn_drawBars(data_allIter_allSubj, ref, colors, x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj);
         % -------------------%
         ylabel('Separability (Pearson''s r)')
 
@@ -1180,12 +1180,12 @@ for iRun=4%[1,3,4]
                 switch flag_plotDist
                     case 0
                         %------------------------------%
-                        basicFxn_drawBars_permutation(data_allIter_allSubj, ref, colors, x_ticks, y_ticks_all{iTunC}, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj)
+                        fxn_drawBars(data_allIter_allSubj, ref, colors, x_ticks, y_ticks_all{iTunC}, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj)
                         % ------------------------------%
                         ylabel(sprintf('%s %s [%s]', namesFeature{iFeature}, namesTunC{iTunC}, str_family))
                     case 1
                         %------------------------------%
-                        basicFxn_drawDist_permutation(data_allIter_allSubj, ref, colors, x_ticks, y_ticks_all{iTunC}, y_ticklabels, str_title, sz_fig, nIterxJob, nSubj)
+                        fxn_drawDist(data_allIter_allSubj, ref, colors, x_ticks, y_ticks_all{iTunC}, y_ticklabels, str_title, sz_fig, nIterxJob, nSubj)
                         %------------------------------%
                         xlabel(sprintf('%s %s [%s]', namesFeature{iFeature}, namesTunC{iTunC}, str_family))
                         ylabel('Probabillity')
@@ -1260,7 +1260,7 @@ for iRun=4%[1,3,4]
                 str_title = sprintf('n=%d, nIter=%d %s vs. %s [L%s]', nSubj, nIterxJob, nameVarX, nameVarY_figTitle, strjoin(string(iLocCorr_all), ''));
 
                 %----------------------------%
-                [PearsonR, SpearmanRho] = basicFxn_drawCorr_permutation(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob);
+                [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob);
                 %----------------------------%
 
                 % Save CI for automatic CI range calcuation in CorrAsym
@@ -1357,7 +1357,7 @@ for iRun=4%[1,3,4]
                 str_title = sprintf('n=%d, nIter=%d %s vs. %s [L%s]', nSubj, nIterxJob, nameVarX, nameVarY_figTitle, strjoin(string(iLocCorr_all), ''));
 
                 %----------------------------%
-                [PearsonR, SpearmanRho] = basicFxn_drawCorr_permutation(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob);
+                [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob);
                 %----------------------------%
                 % Save CI for automatic CI range calcuation in CorrAsym
                 save(sprintf('%s/n%d_L%s_%s.mat', nameFolder_Outputs_NOM_corr, nSubj, strjoin(string(iLocCorr_all), ''), nameVarY_fileTitle), 'PearsonR', 'SpearmanRho')
@@ -1432,7 +1432,7 @@ for iRun=4%[1,3,4]
         str_title = sprintf('n=%d, nIter=%d%s vs. %s [L%s]', nSubj, nIterxJob, nameVarX, nameVarY_figTitle, strjoin(string(iLocCorr_all), ''));
 
         %----------------------------%
-        [PearsonR, SpearmanRho] = basicFxn_drawCorr_permutation(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob);
+        [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob);
         %----------------------------%
         % Save CI for automatic CI range calcuation in CorrAsym
         save(sprintf('%s/n%d_L%s_%s.mat', nameFolder_Outputs_NOM_corr, nSubj, strjoin(string(iLocCorr_all), ''), nameVarY_fileTitle), 'PearsonR', 'SpearmanRho')
@@ -1558,7 +1558,7 @@ for iRun=4%[1,3,4]
                 str_ylabel = sprintf('\\Delta %s %s (%%)', namesFeature{iFeature}, namesTunCs_noUnit{iTunC});
 
                 %----------------------------%
-                basicFxn_compAsym_permutation(asymX_allIter_allSubj*100, asymY_allIter_allSubj*100, nBinsCompAsym, y_ticks, sz_fig, str_title, str_ylabel)
+                fxn_compAsym(asymX_allIter_allSubj*100, asymY_allIter_allSubj*100, nBinsCompAsym, y_ticks, sz_fig, str_title, str_ylabel)
                 %----------------------------%
 
                 % xlabel(sprintf('\\Delta contrast sensitivity (%%)'), 'FontSize', sz_label);
@@ -1696,7 +1696,7 @@ for iRun=4%[1,3,4]
                 end
 
                 %----------------------------%
-                basicFxn_drawCorrAsym_permutation(asymX_allIter_allSubj*100, asymY_allIter_allSubj*100, colors_comb(iLocPair_all, :), flag_UseRUseRho, flag_CIrange, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj)
+                fxn_drawCorrAsym(asymX_allIter_allSubj*100, asymY_allIter_allSubj*100, colors_comb(iLocPair_all, :), flag_UseRUseRho, flag_CIrange, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj)
                 %----------------------------%
 
                 xlabel(sprintf('\\Delta contrast sensitivity (%%)'), 'FontSize', sz_label);
@@ -1799,7 +1799,7 @@ for iRun=4%[1,3,4]
         end
 
         %----------------------------%
-        basicFxn_drawCorrAsym_permutation(asymX_allIter_allSubj*100, asymY_allIter_allSubj*100, ...
+        fxn_drawCorrAsym(asymX_allIter_allSubj*100, asymY_allIter_allSubj*100, ...
             colors_comb(iLocPair_all, :), flag_UseRUseRho, flag_CIrange, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj)
         %----------------------------%
 
@@ -2391,7 +2391,7 @@ for iRun=4%[1,3,4]
                 flag_plotDiff = 1;
 
                 %------------------------------%
-                basicFxn_drawBars_permutation(dnLL_collapse, ref, colors, x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj)
+                fxn_drawBars(dnLL_collapse, ref, colors, x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj)
                 %------------------------------%
 
                 ylabel(sprintf('\\Delta nLL'), 'FontSize', sz_label);
@@ -2433,12 +2433,13 @@ for iRun=4%[1,3,4]
     y_ticks = linspace(0, 16, 5);
     sz_label = 35;
     sz_text = sz_label;
+    y_ticklabels = nan;
 
     % Loop over locations
     for iLocSingle = 1:nLocComb8
 
         nBars = numel(iModelB_selected);
-        sz_fig = [nBars * 180, 300+nchoosek(nBars, 2)*50];
+        sz_fig = [nBars * 180, 100+nchoosek(nBars, 2)*50];
 
         % Extract raw nLL: [ModelB x Subj x Iter]
         nLL_allIter = squeeze(nLL_allCond(iModelA_selected, iModelB_selected, iLocSingle, :, :, :));
@@ -2458,7 +2459,7 @@ for iRun=4%[1,3,4]
         dnLL_med = nLL_med - nLL_min_perSubj; % [nBars x nSubj], >=0
 
         % ------------------------------------------------------------
-        % basicFxn_drawBars_permutation expects [nIter x nSubj x nCond]
+        % fxn_drawBars expects [nIter x nSubj x nCond]
         % We now have only one "iteration" (the median-collapsed value), so set nIter=1.
         % ------------------------------------------------------------
         dnLL_allIter_allSubj = nan(1, nSubj, nBars);
@@ -2470,7 +2471,7 @@ for iRun=4%[1,3,4]
         ref = nan;
 
         % ------------------------------%
-        basicFxn_drawBars_permutation(dnLL_allIter_allSubj, ref, repmat(colors_comb(iLocSingle, :), nBars, 1), namesModelB(iModelB_selected), y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, 1, markers_allSubj);
+        fxn_drawBars(dnLL_allIter_allSubj, ref, repmat(colors_comb(iLocSingle, :), nBars, 1), namesModelB(iModelB_selected), y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, 1, markers_allSubj);
         % ------------------------------%
         % ylim(y_ticks([1, end]))
 
@@ -2478,6 +2479,7 @@ for iRun=4%[1,3,4]
 
         % [Plot] planned comparison brackets + CI of mean difference at midpoint
         pairs_bracket = [1 2; 1 3; 1 4]; % requested comparisons
+        pairs_bracket = [1 2]; % requested comparisons
 
         % dnLL_allIter_allSubj must be [nIter x nSubj x nCond]
         [~, nSubj, nCond] = size(dnLL_allIter_allSubj);
@@ -2554,7 +2556,7 @@ for iRun=4%[1,3,4]
             plot([iA iB], [y y], 'k-', 'LineWidth', wd, 'HandleVisibility','off');
 
             % --- text label (left-aligned, above the bracket line) ---
-            str_delta = sprintf('\\Delta=%.2f [%.2f, %.2f]', diffCond_med(iPair), diffCond_lb(iPair), diffCond_ub(iPair));
+            str_delta = sprintf('$\\Delta = %.4f, \\; [%.4f, %.4f]$', diffCond_med(iPair), diffCond_lb(iPair), diffCond_ub(iPair));
 
             xText = iA; % left end of bracket
             yText = y + 0.02*yRange; % a bit above the bracket line (tune 0.02)
@@ -2564,12 +2566,109 @@ for iRun=4%[1,3,4]
                 'VerticalAlignment', 'bottom', ...
                 'FontSize', sz_text, ...
                 'Color', 'k', ...
-                'Interpreter', 'tex', ...
+                'Interpreter', 'latex', ...
                 'HandleVisibility', 'off');
         end % iPair
 
+        % % ======== Inset ========
+        % % Compare raw nLL_med (not delta nLL) for B1 vs B2 using fxn_drawBars
+        % ax_inset = axes('Position', [0.08, 0.62, 0.33, 0.28]);
+        % nLL_B12_allIter_allSubj = nan(1, nSubj, 2);
+        % nLL_B12_allIter_allSubj(1,:,:) = nLL_med(1:2, :)';
+        %
+        % c1 = colors_comb(iLocSingle, :);
+        % c2 = max(c1 - 0.35, 0);
+        % colors_B12 = [c1; c2];
+        %
+        % flag_plotIDVD_inset = 1;
+        % flag_plotDiff_inset = 0;
+        % str_title_inset = sprintf('B1 vs B2 nLL_{med}');
+        % fxn_drawBars(nLL_B12_allIter_allSubj, nan, colors_B12, namesModelB(iModelB_selected(1:2)), nan, nan, ...
+        %     flag_plotIDVD_inset, flag_plotDiff_inset, str_title_inset, nan, 1, markers_allSubj);
+        % ylabel('nLL', 'FontSize', 12);
+        % title('B1 vs B2 (nLL_{med})', 'FontSize', 10);
+        % set(ax_inset, 'LineWidth', 1.5);
+        % %========================
+
         saveas(gcf, fullfile(nameFolder_Fig_NOM_nLL, sprintf('n%d_L%d_ModelB%s.png', nSubj, iLocSingle, strjoin(string(iModelB_selected), ''))));
-        close(gcf)
+
+
+        % % ======== Plot the box-code figure (only once) ========
+        if iLocSingle==1
+
+            figMain = gcf;
+            axMain  = gca;
+
+            % Copy main-axis geometry as normalized proportions
+            % This preserves the left margin used for y-ticks/y-labels.
+            oldUnitsFig = get(figMain, 'Units');
+            oldUnitsAx  = get(axMain,  'Units');
+
+            set(figMain, 'Units', 'pixels');
+            set(axMain,  'Units', 'normalized');
+
+            figMainPos = get(figMain, 'Position');   % only use width, not screen location
+            axMainPos  = get(axMain,  'Position');   % [left bottom width height], normalized
+
+            xLim_main = get(axMain, 'XLim');
+
+            % Restore units
+            set(figMain, 'Units', oldUnitsFig);
+            set(axMain,  'Units', oldUnitsAx);
+
+            % Box-code matrix
+            % Rows: Nmul, Nadd, Nshared
+            % Canonical columns (B1..B7): Full, NoMul, NoAdd, NoShared, OnlyMul, OnlyAdd, OnlyShared
+            modelBox_all = [
+                1 0 1 1 1 0 0;   % Nmul
+                1 1 0 1 0 1 0;   % Nadd
+                1 1 1 0 0 0 1    % Nshared
+                ];
+            modelBox = modelBox_all(:, iModelB_selected);
+
+            [nRows, nCols] = size(modelBox);
+
+            % Independent canvas
+            figBoxW = figMainPos(3);   % same canvas width as main figure
+            figBoxH = 180;             % independent, short canvas
+
+            figBox = figure('Color', 'w', 'Units', 'pixels', 'Position', [100, 100, figBoxW, figBoxH], 'PaperPositionMode', 'auto');
+
+            % Own axes, but with same left/right plotting geometry as main axes
+            boxBottom = 0.20;
+            boxHeight = 0.65;
+
+            axBox = axes(figBox, 'Units', 'normalized', 'Position', [axMainPos(1), boxBottom, axMainPos(3), boxHeight]);
+
+            hold(axBox, 'on');
+
+            set(axBox, 'XLim', xLim_main, 'YLim', [0.5, nRows + 0.5], 'XTick', 1:nCols, 'YTick', [], 'Visible', 'off');
+
+            markerSize = 600;
+            edgeWidth  = 2.5;
+
+            for iCol = 1:nCols
+                for iRow = 1:nRows
+
+                    x = iCol;
+                    y = nRows - iRow + 1;  % first row appears at top
+
+                    if modelBox(iRow, iCol) == 1
+                        faceColor = 'k';
+                    else
+                        faceColor = 'w';
+                    end
+
+                    scatter(axBox, x, y, markerSize, 's', 'MarkerFaceColor', faceColor, 'MarkerEdgeColor', 'k', 'LineWidth', edgeWidth);
+                end % iRow
+            end % iCol
+
+            % Save the full independent canvas
+            saveas(figBox, fullfile(nameFolder_Fig_NOM_nLL, sprintf('BoxCode_B%s.png', strjoin(string(iModelB_selected), ''))));
+            close(figBox);
+        end % if
+
+        close(gcf) % MUST be here!! as the axis inherited for the box-code figure is from the main figure, so we can't close the main figure before copying the axis geometry.
 
     end % iLocSingle
 
@@ -2626,7 +2725,7 @@ for iRun=4%[1,3,4]
 
                     str_title = sprintf('n=%d nIter=%d L%s [A%dB%d] %s', nSubj, nIterxJob, strjoin(string(iLocPair_all), ''), iModelA_plot, iModelB_NOMplot, namesModelBparams{iModelB_NOMplot}{iParam});
                     %------------------------------%
-                    basicFxn_drawBars_permutation(NOMp_allIter_allSubj, ref, colors_comb(iLocPair_all, :), x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj)
+                    fxn_drawBars(NOMp_allIter_allSubj, ref, colors_comb(iLocPair_all, :), x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj)
                     %------------------------------%
                     ylabel(sprintf('%s', namesModelBparams{iModelB_NOMplot}{iParam}))
                     % Save the figure
@@ -2700,7 +2799,7 @@ for iRun=4%[1,3,4]
                 str_title = sprintf('n=%d, nIter=%d B%d %s vs. %s [L%s]', nSubj, nIterxJob, iModelB_NOMplot, nameVarX, nameVarY_figTitle, strjoin(string(iLocCorr_all), ''));
 
                 %----------------------------%
-                [PearsonR, SpearmanRho] = basicFxn_drawCorr_permutation(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob);
+                [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob);
                 %----------------------------%
                 % Save CI for automatic CI range calcuation in CorrAsym
                 save(sprintf('%s/n%d_B%d_L%s_NOMp%d.mat', nameFolder_Outputs_NOM_corr, nSubj, iModelB_NOMplot, strjoin(string(iLocCorr_all), ''), iNOMparam), 'PearsonR', 'SpearmanRho')
@@ -2798,7 +2897,7 @@ for iRun=4%[1,3,4]
     %             str_title = sprintf('n=%d, nIter=%d B%d %s (%s) vs. %s (%s)', nSubj, nIterxJob, iModelB_NOMplot, nameVarX, nameAsymX, nameVarY_figTitle, nameAsymY);
     %
     %             %----------------------------%
-    %             basicFxn_drawCorrAsym_permutation(asymX_allIter_allSubj*100, asymY_allIter_allSubj*100, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj)
+    %             fxn_drawCorrAsym(asymX_allIter_allSubj*100, asymY_allIter_allSubj*100, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj)
     %             %----------------------------%
     %
     %             xlabel(sprintf('%s of %s (%%)', nameAsymX, nameVarX), 'fontsize', sz_label)
@@ -2868,7 +2967,7 @@ for iRun=4%[1,3,4]
             for iNOMparam = 1:nNOMparams
                 NOMp_allIter_allSubj = squeeze(params_allCond(iModelA_plot, iModelB_NOMplot, iLocCorr_all, :, :, iNOMparam));
 
-                Y_med_allSubj = getCI(NOMp_allIter_allSubj, 1, 3)'; % rotate to match the format needed by basicFxn_drawCorr
+                Y_med_allSubj = getCI(NOMp_allIter_allSubj, 1, 3)'; % rotate to match the format needed by fxn_drawCorr
 
                 switch iModelB_NOMplot
                     case 1, y_ticks_lb = [0, 0, 0, 0]; y_ticks_ub = [.6, 32, 32, 40];
@@ -2892,7 +2991,7 @@ for iRun=4%[1,3,4]
                 str_title = sprintf('n=%d, nIter=%d B%d %s vs. %s [L%s]', nSubj, nIterxJob, iModelB_NOMplot, nameVarX, nameVarY_figTitle, strjoin(string(iLocCorr_all), ''));
 
                 %----------------------------%
-                [PearsonR, SpearmanRho] = basicFxn_drawCorr_permutation(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob);
+                [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob);
                 %----------------------------%
                 % Save CI for automatic CI range calcuation in CorrAsym
                 save(sprintf('%s/n%d_B%d_L%s_NOMp%d.mat', nameFolder_Outputs_NOM_corr, nSubj, iModelB_NOMplot, strjoin(string(iLocCorr_all), ''), iNOMparam), 'PearsonR', 'SpearmanRho')
@@ -3002,7 +3101,7 @@ for iRun=4%[1,3,4]
                 end
 
                 %----------------------------%
-                basicFxn_drawCorrAsym_permutation(asymX_allIter_allSubj*100, asymY_allIter_allSubj*100, colors_comb(iLocPair_all, :), flag_UseRUseRho, flag_CIrange, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj)
+                fxn_drawCorrAsym(asymX_allIter_allSubj*100, asymY_allIter_allSubj*100, colors_comb(iLocPair_all, :), flag_UseRUseRho, flag_CIrange, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj)
                 %----------------------------%
 
                 xlabel(sprintf('\\Delta contrast sensitivity (%%)'), 'FontSize', sz_label);
@@ -3103,7 +3202,7 @@ for iRun=4%[1,3,4]
                 str_ylabel = sprintf('\\Delta %s (%%)', nameVarY_figTitle);
 
                 %----------------------------%
-                basicFxn_compAsym_permutation(asymX_allIter_allSubj_*100, asymY_allIter_allSubj_*100, nBinsCompAsym, y_ticks, sz_fig, str_title, str_ylabel)
+                fxn_compAsym(asymX_allIter_allSubj_*100, asymY_allIter_allSubj_*100, nBinsCompAsym, y_ticks, sz_fig, str_title, str_ylabel)
                 %----------------------------%
 
                 % xlabel(sprintf('\\Delta contrast sensitivity (%%)'), 'FontSize', sz_label);
@@ -3176,7 +3275,7 @@ for iRun=4%[1,3,4]
     y_ticks = linspace(0, .3, 5);
     y_ticklabels = y_ticks ;
     %----------------------------%
-    [PearsonR, SpearmanRho] = basicFxn_drawCorr_permutation(criterion_allIter_allSubj, pAdev_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob);
+    [PearsonR, SpearmanRho] = fxn_drawCorr(criterion_allIter_allSubj, pAdev_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob);
     %----------------------------%
 
     xline(0, '--', 'color', ones(1,3)/2, 'linewidth', 2);

@@ -1,10 +1,10 @@
-function basicFxn_drawCorrAsym_permutation( ...
+function fxn_drawCorrAsym( ...
     X_allIter_allSubj, Y_allIter_allSubj, colors, flag_UseRUseRho, flag_CIrange, x_ticks, y_ticks, ...
     x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, ...
     str_title, markers_allSubj)
 
 % =========================================================================
-% basicFxn_drawCorrAsym_permutation (REVISED)
+% fxn_drawCorrAsym (REVISED)
 %
 % Changes vs. your original:
 %   - REMOVE all per-iteration correlation/regression calculations
@@ -31,7 +31,7 @@ seedBoot = 2;
 
 % Determine conducting one- or two-tailed corr analysis
 if flag_CIrange==1, CI_level=.90; % one-tailed corr
-else, CI_level=.95;% two-tailed corr 
+else, CI_level=.95;% two-tailed corr
 end
 
 %% ---- Validate / canonicalize shapes to [nIter x nSubj] ----

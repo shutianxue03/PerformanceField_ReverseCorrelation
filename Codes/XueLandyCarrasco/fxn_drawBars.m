@@ -1,8 +1,8 @@
-function basicFxn_drawBars_permutation( ...
+function fxn_drawBars( ...
     data_allIter_allSubj, ref, colors, x_ticklabels, y_ticks, y_ticklabels, ...
     flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIter, markers_allSubj)
 
-% basicFxn_drawBars_permutation
+% fxn_drawBars
 % - Omnibus RM one-way ANOVA (per iter -> CI; perm p via within-subj label shuffle on median)
 % - Pairwise posthoc paired t-tests for ALL pairs (per iter -> CI; perm p via sign-flip on median diffs)
 % - Bonferroni correction for pairwise perm p-values
@@ -48,20 +48,20 @@ nPairs = size(pairs, 1);
 %% ----------------- [NHST] Permutation p-values for ANOVA and paired contrasts (subject-level) -----------------
 
 % ---------------- (1) Analysis of variance ----------------
-[Fvalue_obs, ~] = rm_oneway(data_med_allSubj);  
+[Fvalue_obs, ~] = rm_oneway(data_med_allSubj);
 Fvalue_allPerm = nan(nPerm, 1);
 
 % Pregenerate subj indices
 rng(seedPerm, 'twister');
 indRand_allPerm = zeros(nPerm, nSubj, nCond, 'uint16');
-for iPerm = 1:nPerm
+parfor iPerm = 1:nPerm
     for iSubj = 1:nSubj
-    indRand_allPerm(iPerm, iSubj, :) = uint16(randperm(nCond));
+        indRand_allPerm(iPerm, iSubj, :) = uint16(randperm(nCond));
     end
 end
 
+% Generate the null distribution of F-values by shuffling condition labels within each subject
 parfor iPerm = 1:nPerm
-    
     data_perPerm = data_med_allSubj;
     for iSubj = 1:nSubj
         indRandPerm = double(squeeze(indRand_allPerm(iPerm, iSubj, :)));
@@ -74,11 +74,11 @@ pperm_ANOVA = (1 + sum(Fvalue_allPerm >= Fvalue_obs)) / (nPerm + 1);
 
 % ---------------- (2) Planned pairwise contrasts ----------------
 t_obs_allPairs  = nan(1, nPairs);   % observed |t| per pair
-dz_obs_allPairs  = nan(1, nPairs);   % observed dz per pair (mean(diff)/sd(diff))
-gz_obs_allPairs  = dz_obs_allPairs;   % Hedges' g = J*dz, J=1-3/(4*(n-1)-1)
+CohenD_obs_allPairs  = nan(1, nPairs);   % Effect size 1: Cohen's d = mean(diff)/sd(diff)
+HedgeG_obs_allPairs  = CohenD_obs_allPairs;   % Effect size 2: Hedges' g = J*dz, J=1-3/(4*(n-1)-1)
 pperm_allPairs  = nan(1, nPairs);   % permutation p-values per pair (two-tailed)
 
-% sgnMat used to generate null distributions consistently across pairs
+% Generate the null distribution of t-values by sign-flipping the paired differences within each subject
 rng(seedPerm, 'twister');
 sgnMat = int8((rand(nSubj, nPerm) > 0.5) * 2 - 1); % [nSubj x nPerm]
 
@@ -91,21 +91,21 @@ for iPair = 1:nPairs
     diffk = diffk(indOK);
     nk    = numel(diffk);
 
-    if nk < 2 || std(diffk, 0) == 0
-        t_obs_allPairs(iPair) = NaN;
-        dz_obs_allPairs(iPair) = NaN;
-        gz_obs_allPairs(iPair) = NaN;
-        pperm_allPairs(iPair) = NaN;
-        continue;
-    end
+    % if nk < 2 || std(diffk, 0) == 0
+    %     t_obs_allPairs(iPair) = NaN;
+    %     CohenD_obs_allPairs(iPair) = NaN;
+    %     HedgeG_obs_allPairs(iPair) = NaN;
+    %     pperm_allPairs(iPair) = NaN;
+    %     continue;
+    % end
 
     sd_diff = std(diffk, 0);
     denom   = sd_diff / sqrt(nk);
 
     % observed stats
     t_obs_allPairs(iPair) = abs(mean(diffk) / denom);  % |t|
-    dz_obs_allPairs(iPair) = mean(diffk) / sd_diff;     % dz (signed)
-    gz_obs_allPairs(iPair) = fxn_getG(nk, dz_obs_allPairs(iPair));
+    CohenD_obs_allPairs(iPair) = mean(diffk) / sd_diff;     % dz (signed)
+    HedgeG_obs_allPairs(iPair) = fxn_getG(nk, CohenD_obs_allPairs(iPair));
 
     % sign-flip null: only numerator changes
     sgn      = double(sgnMat(indOK, :));                 % [nk x nPerm]
@@ -120,35 +120,36 @@ end % iPair
 if ~isnan(ref)
     % Initialize outputs with the variable names you implied
     tRef_obs_allCond    = nan(1, nCond);   % observed |t| for (cond - ref)
-    dzRef_obs_allCond    = nan(1, nCond);   % observed dz for (cond - ref)
-    gzRef_obs_allCond = dzRef_obs_allCond;
+    CohenD_Ref_obs_allCond    = nan(1, nCond);   % observed Cohen's d for (cond - ref)
+    HedgeG_Ref_obs_allCond = CohenD_Ref_obs_allCond;
     pperm_ref_allCond   = nan(1, nCond);   % permutation p-values per condition (two-tailed)
 
     % Pre-generate sign flips once (consistent null draws)
     rng(seedPerm+1e3, 'twister');
     sgnMat_ref = int8((rand(nSubj, nPerm) > 0.5) * 2 - 1);   % [nSubj x nPerm]
 
+    % Generate the null distribution of t-values
     for iCond = 1:nCond
         diffk = data_med_allSubj(:, iCond) - ref;      % [nSubj x 1]
         indOK = ~isnan(diffk);
         diffk = diffk(indOK);
         nk    = numel(diffk);
 
-        if nk < 2 || std(diffk, 0) == 0
-            tRef_obs_allCond(iCond)  = NaN;
-            dzRef_obs_allCond(iCond)  = NaN;
-            gzRef_obs_allCond(iCond)  = NaN;
-            pperm_ref_allCond(iCond) = NaN;
-            continue;
-        end
+        % if nk < 2 || std(diffk, 0) == 0
+        %     tRef_obs_allCond(iCond)  = NaN;
+        %     dzRef_obs_allCond(iCond)  = NaN;
+        %     gzRef_obs_allCond(iCond)  = NaN;
+        %     pperm_ref_allCond(iCond) = NaN;
+        %     continue;
+        % end
 
         sd_diff = std(diffk, 0);
         denom   = sd_diff / sqrt(nk);
 
         % observed
         tRef_obs_allCond(iCond) = abs(mean(diffk) / denom);  % |t|
-        dzRef_obs_allCond(iCond) = mean(diffk) / sd_diff;     % dz (signed)
-        gzRef_obs_allCond(iCond) = fxn_getG(nk, dzRef_obs_allCond(iCond));     % dz (signed)
+        CohenD_Ref_obs_allCond(iCond) = mean(diffk) / sd_diff;     % Cohen's d (signed)
+        HedgeG_Ref_obs_allCond(iCond) = fxn_getG(nk, CohenD_Ref_obs_allCond(iCond));     % Hedges' g (signed)
 
         % sign-flip null
         sgn      = double(sgnMat_ref(indOK, :));                % [nk x nPerm]
@@ -168,11 +169,12 @@ CI_refPair  = 1 - 0.05;   % planned -> 95%
 groupAve_allBoot = nan(nBoot, nCond);
 eta2p_allBoot = nan(nBoot, 1);
 diffPair_allBoot = nan(nBoot, nPairs); % difference among conditions
-dzPair_allBoot = diffPair_allBoot;
-gzPair_allBoot = dzPair_allBoot;
+CohenDPair_allBoot = diffPair_allBoot; % Cohen's d
+HedgeGPair_allBoot = CohenDPair_allBoot; % Hedges' g
+
 diffRef_allBoot = nan(nBoot, nCond); % difference between each cond and the ref
-dzRef_allBoot = diffRef_allBoot;
-gzRef_allBoot = dzRef_allBoot;
+CohenDRef_allBoot = diffRef_allBoot;
+HedgeGRef_allBoot = CohenDRef_allBoot;
 
 % Pregenerate subj indices
 rng(seedBoot, 'twister');
@@ -180,7 +182,7 @@ indRand_allBoot = randi(nSubj, [nBoot, nSubj]);
 
 parfor iBoot = 1:nBoot
     % resample rows (subjects) with replacement
-    % indResampled = randi(nSubj, [1, nSubj]);   
+    % indResampled = randi(nSubj, [1, nSubj]);
     indRandBoot = double(indRand_allBoot(iBoot, :));
     dataRand = data_med_allSubj(indRandBoot, :);   % [nSubj x nCond] bootstrap sample
 
@@ -196,8 +198,8 @@ parfor iBoot = 1:nBoot
         iCondB = pairs(iPair, 2);
         diffk = dataRand(:, iCondA) - dataRand(:, iCondB);
         diffPair_allBoot(iBoot, iPair) = mean(diffk);
-        dzPair_allBoot(iBoot, iPair) = mean(diffk, 'omitnan')/std(diffk);
-        gzPair_allBoot(iBoot, iPair) = fxn_getG(numel(diffk), dzPair_allBoot(iBoot, iPair));
+        CohenDPair_allBoot(iBoot, iPair) = mean(diffk, 'omitnan')/std(diffk);
+        HedgeGPair_allBoot(iBoot, iPair) = fxn_getG(numel(diffk), CohenDPair_allBoot(iBoot, iPair));
 
     end % iPair
 
@@ -206,28 +208,28 @@ parfor iBoot = 1:nBoot
         for iCond = 1:nCond
             diffk = dataRand(:, iCond) - ref;
             diffRef_allBoot(iBoot, iCond) = mean(diffk);
-            dzRef_allBoot(iBoot, iCond) = mean(diffk)/std(diffk);
-            gzRef_allBoot(iBoot, iCond) = fxn_getG(numel(diffk), dzRef_allBoot(iBoot, iCond));
+            CohenDRef_allBoot(iBoot, iCond) = mean(diffk)/std(diffk);
+            HedgeGRef_allBoot(iBoot, iCond) = fxn_getG(numel(diffk), CohenDRef_allBoot(iBoot, iCond));
         end % iCond
     end
 end % iBoot
 
 %% Obtain point and interval estimates
 % 68% CI for plotting
-[groupAve_med, ~, ~, groupAve_sem_neg68, groupAve_sem_pos68] = getCI(groupAve_allBoot, 1, 1, CI68);  
+[groupAve_med, ~, ~, groupAve_sem_neg68, groupAve_sem_pos68] = getCI(groupAve_allBoot, 1, 1, CI68);
 % 95% CI for reporting
-[~, groupAve_lb95, groupAve_ub95, groupAve_sem_neg95, groupAve_sem_pos95] = getCI(groupAve_allBoot, 1, 1, CI95);  
+[~, groupAve_lb95, groupAve_ub95] = getCI(groupAve_allBoot, 1, 1, CI95);
 
-[eta2p_med, eta2p_lb, eta2p_ub] = getCI(eta2p_allBoot, 1, 1, CI95); 
+[eta2p_med, eta2p_lb, eta2p_ub] = getCI(eta2p_allBoot, 1, 1, CI95);
 [diffPair_med, diffPair_lb, diffPair_ub] = getCI(diffPair_allBoot, 1, 1, CI_diffPair); % for reporting
 [~, ~, ~, diffPair_sem_neg, diffPair_sem_pos] = getCI(diffPair_allBoot, 1, 1, CI68); % for plotting
-% [dzPair_med, dzPair_lb, dzPair_ub] = getCI(dzPair_allBoot, 1, 1, CI_diffPair);
-[gzPair_med, gzPair_lb, gzPair_ub] = getCI(gzPair_allBoot, 1, 1, CI_diffPair);
-[diffRef_med, diffRef_lb, diffRef_ub] = getCI(diffRef_allBoot, 1, 1, CI_refPair);
-% [dzRef_med, dzRef_lb, dzRef_ub] = getCI(dzRef_allBoot, 1, 1, CI_refPair);
-[gzRef_med, gzRef_lb, gzRef_ub] = getCI(gzRef_allBoot, 1, 1, CI_refPair);
+% [CohenDPair_med, CohenDPair_lb, CohenDPair_ub] = getCI(CohenDPair_allBoot, 1, 1, CI_diffPair);
+[HedgeGPair_med, HedgeGPair_lb, HedgeGPair_ub] = getCI(HedgeGPair_allBoot, 1, 1, CI_diffPair);
+[~, diffRef_lb, diffRef_ub] = getCI(diffRef_allBoot, 1, 1, CI_refPair);
+% [CohenDRef_med, CohenDRef_lb, CohenDRef_ub] = getCI(CohenDRef_allBoot, 1, 1, CI_refPair);
+[HedgeGRef_med, HedgeGRef_lb, HedgeGRef_ub] = getCI(HedgeGRef_allBoot, 1, 1, CI_refPair);
 
-%% Strings
+%% Strings handling
 
 % (1) Analysis of variance
 str_ANOVA = sprintf('ANOVA: F=%.2f, p=%.3f, eta2p=%.2f [%.2f, %.2f]', Fvalue_obs, pperm_ANOVA, eta2p_med, eta2p_lb, eta2p_ub);
@@ -240,21 +242,21 @@ for iPair = 1:nPairs
     str_diffPair = [str_diffPair, sprintf('%s-%s%s=%.2f [%.2f, %.2f] | t=%.2f, p=%.3f, g=%.2f [%.2f, %.2f]\n', ...
         x_ticklabels{pairs(iPair,1)}, x_ticklabels{pairs(iPair,2)}, str_cross0, ...
         diffPair_med(iPair), diffPair_lb(iPair), diffPair_ub(iPair), ...
-        t_obs_allPairs(iPair), pperm_allPairs(iPair), gzPair_med(iPair), gzPair_lb(iPair), gzPair_ub(iPair))];
+        t_obs_allPairs(iPair), pperm_allPairs(iPair), HedgeGPair_med(iPair), HedgeGPair_lb(iPair), HedgeGPair_ub(iPair))];
 end
 
 % (3) Compare to the reference
 str_diffRef = 'No ref';
 if ~isnan(ref)
     str_diffRef = sprintf('Ref=%.1f (%.2f%% CI)\n', ref, CI_refPair);
-    
+
     for iCond = 1:nCond
         str_cross0 = '';
         if diffRef_lb(iCond)*diffRef_ub(iCond)>0, str_cross0 = '*'; end
         str_diffRef = [str_diffRef, sprintf('%s%s: %.2f [%.2f, %.2f] | t=%.2f, p=%.3f, g=%.2f [%.2f, %.2f]\n', ...
             x_ticklabels{iCond}, str_cross0, ...
             groupAve_med(iCond), groupAve_lb95(iCond), groupAve_ub95(iCond), ...
-            tRef_obs_allCond(iCond), pperm_ref_allCond(iCond), gzRef_med(iCond), gzRef_lb(iCond), gzRef_ub(iCond))];
+            tRef_obs_allCond(iCond), pperm_ref_allCond(iCond), HedgeGRef_med(iCond), HedgeGRef_lb(iCond), HedgeGRef_ub(iCond))];
     end % iCond
 end
 
@@ -272,7 +274,7 @@ for iCond = 1:nCond
     % 68% CI
     errorbar(iCond, groupAve_med(iCond), groupAve_sem_neg68(iCond), groupAve_sem_pos68(iCond), '.', 'color', colors(iCond,:), 'CapSize', 0, 'linewidth', wd, 'HandleVisibility', 'off');
 
-    % Fancy white overlay (pure aesthetics)
+    % Fancy white overlay (purely for aesthetics)
     if groupAve_med(iCond) > 0
         errorbar(iCond, groupAve_med(iCond), groupAve_sem_neg68(iCond), 0, '.w', 'CapSize', 0, 'linewidth', wd, 'HandleVisibility', 'off');
     else
@@ -321,34 +323,31 @@ ax.XAxis.FontSize = sz_ticks;
 ax.YAxis.FontSize = sz_ticks;
 ax.LineWidth = wd;
 
+%% Prepare the y-pos of the comparison line
+yl = ylim;                      % [ymin ymax]
+yMin = yl(1);
+yMax = yl(2);
+
+% Base height at 80% of y-axis span
+yBar = yMin + 0.80 * (yMax - yMin);
+
+% If CI would exceed yMax, nudge downward
+yTop = yBar + diffPair_sem_pos;
+if yTop > yMax
+    yBar = yMax - diffPair_sem_pos - 0.02 * (yMax - yMin);
+end
+
 %% [Plot] "diff bar" (nCond==2 only) (must be placed after axis are set)
 % Use bootstrap CI of the mean paired difference (not SEM).
 if nCond == 2 && flag_plotDiff
 
-    % --- place the comparison line using YLIM (not data max) ---
-    yl = ylim;                      % [ymin ymax]
-    yMin = yl(1);
-    yMax = yl(2);
-
-    % Base height at 80% of y-axis span
-    yBar = yMin + 0.80 * (yMax - yMin);
-
-    % If CI would exceed yMax, nudge downward
-    yTop = yBar + diffPair_sem_pos;
-    if yTop > yMax
-        yBar = yMax - diffPair_sem_pos - 0.02 * (yMax - yMin);
-    end
     % --- draw horizontal line between the two conditions ---
     plot([1, 2], [yBar, yBar], 'k-', 'LineWidth', wd, 'HandleVisibility', 'off');
 
     % --- draw CI errorbar at the center ---
     errorbar(1.5, yBar, diffPair_sem_neg, diffPair_sem_pos, 'k-', 'LineWidth', wd, 'HandleVisibility', 'off', 'CapSize', 0);
 
-    % --- print point + interval estimate above the line (aligned left) ---
-    % left anchor slightly to the right of x=1 to avoid overlap with the bar
-    % xText = 1.5;
-    % yText = yBar + 0.03 * (yMax - yMin);
-
+    % Prepare x- and y-pos of the text
     xText = 1.5;                                  % left aligned near bar 1
     yPad  = 0.02 * (yMax - yMin);                  % padding in axis units
     yText = (yBar + diffPair_sem_pos) + yPad;          % above upper CI
@@ -358,20 +357,49 @@ if nCond == 2 && flag_plotDiff
         yText = yMax - 0.01 * (yMax - yMin);
     end
 
-    % str_delta = sprintf('\\Delta=%.2f, CI_{%.0f}=[%.2f, %.2f]', diffPair_med, CI95*100, diffPair_lb, diffPair_ub);
-    str_delta = sprintf('\\Delta=%.2f [%.2f, %.2f]', diffPair_med, diffPair_lb, diffPair_ub);
+    % Prepare the string
+    str_delta = sprintf('$\\Delta = %.2f$ [%.2f, %.2f]\n$\\mathit{p} = %.3f$', diffPair_med, diffPair_lb, diffPair_ub, pperm_allPairs);
 
+    % Print
     text(xText, yText, str_delta, ...
         'HorizontalAlignment', 'center', ...
         'VerticalAlignment', 'bottom', ...
         'FontSize', sz_text, ...
         'Color', 'k', ...
-        'Interpreter', 'tex', ...
+        'Interpreter', 'latex', ...
+        'Clipping', 'off');
+end
+
+%% Plot p value of ANOVA results If nCond>2
+if nCond > 2
+    % --- draw horizontal line across conditions ---
+    plot([1, nCond], [yBar, yBar], 'k-', 'LineWidth', wd, 'HandleVisibility', 'off');
+
+    % Prepare the string with LaTeX formatting (keep everything in one math environment)
+    str_ANOVA_p = sprintf('$F = %.2f, \\; \\mathit{p} = %.3f$', Fvalue_obs, pperm_ANOVA);
+
+    % Prepare x- and y-pos of the text
+    xText = (1 + nCond) / 2;                                  % placed at the middle
+    yPad  = 0.1 * (yMax - yMin);                  % padding in axis units
+    yText = yBar + yPad;          % above upper CI
+
+    % If that would exceed yMax, clamp a bit
+    if yText > yMax
+        yText = yMax - 0.01 * (yMax - yMin);
+    end
+
+    % Print
+    text(xText, yText, str_ANOVA_p, ...
+        'HorizontalAlignment', 'center', ...
+        'VerticalAlignment', 'bottom', ...
+        'FontSize', sz_text, ...
+        'Color', 'k', ...
+        'Interpreter', 'latex', ...
         'Clipping', 'off');
 end
 
 %% [Plot] Title
-title(sprintf('%s\n%s\n%s%s\n', str_title, str_ANOVA, str_diffPair, str_diffRef), 'fontsize', sz_title);
+title(sprintf('%s\n%s\n%s%s\n\n', str_title, str_ANOVA, str_diffPair, str_diffRef), 'fontsize', sz_title);
 
 
 end

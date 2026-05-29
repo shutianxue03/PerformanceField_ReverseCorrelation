@@ -1,10 +1,10 @@
-function [PearsonR, SpearmanRho] = basicFxn_drawCorr_permutation( ...
+function [PearsonR, SpearmanRho] = fxn_drawCorr( ...
     X_allIter_allSubj, Y_allIter_allSubj, colors, flag_UseRUseRho, x_ticks, y_ticks, ...
     x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, ...
     flag_plotUnikSymbol, str_title, markers_allSubj, nIter)
 
 % =========================================================================
-% basicFxn_drawCorr_permutation
+% fxn_drawCorr
 % - Always reports BOTH Pearson (r) and Spearman (rho), two-tailed
 % - Partial (control loc) reported via:
 % (A) demean within loc then corr
@@ -217,7 +217,7 @@ yfit_boot_allCond = nan(nBoot, nSamplesLine, nCond);
 rng(seedBoot, 'twister');
 indRand_allBoot = randi(nSubj, [nBoot, nSubj], 'uint16');
 
-% timeBootStart = tic;    
+% timeBootStart = tic;
 parfor iBoot = 1:nBoot
     indRandBoot = double(indRand_allBoot(iBoot, :));
 

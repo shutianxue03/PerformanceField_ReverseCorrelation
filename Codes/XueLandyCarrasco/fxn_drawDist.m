@@ -1,5 +1,5 @@
 
-function basicFxn_drawDist_permutation(data_allIter_allSubj, ref, colors, str_namesCond, x_ticks, x_ticklabels, str_title, sz_fig, nIter, nSubj)
+function fxn_drawDist(data_allIter_allSubj, ref, colors, str_namesCond, x_ticks, x_ticklabels, str_title, sz_fig, nIter, nSubj)
 
 %% Define sizes
 fsz_ticks = 15; % tunC: 20; BEHAV: xx; NOM: 15
@@ -103,7 +103,7 @@ if ~isnan(ref)
     xline(ref, '--',  'color', ones(1,3)/2, 'linewidth', wd_ref, 'HandleVisibility', 'off');
 
     str_Comp2Ref = sprintf('Ref.=%.1f: ', ref);
-    
+
     for iCond = 1:nCond
         str_sig = ''; if (data_ave_lb(iCond)-ref) * (data_ave_ub(iCond)-ref)>0, str_sig = '*'; end
         str_Comp2Ref = [str_Comp2Ref, sprintf('%s%s: [%.2f, %.2f] | ', str_namesCond{iCond}, str_sig, data_ave_lb(iCond), data_ave_ub(iCond))];
@@ -126,6 +126,3 @@ ax.LineWidth = wd;
 
 %% title
 title(sprintf('%s\n%s\n%s\n%s\n%s', str_title, str_ANOVA, str_ttest, str_diff, str_Comp2Ref), 'fontsize', fsz_title)
-
-
-
