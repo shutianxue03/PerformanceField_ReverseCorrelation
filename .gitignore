@@ -1,18 +1,36 @@
+# Ignore datasets and figures
 Data*/
 Figures/
 
+# Ignore MATLAB outputs, autosaves, and compiled artifacts
 *.mat
 *.fig
-*.png
-*.jpg
-*.edf
 *.asv
-*~
 *.autosave
 *.mex*
-*.log
 
-.DS_Store
+# Ignore exported data and image files
+*.edf
+*.png
+*.jpg
+*.pdf
+
+# Ignore logs and temporary editor files
+*.log
 *.bak
 *.tmp
 *.swp
+*~
+
+# Ignore LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+
+# Ignore macOS Finder metadata
+.DS_Store
