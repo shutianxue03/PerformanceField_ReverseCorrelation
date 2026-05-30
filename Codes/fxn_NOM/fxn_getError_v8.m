@@ -1,7 +1,11 @@
-function nLL = fxn_getError_v8(iModelB, params_est, data, C_contribution, iStep, params_fromStep1)
+function [nLL, nLL_pYES, nLL_pA] = fxn_getError_v8(iModelB, params_est, data, C_contribution, iStep, params_fromStep1)
 % Compute negative log-likelihood for the trial-wise noisy observer model,
 
 if nargin < 6, params_fromStep1 = []; end
+
+% Optional diagnostic terms (returned when requested by caller).
+nLL_pYES = NaN;
+nLL_pA = NaN;
 
 % Extract data
 resp_allT = data.resp(:); % 1 = YES, 0 = NO
@@ -29,17 +33,17 @@ switch iStep
         % Combine behavioral likelihood terms
         nLL = nLL_pYES + nLL_pA;
 
-        % Add criterion penalty in z units, if available
-        if isfield(data, 'Cz_emp') && ~isempty(data.Cz_emp) && isfinite(data.Cz_emp)
-            sigmaC = 0.2; % smaller sigmaC → stricter penalty; larger sigmaC → weaker penalty;e similar to sd
-            % Calculate nLL, assuming Cz_emp is normally distibuted, centered at Cz_fit and has SD=sigmaC
-            nLL_C = 0.5 * ((Cz_fit - data.Cz_emp) / sigmaC)^2;
-
-            % convex combination-like weighting
-            nTrials = numel(resp_allT);
-            nLL_behav = (nLL_pYES + nLL_pA) / nTrials;
-            nLL = (1 - C_contribution) * nLL_behav + C_contribution * nLL_C;
-        end
+        % % Add criterion penalty in z units, if available
+        % if isfield(data, 'Cz_emp') && ~isempty(data.Cz_emp) && isfinite(data.Cz_emp)
+        %     sigmaC = 0.2; % smaller sigmaC → stricter penalty; larger sigmaC → weaker penalty;e similar to sd
+        %     % Calculate nLL, assuming Cz_emp is normally distibuted, centered at Cz_fit and has SD=sigmaC
+        %     nLL_C = 0.5 * ((Cz_fit - data.Cz_emp) / sigmaC)^2;
+        % 
+        %     % convex combination-like weighting
+        %     nTrials = numel(resp_allT);
+        %     nLL_behav = (nLL_pYES + nLL_pA) / nTrials;
+        %     nLL = (1 - C_contribution) * nLL_behav + C_contribution * nLL_C;
+        % end
 
     case 1
         % Step 1: fit private-noise params (Nshared forced to 0)

@@ -2,7 +2,7 @@
 noiseCST = .2;
 gaborCST = .3;
 nTrials = 4e3;
-nIter = 96*10;
+nIter = 24;
 cSDT_true = 0;
 
 

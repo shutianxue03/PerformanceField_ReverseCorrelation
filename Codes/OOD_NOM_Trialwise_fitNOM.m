@@ -159,6 +159,8 @@ params_est_norm_allIter = nan(nIter, nParams);
 params_est_allIter = nan(nIter, nParams);
 nLL_train_allIter = nan(nIter, 1);
 nLL_test_allIter = nLL_train_allIter;
+nLL_test_pYES_allIter = nLL_train_allIter;
+nLL_test_pA_allIter = nLL_train_allIter;
 pred_metrics_allIter = cell(nIter, 1);
 
 %% Main estimation loop across iterations
@@ -344,7 +346,6 @@ parfor iIter = 1:nIter
             end
     end
 
-
     %% Caluclate nLL and predict metrics
     iStep = 0; % !iStep=0!: use the full joint nLL (pYES + pA).
     switch flag_incluCrit
@@ -370,7 +371,7 @@ parfor iIter = 1:nIter
 
             % Calculate nLL for the test set
             %------------------------------%
-            nLL_test = fxn_getError_v8(iModelB_fit, params_est, data_test, C_contribution, iStep);
+            [nLL_test, nLL_test_pYES, nLL_test_pA] = fxn_getError_v8(iModelB_fit, params_est, data_test, C_contribution, iStep);
             %------------------------------%
 
             % Predict binned metrics from estimated parameters
@@ -379,34 +380,13 @@ parfor iIter = 1:nIter
             %------------------------------%
     end
 
-    %% Denormalize the est. parameter
-    params_raw = params_est(:).';
-    % switch iModelB_fit
-    %     case 1 % [M, Nadd, Nshared, criterion]
-    %         params_raw([2, 3, 4]) = params_raw([2, 3, 4]) .* DV_scaleFactor;
-    %     case 2 % [Nadd, Nshared, criterion]
-    %         params_raw([1, 2, 3]) = params_raw([1, 2, 3]) .* DV_scaleFactor;
-    %     case 3 % [M, Nshared, criterion]
-    %         params_raw([2, 3]) = params_raw([2, 3]) .* DV_scaleFactor;
-    %     case 4 % [M, Nadd, criterion]
-    %         params_raw([2, 3]) = params_raw([2, 3]) .* DV_scaleFactor;
-    %     case 5 % [M, criterion]
-    %         params_raw(2) = params_raw(2) .* DV_scaleFactor;
-    %     case 6 % [Nadd, criterion]
-    %         params_raw([1, 2]) = params_raw([1, 2]) .* DV_scaleFactor;
-    %     case 7 % [Nshared, criterion]
-    %         params_raw([1, 2]) = params_raw([1, 2]) .* DV_scaleFactor;
-    %     case 8 % [criterion]
-    %         params_raw(1) = params_raw(1) .* DV_scaleFactor;
-    %     otherwise
-    %         error('Unknown iModelB_fit = %d', iModelB_fit);
-    % end
-
     %% Compile
     nLL_train_allIter(iIter) = nLL_train;
     nLL_test_allIter(iIter) = nLL_test;
+    nLL_test_pYES_allIter(iIter) = nLL_test_pYES;
+    nLL_test_pA_allIter(iIter) = nLL_test_pA;
     params_est_norm_allIter(iIter, :) = params_est(:).';
-    params_est_allIter(iIter, :) = params_raw;
+    params_est_allIter(iIter, :) = params_est(:).';
     pred_metrics_allIter{iIter} = pred_test;
 
 end % parfor
