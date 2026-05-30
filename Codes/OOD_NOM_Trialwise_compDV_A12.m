@@ -1,4 +1,4 @@
-function OOD_NOM_Trialwise_compDV_A12(isubj, iLocComb, nIter, nJob, iJob, flag_normDV)
+function OOD_NOM_Trialwise_compDV_A12(isubj, iLocComb, nIter, nJob, iJob, flag_normDV, hyperparams)
 % Created by Shutian Xue on August 27, 2025
 
 clc; close all;
@@ -52,28 +52,40 @@ ORI_bound = [5, 14]; % orientation window, passed to fxn_getDV_v3
 % 1=Univariate; 2=MultiSmooth and Univariate
 if flag_regressType == 2
     basisCfg = struct();
-    basisCfg.basisFamilyORI = 'vonmises';
-    basisCfg.basisFamilySF = 'asymGaussianLog2';
+    basisCfg.basisFamilyORI = 'von_mises_basis';
+    basisCfg.basisFamilySF = 'asym_log2_gaussian';
     basisCfg.oriPeriod_deg = 180;
-    basisCfg.nBasisORI = 3:2:9;
-    basisCfg.nBasisSF = 3:2:9;
-    basisCfg.basisWidthORI = .3:.2:.9;
-    basisCfg.basisWidthSF = .3:.2:.9;
-    basisCfg.asymSF_rightLeftRatio = 1.1:.2:1.5;
-    basisCfg.Ridge = [1,10,100];
+    if isempty(hyperparams)
+        basisCfg.nBasisORI = 3:2:9;
+        basisCfg.nBasisSF = 3:2:9;
+        basisCfg.basisWidthORI = .3:.2:.9;
+        basisCfg.basisWidthSF = .3:.2:.9;
+        basisCfg.asymSF_rightLeftRatio = 1.1:.2:1.5;
+        basisCfg.Ridge = [1,10,100];
+    else
+        basisCfg.nBasisORI = hyperparams.nBasisORI;
+        basisCfg.nBasisSF = hyperparams.nBasisSF;
+        basisCfg.basisWidthORI = hyperparams.basisWidthORI;
+        basisCfg.basisWidthSF = hyperparams.basisWidthSF;
+        basisCfg.asymSF_rightLeftRatio = hyperparams.asymSF_rightLeftRatio;
+        basisCfg.Ridge = hyperparams.Ridge;
+    end
     basisCfg.nFolds = 5;
     basisCfg.link = 'probit';
     basisCfg.sigmaORI_deg = [];
     basisCfg.sigmaSF_log2 = [];
     basisCfg.zscorePredictor = true;
+    basisCfg.stratifyByResp = true; % ensure balanced response labels in CV folds
     basisCfg.maxIter = 100;
     basisCfg.tol = 1e-6;
 end
 
 % Settings for fitting tuning functions
 nRep = 20;
-iFamily_ORI = 10; % input to predKernelSF, 1=scaled gaussian, 8=DoG, 10=von Mises,
-iFamily_SF = 14; % 2=log parabola, 14=asymmetric Gaussian in log2 space,
+iFamily_ORI = 'von_mises'; % input to predKernelSF, 1=scaled gaussian, 8=DoG, 10=von Mises,
+iFamily_SF = 'log_parabola'; % 2=log parabola, 14=asymmetric Gaussian in log2 space,
+iFamily_ORI_idx = 10; % von Mises
+iFamily_SF_idx = 2;   % log parabola
 problem_setting = MultiStart('StartPointsToRun', 'bounds','UseParallel', 1, 'Display', 'off');
 
 % Local fmincon options used by runMultistartFmincon (parfor-safe path).
@@ -84,10 +96,10 @@ else
 end
 
 % Cache bounds as plain numeric vectors (avoid brace indexing in loop expressions).
-ubORI = ub_full_all{iFamily_ORI};
-lbORI = lb_full_all{iFamily_ORI};
-ubSF = ub_full_all{iFamily_SF};
-lbSF = lb_full_all{iFamily_SF};
+ubORI = ub_full_all{iFamily_ORI_idx};
+lbORI = lb_full_all{iFamily_ORI_idx};
+ubSF = ub_full_all{iFamily_SF_idx};
+lbSF = lb_full_all{iFamily_SF_idx};
 
 flag_plot_tuning = 0;
 
@@ -256,6 +268,59 @@ template_ideal = fxn_getTemplate(template_ideal, str_templateType_true, 0);
 % ENSURE this step is consistent with OOD_xx_compDV_A12 when creating the ideal template
 template_ideal = template_ideal / norm(template_ideal(:));
 
+% %%
+% % 1) Build a 1D profile from the ideal template (SF marginal)
+% xSF_log2 = axisSF(:)';            % SF ticks in log2 space
+% ySF = mean(template_ideal, 1);    % SF profile
+% 
+% % 2) Peak and half-height (relative to baseline)
+% [peakVal, iPeak] = max(ySF);
+% xPeak_log2 = xSF_log2(iPeak);
+% 
+% baseVal = min(ySF);
+% halfVal = baseVal + 0.5 * (peakVal - baseVal);
+% 
+% % 3) Find half-height crossing on LEFT side (closest to peak)
+% xHalfLeft_log2 = NaN;
+% for i = iPeak-1:-1:1
+%     y1 = ySF(i);
+%     y2 = ySF(i+1);
+%     if (y1-halfVal) * (y2-halfVal) <= 0 && y2 ~= y1
+%         x1 = xSF_log2(i);
+%         x2 = xSF_log2(i+1);
+%         xHalfLeft_log2 = x1 + (halfVal - y1) * (x2 - x1) / (y2 - y1); % linear interp
+%         break;
+%     end
+% end
+% 
+% % 4) Find half-height crossing on RIGHT side (closest to peak)
+% xHalfRight_log2 = NaN;
+% for i = iPeak:numel(ySF)-1
+%     y1 = ySF(i);
+%     y2 = ySF(i+1);
+%     if (y1-halfVal) * (y2-halfVal) <= 0 && y2 ~= y1
+%         x1 = xSF_log2(i);
+%         x2 = xSF_log2(i+1);
+%         xHalfRight_log2 = x1 + (halfVal - y1) * (x2 - x1) / (y2 - y1); % linear interp
+%         break;
+%     end
+% end
+% 
+% % 5) Distances from peak (in log2 SF units)
+% dLeft_log2  = xPeak_log2 - xHalfLeft_log2;
+% dRight_log2 = xHalfRight_log2 - xPeak_log2;
+% 
+% % 6) Compare left vs right
+% dDiff_log2  = dRight_log2 - dLeft_log2;                                 % >0 => right broader
+% dRatio_log2 = dRight_log2 / max(dLeft_log2, eps);                       % 1 => symmetric
+% dIndex_log2 = (dRight_log2 - dLeft_log2) / max(dRight_log2 + dLeft_log2, eps); % [-1,1]
+% 
+% fprintf('SF peak(log2) = %.4f, half = %.4f\n', xPeak_log2, halfVal);
+% fprintf('SF half-left(log2) = %.4f, half-right(log2) = %.4f\n', xHalfLeft_log2, xHalfRight_log2);
+% fprintf('dLeft(log2) = %.4f, dRight(log2) = %.4f, diff = %.4f, ratio = %.4f, index = %.4f\n', ...
+%     dLeft_log2, dRight_log2, dDiff_log2, dRatio_log2, dIndex_log2);
+% %%
+
 fprintf('%s: Ideal template created and scaled.\n\n', datetime('now'))
 
 %% Stage overview
@@ -291,11 +356,11 @@ pseudoR2_Tjur_tmpl_allIter = nan(nIter, 1); % Tjur R² on training set
 sep_allIter = nan(nIter, 2); % 1=template set, 2=full set
 margORI_allIter = nan(nIter, 2, nORI);
 margPred_ORI_allIter = nan(nIter, 2, nORI);
-margParams_ORI_allIter = nan(nIter, 2, length(namesParams_all{iFamily_ORI}));
+margParams_ORI_allIter = nan(nIter, 2, length(namesParams_all{iFamily_ORI_idx}));
 margR2_ORI_allIter = nan(nIter, 2);
 margSF_allIter = nan(nIter, 2, nSF);
 margPred_SF_allIter = nan(nIter, 2, nSF);
-margParams_SF_allIter = nan(nIter, 2, length(namesParams_all{iFamily_SF}));
+margParams_SF_allIter = nan(nIter, 2, length(namesParams_all{iFamily_SF_idx}));
 margR2_SF_allIter = nan(nIter, 2);
 
 fprintf('%s: A1 Started running %d iterations.\n\n', datetime('now'), nIter)
@@ -371,9 +436,7 @@ parfor iIter = 1:nIter
     basisWidthSF_tmpl = nan;
     asymSF_rightLeftRatio_tmpl = nan;
     ridge_tmpl = nan;
-    % nLL_tmpl = nan;
     nLL_cv_mean_tmpl = nan;
-    % nLL_cv_se_tmpl = nan;
     pseudoR2_Tjur_tmpl = nan;
 
     % Estimate template in whitened space via regression

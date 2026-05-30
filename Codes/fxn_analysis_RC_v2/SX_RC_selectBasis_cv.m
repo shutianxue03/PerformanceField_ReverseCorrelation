@@ -10,8 +10,7 @@ if nargin < 5
     error('Need e3D_allT, resp_allT, axis_ori_deg, axis_sf_log2, and opts');
 end
 
-opts = fill_default_opts(opts);
-
+%% Extract response vector
 resp_allT = resp_allT(:);
 nTrials = size(e3D_allT, 1);
 
@@ -19,7 +18,7 @@ if length(resp_allT) ~= nTrials
     error('resp_allT length does not match number of trials');
 end
 
-%% Extract (range of) hyperparameters
+%% Extract hyperparameters
 candidateORI = opts.nBasisORI(:)';
 candidateSF = opts.nBasisSF(:)';
 candidateBasisFamilyORI = opts.basisFamilyORI;
@@ -31,9 +30,37 @@ candidateBasisWidthSF = opts.basisWidthSF(:)';
 candidateAsymSF_rightLeftRatio = opts.asymSF_rightLeftRatio(:)';
 candidateRidge = opts.Ridge(:)';
 
-%% ---------------- create CV folds ----------------
+%% Create CV folds
 nFolds = opts.nFolds;
-foldID = make_cv_folds(resp_allT, nFolds, opts);
+nTrials_fold = numel(resp_allT);
+foldID = nan(nTrials_fold,1);
+
+if isfield(opts, 'rngSeed') && ~isempty(opts.rngSeed)
+    rng(opts.rngSeed);
+end
+
+if opts.stratifyByResp % To ensure balanced response labels in CV folds, we stratify by response class before assigning fold IDs
+    idx0 = find(resp_allT == 0);
+    idx1 = find(resp_allT == 1);
+
+    idx0 = idx0(randperm(numel(idx0)));
+    idx1 = idx1(randperm(numel(idx1)));
+
+    labels0 = repmat(1:nFolds, 1, ceil(numel(idx0)/nFolds));
+    labels0 = labels0(1:numel(idx0));
+    foldID(idx0) = labels0;
+
+    labels1 = repmat(1:nFolds, 1, ceil(numel(idx1)/nFolds));
+    labels1 = labels1(1:numel(idx1));
+    foldID(idx1) = labels1;
+else % No stratification, just random assignment to folds
+    idx = randperm(nTrials_fold);
+    labels = repmat(1:nFolds, 1, ceil(nTrials_fold/nFolds));
+    labels = labels(1:nTrials_fold);
+    foldID(idx) = labels;
+end
+
+foldID = foldID(:);
 
 % precompute fold masks once
 idxTrain_all = cell(nFolds,1);
@@ -43,7 +70,7 @@ for iFold = 1:nFolds
     idxTrain_all{iFold} = ~idxTest_all{iFold};
 end
 
-%% ---------------- build all non-ridge combinations ----------------
+%% Build all non-ridge combinations
 comb = struct([]);
 iComb = 0;
 
@@ -89,22 +116,25 @@ res(nRes) = struct( ...
 
 iRes = 0;
 
-%% ---------------- main search ----------------
+%% Main search
 for iComb = 1:nCombBase
 
-    opts_basis = opts;
-    opts_basis.nBasisORI = comb(iComb).nBasisORI;
-    opts_basis.nBasisSF  = comb(iComb).nBasisSF;
-    opts_basis.basisFamilyORI = comb(iComb).basisFamilyORI;
-    opts_basis.basisFamilySF  = comb(iComb).basisFamilySF;
-    opts_basis.basisWidthORI = comb(iComb).basisWidthORI;
-    opts_basis.basisWidthSF  = comb(iComb).basisWidthSF;
-    opts_basis.asymSF_rightLeftRatio = comb(iComb).asymSF_rightLeftRatio;
+    % Extract the basis parameters for this combination and prepare the basis matrices
+    opts_combo = opts;
+    opts_combo.nBasisORI = comb(iComb).nBasisORI;
+    opts_combo.nBasisSF  = comb(iComb).nBasisSF;
+    opts_combo.basisFamilyORI = comb(iComb).basisFamilyORI;
+    opts_combo.basisFamilySF  = comb(iComb).basisFamilySF;
+    opts_combo.basisWidthORI = comb(iComb).basisWidthORI;
+    opts_combo.basisWidthSF  = comb(iComb).basisWidthSF;
+    opts_combo.asymSF_rightLeftRatio = comb(iComb).asymSF_rightLeftRatio;
 
-    % project all trials once using the shared basis-projector
-    Z_all = SX_RC_basisProject(e3D_allT, axis_ori_deg, axis_sf_log2, opts_basis);
+    % Project all trials once using the shared basis-projector
+    %--------------------------%
+    Z_all = SX_RC_basisProject(e3D_allT, axis_ori_deg, axis_sf_log2, opts_combo);
+    %--------------------------%
 
-    % precompute fold-specific standardized design matrices once
+    % Precompute fold-specific standardized design matrices once
     Xtrain_all = cell(nFolds,1);
     Xtest_all  = cell(nFolds,1);
     rtrain_all = cell(nFolds,1);
@@ -118,29 +148,40 @@ for iComb = 1:nCombBase
         Z_test  = Z_all(idxTest, :);
 
         % fold-specific standardization and design matrix construction
-        [Xtrain_all{iFold}, Xtest_all{iFold}] = prepare_fold_design_matrices(Z_train, Z_test, opts.zscorePredictor);
+        %--------------------------%
+        [Xtrain_all{iFold}, muZ_fold, sdZ_fold] = build_design_matrix(Z_train, opts_combo.zscorePredictor);
+        Xtest_all{iFold} = build_design_matrix(Z_test, opts_combo.zscorePredictor, muZ_fold, sdZ_fold);
+        %--------------------------%
 
         rtrain_all{iFold} = resp_allT(idxTrain);
         rtest_all{iFold}  = resp_allT(idxTest);
     end
 
-    % now sweep ridge cheaply
+    % Now sweep ridge cheaply
     for iRidge = 1:nRidge
-        ridge = candidateRidge(iRidge);
+        Ridge = candidateRidge(iRidge);
         nLL_test_allFolds = nan(nFolds,1);
 
         % optional warm start across folds is usually not worth it;
         % warm start across ridge values within a fold would require
         % storing one beta per fold. Keep simple first.
         for iFold = 1:nFolds
-            % fit on train, predict on test using precomputed X
-            beta = fit_ridge_glm_from_X(Xtrain_all{iFold}, rtrain_all{iFold}, ridge, opts.link, opts.maxIter, opts.tol);
-            % Prediction on test set using the beta fitted on the train set of this fold
+
+            % Fit on train, predict on test using precomputed beta from precomputed X
+            %--------------------------%
+            beta = fit_ridge_glm_from_X(Xtrain_all{iFold}, rtrain_all{iFold}, Ridge, opts.link, opts.maxIter, opts.tol);
+            %--------------------------%
+
+            % Predict on test set
+            %--------------------------%
             pred = predict_ridge_glm_from_X(Xtest_all{iFold}, rtest_all{iFold}, beta, opts.link);
+            %--------------------------%
+
             % Store the test nLL for this fold
             nLL_test_allFolds(iFold) = pred.nLL;
         end
 
+        % Store the results for this combination and ridge value
         iRes = iRes + 1;
         res(iRes).nBasisORI = comb(iComb).nBasisORI;
         res(iRes).nBasisSF  = comb(iComb).nBasisSF;
@@ -149,17 +190,17 @@ for iComb = 1:nCombBase
         res(iRes).basisWidthORI = comb(iComb).basisWidthORI;
         res(iRes).basisWidthSF  = comb(iComb).basisWidthSF;
         res(iRes).asymSF_rightLeftRatio = comb(iComb).asymSF_rightLeftRatio;
-        res(iRes).Ridge = ridge;
+        res(iRes).Ridge = Ridge;
         res(iRes).nLL_mean = mean(nLL_test_allFolds, 'omitnan');
         res(iRes).nLL_se   = std(nLL_test_allFolds, 'omitnan') / sqrt(sum(isfinite(nLL_test_allFolds)));
     end % iRidge
 end % iComb
 
-%% ---------------- choose best by lowest mean nLL ----------------
+%% Choose the best by lowest mean nLL
 [~, idxBest] = min([res.nLL_mean]);
 bestRes = res(idxBest);
 
-%% ---------------- refit on all data using full model ----------------
+%% Store and refit the best model on the full dataset (no CV) to get the final template and training nLL for reference
 opts_best = opts;
 opts_best.nBasisORI = bestRes.nBasisORI;
 opts_best.nBasisSF  = bestRes.nBasisSF;
@@ -170,7 +211,9 @@ opts_best.basisWidthSF  = bestRes.basisWidthSF;
 opts_best.asymSF_rightLeftRatio = bestRes.asymSF_rightLeftRatio;
 opts_best.Ridge = bestRes.Ridge;
 
+%--------------------------%
 out_best = SX_RC_fit_smoothBasis(e3D_allT, resp_allT, axis_ori_deg, axis_sf_log2, opts_best);
+%--------------------------%
 
 %% Store the outputs of the best fit
 output = [];
@@ -200,37 +243,39 @@ output.Ridge = opts_best.Ridge;
 % plot_best_template_marginalized(out_best.template2D, axis_ori_deg, axis_sf_log2, opts.template_ideal, bestRes);
 %
 % % close all
-%%
+
 end
 
+%% Helper: standardize predictors and build design matrix
+function [X, muZ, sdZ] = build_design_matrix(Z, zscorePredictor, muZ, sdZ)
 
-%% Helper: precompute standardized train/test X once per fold
-function [Xtrain, Xtest] = prepare_fold_design_matrices(Ztrain, Ztest, zscorePredictor)
-
-muZ = mean(Ztrain, 1);
-sdZ = std(Ztrain, 0, 1);
-sdZ(sdZ < 1e-8) = 1;
+if nargin < 3
+    muZ = mean(Z, 1);
+    sdZ = std(Z, 0, 1);
+    sdZ(sdZ < 1e-8) = 1;
+end
 
 if zscorePredictor
-    Ztrain_fit = (Ztrain - muZ) ./ sdZ;
-    Ztest_fit  = (Ztest  - muZ) ./ sdZ;
+    Zfit = (Z - muZ) ./ sdZ;
 else
-    Ztrain_fit = Ztrain;
-    Ztest_fit  = Ztest;
+    Zfit = Z;
+    if nargin < 3
+        muZ = zeros(1, size(Z,2));
+        sdZ = ones(1, size(Z,2));
+    end
 end
 
-Xtrain = [ones(size(Ztrain_fit,1),1), Ztrain_fit];
-Xtest  = [ones(size(Ztest_fit,1),1),  Ztest_fit];
+X = [ones(size(Zfit,1),1), Zfit];
 end
 
 %% Helper: fit GLM from precomputed X
-function beta = fit_ridge_glm_from_X(X, resp_allT, ridge, linkName, maxIter, tol)
+function beta = fit_ridge_glm_from_X(X, resp_allT, Ridge, linkName, maxIter, tol)
 
 resp_allT = resp_allT(:);
 p = size(X,2);
 
 beta = zeros(p,1);
-ridgeMat = diag([0; ones(p-1,1)]) * ridge;
+ridgeMat = diag([0; ones(p-1,1)]) * Ridge;
 dev_prev = Inf;
 
 for iIter = 1:maxIter
@@ -248,19 +293,25 @@ for iIter = 1:maxIter
             error('Unknown link: use ''probit'' or ''logit''');
     end
 
+    % Define bound mu and gprime to avoid numerical issues
     mu = min(max(mu, 1e-8), 1 - 1e-8);
     gprime = max(gprime, 1e-6);
 
+    % Compute IRLS weights and adjusted response
     W = (gprime.^2) ./ (mu .* (1 - mu) + eps);
     W = max(W, 1e-8);
 
+    % Adjusted response for IRLS
     z = eta + (resp_allT - mu) ./ (gprime + eps);
 
+    % Update beta using the weighted least squares solution with ridge penalty
     WX = X .* sqrt(W);
     wz = sqrt(W) .* z;
 
+    % Add ridge penalty to the normal equations
     beta_new = (WX' * WX + ridgeMat) \ (WX' * wz);
 
+    % Compute deviance for convergence check
     dev = -2 * sum(resp_allT .* log(mu) + (1 - resp_allT) .* log(1 - mu));
 
     if abs(dev_prev - dev) < tol
@@ -268,6 +319,7 @@ for iIter = 1:maxIter
         break;
     end
 
+    % Update beta and deviance for next iteration
     beta = beta_new;
     dev_prev = dev;
 end
@@ -278,9 +330,11 @@ function pred = predict_ridge_glm_from_X(X, resp, beta, linkName)
 
 resp = resp(:);
 
+% Compute linear predictor
 eta = X * beta;
 eta = max(min(eta, 8), -8);
 
+% Compute predicted probabilities based on the link function
 switch lower(linkName)
     case 'logit'
         yhat = 1 ./ (1 + exp(-eta));
@@ -295,12 +349,12 @@ yhat = min(max(yhat, 1e-8), 1 - 1e-8);
 pred = struct();
 pred.yhat = yhat;
 pred.nLL = -sum(resp .* log(yhat) + (1 - resp) .* log(1 - yhat));
+pred.deviance = -2 * sum(resp .* log(yhat) + (1 - resp) .* log(1 - yhat));
+pred.eta = eta;
 end
 
 %%
 function out = SX_RC_fit_smoothBasis(e3D_allT, resp_allT, axis_ori_deg, axis_sf_log2, opts)
-
-opts = fill_default_opts(opts);
 
 axis_ori_deg = axis_ori_deg(:);
 axis_sf_log2 = axis_sf_log2(:);
@@ -319,10 +373,8 @@ end
 
 resp_allT = resp_allT(:);
 
-%--------------------%
-Bori = predSFkernel('make_basis_ori', axis_ori_deg, opts, 0);
-Bsf  = predSFkernel('make_basis_sf', axis_sf_log2, opts, 0);
-%--------------------%
+% build basis matrices for the selected hyperparameters (important to do this before any CV-based standardization to avoid data leakage)
+[Bori, Bsf] = build_basis_matrices_from_opts(axis_ori_deg, axis_sf_log2, opts);
 
 % Optional: keep these only if you still want them in output
 centersORI_deg = [];
@@ -331,88 +383,36 @@ centersSF_cpd  = [];
 
 Kori = size(Bori, 2);
 Ksf = size(Bsf, 2);
-Ktot = Kori * Ksf;
 
-% ---------------- project trials into basis space ----------------
+% Project trials into basis space
 Z = SX_RC_basisProject(e3D_allT, axis_ori_deg, axis_sf_log2, opts);
 
-% ---------------- standardize predictors ----------------
-muZ = mean(Z, 1);
-sdZ = std(Z, 0, 1);
-sdZ(sdZ < 1e-8) = 1;
+% Fit ridge-regularized binomial GLM via IRLS (iteratively reweighted least squares)
+%--------------------------%
+[X, muZ, sdZ] = build_design_matrix(Z, opts.zscorePredictor);
+%--------------------------%
 
-if opts.zscorePredictor
-    Zfit = (Z - muZ) ./ sdZ;
-else
-    Zfit = Z;
-    muZ = zeros(1, Ktot);
-    sdZ = ones(1, Ktot);
-end
+%--------------------------%
+beta = fit_ridge_glm_from_X(X, resp_allT, opts.Ridge, opts.link, opts.maxIter, opts.tol);
+%--------------------------%
 
-% ---------------- fit ridge-regularized binomial GLM via IRLS ----------------
-X = [ones(nTrials,1), Zfit];
-p = size(X,2);
+% Final predictions on training data
+predTrain = predict_ridge_glm_from_X(X, resp_allT, beta, opts.link);
+%--------------------------%
 
-beta = zeros(p,1);
-ridgeMat = diag([0; ones(p-1,1)]) * opts.ridge;
-dev_prev = Inf;
-
-for iIter = 1:opts.maxIter
-
-    eta = X * beta;
-    eta = max(min(eta, 8), -8);
-
-    switch lower(opts.link)
-        case 'logit'
-            mu = 1 ./ (1 + exp(-eta));
-            gprime = mu .* (1 - mu);
-        case 'probit'
-            mu = normcdf(eta);
-            gprime = normpdf(eta);
-        otherwise
-            error('Unknown link: use ''probit'' or ''logit''');
-    end
-
-    mu = min(max(mu, 1e-8), 1 - 1e-8);
-    gprime = max(gprime, 1e-6);
-
-    W = (gprime.^2) ./ (mu .* (1 - mu) + eps);
-    W = max(W, 1e-8);
-
-    z = eta + (resp_allT - mu) ./ (gprime + eps);
-
-    WX = bsxfun(@times, X, sqrt(W));
-    wz = sqrt(W) .* z;
-
-    beta_new = (WX' * WX + ridgeMat) \ (WX' * wz);
-
-    dev = -2 * sum(resp_allT .* log(mu) + (1 - resp_allT) .* log(1 - mu));
-
-    if abs(dev_prev - dev) < opts.tol
-        beta = beta_new;
-        break;
-    end
-
-    beta = beta_new;
-    dev_prev = dev;
-end % iIter
-
-% ---------------- final predictions on training data ----------------
-predTrain = compute_predictions_from_beta(Z, resp_allT, beta, muZ, sdZ, opts.link, opts.zscorePredictor);
-
-% ---------------- reconstruct template ----------------
+% Reconstruct the recovered template
 beta0 = beta(1);
 theta_vec = beta(2:end);
 theta_vec_unscaled = theta_vec ./ sdZ(:); % unscale by predictor SD to get back to original basis space
 Theta = reshape(theta_vec_unscaled, [Kori, Ksf]);
 template2D = Bori * Theta * Bsf';
 
-% ---------------- fit summary ----------------
+% Fit summary
 idx1 = resp_allT == 1;
 idx0 = resp_allT == 0;
 pseudoR2_Tjur = mean(predTrain.yhat(idx1)) - mean(predTrain.yhat(idx0));
 
-% ---------------- output ----------------
+% Store output
 out = struct();
 out.template2D = template2D;
 out.Theta = Theta;
@@ -437,102 +437,108 @@ out.zscorePredictor = opts.zscorePredictor;
 out.opts = opts;
 end
 
-%% Helper: INTERNAL PREDICTION HELPER
-function pred = compute_predictions_from_beta(Z, resp, beta, muZ, sdZ, linkName, zscorePredictor)
+%%
+function Z = SX_RC_basisProject(e3D_allT, axis_ori_deg, axis_sf_log2, basisOpts)
+% SX_RC_basisProject
+% Project ORI x SF energy maps into the tensor-product basis used by SX_RC_selectBasis_cv.
+% Basis preparation happens here; predSFkernel only evaluates per-kernel equations.
+% Called by SX_RC_selectBasis_cv, which calls predSFkernel for basis preparation and evaluation.
 
-if zscorePredictor
-    Zfit = (Z - muZ) ./ sdZ;
-else
-    Zfit = Z;
+[Bori, Bsf] = build_basis_matrices_from_opts(axis_ori_deg, axis_sf_log2, basisOpts);
+
+nTrials = size(e3D_allT, 1);
+Kori = size(Bori, 2);
+Ksf = size(Bsf, 2);
+Z = zeros(nTrials, Kori * Ksf);
+
+for iTrial = 1:nTrials
+    Ei = squeeze(e3D_allT(iTrial, :, :));
+    Zi = Bori' * Ei * Bsf;
+    Z(iTrial, :) = Zi(:)';
+end
 end
 
-X = [ones(size(Zfit,1),1), Zfit];
-eta = X * beta;
-eta = max(min(eta, 8), -8);
+%%
+function [Bori, Bsf] = build_basis_matrices_from_opts(axis_ori_deg, axis_sf_log2, opts)
+%----------- ORI -----------
+% Define centers for ORI basis functions
+centersORI_deg = linspace(0, opts.oriPeriod_deg, opts.nBasisORI + 1);
+centersORI_deg(end) = []; % remove the last one to avoid duplication at the period boundary
 
-switch lower(linkName)
-    case 'logit'
-        yhat = 1 ./ (1 + exp(-eta));
-    case 'probit'
-        yhat = normcdf(eta);
+% Calculate spacing between centers (in degrees)
+dist_ori = opts.oriPeriod_deg / opts.nBasisORI; %
+
+% Determine the  width parameter
+str_family = opts.basisFamilyORI;
+switch lower(char(opts.basisFamilyORI))
+    case 'circ_gaussian_basis'
+        ori_param2 = dist_ori * opts.basisWidthORI;
+    case 'von_mises_basis'
+        sigma_rad = deg2rad(dist_ori * opts.basisWidthORI);
+        ori_param2 = 1 / max(sigma_rad.^2, 1e-6);
     otherwise
-        error('Unknown link: use ''probit'' or ''logit''');
+        error('Unknown ORI basis family: %s', opts.basisFamilyORI);
 end
 
-yhat = min(max(yhat, 1e-8), 1 - 1e-8);
-
-nLL = -sum(resp .* log(yhat) + (1 - resp) .* log(1 - yhat));
-deviance = -2 * sum(resp .* log(yhat) + (1 - resp) .* log(1 - yhat));
-
-pred = struct();
-pred.yhat = yhat;
-pred.nLL = nLL;
-pred.deviance = deviance;
-pred.eta = eta;
+% Compute ORI basis matrix
+Bori = zeros(numel(axis_ori_deg), numel(centersORI_deg));
+for iCenter = 1:numel(centersORI_deg)
+    Bori(:, iCenter) = predSFkernel(axis_ori_deg, str_family, [centersORI_deg(iCenter), ori_param2, opts.oriPeriod_deg], 0);
 end
 
-%% Helper: MAKE CV FOLDS
-function foldID = make_cv_folds(resp_allT, nFolds, opts)
+%----------- SF -----------
+% Define centers for SF basis functions in both log2 and linear (cpd) space
+centersSF_log2 = linspace(min(axis_sf_log2), max(axis_sf_log2), opts.nBasisSF);
+axis_sf_cpd = 2 .^ axis_sf_log2;
+centersSF_cpd = logspace(log10(min(axis_sf_cpd)), log10(max(axis_sf_cpd)), opts.nBasisSF);
 
-nTrials = numel(resp_allT);
-foldID = nan(nTrials,1);
+% Calculate spacing between centers in log2 and log10 space
+dist_log2 = mean(diff(centersSF_log2));
+dist_log10cpd = mean(diff(log10(centersSF_cpd)));
 
-if isfield(opts, 'rngSeed') && ~isempty(opts.rngSeed)
-    rng(opts.rngSeed);
+% Determine the parameters for SF basis functions
+sf_family = opts.basisFamilySF;
+switch lower(char(opts.basisFamilySF))
+    case 'log2_gaussian'
+        sf_centers = centersSF_log2;
+        sf_param2 = dist_log2 * opts.basisWidthSF;
+        sf_param3 = [];
+    case 'asym_log2_gaussian'
+        sf_centers = centersSF_log2;
+        sf_param2 = dist_log2 * opts.basisWidthSF;
+        sf_param3 = sf_param2 * opts.asymSF_rightLeftRatio;
+    case 'log_parabola_basis'
+        sf_centers = centersSF_cpd;
+        sf_param2 = dist_log10cpd * 1.2;
+        sf_param3 = [];
+    case 'asym_log_parabola_basis'
+        sf_centers = centersSF_cpd;
+        sf_param2 = dist_log10cpd;
+        sf_param3 = sf_param2 * opts.asymSF_rightLeftRatio;
+    otherwise
+        error('Unknown SF basis family: %s', opts.basisFamilySF);
 end
 
-if opts.stratifyByResp
-    idx0 = find(resp_allT == 0);
-    idx1 = find(resp_allT == 1);
-
-    idx0 = idx0(randperm(numel(idx0)));
-    idx1 = idx1(randperm(numel(idx1)));
-
-    labels0 = repmat(1:nFolds, 1, ceil(numel(idx0)/nFolds));
-    labels0 = labels0(1:numel(idx0));
-    foldID(idx0) = labels0;
-
-    labels1 = repmat(1:nFolds, 1, ceil(numel(idx1)/nFolds));
-    labels1 = labels1(1:numel(idx1));
-    foldID(idx1) = labels1;
-else
-    idx = randperm(nTrials);
-    labels = repmat(1:nFolds, 1, ceil(nTrials/nFolds));
-    labels = labels(1:nTrials);
-    foldID(idx) = labels;
+% Compute SF basis matrix
+Bsf = zeros(numel(axis_sf_log2), numel(sf_centers));
+if isempty(sf_param3) % symmetric case
+    for iCenter = 1:numel(sf_centers)
+        Bsf(:, iCenter) = predSFkernel(axis_sf_log2, sf_family, [sf_centers(iCenter), sf_param2], 0);
+    end
+else % asymmetric case
+    for iCenter = 1:numel(sf_centers)
+        Bsf(:, iCenter) = predSFkernel(axis_sf_log2, sf_family, [sf_centers(iCenter), sf_param2, sf_param3], 0);
+    end
 end
 
-foldID = foldID(:);
+%----------- Normalization -----------
+Bori = normalize_columns_local(Bori);
+Bsf = normalize_columns_local(Bsf);
 end
 
-%% Helper: DEFAULT OPTS
-function opts = fill_default_opts(opts)
-
-if nargin < 1 || isempty(opts)
-    opts = struct();
-end
-
-if ~isfield(opts, 'link') || isempty(opts.link), opts.link = 'probit'; end
-if ~isfield(opts, 'nBasisORI') || isempty(opts.nBasisORI), opts.nBasisORI = 6; end
-if ~isfield(opts, 'nBasisSF') || isempty(opts.nBasisSF), opts.nBasisSF = 5; end
-if ~isfield(opts, 'sigmaORI_deg'), opts.sigmaORI_deg = []; end
-if ~isfield(opts, 'sigmaSF_log2'), opts.sigmaSF_log2 = []; end
-if ~isfield(opts, 'oriPeriod_deg') || isempty(opts.oriPeriod_deg), opts.oriPeriod_deg = 180; end
-if ~isfield(opts, 'zscorePredictor') || isempty(opts.zscorePredictor), opts.zscorePredictor = true; end
-if ~isfield(opts, 'ridge') || isempty(opts.ridge), opts.ridge = 10; end
-if ~isfield(opts, 'maxIter') || isempty(opts.maxIter), opts.maxIter = 100; end
-if ~isfield(opts, 'tol') || isempty(opts.tol), opts.tol = 1e-6; end
-if ~isfield(opts, 'nFolds') || isempty(opts.nFolds), opts.nFolds = 5; end
-if ~isfield(opts, 'foldID'), opts.foldID = []; end
-if ~isfield(opts, 'rngSeed'), opts.rngSeed = []; end
-if ~isfield(opts, 'stratifyByResp') || isempty(opts.stratifyByResp), opts.stratifyByResp = true; end
-if ~isfield(opts, 'basisFamilyORI') || isempty(opts.basisFamilyORI), opts.basisFamilyORI = 'circ_gaussian'; end
-if ~isfield(opts, 'basisFamilySF') || isempty(opts.basisFamilySF), opts.basisFamilySF = 'gaussianLog2'; end
-if ~isfield(opts, 'kappaORI'), opts.kappaORI = []; end
-if ~isfield(opts, 'basisWidthORI') || isempty(opts.basisWidthORI), opts.basisWidthORI = opts.basisWidth; end
-if ~isfield(opts, 'basisWidthSF') || isempty(opts.basisWidthSF), opts.basisWidthSF = opts.basisWidth; end
-if ~isfield(opts, 'asymSF_rightLeftRatio') || isempty(opts.asymSF_rightLeftRatio), opts.asymSF_rightLeftRatio = 1.5; end
-if ~isfield(opts, 'widthSF_logParabola'), opts.widthSF_logParabola = []; end
-if ~isfield(opts, 'widthSF_logParabola_left'),  opts.widthSF_logParabola_left  = []; end
-if ~isfield(opts, 'widthSF_logParabola_right'), opts.widthSF_logParabola_right = []; end
+%%
+function B = normalize_columns_local(B)
+nrm = sqrt(sum(B.^2, 1));
+nrm(nrm == 0) = 1;
+B = bsxfun(@rdivide, B, nrm);
 end

@@ -2,8 +2,9 @@
 noiseCST = .2;
 gaborCST = .3;
 nTrials = 4e3;
-nIter = 24;
+nIter = 96*10;
 cSDT_true = 0;
+
 
 for iModelB_sim = [5] % 5=Nmul only; 6=Nadd only; 7=Nshared only
 

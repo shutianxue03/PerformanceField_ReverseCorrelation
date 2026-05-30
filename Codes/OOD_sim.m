@@ -14,6 +14,16 @@ function OOD_sim(noiseCST, gaborCST, nTrials, Nmul_true, Nadd_true, Nshared_true
 iModelA_fit_all = [1:2]; % DO NOT CHANGE! 1 = RC-derived template (Model A), 2=ideal template; 3=permuted template
 iModelB_fit_all = 1:7; %1=full, 2=No Nmul, 3=No Nadd, 4=No Nshared, 5=Nmul-only, 6=Nadd-only, 7=Nshared-only, 8=criterion-only
 
+% Set hyperparameters
+hyperparams = [];
+
+hyperparams.nBasisORI = 3;%3:2:9;
+hyperparams.nBasisSF = 3;%3:2:9;
+hyperparams.basisWidthORI = .6;%.3:.2:.9;
+hyperparams.basisWidthSF = .4;%.3:.2:.9;
+hyperparams.asymSF_rightLeftRatio = 0.9;%1.1:.2:1.5;
+hyperparams.Ridge = 100;%[1,10,100];
+
 % Enforce reduced-model ground truth by zeroing excluded IN terms.
 switch iModelB_sim
     case 1  % Full: Nmul + Nadd + Nshared
@@ -88,10 +98,18 @@ fprintf(' - Regression type (1=Univariate; 2=Multi+smoothing): %d \n\n', flag_re
 
 % Define IO name & folders %
 % Define the IO name
-nameIO = sprintf('IO_Bsim%d_cN%.0f_cG%.0f_nT%s_Nm%.1f_Na%.1f_Ns%.1f_cSDT%.1f', ...
-    iModelB_sim, ...
-    noiseCST*100, gaborCST*100, format_num2exp(nTrials), ...
-    Nmul_true, Nadd_true, Nshared_true, cSDT_true);
+if isempty(hyperparams) % if basis functions' hyperparameters are NOT specified
+    nameIO = sprintf('IO_Bsim%d_cN%.0f_cG%.0f_nT%s_Nm%.1f_Na%.1f_Ns%.1f_cSDT%.1f', ...
+        iModelB_sim, ...
+        noiseCST*100, gaborCST*100, format_num2exp(nTrials), ...
+        Nmul_true, Nadd_true, Nshared_true, cSDT_true);
+else % if hyperparameters are specified, include them in the IO name
+    nameIO = sprintf('IO_Bsim%d_Bori%d_%.1f_Bsf%d_%.1f_RL%.1f_ridge%d_cN%.0f_cG%.0f_nT%s_Nm%.1f_Na%.1f_Ns%.1f_cSDT%.1f', ...
+        iModelB_sim, ...
+        hyperparams.nBasisORI, hyperparams.basisWidthORI, hyperparams.nBasisSF, hyperparams.basisWidthSF, hyperparams.asymSF_rightLeftRatio, hyperparams.Ridge, ...
+        noiseCST*100, gaborCST*100, format_num2exp(nTrials), ...
+        Nmul_true, Nadd_true, Nshared_true, cSDT_true);
+end
 
 % Folder to save IO data (energy + behav)
 nameFolder_Data_OOD_IO = sprintf('%s/%s', nameFolder_Data_OOD, nameIO);
@@ -371,7 +389,7 @@ if (pC_sim >= pC_filter(1)) && (pC_sim <= pC_filter(2))
     %% Step 1: Estimate the template and compute DV
     % Step 1: compute DVs, templates, and test-set metrics
     %----------------------------%
-    OOD_NOM_Trialwise_compDV_A12({nameIO, criterion_DV_true}, iLocComb, nIter, nJob, iJob, flag_normDV)
+    OOD_NOM_Trialwise_compDV_A12({nameIO, criterion_DV_true}, iLocComb, nIter, nJob, iJob, flag_normDV, hyperparams)
     %----------------------------%
 
     %% Step 2: fit NOM parameters and predict metrics
