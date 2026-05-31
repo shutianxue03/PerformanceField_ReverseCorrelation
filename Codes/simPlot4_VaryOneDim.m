@@ -852,7 +852,7 @@ fprintf('\n%s: Median/CI fields extracted for all metrics.\n', string(datetime('
 %
 % % Plot
 % h_tmp = figure('Position', [120 120 1400 620], 'Color', 'w');
-% tlo_tmp = tiledlayout(1, 2, 'TileSpacing', 'compact', 'Padding', 'compact'); %#ok<NASGU>
+% tileLayout_tmp = tiledlayout(1, 2, 'TileSpacing', 'compact', 'Padding', 'compact'); %#ok<NASGU>
 %
 % % Left: ORI heatmap
 % ax1_tmp = nexttile; hold on;
@@ -1436,10 +1436,14 @@ for iMetric_fig3 = 1:nMetric_fig3
     end % iSim_fig3
 end % iMetric_fig3
 
-% Layout: nMetric rows × (1 heatmap + nGapCols + nSim curve columns)
-h = figure('Position', [0 0 2e3 7e2]);
-nGapCols_fig3 = max(0, round(setting.fig3_gapColsLeft));
-tlo_fig3 = tiledlayout(nMetric_fig3, 1 + nGapCols_fig3 + nSim_fig3, 'TileSpacing', setting.fig3_curveTileSpacing, 'Padding', 'compact');
+% Layout split into two figures with the same height.
+fig3_h = 7e2;
+
+handle_heat = figure('Position', [0 0 9e2 fig3_h]);
+tileLayout_heat = tiledlayout(nMetric_fig3, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+handle_curve = figure('Position', [0 0 2e3 fig3_h]);
+tileLayout_curve = tiledlayout(nMetric_fig3, nSim_fig3, 'TileSpacing', setting.fig3_curveTileSpacing, 'Padding', 'compact');
 
 % Axis tick labels for heatmap (same logic as Fig 5)
 xTickLabels_fig3 = arrayfun(@(k) sprintf('M%d', k), Bsim_unik, 'UniformOutput', false);
@@ -1460,11 +1464,11 @@ for iRow_metric = 1:nMetric_fig3
     end
 
     % ------------------------------------------------------------------ %
-    % Leftmost column: heatmap of mean NLL  (rows = fit model, cols = sim) %
+    % Heatmap of mean NLL  (rows = fit model, cols = sim) %
     % ------------------------------------------------------------------ %
     M_heatmap_fig3 = squeeze(GoF_ByFit_mean_fig3(iRow_metric, :, :))'; % nFit × nSim
 
-    axHeat = nexttile(tlo_fig3);
+    axHeat = nexttile(tileLayout_heat);
     hold(axHeat, 'on');
 
     M_heatmap_fig3 = M_heatmap_fig3(isfinite(M_heatmap_fig3));
@@ -1488,7 +1492,7 @@ for iRow_metric = 1:nMetric_fig3
         'XLim', [0.5, nSim_fig3+0.5], 'YLim', [0.5, nFit_fig3+0.5]);
     xlabel(axHeat, 'Generating model');
     ylabel(axHeat, 'Fitting model');
-    title(axHeat, [metricTitle ' RMSE']);
+    title(axHeat, [metricTitle ' NLL']);
     axis(axHeat, 'square');
     clim(axHeat, [cLo_h cHi_h]);
     cbar_h = colorbar(axHeat, 'Location', 'eastoutside');
@@ -1509,21 +1513,15 @@ for iRow_metric = 1:nMetric_fig3
         rectangle('Parent', axHeat, 'Position', [iSim_h-0.5, bestRow_h-0.5, 1, 1], 'EdgeColor', 'k', 'LineWidth', 2.5, 'LineStyle', '--');
     end
 
-    % Spacer tiles to separate the heatmap column from curve columns.
-    for iGap_fig3 = 1:nGapCols_fig3
-        axGap_fig3 = nexttile(tlo_fig3);
-        axis(axGap_fig3, 'off');
-    end
-
     % ------------------------------------------------------------------ %
-    % RIGHT: Curve panels: one per generating model                              %
+    % Curve panels: one per generating model                              %
     % ------------------------------------------------------------------ %
     for iCol_Bsim = 1:nSim_fig3
         simModel = Bsim_unik(iCol_Bsim);
 
         R_data = R([R.iModelB_sim] == simModel & [R.iModelB_fit] == 1);
 
-        axMain = nexttile(tlo_fig3);
+        axMain = nexttile(tileLayout_curve);
         hold(axMain, 'on');
         isFirstPanel = (iCol_Bsim == 1) && (iRow_metric == 1);
 
@@ -1532,8 +1530,7 @@ for iRow_metric = 1:nMetric_fig3
         dot_nMin = nan; dot_nMax = nan;
         dot_sMin = max(4, setting.markerSize * 0.5);
         dot_sMax = max(dot_sMin + 2, setting.markerSize * 1.5);
-å
-        % First pass: collect predicted curves and compute RMSE for all fit models
+        % First pass: collect predicted curves and compute RMSE for all fit models.
         nFit = numel(Bfit_unik);
         CpredAll_fig3 = cell(1, nFit);
         rmseAll_fig3  = nan(1, nFit);
@@ -1546,7 +1543,7 @@ for iRow_metric = 1:nMetric_fig3
             end
         end
 
-        % Identify matching and best-RMSE fit models
+        % Identify matching and best-RMSE fit models.
         matchFitIdx_fig3 = find(Bfit_unik == simModel, 1);
         finRmseIdx_fig3  = find(isfinite(rmseAll_fig3));
         if ~isempty(finRmseIdx_fig3)
@@ -1556,7 +1553,7 @@ for iRow_metric = 1:nMetric_fig3
             bestFitIdx_fig3 = [];
         end
 
-        % Second pass: grey curves (skip matching and best-non-matching)
+        % Second pass: gray curves (skip matching and best non-matching).
         for iFit = 1:nFit
             if iFit == matchFitIdx_fig3, continue; end
             if ~isempty(bestFitIdx_fig3) && iFit == bestFitIdx_fig3 && bestFitIdx_fig3 ~= matchFitIdx_fig3
@@ -1572,16 +1569,16 @@ for iRow_metric = 1:nMetric_fig3
             plot(CpredAll_fig3{matchFitIdx_fig3}.x, CpredAll_fig3{matchFitIdx_fig3}.y, 'Color', [1, 0, 0], 'LineStyle', '-', 'LineWidth', setting.lineWidth*1.5);
         end
 
-        % Plot best-RMSE model last: black dashed; label if not the matching model
+        % Plot best-RMSE model last using black dashed line.
         if ~isempty(bestFitIdx_fig3)
             Cbest = CpredAll_fig3{bestFitIdx_fig3};
             if ~isempty(Cbest.x)
                 % plot the curve
-                plot(Cbest.x, Cbest.y, 'Color', [0, 0, 0], 'LineStyle', '--', 'LineWidth', setting.lineWidth*1.5);å
+                plot(Cbest.x, Cbest.y, 'Color', [0, 0, 0], 'LineStyle', '--', 'LineWidth', setting.lineWidth*1.5);
             end
         end
 
-        % Plot dotså
+        % Plot dots
         if ~isempty(Cdata.x)
             mSizes = setting.markerSize * ones(size(Cdata.x));
             if ~isempty(nDataBins) && numel(nDataBins) == numel(Cdata.x)
@@ -1605,12 +1602,14 @@ for iRow_metric = 1:nMetric_fig3
         fxn_style_ax(gca, setting);
         set(gca, 'YGrid', 'off');
 
-        % x and y lavel
-        if iRow_metric == nMetric_fig3
-            xlabel('Collapsed DV bins');
-        end
+        % x and y label
         if iCol_Bsim == 1
+            xlabel('Collapsed DV bins');
             ylabel(metricTitle);
+        else
+            xlabel('');
+            ylabel('');
+            set(gca, 'XTickLabel', [], 'YTickLabel', []);
         end
 
         % Title
@@ -1621,6 +1620,8 @@ for iRow_metric = 1:nMetric_fig3
         end
         axis square
 
+        % xticks
+        xticks(0:2:8);
         % ylimits
         switch mName
             case 'pYES';  ylim([0 1]); yticks(0:.2:1)
@@ -1650,11 +1651,17 @@ for iRow_metric = 1:nMetric_fig3
     end % iCol_Bsim
 end % iRow_metric
 
-sgtitle('Fig 3: metric recovery', 'FontWeight', 'bold');
-set(findall(gcf,'-property','FontSize'), 'FontSize', 14);
+% Save heatmap and curve panels as separate figures
+sgtitle(tileLayout_heat, 'Fig 3a: metric NLL heatmaps', 'FontWeight', 'bold');
+set(findall(handle_heat,'-property','FontSize'), 'FontSize', 14);
+saveas(handle_heat, fullfile(nameFolder_Figures_part4, 'FigS3a_MetricHeatmap.png'));
+close(handle_heat);
 
-saveas(h, fullfile(nameFolder_Figures_part4, 'FigS3_MetricRecovery.png'));
-close(h);
+sgtitle(tileLayout_curve, 'Fig 3b: metric curves', 'FontWeight', 'bold');
+set(findall(handle_curve,'-property','FontSize'), 'FontSize', 14);
+saveas(handle_curve, fullfile(nameFolder_Figures_part4, 'FigS3b_MetricCurves.png'));
+close(handle_curve);
+
 fprintf('DONE\n\n')
 
 %% Figure 4: Parameter recovery
@@ -1867,13 +1874,17 @@ for iRow_param = 1:numel(setting.fig4_paramNames)
 
         % Define xlim and ylim
         xlim([mn mx]); ylim([mn mx]);
-        if ~isempty(tickVals)
-            if strcmp(pName, 'criterion_DV')
-                tickVals = round(linspace(mn, mx, 4), 1);
-                tickVals = unique(tickVals, 'stable');
+        if iCol_Bsimfit == 1
+            if ~isempty(tickVals)
+                if strcmp(pName, 'criterion_DV')
+                    tickVals = round(linspace(mn, mx, 4), 1);
+                    tickVals = unique(tickVals, 'stable');
+                end
+                xticks(tickVals);
+                yticks(tickVals);
             end
-            xticks(tickVals);
-            yticks(tickVals);
+        else
+            set(gca, 'XTick', [], 'YTick', []);
         end
 
         % one series per (signalCST x cSDT_true)
@@ -1923,11 +1934,13 @@ for iRow_param = 1:numel(setting.fig4_paramNames)
         axis square; fxn_style_ax(gca, setting_fig4);
         %=====================%
         set(gca, 'XGrid', 'off', 'YGrid', 'off');
-        if iRow_param == numel(setting.fig4_paramNames)
-            xlabel('True');
-        end
         if iCol_Bsimfit == 1
-            ylabel(pTitle);
+            xlabel(sprintf('True %s', pTitle));
+            ylabel(sprintf('Est. %s', pTitle));
+        else
+            xlabel('');
+            ylabel('');
+            set(gca, 'XTickLabel', [], 'YTickLabel', []);
         end
         Ppanel = fxn_collect_fig4_panel_points(  Rsub, pName, gaborCST_unik, cSDT_unik, setting.scalarCollapseFcn, nBins_Part4, criterionBinEdges_fig4);
         [rho_panel, ~, ~, rmse_panel] = fxn_param_recovery_stats(Ppanel.x, Ppanel.y);
@@ -1965,24 +1978,24 @@ idsPerSim_fig5 = cell(nSim_fig5, 1);
 rowsPerSimCondFit_fig5 = cell(nSim_fig5, 1);
 rowsPerSimFit_fig5 = cell(nSim_fig5, nFit_fig5);
 
-for iSim_fig5 = 1:nSim_fig5
-    simVal_fig5 = Bsim_unik(iSim_fig5);
+for iBsim_fig5 = 1:nSim_fig5
+    simVal_fig5 = Bsim_unik(iBsim_fig5);
     idxSimRows_fig5 = find(simAll_fig5 == simVal_fig5);
     idsSim_fig5 = unique(datasetIDs_fig5(idxSimRows_fig5));
-    idsPerSim_fig5{iSim_fig5} = idsSim_fig5;
+    idsPerSim_fig5{iBsim_fig5} = idsSim_fig5;
 
     rowsCell_fig5 = cell(numel(idsSim_fig5), nFit_fig5);
     for iID_fig5 = 1:numel(idsSim_fig5)
         idxCondRows_fig5 = idxSimRows_fig5(datasetIDs_fig5(idxSimRows_fig5) == idsSim_fig5(iID_fig5));
         fitCond_fig5 = fitAll_fig5(idxCondRows_fig5);
-        for iFit_fig5 = 1:nFit_fig5
-            rowsCell_fig5{iID_fig5, iFit_fig5} = idxCondRows_fig5(fitCond_fig5 == Bfit_unik(iFit_fig5));
+        for iBfit_fig5 = 1:nFit_fig5
+            rowsCell_fig5{iID_fig5, iBfit_fig5} = idxCondRows_fig5(fitCond_fig5 == Bfit_unik(iBfit_fig5));
         end
     end
-    rowsPerSimCondFit_fig5{iSim_fig5} = rowsCell_fig5;
+    rowsPerSimCondFit_fig5{iBsim_fig5} = rowsCell_fig5;
 
-    for iFit_fig5 = 1:nFit_fig5
-        rowsPerSimFit_fig5{iSim_fig5, iFit_fig5} = idxSimRows_fig5(fitAll_fig5(idxSimRows_fig5) == Bfit_unik(iFit_fig5));
+    for iBfit_fig5 = 1:nFit_fig5
+        rowsPerSimFit_fig5{iBsim_fig5, iBfit_fig5} = idxSimRows_fig5(fitAll_fig5(idxSimRows_fig5) == Bfit_unik(iBfit_fig5));
     end
 end
 
@@ -2034,17 +2047,17 @@ end
 M_curveRMSE = nan(nFit_fig5, nSim_fig5);
 M_paramRMSE = nan(nFit_fig5, nSim_fig5);
 
-for iSim = 1:nSim_fig5
+for iBsim = 1:nSim_fig5
     for iFit = 1:nFit_fig5
         fitModel = Bfit_unik(iFit);
-        rowsSimFit_fig5 = rowsPerSimFit_fig5{iSim, iFit};
+        rowsSimFit_fig5 = rowsPerSimFit_fig5{iBsim, iFit};
         Rsub = R(rowsSimFit_fig5);
         if isempty(Rsub), continue; end
 
         % metric RMSE
         rmseMetricVals = [[Rsub.pYES_rmse]'; [Rsub.pC_rmse]'; [Rsub.pA_rmse]'];
         % rmseMetricVals = [Rsub.pA_rmse]';
-        [M_curveRMSE(iFit, iSim), ~, ~] = getCI(rmseMetricVals, 2, 1);
+        [M_curveRMSE(iFit, iBsim), ~, ~] = getCI(rmseMetricVals, 2, 1);
 
         % parameter RMSE
         rmseParamFields = strcat(namesModelBparams_short{fitModel}, '_rmse');
@@ -2054,7 +2067,7 @@ for iSim = 1:nSim_fig5
             vals = [Rsub.(rmseParamFields{iFld})]';
             rmseParamVals = [rmseParamVals; vals]; %#ok<AGROW>
         end
-        [M_paramRMSE(iFit, iSim), ~, ~] = getCI(rmseParamVals, 2, 1);
+        [M_paramRMSE(iFit, iBsim), ~, ~] = getCI(rmseParamVals, 2, 1);
     end
 end
 
@@ -2098,7 +2111,7 @@ end
 % Layout: 2x2
 %   (1,1) Win rate      (1,2) Metric RMSE
 %   (2,1) Median ΔnLL   (2,2) Param RMSE
-panels_fig5 = {  W_bestNLL,   'Win rate (% iters, avg over conds)',  [0 1];  M_deltaNLL,  'ΔNLL from the best model', [ 0 160];  M_curveRMSE, 'Metrics RMSE',            [0.05, 0.07];  M_paramRMSE, 'Parameters RMSE',             [1 2.8] };
+panels_fig5 = {  W_bestNLL,   'Win rate (% iters, avg over conds)',  [0 1];  M_deltaNLL,  'ΔNLL (compared to the best model)', [ 0 160];  M_curveRMSE, 'Metrics RMSE',            [0.05, 0.07];  M_paramRMSE, 'Parameters RMSE',             [1 2.8] };
 
 % tile order in a 2x2 tiledlayout (row-major): (1,1),(1,2),(2,1),(2,2)
 % desired: WinRate, MetricRMSE, DeltaNLL, ParamRMSE
@@ -2110,20 +2123,20 @@ tlo = tiledlayout(2, 2, 'TileSpacing', 'loose', 'Padding', 'loose');
 % Use model names for axis ticks when available.
 xTickLabels_fig5 = arrayfun(@(k) sprintf('M%d', k), Bsim_unik, 'UniformOutput', false);
 yTickLabels_fig5 = arrayfun(@(k) sprintf('M%d', k), Bfit_unik, 'UniformOutput', false);
-if exist('namesModelB', 'var') && ~isempty(namesModelB)
-    for iLab = 1:numel(Bsim_unik)
-        k = Bsim_unik(iLab);
-        if k >= 1 && k <= numel(namesModelB)
-            xTickLabels_fig5{iLab} = char(string(namesModelB{k}));
-        end
-    end
-    for iLab = 1:numel(Bfit_unik)
-        k = Bfit_unik(iLab);
-        if k >= 1 && k <= numel(namesModelB)
-            yTickLabels_fig5{iLab} = char(string(namesModelB{k}));
-        end
-    end
-end
+% if exist('namesModelB', 'var') && ~isempty(namesModelB)
+%     for iLab = 1:numel(Bsim_unik)
+%         k = Bsim_unik(iLab);
+%         if k >= 1 && k <= numel(namesModelB)
+%             xTickLabels_fig5{iLab} = char(string(namesModelB{k}));
+%         end
+%     end
+%     for iLab = 1:numel(Bfit_unik)
+%         k = Bfit_unik(iLab);
+%         if k >= 1 && k <= numel(namesModelB)
+%             yTickLabels_fig5{iLab} = char(string(namesModelB{k}));
+%         end
+%     end
+% end
 
 % Loop over tiles in specified order to control color limits and annotations per panel.
 nTiltes=4;
@@ -2471,6 +2484,11 @@ if cacheLoaded_fig6
     for iPair = 1:nCols_fig6
         for iModel = 1:nRows_fig6
             nexttile((iPair-1)*nRows_fig6 + iModel); hold on;
+
+            panelTitle_fig6 = sprintf('M%d %s', Bdiag_fig6(iModel), namesModelB{Bdiag_fig6(iModel)});
+            if iPair == 1
+                title(panelTitle_fig6);
+            end
 
             yMean = squeeze(permStats_fig6.observedMean(iPair, iModel, :));
             ySem = squeeze(permStats_fig6.observedSem(iPair, iModel, :));
