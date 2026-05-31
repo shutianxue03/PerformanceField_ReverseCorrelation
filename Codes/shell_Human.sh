@@ -4,7 +4,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=32G
-#SBATCH --time=01:00:00
+#SBATCH --time=00:30:00
 #SBATCH --output=Logs/Human_%A_%a.out
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=shutianxue30@gmail.com

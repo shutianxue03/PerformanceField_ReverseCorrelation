@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+O#!/usr/bin/env bash
 set -euo pipefail
 
 # ============================================================
@@ -12,7 +12,7 @@ array_script="${project_root}/Codes/shell_Human.sh"
 
 # Settings; override with environment variables when needed.
 batch_size="${BATCH_SIZE:-4999}"        # number of array tasks per submitted batch
-max_running="${MAX_RUNNING:-250}"       # Slurm array throttle
+max_running="${MAX_RUNNING:-375}"       # Slurm array throttle
 sleep_seconds="${SLEEP_SECONDS:-2}"     # small pause between sbatch calls
 
 if [[ ! -f "${param_file}" ]]; then

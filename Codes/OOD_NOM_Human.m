@@ -27,8 +27,18 @@ if ~exist('C_contribution', 'var'), C_contribution = nan; end
 if ~exist('flag_regressType', 'var'), flag_regressType = nan; end
 
 % Model sets to run.
-iModelA_fit_all = 1:2;
+iModelA_fit_all = 1;
 iModelB_fit_all = 1:7;
+
+% Set hyperparameters
+hyperparams = [];
+
+hyperparams.nBasisORI = 3;%3:2:9;
+hyperparams.nBasisSF = 3;%3:2:9;
+hyperparams.basisWidthORI = .6;%.3:.2:.9;
+hyperparams.basisWidthSF = .4;%.3:.2:.9;
+hyperparams.asymSF_rightLeftRatio = 0.9;%1.1:.2:1.5;
+hyperparams.Ridge = 100;%[1,10,100];
 
 % Human-readable subject name for logging.
 subjList = {'YK', 'SP', 'SX', 'LS', 'RE', 'MD', 'AS', 'HL', 'FH', 'HA', 'CS', 'DT', 'DU', 'RC', 'SR'};
@@ -43,7 +53,7 @@ fprintf(' - Fit ModelA = %s\n', strjoin(string(iModelA_fit_all), ' '));
 fprintf(' - Fit ModelB = %s\n', strjoin(string(iModelB_fit_all), ' '));
 
 %% Part 1: compute DVs/templates (A1 + A2)
-OOD_NOM_Trialwise_compDV_A12(isubj, iLocComb, nIter, nJob, iJob, flag_normDV)
+OOD_NOM_Trialwise_compDV_A12(isubj, iLocComb, nIter, nJob, iJob, flag_normDV, hyperparams)
 
 %% Part 2: fit NOM for all A/B combinations
 for iModelA_fit = iModelA_fit_all
