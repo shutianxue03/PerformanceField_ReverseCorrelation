@@ -2418,8 +2418,8 @@ for iRun=1%[1,3,4]
     flag_plotIDVD = 0;
     flag_plotDiff = 1;
     
-    y_ticks = linspace(0, 16, 5);
-    sz_label = 40;
+    y_ticks = linspace(0, 20, 5);
+    sz_label = 20;
     sz_text = sz_label;
     wd = 2;
     y_ticklabels = nan;
@@ -2428,7 +2428,7 @@ for iRun=1%[1,3,4]
     for iLocSingle = 1:nLocComb8
 
         nBars = numel(iModelB_selected);
-        sz_fig = [nBars * 180, 100+nchoosek(nBars, 2)*50];
+        sz_fig = [nBars * 180, 0+nchoosek(nBars, 2)*40];
 
         % Extract raw nLL: [ModelB x Subj x Iter]
         nLL_allIter = squeeze(nLL_allCond(iModelA_selected, iModelB_selected, iLocSingle, :, :, :));
@@ -2460,7 +2460,7 @@ for iRun=1%[1,3,4]
         ref = nan;
 
         % ------------------------------%
-        fxn_drawBars(dnLL_allIter_allSubj, ref, repmat(colors_comb(iLocSingle, :), nBars, 1), namesModelB(iModelB_selected), y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, 1, markers_allSubj, sz_text, wd);
+        [pperm_allPairs , pairs] = fxn_drawBars(dnLL_allIter_allSubj, ref, repmat(colors_comb(iLocSingle, :), nBars, 1), namesModelB(iModelB_selected), y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, 1, markers_allSubj, sz_text, wd);
         % ------------------------------%
         % ylim(y_ticks([1, end]))
 
@@ -2545,7 +2545,8 @@ for iRun=1%[1,3,4]
             plot([iA iB], [y y], 'k-', 'LineWidth', wd, 'HandleVisibility','off');
 
             % --- text label (left-aligned, above the bracket line) ---
-            str_delta = sprintf('$\\Delta=%+.2f, \\; [%+.2f, %+.2f]$', diffCond_med(iPair), diffCond_lb(iPair), diffCond_ub(iPair));
+            % "pperm_allPairs(1)" is hard-coded!! 1=comparing Full vs. NoMul
+            str_delta = sprintf('$\\Delta=%+.2f, \\; [%+.2f, %+.2f], p=%.3f$', diffCond_med(iPair), diffCond_lb(iPair), diffCond_ub(iPair), pperm_allPairs(1));
 
             xText = iA; % left end of bracket
             yText = y + 0.02*yRange; % a bit above the bracket line (tune 0.02)
@@ -2582,7 +2583,7 @@ for iRun=1%[1,3,4]
         saveas(gcf, fullfile(nameFolder_Fig_NOM_nLL, sprintf('n%d_L%d_ModelB%s.png', nSubj, iLocSingle, strjoin(string(iModelB_selected), ''))));
         % close(gcf); % do NOT close here, as we need to copy the axis geometry for the box-code figure; close at the end of the loop after copying geometry.
 
-        % % ======== Plot the box-code figure (only once) ========
+        % ======== Plot the box-code figure (only once) ========
         if iLocSingle==1
 
             figMain = gcf;
@@ -2664,7 +2665,7 @@ for iRun=1%[1,3,4]
     clear nLL_allCond
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
-    %% [NOM] Compare NOM parameters across locations
+    %% 18. [NOM] Compare NOM parameters across locations
     % Load data
     load(nameFolder_Data_SaveCompile, 'params_allCond')
     clc; fprintf('\n%s: Fig 18/23: Compare NOM params across locations STARTED.\n', string(datetime('now')))
@@ -2678,7 +2679,7 @@ for iRun=1%[1,3,4]
     nBars = 2;
     sz_fig = [nBars * 150, 300+nchoosek(nBars, 2)*30];
 
-    for iModelB_NOMplot = iModelB_plot_all
+    for iModelB_NOMplot = 2; %iModelB_plot_all % Only plot NoMul
 
         % Number of parameters for this Model B
         nNOMparams = numel(namesModelBparams{iModelB_NOMplot});
@@ -2697,26 +2698,28 @@ for iRun=1%[1,3,4]
                     NOMp_allIter_allSubj = squeeze(params_allCond(iModelA_plot, iModelB_NOMplot, iLocPair_all, :, :, iParam));
 
                     x_ticks = namesLocComb(iLocPair_all);
-                    switch nNOMparams
-                        case 2
+                    switch iModelB_NOMplot
+                        case 1 % FullModel
                             switch iParam
-                                case 1, y_ticks = linspace(NOMp2_lb, 40, 5);
-                                case 2, y_ticks = linspace(NOMp3_lb, 40, 5);
+                                case 1, y_ticks = linspace(NOMp2_lb, 1.2, 5);
+                                case 2, y_ticks = linspace(NOMp3_lb, 3, 5);
+                                case 3, y_ticks = linspace(NOMp3_lb, 3, 5);
+                                case 4, y_ticks = linspace(NOMp3_lb, 40, 5);
                             end
-                        case 3
+                        case 2 % NoMul
                             switch iParam
-                                case 1, y_ticks = linspace(NOMp1_lb, .8, 5);
-                                case 2, y_ticks = linspace(NOMp2_lb, 40, 5);
+                                case 1, y_ticks = linspace(NOMp1_lb, 3, 5);
+                                case 2, y_ticks = linspace(NOMp2_lb, 3, 5);
                                 case 3, y_ticks = linspace(NOMp3_lb, 40, 5);
                             end
                     end
                     y_ticklabels = round(y_ticks, 2);
 
                     str_title = sprintf('n=%d nIter=%d L%s [A%dB%d] %s', nSubj, nIterxJob, strjoin(string(iLocPair_all), ''), iModelA_plot, iModelB_NOMplot, namesModelBparams{iModelB_NOMplot}{iParam});
-                    sz_text = 25;
-                    wd = 3;
+                    sz_text = 20;
+                    wd = 2;
                     %------------------------------%
-                    fxn_drawBars(NOMp_allIter_allSubj, ref, colors_comb(iLocPair_all, :), x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd)
+                    fxn_drawBars(NOMp_allIter_allSubj, ref, colors_comb(iLocPair_all, :), x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd);
                     %------------------------------%
                     ylabel(sprintf('%s', namesModelBparams{iModelB_NOMplot}{iParam}))
                     % Save the figure
@@ -2729,7 +2732,7 @@ for iRun=1%[1,3,4]
     clear params_allCond
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
-    %% [NOM] Corr1: pA and NOM params
+    %% 19. [NOM] Corr1: pA and NOM params
     clc; fprintf('\n%s: Fig 19/23: Corr pA vs NOM params STARTED.\n', string(datetime('now')))
 
     % Load data
@@ -2738,8 +2741,8 @@ for iRun=1%[1,3,4]
     nameVarY = 'NOMparams';
 
     sz_label = 55;
-    sz_labelOffset = .05;
-    sz_axOffset = 0.05; % extra breathing room
+    sz_labelOffset = 0.02; % normalized units to move labels away from axes; tune as needed
+    sz_axOffset = 0.05; % normalized units to move axes away from figure edges; tune as needed
 
     nameFolder_Fig_NOM_corr = sprintf('%s/Corr/%s_%s', nameFolder_Fig_NOM_Trialwise, nameVarX, nameVarY);
     if isempty(dir(nameFolder_Fig_NOM_corr)); mkdir(nameFolder_Fig_NOM_corr), end
@@ -2751,7 +2754,7 @@ for iRun=1%[1,3,4]
     flag_plotIdvdCI = 0;
     flag_plotUnikSymbol = 0; % 1=each subj has a unique marker; 0=all are circles
 
-    for iModelB_NOMplot = iModelB_plot_all
+    for iModelB_NOMplot = 2%iModelB_plot_all % Just plot NoMul!!
         nNOMparams = length(namesModelBparams{iModelB_NOMplot});
 
         for iSet = 1:numel(iLocSingle_allSets)
@@ -2770,7 +2773,7 @@ for iRun=1%[1,3,4]
 
                 switch iModelB_NOMplot
                     case 1, y_ticks_lb = [0, 0, 0, 0]; y_ticks_ub = [.8, 30, 30, 40];
-                    case 2, y_ticks_lb = [0, 0, 0]; y_ticks_ub = [30, 30, 40];
+                    case 2, y_ticks_lb = [0, 0, 0]; y_ticks_ub = [3, 3, 40];
                     case 3, y_ticks_lb = [0, 0, 0]; y_ticks_ub = [.8, 30, 40];
                     case 4, y_ticks_lb = [0, 0, 0]; y_ticks_ub = [.8, 30, 40];
                     case 5, y_ticks_lb = [0, 0]; y_ticks_ub = [.8, 40];
@@ -2795,7 +2798,7 @@ for iRun=1%[1,3,4]
                 % Save CI for automatic CI range calcuation in CorrAsym
                 save(sprintf('%s/n%d_B%d_L%s_NOMp%d.mat', nameFolder_Outputs_NOM_corr, nSubj, iModelB_NOMplot, strjoin(string(iLocCorr_all), ''), iNOMparam), 'PearsonR', 'SpearmanRho')
 
-                xlabel('Resp. consistency', 'fontsize', sz_label)
+                xlabel('Consistency rate', 'fontsize', sz_label)
                 ylabel(nameVarY_figTitle, 'fontsize', sz_label)
 
                 % Adjust distance between components
@@ -2918,7 +2921,7 @@ for iRun=1%[1,3,4]
     % clear params_allCond
     % fprintf('\n\n Plotting DONE\n\n')
 
-    %% [NOM] Corr2: CS and NOM params
+    %% 20. [NOM] Corr2: CS and NOM params
     clc; fprintf('\n%s: Fig 20/23: Corr CS vs NOM params STARTED.\n', string(datetime('now')))
 
     % Load data
@@ -2928,7 +2931,7 @@ for iRun=1%[1,3,4]
     nameVarY = 'NOMparams';
 
     sz_label = 55;
-    sz_labelOffset = .05;
+    sz_labelOffset = 0.02;
     sz_axOffset = 0.05; % extra breathing room
 
     nameFolder_Fig_NOM_corr = sprintf('%s/Corr/%s_%s', nameFolder_Fig_NOM_Trialwise, nameVarX, nameVarY);
@@ -2941,7 +2944,7 @@ for iRun=1%[1,3,4]
     flag_plotIdvdCI = 0;
     flag_plotUnikSymbol = 0; % 1=each subj has a unique marker; 0=all are circles
 
-    for iModelB_NOMplot = iModelB_plot_all
+    for iModelB_NOMplot = 2;%iModelB_plot_all % Only plot NoMul!
         nNOMparams = length(namesModelBparams{iModelB_NOMplot});
 
         for iSet = 1:numel(iLocSingle_allSets)
@@ -2962,7 +2965,7 @@ for iRun=1%[1,3,4]
 
                 switch iModelB_NOMplot
                     case 1, y_ticks_lb = [0, 0, 0, 0]; y_ticks_ub = [.6, 32, 32, 40];
-                    case 2, y_ticks_lb = [0, 0, 0]; y_ticks_ub = [32, 32, 40];
+                    case 2, y_ticks_lb = [0, 0, 0]; y_ticks_ub = [3, 3, 40];
                     case 3, y_ticks_lb = [0, 0, 0]; y_ticks_ub = [.6, 32, 40];
                     case 4, y_ticks_lb = [0, 0, 0]; y_ticks_ub = [.6, 32, 40];
                     case 5, y_ticks_lb = [0, 0]; y_ticks_ub = [.6, 40];
@@ -3013,7 +3016,7 @@ for iRun=1%[1,3,4]
     clear params_allCond
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
-    %% [NOM] CorrAsym2: CS and NOMparams: corr between extents of EE/HVA/VMA
+    %% 21. [NOM] CorrAsym2: CS and NOMparams: corr between extents of EE/HVA/VMA
     clc; fprintf('\n%s: Fig 21/23: CorrAsym CS vs NOM params STARTED.\n', string(datetime('now')))
 
     % Load data
@@ -3036,7 +3039,7 @@ for iRun=1%[1,3,4]
     flag_plotUnikSymbol = 0;
     iLocCorr_all = [6,5,3];
 
-    for iModelB_NOMplot = iModelB_plot_all
+    for iModelB_NOMplot = 2; %iModelB_plot_all % Only plot NoMul!
         nNOMparams = length(namesModelBparams{iModelB_NOMplot});
 
         for iGroup = 1:nGroups

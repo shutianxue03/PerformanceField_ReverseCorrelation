@@ -1,4 +1,4 @@
-function fxn_drawBars( ...
+function [pperm_allPairs, pairs]=fxn_drawBars( ...
     data_allIter_allSubj, ref, colors, x_ticklabels, y_ticks, y_ticklabels, ...
     flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIter, markers_allSubj, sz_text, wd)
 
@@ -41,7 +41,7 @@ assert(nSubj2 == nSubj && nCond2 == nCond, 'ALERT: Reshaped matrix has wrong nSu
 
 pairs  = nchoosek(1:nCond, 2);
 nPairs = size(pairs, 1);
-
+nPairs = min([6,nPairs]) ; % Only plot the first 6 pairs for now (to avoid clutter); change to "1:nPairs" to do all pairs
 %% Obtain median and CI of the data
 [data_med_allSubj, ~, ~] = getCI(data_allIter_allSubj, 1, 1, CI95); % [nSubj x nCond] median over iters
 
