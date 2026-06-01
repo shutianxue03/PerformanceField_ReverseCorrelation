@@ -99,6 +99,7 @@ tail_all = {'left','both','right'};
 tail_lab = {'L','2','R'};
 nTails = numel(tail_all);
 
+% 
 p_perm_pearson_all  = nan(1,nTails);
 p_perm_spearman_all = nan(1,nTails);
 p_perm_kendall_all  = nan(1,nTails);
@@ -275,10 +276,10 @@ xline(0, '--', 'Color', ones(1,3)/2, 'LineWidth', wd_ref);
 yline(0, '--', 'Color', ones(1,3)/2, 'LineWidth', wd_ref);
 
 %% ---- 9) Axes ticks/limits ----
-if ~isnan(x_ticks), xticks(x_ticks); xlim(x_ticks([1 end])); end
-if ~isnan(y_ticks), yticks(y_ticks); ylim(y_ticks([1 end])); end
-if ~isnan(x_ticklabels), xticklabels(x_ticklabels); end
-if ~isnan(y_ticklabels), yticklabels(y_ticklabels); end
+% if ~isnan(x_ticks), xticks(x_ticks); xlim(x_ticks([1 end])); end
+% if ~isnan(y_ticks), yticks(y_ticks); ylim(y_ticks([1 end])); end
+% if ~isnan(x_ticklabels), xticklabels(x_ticklabels); end
+% if ~isnan(y_ticklabels), yticklabels(y_ticklabels); end
 
 axis square
 xabs = gca;
@@ -287,7 +288,7 @@ xabs.YAxis.FontSize = fsz_ticks;
 xabs.LineWidth = wd_border;
 
 %% ---- 10) Title / annotation ----
-pstr_pearson  = sprintf('p(%s/%s/%s)=[%.3f, %.3f, %.3f]', tail_lab{:}, p_perm_pearson_all);
+pstr_pearson  = sprintf('p(%s/%s/%s)=[%.3f, %.3f, %.3f]', tail_lab{:}, p_perm_pearson_all); % p-values for left/2/right tails
 pstr_spearman = sprintf('p(%s/%s/%s)=[%.3f, %.3f, %.3f]', tail_lab{:}, p_perm_spearman_all);
 pstr_kendall  = sprintf('p(%s/%s/%s)=[%.3f, %.3f, %.3f]', tail_lab{:}, p_perm_kendall_all);
 
@@ -304,11 +305,19 @@ str_corr = sprintf([ ...
 title(sprintf('%s %.0f%% CI \n%s\n', str_title, CI_level*100, str_corr));
 
 %% Print string at the bottom-center
+if flag_CIrange == 1
+    p_print_pearson = min(p_perm_pearson_all(1:2));
+    p_print_spearman = min(p_perm_spearman_all(1:2));
+else
+    p_print_pearson = p_perm_pearson_all(2);
+    p_print_spearman = p_perm_spearman_all(2);
+end
+
 switch flag_UseRUseRho
     case 'useR'
-        str_print = sprintf('r = %.2f, CI_{%.0f}=[%.2f, %.2f]', r_med, CI_level*100, r_lb, r_ub);
+        str_print = sprintf('r=%+.2f, CI_{%.0f}=[%+.2f, %+.2f], p=%.3f', r_med, CI_level*100, r_lb, r_ub, p_print_pearson);
     case 'useRho'
-        str_print = sprintf('\\rho = %.2f, CI_{%.0f}=[%.2f, %.2f]', rho_med, CI_level*100, rho_lb, rho_ub);
+        str_print = sprintf('\\rho=%+.2f, CI_{%.0f}=[%+.2f, %+.2f], p=%.3f', rho_med, CI_level*100, rho_lb, rho_ub, p_print_spearman);
 end
 
 xabs = gca;

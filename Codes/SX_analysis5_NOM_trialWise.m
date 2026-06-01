@@ -465,7 +465,7 @@ for iRun=1%[1,3,4]
 
     end
 
-    %% Behavioral metrics: paired locations
+    %% 1. Behavioral metrics: paired locations
     clc; fprintf('\n%s: Fig 1/23: Behavioral metrics (paired locations) STARTED.\n', string(datetime('now')))
 
     % Load data
@@ -478,7 +478,7 @@ for iRun=1%[1,3,4]
     flag_plotIDVD = 1;
     flag_plotDiff = 1;
     namesMetrics_behav = {'CS', 'pA', 'dprime', 'criterion', 'pC', 'RT'}; nMetrics_behav = length(namesMetrics_behav);
-    namesMetrics_behav_long = {'Contrast sensitivity', 'Resp. consisteny', 'Dprime', 'Criterion', 'Accuracy', 'Resp. time'};
+    namesMetrics_behav_long = {'Contrast sensitivity', 'Consistency rate', 'Dprime', 'Criterion', 'Accuracy', 'Resp. time'};
     [d70,~] = SX_sim06_SDT(.7, .3);
 
     sz_wd_perBar = 180;
@@ -489,20 +489,22 @@ for iRun=1%[1,3,4]
         iLocPair_all = iLocGroups_all{iGroup};
         for iMetric_prob = 1:nMetrics_behav
             switch iMetric_prob
-                case 1, iMetric_vec = 10; x_ticks = linspace(1.6, 3.6, 5); flag_plotIDVD = 1; ref=nan;
-                case 2, iMetric_vec = 6; x_ticks = linspace(.5, .9, 5); flag_plotIDVD = 1; ref=nan;
-                case 3, iMetric_vec = 1; x_ticks = linspace(0, 1.6, 5); flag_plotIDVD = 0; ref=d70;
-                case 4, iMetric_vec = 2; x_ticks = linspace(-1,1, 5); flag_plotIDVD = 0; ref=0;
-                case 5, iMetric_vec = 3; x_ticks = linspace(.5, .9, 5); flag_plotIDVD = 0; ref=.7;
-                case 6, iMetric_vec = 11; x_ticks = linspace(0, .2, 5); flag_plotIDVD = 0; ref=nan;
+                case 1, iMetric_vec = 10; x_ticks = linspace(0,4, 5); flag_plotIDVD = 1; ref=nan; % CS
+                case 2, iMetric_vec = 6; x_ticks = linspace(.5, .9, 5); flag_plotIDVD = 1; ref=nan; % pA
+                case 3, iMetric_vec = 1; x_ticks = linspace(0, 1.6, 5); flag_plotIDVD = 0; ref=d70; % dprime
+                case 4, iMetric_vec = 2; x_ticks = linspace(-1, 1, 5); flag_plotIDVD = 0; ref=0; % SDT criterion 
+                case 5, iMetric_vec = 3; x_ticks = linspace(.5, .9, 5); flag_plotIDVD = 0; ref=.7; % pC
+                case 6, iMetric_vec = 11; x_ticks = linspace(0, .2, 5); flag_plotIDVD = 0; ref=nan; % RT
             end
             x_ticks = round(x_ticks, 2);
 
             data_allIter_allSubj = squeeze(metrics_allCond(iModelA_plot, iLocPair_all, :, :, iDataset_plotNOM, iMetric_vec));
 
             str_title = sprintf('n=%d %s nIter=%d L%d%d', nSubj, namesMetrics_behav{iMetric_prob}, nIterxJob, iLocPair_all);
+            sz_text = 22;
+            wd = 3;
             %------------------------------%
-            fxn_drawBars(data_allIter_allSubj, ref, colors_comb(iLocPair_all, :), namesLocComb(iLocPair_all), x_ticks, x_ticks, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj)
+            fxn_drawBars(data_allIter_allSubj, ref, colors_comb(iLocPair_all, :), namesLocComb(iLocPair_all), x_ticks, x_ticks, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd)
             %------------------------------%
             ylabel(namesMetrics_behav_long{iMetric_prob})
             saveas(gcf, sprintf('%s/n%d_L%d%d_%s.png', nameFolder_Fig_behav, nSubj, iLocPair_all, namesMetrics_behav{iMetric_prob}))
@@ -512,7 +514,7 @@ for iRun=1%[1,3,4]
     clear metrics_allCond
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
-    %% Behavioral metrics: single locations
+    %% 2. Behavioral metrics: single locations
     clc; fprintf('\n%s: Fig 2/23: Behavioral metrics (single locations) STARTED.\n', string(datetime('now')))
     % Load data
     load(nameFolder_Data_SaveCompile, 'metrics_allCond')
@@ -524,7 +526,7 @@ for iRun=1%[1,3,4]
     flag_plotIDVD = 1;
     flag_plotDiff = 1;
     namesMetrics_behav = {'CS', 'pA', 'dprime', 'criterion', 'pC', 'RT'}; nMetrics_behav = length(namesMetrics_behav);
-    namesMetrics_behav_long = {'Contrast sensitivity', 'Resp. consisteny', 'Dprime', 'Criterion', 'Accuracy', 'Resp. time'};
+    namesMetrics_behav_long = {'Contrast sensitivity', 'Consistency rate', 'Dprime', 'Criterion', 'Accuracy', 'Resp. time'};
     [d70,~] = SX_sim06_SDT(.7, .3);
 
     sz_wd_perBar = 150;
@@ -550,8 +552,10 @@ for iRun=1%[1,3,4]
             data_allIter_allSubj = squeeze(metrics_allCond(iModelA_plot, iLocSingle_perSet, :, :, iDataset_plotNOM, iMetric_vec));
 
             str_title = sprintf('n=%d %s nIter=%d L%s', nSubj, namesMetrics_behav{iMetric_prob}, nIterxJob, strjoin(string(iLocSingle_perSet), ''));
+            sz_text = 22;
+            wd = 3;
             %------------------------------%
-            fxn_drawBars(data_allIter_allSubj, ref, colors_comb(iLocSingle_perSet, :), namesLocComb(iLocSingle_perSet), x_ticks, x_ticks, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj)
+            fxn_drawBars(data_allIter_allSubj, ref, colors_comb(iLocSingle_perSet, :), namesLocComb(iLocSingle_perSet), x_ticks, x_ticks, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd)
             % ------------------------------%
             ylabel(namesMetrics_behav_long{iMetric_prob})
 
@@ -562,7 +566,7 @@ for iRun=1%[1,3,4]
     clear metrics_allCond
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
-    %% Templates for IDVD and group averages
+    %% 3. Templates for IDVD and group averages
     clc; fprintf('\n%s: Fig 3/23: Templates (group averages) STARTED.\n', string(datetime('now')))
     % Load data
     load(nameFolder_Data_SaveCompile, 'template_*_allCond')
@@ -592,7 +596,7 @@ for iRun=1%[1,3,4]
             if iLocComb==1
                 cLim = [-.03, .26];
             else
-                cLim = [-.02, .14];
+                cLim = [-1, 8]*1e-3;
                 pixMin = min(pixMin, min(e2D_ave(:)));
                 pixMax = max(pixMax, max(e2D_ave(:)));
             end
@@ -609,11 +613,11 @@ for iRun=1%[1,3,4]
 
             figure('Position', [0, 0, 2e3, 1.8e3])
             for isubj = 1:nSubj
-
                 e2D = squeeze(template_med_allSubj(iiLoc, isubj, :,:))';
-
                 subplot(nRows_subj, nCols_subj, isubj), hold on
+                %-----------------%
                 RCplot_2Dkernel(e2D, nan)
+                %-----------------%
                 % function RCplot_2Dkernel(data2D, caxisLim, outline_pos, outline_neg)
                 title(subjList{isubj})
 
@@ -634,7 +638,7 @@ for iRun=1%[1,3,4]
     clear template_*_allCond
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
-    %% Separability
+    %% 4. Separability
     clc; fprintf('\n%s: Fig 4/23: Separability analysis STARTED.\n', string(datetime('now')))
     str_dataset = namesDataset{iDataset_plotRC};
 
@@ -677,17 +681,19 @@ for iRun=1%[1,3,4]
         y_ticks = [0.6 0.7 0.8 0.9 1.0];
         y_ticklabels = y_ticks;
 
-        flag_plotIDVD = 1; % show subject-level lines (recommended)
+        flag_plotIDVD = 0; % show subject-level lines (recommended)
         flag_plotDiff = 0; % only meaningful when nCond==2 (turn on if you want)
-        sz_wd_perBar = 200;
+        sz_wd_perBar = 150;
         nBars =nLoc;
         sz_fig = [nBars*sz_wd_perBar, 300+nchoosek(nBars,2)*50];
 
         str_loc = strjoin(string(iLocSingle_perSet), '');
         str_title = sprintf('n%d nIter=%d [A%dB%d] L%s %s', nSubj, nIterxJob, iModelA_plot, iModelB_plot, str_loc, str_dataset);
+        sz_text = 22;
+        wd = 3;
 
         % -------------------%
-        fxn_drawBars(data_allIter_allSubj, ref, colors, x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj);
+        fxn_drawBars(data_allIter_allSubj, ref, colors, x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd);
         % -------------------%
         ylabel('Separability (Pearson''s r)')
 
@@ -716,7 +722,7 @@ for iRun=1%[1,3,4]
     clear sep_allCond
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
-    %% Tuning functions: group averages
+    %% 5. Tuning functions: group averages
     clc; fprintf('\n%s: Fig 5/23: Tuning functions (group averages) STARTED.\n', string(datetime('now')))
     % Load data
     load(nameFolder_Data_SaveCompile, 'marg*_allCond', 'margPred*_allCond', 'margR2*_allCond')
@@ -761,14 +767,14 @@ for iRun=1%[1,3,4]
                         margPred_allCond = margPred_ORI_allCond;
                         margR2_allCond = margR2_ORI_allCond;
                         if find(iLocPair_all==1), yticks_ = [-.03, linspace(0, .24, 4)]; % fov vs. peri, higher ub
-                        else, yticks_ = [-.03, linspace(0, .12, 4)];
+                        else, yticks_ = linspace(-1, 5, 5)*1e-3; %yticks_ = [-.03, linspace(0, .12, 4)];
                         end
                     else % SF tuning fxn
                         marg_allCond = margSF_allCond;
                         margPred_allCond = margPred_SF_allCond;
                         margR2_allCond = margR2_SF_allCond;
                         if find(iLocPair_all==1), yticks_ = [-.01, linspace(0, .12, 4)];
-                        else, yticks_ = [-.01, linspace(0, .06, 4)]; %[-.02, 0, .02, .04, .06];
+                        else, yticks_ = linspace(-.5, 2, 5)*1e-3; %[-.02, 0, .02, .04, .06];
                         end
                     end
 
@@ -809,8 +815,8 @@ for iRun=1%[1,3,4]
                     plot(xaxis, marg_med, 's', 'color', color_comb, 'MarkerFaceColor', 'w', 'MarkerSize', 15, 'HandleVisibility','off')
 
                     % Draw reference lines
-                    yline(0, '--', 'handlevisibility', 'off', 'linewidth', wd_border*1.5, 'color', [.7, .7, .7]);
-                    xline(iFeature-1, '--', 'handlevisibility', 'off', 'linewidth', wd_border*1.5, 'color', [.7, .7, .7]);
+                    yline(0, '--', 'handlevisibility', 'off', 'linewidth', wd_border*2, 'color', [.7, .7, .7]);
+                    xline(iFeature-1, '--', 'handlevisibility', 'off', 'linewidth', wd_border*2, 'color', [.7, .7, .7]);
 
                     % Set ticks, labels and limits (for EACH loc, to print R2 at the right loc)
                     xlabel(namesFeature_axis{iFeature})
@@ -824,21 +830,17 @@ for iRun=1%[1,3,4]
                     xticklabels(axisTL_tuning{iFeature})
                     if iFeature==2, xticklabels(round(axisTL_tuning{iFeature}, 2)), end
 
-                    % Print R2 in the figure
-                    xlims = axisLim{iFeature};
-                    switch iFeature
-                        % case 1, x_R2 = xlims(1) + 0.1 * range(xlims); str_HorizontalAlignment = 'left'; % slightly right of the left boundary
-                        case 1, x_R2 = xlims(2) - 0.02 * range(xlims); str_HorizontalAlignment = 'right'; % slightly left of the right boundary
-                        case 2, x_R2 = xlims(2) - 0.02 * range(xlims); str_HorizontalAlignment = 'right'; % slightly left of the right boundary
-                    end
-                    y_R2 = ymax - 0.01-0.08*(find(iLoc == iLocPair_all)-1) * (ymax-ymin); % slightly below top boundary
+                    % Print R2 in normalized axes coordinates so placement is stable across y-ranges
+                    x_R2 = 0.98;
+                    y_R2 = 0.95 - 0.08 * (find(iLoc == iLocPair_all) - 1);
 
                     text(x_R2, y_R2, ...
                         sprintf('R^2 = %.2f [%.2f, %.2f]', R2_med, R2_lb, R2_ub), ...
+                        'Units', 'normalized', ...
                         'Interpreter', 'tex', ...
                         'FontSize', 35, ...
                         'Color', color_comb, ...
-                        'HorizontalAlignment', str_HorizontalAlignment, ...
+                        'HorizontalAlignment', 'right', ...
                         'VerticalAlignment', 'top', ...
                         'Interpreter','tex');
                 end % iLoc
@@ -861,7 +863,7 @@ for iRun=1%[1,3,4]
     clear marg*_allCond margPred*_allCond margR2*_allCond
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
-    %% Tuning functions: idvd (LARGE FIGURES!!)
+    %% 6. Tuning functions: idvd (LARGE FIGURES!!)
     clc; fprintf('\n%s: Fig 6/23: Tuning functions (individual) STARTED.\n', string(datetime('now')))
 
     % Load data
@@ -968,7 +970,7 @@ for iRun=1%[1,3,4]
     clear marg*_allCond margPred*_allCond
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
-    %% Tuning characteristics
+    %% 7. Tuning characteristics
     clc; fprintf('\n%s: Fig 7/23: Tuning characteristics STARTED.\n', string(datetime('now')))
 
     % Load data
@@ -1037,9 +1039,9 @@ for iRun=1%[1,3,4]
                                 if find(iLocPair_all==1)
                                     y_ticks_all{1} = linspace(0, .4, 5); % ORI peak amp
                                 else
-                                    y_ticks_all{1} = linspace(0, .2, 5); % ORI peak amp
+                                    y_ticks_all{1} = linspace(0, 8, 5)*1e-3; % ORI peak amp
                                 end
-                                y_ticks_all{2} = linspace(0, 60, 5); % ORI band
+                                y_ticks_all{2} = linspace(10, 30, 5); % ORI band
                                 y_ticks_all{3} = linspace(-.05, .03, 5); % ORI baseline
                             else
                                 if find(iLocPair_all==1)
@@ -1059,9 +1061,9 @@ for iRun=1%[1,3,4]
                                 if find(iLocPair_all==1)
                                     y_ticks_all{2} = linspace(.01, .2, 5); % SF peak amp
                                 else
-                                    y_ticks_all{2} = linspace(.0, .12, 5); % SF peak amp
+                                    y_ticks_all{2} = linspace(.0, 4, 5)*1e-3; % SF peak amp
                                 end
-                                y_ticks_all{3} = linspace(.5, 2.5, 5); % SF bandwidth
+                                y_ticks_all{3} = linspace(1, 3, 5); % SF bandwidth
                                 y_ticks_all{4} = linspace(-.1, .1, 5); % SF baseline
                             else
                                 y_ticks_all{1} = linspace(0, 2, 5); % peak SF
@@ -1156,8 +1158,8 @@ for iRun=1%[1,3,4]
                         data_obs_allSubj = squeeze(margTunC_SF_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, 1, 2, iTunC));
                 end
 
-                % Obtain ytick labels and ref
-                y_ticklabels = round(y_ticks_all{iTunC}, 2);
+                % Let MATLAB format y-axis ticks automatically unless a custom unit remapping is needed.
+                y_ticklabels = nan;
                 ref = nan;
                 switch iFamily_perF(iFeature)
                     case 1
@@ -1168,7 +1170,10 @@ for iRun=1%[1,3,4]
 
                     case 2 % log parabola
                         switch iTunC
-                            case 1, y_ticklabels = round(2.^y_ticks_all{iTunC}, 1); ref = log2(2);
+                            case 1
+                                y_ticklabels = 2.^y_ticks_all{iTunC}; 
+                                y_ticklabels = round(y_ticklabels, 2);
+                                ref = log2(2);
                                 data_allIter_allSubj = log2(data_allIter_allSubj); % pref SF
                             case 4, ref = 0; % baseline
                         end
@@ -1181,14 +1186,17 @@ for iRun=1%[1,3,4]
                         end
                 end
 
-                str_title = sprintf('n=%d nIter=%d L%d%d [A%d] [%s] | %s %s | %s', nSubj, nIterxJob, iLocPair_all, iModelA_plot, namesDataset{iDataset_plotRC}, namesFeature{iFeature}, namesTunC{iTunC}, str_family);
+                str_title = sprintf('n=%d nIter=%d L%d%d [A%d] [%s] | %s %s | %s', ...
+                    nSubj, nIterxJob, iLocPair_all, iModelA_plot, namesDataset{iDataset_plotRC}, namesFeature{iFeature}, namesTunC{iTunC}, str_family);
+                sz_text = 22;
+                wd = 3;
 
                 switch flag_plotDist
                     case 0
                         %------------------------------%
-                        fxn_drawBars(data_allIter_allSubj, ref, colors, x_ticks, y_ticks_all{iTunC}, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj)
+                        fxn_drawBars(data_allIter_allSubj, ref, colors, x_ticks, y_ticks_all{iTunC}, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd)
                         % ------------------------------%
-                        ylabel(sprintf('%s %s [%s]', namesFeature{iFeature}, namesTunC{iTunC}, str_family))
+                        ylabel(sprintf('%s %s', namesFeature{iFeature}, namesTunC{iTunC}))
                     case 1
                         %------------------------------%
                         fxn_drawDist(data_allIter_allSubj, ref, colors, x_ticks, y_ticks_all{iTunC}, y_ticklabels, str_title, sz_fig, nIterxJob, nSubj)
@@ -1206,7 +1214,7 @@ for iRun=1%[1,3,4]
     clear margTunC_*_allCond
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
-    %% Corr0: Corr between CS and tunParams (just to check bound-hitting)
+    %% 8. Corr0: Corr between CS and tunParams (just to check bound-hitting)
     clc; fprintf('\n%s: Fig 8/23: Corr CS vs tuning params STARTED.\n', string(datetime('now')))
 
     % Load data
@@ -1303,7 +1311,7 @@ for iRun=1%[1,3,4]
     clear margParams*_allCond
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
-    %% Corr1: Corr between CS and tunC
+    %% 9. Corr1: Corr between CS and tunC
     clc; fprintf('\n%s: Fig 9/23: Corr CS vs tuning characteristics STARTED.\n', string(datetime('now')))
 
     % Load data
@@ -1331,7 +1339,7 @@ for iRun=1%[1,3,4]
 
         % Obtain CS (x-axis)
         X_allSubj = CS_allSubj(:, iLocCorr_all);
-        x_ticks = linspace(1.5, 3.5, 5); % EE
+        x_ticks = linspace(1.5, 3.5, 5); % Asymmetry in CS
         X_allIter_allSubj = repmat(X_allSubj, 1, 1, nIterxJob);
 
         for iFeature = 1:nFeatures
@@ -1348,8 +1356,8 @@ for iRun=1%[1,3,4]
                 end
 
                 switch iFeature
-                    case 1, y_ticks_allTunC_lb = [0, 0, -.1]; y_ticks_allTunC_ub = [.2, 48, .1];% 3 values are ORI peak amplitude, width, baseline
-                    case 2, y_ticks_allTunC_lb = [0, 0, 0, -.1]; y_ticks_allTunC_ub = [4, .12, 2.8, .1]; % 4 values are SF peak, peak amplitude, width, baseline
+                    case 1, y_ticks_allTunC_lb = [0, 15, -.1]; y_ticks_allTunC_ub = [.008, 25, .1];% 3 values are ORI peak amplitude, width, baseline
+                    case 2, y_ticks_allTunC_lb = [0, 0, .5, -.1]; y_ticks_allTunC_ub = [4, .004, 3.5, .1]; % 4 values are SF peak, peak amplitude, width, baseline
                 end
 
                 y_ticks = linspace(y_ticks_allTunC_lb(iTunC), y_ticks_allTunC_ub(iTunC), 5);
@@ -1357,7 +1365,7 @@ for iRun=1%[1,3,4]
                 x_ticklabels = x_ticks;
                 y_ticklabels = y_ticks;
 
-                nameVarY_figTitle = sprintf('%s %s [%s]', namesFeature{iFeature}, namesTunCs{iTunC}, str_family);
+                nameVarY_figTitle = sprintf('%s %s', namesFeature{iFeature}, namesTunCs{iTunC});
                 nameVarY_fileTitle = sprintf('%s%d', namesFeature{iFeature}, iTunC);
 
                 str_title = sprintf('n=%d, nIter=%d %s vs. %s [L%s]', nSubj, nIterxJob, nameVarX, nameVarY_figTitle, strjoin(string(iLocCorr_all), ''));
@@ -1369,7 +1377,7 @@ for iRun=1%[1,3,4]
                 save(sprintf('%s/n%d_L%s_%s.mat', nameFolder_Outputs_NOM_corr, nSubj, strjoin(string(iLocCorr_all), ''), nameVarY_fileTitle), 'PearsonR', 'SpearmanRho')
 
                 xlabel('Contrast sensitivity (1/contrast)', 'fontsize', sz_label)
-                ylabel(sprintf('%s %s [%s]', namesFeature{iFeature}, namesTunCs{iTunC}, str_family), 'fontsize', sz_label)
+                ylabel(sprintf('%s %s', namesFeature{iFeature}, namesTunCs{iTunC}), 'fontsize', sz_label)
 
                 % Adjust distance between components
                 ax = gca;
@@ -1596,13 +1604,13 @@ for iRun=1%[1,3,4]
     % clear margTunC_*_allCond
     % fprintf('\n%s: DONE.\n', string(datetime('now')))
 
-    %% CorrAsym1: (CS and tunC): corr between extents of EE/HVA/VMA
+    %% 12. CorrAsym1: (CS and tunC): corr between extents of EE/HVA/VMA
+    clc; fprintf('\n%s: Fig 12/23: CorrAsym CS vs tuning characteristics STARTED.\n', string(datetime('now')))
+
     flag_plotIdvdCI = 1;
     flag_plotUnikSymbol = 0;
     iLocCorr_all = [6,5,3];
-
-    clc; fprintf('\n%s: Fig 12/23: CorrAsym CS vs tuning characteristics STARTED.\n', string(datetime('now')))
-
+    
     % Load data
     load(nameFolder_Data_SaveCompile, 'margTunC_*_allCond', 'CS_allSubj')
 
@@ -1698,9 +1706,11 @@ for iRun=1%[1,3,4]
                 load(sprintf('%s/n%d_L%s_%s.mat', nameFolder_Outputs_NOM_corr, nSubj, strjoin(string(iLocCorr_all), ''), nameVarY_fileTitle), 'PearsonR', 'SpearmanRho');
                 switch flag_UseRUseRho
                     case 'useR'
-                        flag_CIrange = PearsonR(2) * PearsonR(3)>0; % flag_CIrange=1 if r excludes 0, so one-tailed corr should be conducted, so CI range is 90%
+                        flag_CIrange = PearsonR(4) < 0.05; % use permutation p-value to determine whether one-tailed corr should be conducted
+                        % flag_CIrange = PearsonR(2) * PearsonR(3)>0; % flag_CIrange=1 if r excludes 0, so one-tailed corr should be conducted, so CI range is 90%
                     case 'useRho'
-                        flag_CIrange = SpearmanRho(2) * SpearmanRho(3)>0; % flag_CIrange=1 if r excludes 0, so one-tailed corr should be conducted, so CI range is 95%
+                        flag_CIrange = SpearmanRho(4) < 0.05; % use permutation p-value to determine whether one-tailed corr should be conducted
+                        % flag_CIrange = SpearmanRho(2) * SpearmanRho(3)>0; % flag_CIrange=1 if r excludes 0, so one-tailed corr should be conducted, so CI range is 95%
                 end
 
                 %----------------------------%
@@ -1801,9 +1811,11 @@ for iRun=1%[1,3,4]
         load(sprintf('%s/n%d_L%s_%s.mat', nameFolder_Outputs_NOM_corr, nSubj, strjoin(string(iLocCorr_all), ''), nameVarY_fileTitle), 'PearsonR', 'SpearmanRho');
         switch flag_UseRUseRho
             case 'useR'
-                flag_CIrange = PearsonR(2) * PearsonR(3)>0; % flag_CIrange=1 if r excludes 0, so one-tailed corr should be conducted, so CI range is 90%
+                flag_CIrange = PearsonR(4) < 0.05; % use permutation p-value to determine whether one-tailed corr should be conducted
+                % flag_CIrange = PearsonR(2) * PearsonR(3)>0; % flag_CIrange=1 if r excludes 0, so one-tailed corr should be conducted, so CI range is 90%
             case 'useRho'
-                flag_CIrange = SpearmanRho(2) * SpearmanRho(3)>0; % flag_CIrange=1 if r excludes 0, so one-tailed corr should be conducted, so CI range is 95%
+                flag_CIrange = SpearmanRho(4) < 0.05; % use permutation p-value to determine whether one-tailed corr should be conducted
+                % flag_CIrange = SpearmanRho(2) * SpearmanRho(3)>0; % flag_CIrange=1 if r excludes 0, so one-tailed corr should be conducted, so CI range is 95%
         end
 
         %----------------------------%
@@ -1836,7 +1848,7 @@ for iRun=1%[1,3,4]
     clear metric_data_allCond
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
-    %% [NOM] Metrics vs. DV; group averages
+    %% 14. [NOM] Metrics vs. DV; group averages
     clc; fprintf('\n%s: Fig 14/23: NOM metrics vs DV (group averages) STARTED.\n', string(datetime('now')))
 
     % Load data
@@ -2153,7 +2165,7 @@ for iRun=1%[1,3,4]
 
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
-    %% [NOM] Metrics vs. DV; per idvd
+    %% 15. [NOM] Metrics vs. DV; per idvd
     clc; fprintf('\n%s: Fig 15/23: NOM metrics vs DV (individual) STARTED.\n', string(datetime('now')))
     lineStyle_all = {'-', '-', '--', ':', '-.', '-', '--', ':', '-.'};
 
@@ -2236,7 +2248,7 @@ for iRun=1%[1,3,4]
                     % if isubj == 1, legend(namesModelB(iModelB_all), 'Location', 'best'), end
 
                     % Median and CI of GoF (trial-weighted R2)
-                    str_title = sprintf('%s\n[B%d] wR^2: %.2f [%.2f, %.2f]\n%s\n', str_title, iModelB, R2_w_NOM_med, R2_w_NOM_lb, R2_w_NOM_ub, str_slope);
+                    str_title = sprintf('%s\n[B%d] wR^2: %.2f [%.2f, %.2f]\n', str_title, iModelB, R2_w_NOM_med, R2_w_NOM_lb, R2_w_NOM_ub);
 
                 end % iModelB
 
@@ -2364,9 +2376,11 @@ for iRun=1%[1,3,4]
                 sz_fig = nan; % set to be nan to not create a figure inside the fxn
                 flag_plotIDVD = 1;
                 flag_plotDiff = 1;
+                sz_text = 35;
+                wd = 2;
 
                 %------------------------------%
-                fxn_drawBars(dnLL_collapse, ref, colors, x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj)
+                fxn_drawBars(dnLL_collapse, ref, colors, x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd)
                 %------------------------------%
 
                 ylabel(sprintf('\\Delta nLL'), 'FontSize', sz_label);
@@ -2388,7 +2402,7 @@ for iRun=1%[1,3,4]
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
 
-    %% [NOM] ANOVA on nLL (ModelB x Loc; NO vars collapsed)
+    %% 17. [NOM] ANOVA on nLL (ModelB x Loc; NO vars collapsed)
     % Load data
     load(nameFolder_Data_SaveCompile, 'nLL_allCond')
     clc; fprintf('\n%s: Fig 17/23: ANOVA nLL (no collapse) STARTED.\n', string(datetime('now')))
@@ -2403,11 +2417,11 @@ for iRun=1%[1,3,4]
     iModelB_selected = 1:7;
     flag_plotIDVD = 0;
     flag_plotDiff = 1;
-    wd = 2;
-
+    
     y_ticks = linspace(0, 16, 5);
-    sz_label = 35;
+    sz_label = 40;
     sz_text = sz_label;
+    wd = 2;
     y_ticklabels = nan;
 
     % Loop over locations
@@ -2446,7 +2460,7 @@ for iRun=1%[1,3,4]
         ref = nan;
 
         % ------------------------------%
-        fxn_drawBars(dnLL_allIter_allSubj, ref, repmat(colors_comb(iLocSingle, :), nBars, 1), namesModelB(iModelB_selected), y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, 1, markers_allSubj);
+        fxn_drawBars(dnLL_allIter_allSubj, ref, repmat(colors_comb(iLocSingle, :), nBars, 1), namesModelB(iModelB_selected), y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, 1, markers_allSubj, sz_text, wd);
         % ------------------------------%
         % ylim(y_ticks([1, end]))
 
@@ -2515,7 +2529,7 @@ for iRun=1%[1,3,4]
         topData = y_ticks(end);
         if isnan(topData), topData = yMax; end
         yBase = yMin + 0.4*yRange;
-        yStep = 0.2 * yRange; % vertical spacing between brackets
+        yStep = 0.02 * yRange; % vertical spacing between brackets
 
         % Helper: find index in "pairs" for a given (iA,iB)
         getPairIdx = @(iA,iB) find(pairs_all(:,1)==min(iA,iB) & pairs_all(:,2)==max(iA,iB), 1, 'first');
@@ -2531,7 +2545,7 @@ for iRun=1%[1,3,4]
             plot([iA iB], [y y], 'k-', 'LineWidth', wd, 'HandleVisibility','off');
 
             % --- text label (left-aligned, above the bracket line) ---
-            str_delta = sprintf('$\\Delta = %.2f, \\; [%.2f, %.2f]$', diffCond_med(iPair), diffCond_lb(iPair), diffCond_ub(iPair));
+            str_delta = sprintf('$\\Delta=%+.2f, \\; [%+.2f, %+.2f]$', diffCond_med(iPair), diffCond_lb(iPair), diffCond_ub(iPair));
 
             xText = iA; % left end of bracket
             yText = y + 0.02*yRange; % a bit above the bracket line (tune 0.02)
@@ -2566,7 +2580,7 @@ for iRun=1%[1,3,4]
         % %========================
 
         saveas(gcf, fullfile(nameFolder_Fig_NOM_nLL, sprintf('n%d_L%d_ModelB%s.png', nSubj, iLocSingle, strjoin(string(iModelB_selected), ''))));
-
+        % close(gcf); % do NOT close here, as we need to copy the axis geometry for the box-code figure; close at the end of the loop after copying geometry.
 
         % % ======== Plot the box-code figure (only once) ========
         if iLocSingle==1
@@ -2699,8 +2713,10 @@ for iRun=1%[1,3,4]
                     y_ticklabels = round(y_ticks, 2);
 
                     str_title = sprintf('n=%d nIter=%d L%s [A%dB%d] %s', nSubj, nIterxJob, strjoin(string(iLocPair_all), ''), iModelA_plot, iModelB_NOMplot, namesModelBparams{iModelB_NOMplot}{iParam});
+                    sz_text = 25;
+                    wd = 3;
                     %------------------------------%
-                    fxn_drawBars(NOMp_allIter_allSubj, ref, colors_comb(iLocPair_all, :), x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj)
+                    fxn_drawBars(NOMp_allIter_allSubj, ref, colors_comb(iLocPair_all, :), x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd)
                     %------------------------------%
                     ylabel(sprintf('%s', namesModelBparams{iModelB_NOMplot}{iParam}))
                     % Save the figure
@@ -3070,9 +3086,11 @@ for iRun=1%[1,3,4]
                 load(sprintf('%s/n%d_B%d_L%s_NOMp%d.mat', nameFolder_Outputs_NOM_corr, nSubj, iModelB_NOMplot, strjoin(string(iLocCorr_all), ''), iNOMparam), 'PearsonR', 'SpearmanRho')
                 switch flag_UseRUseRho
                     case 'useR'
-                        flag_CIrange = PearsonR(2) * PearsonR(3)>0; % flag_CIrange=1 if r excludes 0, so one-tailed corr should be conducted, so CI range is 90%
+                        flag_CIrange = PearsonR(4) < 0.05; % use permutation p-value to determine whether one-tailed corr should be conducted
+                        % flag_CIrange = PearsonR(2) * PearsonR(3)>0; % flag_CIrange=1 if r excludes 0, so one-tailed corr should be conducted, so CI range is 90%
                     case 'useRho'
-                        flag_CIrange = SpearmanRho(2) * SpearmanRho(3)>0; % flag_CIrange=1 if r excludes 0, so one-tailed corr should be conducted, so CI range is 95%
+                        flag_CIrange = SpearmanRho(4) < 0.05; % use permutation p-value to determine whether one-tailed corr should be conducted
+                        % flag_CIrange = SpearmanRho(2) * SpearmanRho(3)>0; % flag_CIrange=1 if r excludes 0, so one-tailed corr should be conducted, so CI range is 95%
                 end
 
                 %----------------------------%

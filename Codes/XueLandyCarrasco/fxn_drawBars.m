@@ -1,6 +1,6 @@
 function fxn_drawBars( ...
     data_allIter_allSubj, ref, colors, x_ticklabels, y_ticks, y_ticklabels, ...
-    flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIter, markers_allSubj)
+    flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIter, markers_allSubj, sz_text, wd)
 
 % fxn_drawBars
 % - Omnibus RM one-way ANOVA (per iter -> CI; perm p via within-subj label shuffle on median)
@@ -9,12 +9,12 @@ function fxn_drawBars( ...
 % - Only print significant pairs (p_perm < pThresh_print) in the title
 
 %% ---- settings ----
-sz_marker_idvd = 10;
-sz_ticks = 22; % behav, sep: 25; tunC: 22; nLL: 35;  NOM params: 25
-sz_title = 10;
-wd = 3; % behav: 3; sep: 2; tunC: 3
+% sz_text = 22; % behav, sep: 25; tunC: 22; nLL: 35;  NOM params: 25
+% wd = 3; % behav: 3; sep: 2; tunC: 3
+
 wd_bar = .5;
-sz_text = 25;
+sz_title = 10;
+sz_marker_idvd = 10;
 
 CI95 = .95;
 CI68 = .68;          % 68% for plotting (visual readability)
@@ -49,6 +49,8 @@ nPairs = size(pairs, 1);
 
 % ---------------- (1) Analysis of variance ----------------
 [Fvalue_obs, ~] = rm_oneway(data_med_allSubj);
+df_ANOVA_num = nCond - 1;
+df_ANOVA_den = (nSubj - 1) * (nCond - 1);
 Fvalue_allPerm = nan(nPerm, 1);
 
 % Pregenerate subj indices
@@ -232,7 +234,7 @@ end % iBoot
 %% Strings handling
 
 % (1) Analysis of variance
-str_ANOVA = sprintf('ANOVA: F=%.2f, p=%.3f, eta2p=%.2f [%.2f, %.2f]', Fvalue_obs, pperm_ANOVA, eta2p_med, eta2p_lb, eta2p_ub);
+str_ANOVA = sprintf('ANOVA: F(%d,%d)=%.2f, p=%.3f, eta2p=%.2f [%.2f, %.2f]', df_ANOVA_num, df_ANOVA_den, Fvalue_obs, pperm_ANOVA, eta2p_med, eta2p_lb, eta2p_ub);
 
 % (2) Pairwise comparisons
 str_diffPair = sprintf('Planned pairwise contrasts (%.1f%%CI)\n', CI_diffPair*100);
@@ -304,11 +306,11 @@ end
 xticks(1:nCond); xticklabels([])
 % if ~isempty(x_ticklabels), xticklabels(x_ticklabels), end
 if ~isnan(y_ticks)
-    % yticks(y_ticks);
-    % ylim(y_ticks([1, end]));
+    yticks(y_ticks);
+    ylim(y_ticks([1, end]));
 end
 if ~isnan(y_ticklabels)
-    % yticklabels(y_ticklabels);
+    yticklabels(y_ticklabels);
 end
 
 if flag_plotIDVD
@@ -319,8 +321,8 @@ end
 xlim([1-buffer, nCond+buffer]);
 
 ax = gca;
-ax.XAxis.FontSize = sz_ticks;
-ax.YAxis.FontSize = sz_ticks;
+ax.XAxis.FontSize = sz_text;
+ax.YAxis.FontSize = sz_text;
 ax.LineWidth = wd;
 
 %% Prepare the y-pos of the comparison line
@@ -358,7 +360,8 @@ if nCond == 2 && flag_plotDiff
     end
 
     % Prepare the string
-    str_delta = sprintf('$\\Delta = %.2f$ [%.2f, %.2f]\n$\\mathit{p} = %.3f$', diffPair_med, diffPair_lb, diffPair_ub, pperm_allPairs);
+    str_delta = sprintf('$\\Delta=%s$ [%s, %s]\n$\\mathit{p}=%.3f$', ...
+        fxn_formatSignedDecimal(diffPair_med), fxn_formatSignedDecimal(diffPair_lb), fxn_formatSignedDecimal(diffPair_ub), pperm_allPairs);
 
     % Print
     text(xText, yText, str_delta, ...
@@ -370,13 +373,14 @@ if nCond == 2 && flag_plotDiff
         'Clipping', 'off');
 end
 
+
 %% Plot p value of ANOVA results If nCond>2
 if nCond > 2
     % --- draw horizontal line across conditions ---
     plot([1, nCond], [yBar, yBar], 'k-', 'LineWidth', wd, 'HandleVisibility', 'off');
 
     % Prepare the string with LaTeX formatting (keep everything in one math environment)
-    str_ANOVA_p = sprintf('$F = %.2f, \\; \\mathit{p} = %.3f$', Fvalue_obs, pperm_ANOVA);
+    str_ANOVA_p = sprintf('$F(%d,%d) = %.2f, \\; \\mathit{p} = %.3f$', df_ANOVA_num, df_ANOVA_den, Fvalue_obs, pperm_ANOVA);
 
     % Prepare x- and y-pos of the text
     xText = (1 + nCond) / 2;                                  % placed at the middle
@@ -402,4 +406,22 @@ end
 title(sprintf('%s\n%s\n%s%s\n\n', str_title, str_ANOVA, str_diffPair, str_diffRef), 'fontsize', sz_title);
 
 
+end
+%% 
+function str = fxn_formatSignedDecimal(val)
+if isnan(val)
+    str = 'NaN';
+    return;
+end
+
+abs_val = abs(val);
+if abs_val >= 1
+    str = sprintf('%+.2f', val);
+elseif abs_val >= 0.01
+    str = sprintf('%+.2f', val);
+else
+    str = sprintf('%+.4f', val);
+    str = regexprep(str, '(\.\d*?)0+$', '$1');
+    str = regexprep(str, '\.$', '');
+end
 end

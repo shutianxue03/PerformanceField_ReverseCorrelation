@@ -154,8 +154,8 @@ NOMp2_lb = 0;
 NOMp3_lb  = 0;
 
 NOMp1_ub = 2;     % multi noise
-NOMp2_ub = 10;   % (private) additive noise
-NOMp3_ub = 10; % (shared) additive noise
+NOMp2_ub = 4;   % (private) additive noise
+NOMp3_ub = 3; % (shared) additive noise
 
 % Midpoint initial guesses
 NOMp1_0 = mean([NOMp1_lb,  NOMp1_ub]);

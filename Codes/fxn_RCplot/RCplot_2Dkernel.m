@@ -13,8 +13,8 @@ sz_colorbar = 40;
 
 hold on
 imagesc(axis_tuning{1}, axis_tuning{2}, data2D)
-xline(axisTicks_tuning{1}(3), 'r--', 'linewidth', wd_ref);
-yline(axisTicks_tuning{2}(3), 'r--', 'linewidth', wd_ref);
+xline(axisTicks_tuning{1}(3), 'r-', 'linewidth', wd_ref);
+yline(axisTicks_tuning{2}(3), 'r-', 'linewidth', wd_ref);
 
 xticks(axisTicks_tuning{1})
 xticklabels(axisTL_tuning{1})

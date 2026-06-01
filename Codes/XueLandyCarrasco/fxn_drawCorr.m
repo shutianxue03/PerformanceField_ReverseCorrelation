@@ -6,8 +6,8 @@ function [PearsonR, SpearmanRho] = fxn_drawCorr( ...
 % =========================================================================
 % fxn_drawCorr
 % - Always reports BOTH Pearson (r) and Spearman (rho), two-tailed
-% - Partial (control loc) reported via:
-% (A) demean within loc then corr
+% - Location-adjusted association reported via:
+% (A) demean within loc then corr (not partialcorr)
 % (B) partialcorr with location dummy coding
 % - Per-location correlations also reported (r and rho)
 % - Permutation p-values (two-tailed) computed on MEDIANS
@@ -84,13 +84,14 @@ switch flag_zeroMean
         Y_lb_plot = Y_lb; Y_ub_plot = Y_ub;
 end
 
-%% ---------------- Precompute vectors + dummy controls for partialcorr ----------------
+%% ---------------- Precompute vectors + dummy-coded categorical controls for partialcorr ----------------
 xvec = X_obs(:);
 yvec = Y_obs(:);
 
-Z = repmat(1:nCond, nSubj, 1);
-D = dummyvar(Z(:));
-D = D(:, 1:end-1);
+% Create dummy-coded location regressors for partialcorr
+loc_group = categorical(repmat(1:nCond, nSubj, 1));
+D_loc = dummyvar(loc_group(:));
+D_loc = D_loc(:, 1:end-1);
 
 % Fast bootstrap of D by indexing subject blocks
 rowIx_perSubj = reshape(1:(nSubj*nCond), nSubj, nCond); % [nSubj x nCond]
@@ -99,12 +100,15 @@ rowIx_perSubj = reshape(1:(nSubj*nCond), nSubj, nCond); % [nSubj x nCond]
 X_res = X_obs - mean(X_obs, 1, 'omitnan');
 Y_res = Y_obs - mean(Y_obs, 1, 'omitnan');
 
-r_partial_demean_obs = safeCorr(X_res(:), Y_res(:), 'Pearson');
-rho_partial_demean_obs = safeCorr(X_res(:), Y_res(:), 'Spearman');
+% (A) demean + corr (not partialcorr)
+r_demean_obs = safeCorr(X_res(:), Y_res(:), 'Pearson');
+rho_demean_obs = safeCorr(X_res(:), Y_res(:), 'Spearman');
 
-r_partial_pc_obs = partialcorr(xvec, yvec, D, 'type', 'Pearson', 'rows', 'complete');
-rho_partial_pc_obs = partialcorr(xvec, yvec, D, 'type', 'Spearman', 'rows', 'complete');
+% (B) partialcorr with location dummy coding
+r_partial_pc_obs = partialcorr(xvec, yvec, D_loc, 'type', 'Pearson', 'rows', 'complete');
+rho_partial_pc_obs = partialcorr(xvec, yvec, D_loc, 'type', 'Spearman', 'rows', 'complete');
 
+% (C) per-location corr
 r_obs_allCond = nan(1,nCond);
 rho_obs_allCond = nan(1,nCond);
 for iCond = 1:nCond
@@ -113,8 +117,8 @@ for iCond = 1:nCond
 end
 
 %% ---------------- [NHST] Permutation tests (ONE parfor) ----------------
-r_partial_demean_perm = nan(nPerm,1);
-rho_partial_demean_perm = nan(nPerm,1);
+r_demean_perm = nan(nPerm,1);
+rho_demean_perm = nan(nPerm,1);
 
 r_partial_pc_perm = nan(nPerm,1);
 rho_partial_pc_perm = nan(nPerm,1);
@@ -125,7 +129,7 @@ rho_perm_allCond = nan(nPerm,nCond);
 % Pregenerate subj indices
 rng(seedPerm, 'twister');
 indRand_allPerm = zeros(nPerm, nSubj, 'uint16');
-for iPerm = 1:nPerm
+parfor iPerm = 1:nPerm
     indRand_allPerm(iPerm, :) = uint16(randperm(nSubj));
 end
 
@@ -136,13 +140,13 @@ parfor iPerm = 1:nPerm
 
     % (A) demean + corr null
     YrandRes = Yrand - mean(Yrand, 1, 'omitnan');
-    r_partial_demean_perm(iPerm) = safeCorr(X_res(:), YrandRes(:), 'Pearson');
-    rho_partial_demean_perm(iPerm) = safeCorr(X_res(:), YrandRes(:), 'Spearman');
+    r_demean_perm(iPerm) = safeCorr(X_res(:), YrandRes(:), 'Pearson');
+    rho_demean_perm(iPerm) = safeCorr(X_res(:), YrandRes(:), 'Spearman');
 
     % (B) partialcorr + dummies null
     YrandVec = Yrand(:);
-    r_partial_pc_perm(iPerm) = partialcorr(xvec, YrandVec, D, 'type', 'Pearson', 'rows', 'complete');
-    rho_partial_pc_perm(iPerm) = partialcorr(xvec, YrandVec, D, 'type', 'Spearman', 'rows', 'complete');
+    r_partial_pc_perm(iPerm) = partialcorr(xvec, YrandVec, D_loc, 'type', 'Pearson', 'rows', 'complete');
+    rho_partial_pc_perm(iPerm) = partialcorr(xvec, YrandVec, D_loc, 'type', 'Spearman', 'rows', 'complete');
 
     % (C) per-location null
     for iCond = 1:nCond
@@ -150,11 +154,9 @@ parfor iPerm = 1:nPerm
         rho_perm_allCond(iPerm,iCond) = safeCorr(X_obs(:,iCond), Yrand(:,iCond), 'Spearman');
     end
 end % iPerm
-% timePermEnd = toc(timePermStart);
-% fprintf('Permutation tests completed in %.1f seconds (%.2f min).\n', timePermEnd, timePermEnd/60);
 
-pperm_r_partial_demean = fxn_perm_pval(r_partial_demean_perm, r_partial_demean_obs, 'both');
-pperm_rho_partial_demean = fxn_perm_pval(rho_partial_demean_perm, rho_partial_demean_obs, 'both');
+pperm_r_demean = fxn_perm_pval(r_demean_perm, r_demean_obs, 'both');
+pperm_rho_demean = fxn_perm_pval(rho_demean_perm, rho_demean_obs, 'both');
 
 pperm_r_partial_pc = fxn_perm_pval(r_partial_pc_perm, r_partial_pc_obs, 'both');
 pperm_rho_partial_pc = fxn_perm_pval(rho_partial_pc_perm, rho_partial_pc_obs, 'both');
@@ -201,8 +203,8 @@ for iCond = 1:nCond
 end
 
 %% ---------------- Bootstrapping ----------------
-r_partial_demean_allBoot = nan(nBoot,1);
-rho_partial_demean_allBoot = nan(nBoot,1);
+r_demean_allBoot = nan(nBoot,1);
+rho_demean_allBoot = nan(nBoot,1);
 
 r_partial_pc_allBoot = nan(nBoot,1);
 rho_partial_pc_allBoot = nan(nBoot,1);
@@ -227,16 +229,16 @@ parfor iBoot = 1:nBoot
     % (A) partial demean + corr
     XrandRes = Xrand - mean(Xrand, 1, 'omitnan');
     YrandRes = Yrand - mean(Yrand, 1, 'omitnan');
-    r_partial_demean_allBoot(iBoot) = safeCorr(XrandRes(:), YrandRes(:), 'Pearson');
-    rho_partial_demean_allBoot(iBoot) = safeCorr(XrandRes(:), YrandRes(:), 'Spearman');
+    r_demean_allBoot(iBoot) = safeCorr(XrandRes(:), YrandRes(:), 'Pearson');
+    rho_demean_allBoot(iBoot) = safeCorr(XrandRes(:), YrandRes(:), 'Spearman');
 
-    % (B) partialcorr + dummies (reuse D blocks)
+    % (B) partialcorr + dummies (reuse categorical-control blocks)
     XrandVec = Xrand(:);
     YrandVec = Yrand(:);
 
     rows = rowIx_perSubj(indRandBoot, :);
     rows = rows(:);
-    Db = D(rows, :);
+    Db = D_loc(rows, :);
 
     r_partial_pc_allBoot(iBoot) = partialcorr(XrandVec, YrandVec, Db, 'type', 'Pearson', 'rows', 'complete');
     rho_partial_pc_allBoot(iBoot) = partialcorr(XrandVec, YrandVec, Db, 'type', 'Spearman', 'rows', 'complete');
@@ -260,8 +262,8 @@ end % iBoot
 % fprintf('Bootstrapping completed in %.1f seconds (%.2f min).\n', timeBootEnd, timeBootEnd/60);
 
 %% ---------------- Bootstrap CIs (corr) ----------------
-[r_partial_demean_med, r_partial_demean_lb, r_partial_demean_ub] = getCI(r_partial_demean_allBoot, 1, 1, CI95);
-[rho_partial_demean_med, rho_partial_demean_lb, rho_partial_demean_ub] = getCI(rho_partial_demean_allBoot, 1, 1, CI95);
+[r_demean_med, r_demean_lb, r_demean_ub] = getCI(r_demean_allBoot, 1, 1, CI95);
+[rho_demean_med, rho_demean_lb, rho_demean_ub] = getCI(rho_demean_allBoot, 1, 1, CI95);
 
 [r_partial_pc_med, r_partial_pc_lb, r_partial_pc_ub] = getCI(r_partial_pc_allBoot, 1, 1, CI95);
 [rho_partial_pc_med, rho_partial_pc_lb, rho_partial_pc_ub] = getCI(rho_partial_pc_allBoot, 1, 1, CI95);
@@ -352,12 +354,12 @@ for iCond = 1:nCond
 end
 
 %% ---------------- strings ----------------
-str_partial_demean = sprintf( ...
-    'Partial (demean+corr): r%s=%.2f [%.2f, %.2f], p=%.3f, \\rho%s=%.2f [%.2f, %.2f], p=%.3f' , ...
-    sigMark(r_partial_demean_lb, r_partial_demean_ub), ...
-    r_partial_demean_med, r_partial_demean_lb, r_partial_demean_ub, pperm_r_partial_demean, ...
-    sigMark(rho_partial_demean_lb, rho_partial_demean_ub), ...
-    rho_partial_demean_med, rho_partial_demean_lb, rho_partial_demean_ub, pperm_rho_partial_demean);
+str_demean = sprintf( ...
+    'Location-demeaned corr: r%s=%.2f [%.2f, %.2f], p=%.3f, \\rho%s=%.2f [%.2f, %.2f], p=%.3f' , ...
+    sigMark(r_demean_lb, r_demean_ub), ...
+    r_demean_med, r_demean_lb, r_demean_ub, pperm_r_demean, ...
+    sigMark(rho_demean_lb, rho_demean_ub), ...
+    rho_demean_med, rho_demean_lb, rho_demean_ub, pperm_rho_demean);
 
 str_partial_pc = sprintf( ...
     'Partial (partialcorr): r%s=%.2f [%.2f, %.2f], p=%.3f, \\rho%s=%.2f [%.2f, %.2f], p=%.3f' , ...
@@ -378,10 +380,10 @@ for iCond = 1:nCond
 end
 
 %% ---------------- axes formatting ----------------
-% if ~isnan(x_ticks), xticks(x_ticks); xlim(x_ticks([1 end])); end
-% if ~isnan(y_ticks), yticks(y_ticks); ylim(y_ticks([1 end])); end
-% if ~isnan(x_ticklabels), xticklabels(x_ticklabels); end
-% if ~isnan(y_ticklabels), yticklabels(y_ticklabels); end
+if ~isnan(x_ticks), xticks(x_ticks); xlim(x_ticks([1 end])); end
+if ~isnan(y_ticks), yticks(y_ticks); ylim(y_ticks([1 end])); end
+if ~isnan(x_ticklabels), xticklabels(x_ticklabels); end
+if ~isnan(y_ticklabels), yticklabels(y_ticklabels); end
 
 axis square
 ax = gca;
@@ -392,22 +394,21 @@ ax.LineWidth = wd_border;
 %% ---------------- print stats ----------------
 switch flag_UseRUseRho
     case 'useR'
-        str_print = sprintf('Partial r=%.2f [%.2f, %.2f]' , r_partial_pc_med, r_partial_pc_lb, r_partial_pc_ub);
+        str_print = sprintf('r_p=%+.2f [%+.2f, %+.2f], p=%.3f' , r_partial_pc_med, r_partial_pc_lb, r_partial_pc_ub, pperm_r_partial_pc);
     case 'useRho'
-        str_print = sprintf('Partial \\rho=%.2f [%.2f, %.2f]' , rho_partial_pc_med, rho_partial_pc_lb, rho_partial_pc_ub);
+        str_print = sprintf('\\rho=%+.2f [%+.2f, %+.2f], p=%.3f' , rho_partial_pc_med, rho_partial_pc_lb, rho_partial_pc_ub, pperm_rho_partial_pc);
 end
-
 
 y_str = 0.02; % Figure 6: 0.02
 text(ax, 0.5, y_str, str_print, 'Units', 'normalized', ...
     'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom', ...
     'FontSize', 45, 'Color', 'k', 'Interpreter', 'tex', 'Clipping', 'off');
 
-title(sprintf('%s\n%s\n%s\n%s\n', str_title, str_partial_demean, str_partial_pc, str_perLoc), 'FontSize', 14);
+title(sprintf('%s\n%s\n%s\n%s\n', str_title, str_demean, str_partial_pc, str_perLoc), 'FontSize', 10);
 
-%% Save CI for automatic CI range calcuation in CorrAsym
-PearsonR = [r_partial_pc_med, r_partial_pc_lb, r_partial_pc_ub];
-SpearmanRho = [rho_partial_pc_med, rho_partial_pc_lb, rho_partial_pc_ub];
+%% Save CI and permutation-p summaries for automatic CI range calculation in CorrAsym
+PearsonR = [r_partial_pc_med, r_partial_pc_lb, r_partial_pc_ub, pperm_r_partial_pc];
+SpearmanRho = [rho_partial_pc_med, rho_partial_pc_lb, rho_partial_pc_ub, pperm_rho_partial_pc];
 
 end
 
