@@ -74,7 +74,7 @@ iModelA_all = iModelA_fit_all;
 iModelB_all = iModelB_fit_all;
 
 %%
-for iRun=1%[1,3,4]
+for iRun=4%[1,3,4]
     % Define subject list
     if flag_subjIsHuman
         switch iRun
@@ -117,7 +117,6 @@ for iRun=1%[1,3,4]
 
     markers_allSubj = markers_allSubj_full(1:nSubj);
 
-    nameFolder_Data_SaveCompile = sprintf('%s/n%d_n%d', nameFolder_Data_NOM_Trialwise, nSubj, nIterxJob);
 
     % Names of the performance metrics being analyzed
     nModelsA = length(iModelA_all);
@@ -138,6 +137,9 @@ for iRun=1%[1,3,4]
     nameFolder_Outputs_NOM_Trialwise = sprintf('%s/NOM_Trialwise_n%d', nameFolder_Outputs, nSubj);
     if isempty(dir(nameFolder_Outputs_NOM_Trialwise)), mkdir(nameFolder_Outputs_NOM_Trialwise), end
 
+    % Define where to save the compiled data
+    nameFolder_Output_SaveCompile = sprintf('%s/n%d_n%d', nameFolder_Outputs_NOM_Trialwise, nSubj, nIterxJob);
+
     % Print a header to summarize the setting
     fprintf('NOM trial-wise analysis settings:\n')
     fprintf(' - nSubj = %d\n', nSubj)
@@ -149,12 +151,9 @@ for iRun=1%[1,3,4]
     fprintf(' - SF tuning function: %s\n', namesFamily_all{iFamily_SF});
     fprintf(' - Number of Bins: %d\n', nBins);
     fprintf(' - Information Criterion to plot: %s\n\n', namesIC{iIC_plot});
-
-
-    % flag_step_all = [1,2];
-
+    
     %% Compile/load data
-    nameFile_compiledData = sprintf('%s.mat', nameFolder_Data_SaveCompile);
+    nameFile_compiledData = sprintf('%s.mat', nameFolder_Output_SaveCompile);
     if ~exist(nameFile_compiledData, 'file')
 
         % Preallocate arrays for storing results across all conditions
@@ -414,7 +413,7 @@ for iRun=1%[1,3,4]
         fprintf('\n\n ==== Combined locations (6,7,8) created by averaging single locations ==== \n\n');
 
         %%% Save the organized data for all subjects
-        save(nameFolder_Data_SaveCompile, '*_allCond')
+        save(nameFolder_Output_SaveCompile, '*_allCond')
         clear *_allCond
         fprintf('\n\n ==== *_allCond saved and cleared ==== \n\n');
 
@@ -455,12 +454,12 @@ for iRun=1%[1,3,4]
         end % isubj
 
         % Save the organized data for all subjects
-        save(nameFolder_Data_SaveCompile, '*_allSubj', '-append')
+        save(nameFolder_Output_SaveCompile, '*_allSubj', '-append')
 
         fprintf('\n ==== Behav data compiled ==== \n\n')
     else
         fprintf('\n%s: Loading compiled data: %s ...', string(datetime('now')), nameFile_compiledData)
-        load(nameFolder_Data_SaveCompile)
+        load(nameFolder_Output_SaveCompile)
         fprintf('DONE \n\n')
 
     end
@@ -469,7 +468,7 @@ for iRun=1%[1,3,4]
     clc; fprintf('\n%s: Fig 1/23: Behavioral metrics (paired locations) STARTED.\n', string(datetime('now')))
 
     % Load data
-    load(nameFolder_Data_SaveCompile, 'metrics_allCond')
+    load(nameFolder_Output_SaveCompile, 'metrics_allCond')
 
     % Define folder for saving figures
     nameFolder_Fig_behav = sprintf('%s/Behav_pairedLoc', nameFolder_Fig_NOM_Trialwise);
@@ -504,11 +503,11 @@ for iRun=1%[1,3,4]
             sz_text = 22;
             wd = 3;
             %------------------------------%
-            fxn_drawBars(data_allIter_allSubj, ref, colors_comb(iLocPair_all, :), namesLocComb(iLocPair_all), x_ticks, x_ticks, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd)
+            fxn_drawBars(data_allIter_allSubj, ref, colors_comb(iLocPair_all, :), namesLocComb(iLocPair_all), x_ticks, x_ticks, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd);
             %------------------------------%
+            fig = gcf;
             ylabel(namesMetrics_behav_long{iMetric_prob})
-            saveas(gcf, sprintf('%s/n%d_L%d%d_%s.png', nameFolder_Fig_behav, nSubj, iLocPair_all, namesMetrics_behav{iMetric_prob}))
-            close(gcf)
+            saveAndCloseFigure(fig, sprintf('%s/n%d_L%d%d_%s.png', nameFolder_Fig_behav, nSubj, iLocPair_all, namesMetrics_behav{iMetric_prob}))
         end % iMetric
     end % iGroup
     clear metrics_allCond
@@ -517,7 +516,7 @@ for iRun=1%[1,3,4]
     %% 2. Behavioral metrics: single locations
     clc; fprintf('\n%s: Fig 2/23: Behavioral metrics (single locations) STARTED.\n', string(datetime('now')))
     % Load data
-    load(nameFolder_Data_SaveCompile, 'metrics_allCond')
+    load(nameFolder_Output_SaveCompile, 'metrics_allCond')
 
     % Define folder for saving figures
     nameFolder_Fig_behav = sprintf('%s/Behav_singleLoc', nameFolder_Fig_NOM_Trialwise);
@@ -555,12 +554,12 @@ for iRun=1%[1,3,4]
             sz_text = 22;
             wd = 3;
             %------------------------------%
-            fxn_drawBars(data_allIter_allSubj, ref, colors_comb(iLocSingle_perSet, :), namesLocComb(iLocSingle_perSet), x_ticks, x_ticks, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd)
+            fxn_drawBars(data_allIter_allSubj, ref, colors_comb(iLocSingle_perSet, :), namesLocComb(iLocSingle_perSet), x_ticks, x_ticks, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd);
             % ------------------------------%
+            fig = gcf;
             ylabel(namesMetrics_behav_long{iMetric_prob})
 
-            saveas(gcf, sprintf('%s/n%d_L%s_%s.png', nameFolder_Fig_behav, nSubj, strjoin(string(iLocSingle_perSet), ''), namesMetrics_behav{iMetric_prob}))
-            close(gcf)
+            saveAndCloseFigure(fig, sprintf('%s/n%d_L%s_%s.png', nameFolder_Fig_behav, nSubj, strjoin(string(iLocSingle_perSet), ''), namesMetrics_behav{iMetric_prob}))
         end % iMetric
     end % iSet
     clear metrics_allCond
@@ -569,7 +568,7 @@ for iRun=1%[1,3,4]
     %% 3. Templates for IDVD and group averages
     clc; fprintf('\n%s: Fig 3/23: Templates (group averages) STARTED.\n', string(datetime('now')))
     % Load data
-    load(nameFolder_Data_SaveCompile, 'template_*_allCond')
+    load(nameFolder_Output_SaveCompile, 'template_*_allCond')
 
     pixMin = 0;
     pixMax = 0;
@@ -588,7 +587,7 @@ for iRun=1%[1,3,4]
 
         %%%% Group ave %%%%%
         for iLocComb = iLocComb_all
-            figure('Position', [0 0 1e3 1e3]), hold on
+            fig = figure('Position', [0 0 1e3 1e3]); hold on
             e2D_ave = getCI(template_med_allSubj(iLocComb, :, :, :), 2, 2);
             e2D_ave = e2D_ave';
             fprintf('\n%s L%d: Min = %.3f, Max=%.3f\n', str_dataset, iLocComb, min(e2D_ave(:)), max(e2D_ave(:)))
@@ -604,14 +603,13 @@ for iRun=1%[1,3,4]
             RCplot_2Dkernel(e2D_ave, nan)
             %-----------------%
             title(sprintf('n=%d nIter=%d L%d %s (%s)', nSubj, nIterxJob, iLocComb, namesLocComb{iLocComb}, str_dataset))
-            saveas(gcf, sprintf('%s/n%d_group_L%d_A%d_%s.png', nameFolder_Fig_NOM_Template, nSubj, iLocComb, iModelA_plot, str_dataset))
-            close(gcf)
+            saveAndCloseFigure(fig, sprintf('%s/n%d_group_L%d_A%d_%s.png', nameFolder_Fig_NOM_Template, nSubj, iLocComb, iModelA_plot, str_dataset))
         end % iiLoc
 
         % %% Idvd data in one figure, per loc %%%%%
         for iiLoc = 1:nLocComb8
 
-            figure('Position', [0, 0, 2e3, 1.8e3])
+            fig = figure('Position', [0, 0, 2e3, 1.8e3]);
             for isubj = 1:nSubj
                 e2D = squeeze(template_med_allSubj(iiLoc, isubj, :,:))';
                 subplot(nRows_subj, nCols_subj, isubj), hold on
@@ -626,8 +624,7 @@ for iRun=1%[1,3,4]
             sgtitle(sprintf('L%d %s [A%dB%d] (%s)', iiLoc, namesLocComb{iiLoc}, iModelA_plot, iModelB_plot, str_dataset), 'FontSize',20)
 
             % save
-            saveas(gcf, sprintf('%s/n%d_L%d_A%dB%d_%s.png', nameFolder_Fig_NOM_Template, nSubj, iiLoc, iModelA_plot, iModelB_plot, str_dataset))
-            close(gcf)
+            saveAndCloseFigure(fig, sprintf('%s/n%d_L%d_A%dB%d_%s.png', nameFolder_Fig_NOM_Template, nSubj, iiLoc, iModelA_plot, iModelB_plot, str_dataset))
 
         end % iiLoc
     end % iDataset
@@ -643,7 +640,7 @@ for iRun=1%[1,3,4]
     str_dataset = namesDataset{iDataset_plotRC};
 
     % Load compiled separability: sep_allCond
-    load(nameFolder_Data_SaveCompile, 'sep_allCond')
+    load(nameFolder_Output_SaveCompile, 'sep_allCond')
 
     % Folder for saving figures
     nameFolder_Fig_Sep = sprintf('%s/Separability', nameFolder_Fig_NOM_Trialwise);
@@ -695,6 +692,7 @@ for iRun=1%[1,3,4]
         % -------------------%
         fxn_drawBars(data_allIter_allSubj, ref, colors, x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd);
         % -------------------%
+        fig = gcf;
         ylabel('Separability (Pearson''s r)')
 
         % Adjust distance between components
@@ -714,8 +712,7 @@ for iRun=1%[1,3,4]
 
         % ---- save ----
         outName = sprintf('%s/n%d_L%s_A%d_%s.png', nameFolder_Fig_Sep, nSubj, str_loc, iModelA_plot, str_dataset);
-        saveas(gcf, outName);
-        close(gcf);
+        saveAndCloseFigure(fig, outName);
 
     end % iSet
 
@@ -725,7 +722,7 @@ for iRun=1%[1,3,4]
     %% 5. Tuning functions: group averages
     clc; fprintf('\n%s: Fig 5/23: Tuning functions (group averages) STARTED.\n', string(datetime('now')))
     % Load data
-    load(nameFolder_Data_SaveCompile, 'marg*_allCond', 'margPred*_allCond', 'margR2*_allCond')
+    load(nameFolder_Output_SaveCompile, 'marg*_allCond', 'margPred*_allCond', 'margR2*_allCond')
 
     % Define folder for saving figures
     nameFolder_Fig_NOM_Tuning = sprintf('%s/TuningFxns_group', nameFolder_Fig_NOM_Trialwise);
@@ -752,7 +749,7 @@ for iRun=1%[1,3,4]
 
                 xaxis = axis_tuning{iFeature};
 
-                figure('Position', [0 0 1.1e3 6e2]) % default 8e2
+                fig = figure('Position', [0 0 1.1e3 6e2]); % default 8e2
                 hold on
                 for iLoc = iLocPair_all
 
@@ -855,8 +852,7 @@ for iRun=1%[1,3,4]
                 set(findall(gcf, '-property', 'linewidth'), 'linewidth', 2)
 
                 % Save the figure
-                saveas(gcf, sprintf('%s/n%d_L%d%d_A%d_%s_%s.png', nameFolder_Fig_NOM_Tuning, nSubj, iLocPair_all, iModelA_plot, namesFeature{iFeature}, namesDataset{iDataset}))
-                close(gcf)
+                saveAndCloseFigure(fig, sprintf('%s/n%d_L%d%d_A%d_%s_%s.png', nameFolder_Fig_NOM_Tuning, nSubj, iLocPair_all, iModelA_plot, namesFeature{iFeature}, namesDataset{iDataset}))
             end % iFeature
         end % iGroup
     end % iDataset = 1:2
@@ -867,7 +863,7 @@ for iRun=1%[1,3,4]
     clc; fprintf('\n%s: Fig 6/23: Tuning functions (individual) STARTED.\n', string(datetime('now')))
 
     % Load data
-    load(nameFolder_Data_SaveCompile, 'marg*_allCond', 'margPred*_allCond', 'margParams*_allCond', 'margR2*_allCond')
+    load(nameFolder_Output_SaveCompile, 'marg*_allCond', 'margPred*_allCond', 'margParams*_allCond', 'margR2*_allCond')
 
     % Define folder for saving figures
     nameFolder_Fig_NOM_Tuning = sprintf('%s/TuningFxns_IDVD', nameFolder_Fig_NOM_Trialwise);
@@ -893,7 +889,7 @@ for iRun=1%[1,3,4]
                         lineStyle = '--';
                 end
 
-                figure('Position', [0 0 2e3 1.5e3])
+                fig = figure('Position', [0 0 2e3 1.5e3]);
 
                 for isubj = 1:nSubj
                     subplot(nRows_subj, nCols_subj, isubj), hold on
@@ -962,8 +958,7 @@ for iRun=1%[1,3,4]
                 set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
 
                 % Save the figure
-                saveas(gcf, sprintf('%s/n%d_L%d%d_A%d_%s_%s.png', nameFolder_Fig_NOM_Tuning, nSubj, iLocPair_all, iModelA_plot, namesFeature{iFeature}, namesDataset{iDataset}))
-                close(gcf)
+                saveAndCloseFigure(fig, sprintf('%s/n%d_L%d%d_A%d_%s_%s.png', nameFolder_Fig_NOM_Tuning, nSubj, iLocPair_all, iModelA_plot, namesFeature{iFeature}, namesDataset{iDataset}))
             end % iDataset
         end % iFeature
     end % iGroup
@@ -974,7 +969,7 @@ for iRun=1%[1,3,4]
     clc; fprintf('\n%s: Fig 7/23: Tuning characteristics STARTED.\n', string(datetime('now')))
 
     % Load data
-    load(nameFolder_Data_SaveCompile, 'margTunC_*_allCond')
+    load(nameFolder_Output_SaveCompile, 'margTunC_*_allCond')
 
     % Define folder for saving figures
     nameFolder_Fig_tunC = sprintf('%s/TuningCs', nameFolder_Fig_NOM_Trialwise);
@@ -1194,19 +1189,20 @@ for iRun=1%[1,3,4]
                 switch flag_plotDist
                     case 0
                         %------------------------------%
-                        fxn_drawBars(data_allIter_allSubj, ref, colors, x_ticks, y_ticks_all{iTunC}, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd)
+                        fxn_drawBars(data_allIter_allSubj, ref, colors, x_ticks, y_ticks_all{iTunC}, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd);
                         % ------------------------------%
+                        fig = gcf;
                         ylabel(sprintf('%s %s', namesFeature{iFeature}, namesTunC{iTunC}))
                     case 1
                         %------------------------------%
                         fxn_drawDist(data_allIter_allSubj, ref, colors, x_ticks, y_ticks_all{iTunC}, y_ticklabels, str_title, sz_fig, nIterxJob, nSubj)
                         %------------------------------%
+                        fig = gcf;
                         xlabel(sprintf('%s %s [%s]', namesFeature{iFeature}, namesTunC{iTunC}, str_family))
                         ylabel('Probabillity')
                 end
                 % Save the figure
-                saveas(gcf, sprintf('%s/n%d_L%d%d_A%d_%s%d.png', nameFolder_Fig_tunC, nSubj, iLocPair_all, iModelA_plot, namesFeature{iFeature}, iTunC))
-                close(gcf)
+                    saveAndCloseFigure(fig, sprintf('%s/n%d_L%d%d_A%d_%s%d.png', nameFolder_Fig_tunC, nSubj, iLocPair_all, iModelA_plot, namesFeature{iFeature}, iTunC))
 
             end % end of iTunC
         end % end of iFeature
@@ -1218,7 +1214,7 @@ for iRun=1%[1,3,4]
     clc; fprintf('\n%s: Fig 8/23: Corr CS vs tuning params STARTED.\n', string(datetime('now')))
 
     % Load data
-    load(nameFolder_Data_SaveCompile, 'margParams*_allCond', 'CS_allSubj')
+    load(nameFolder_Output_SaveCompile, 'margParams*_allCond', 'CS_allSubj')
 
     nameVarX = 'CS';
     nameVarY = 'tunParam';
@@ -1276,6 +1272,7 @@ for iRun=1%[1,3,4]
                 %----------------------------%
                 [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob);
                 %----------------------------%
+                fig = gcf;
 
                 % Save CI for automatic CI range calcuation in CorrAsym
                 save(sprintf('%s/n%d_L%s_%s.mat', nameFolder_Outputs_NOM_corr, nSubj, strjoin(string(iLocCorr_all), ''), nameVarY_fileTitle), 'PearsonR', 'SpearmanRho')
@@ -1302,8 +1299,7 @@ for iRun=1%[1,3,4]
                     1 - ti(1) - ti(3) - 2*sz_axOffset, ...
                     1 - ti(2) - ti(4) - 2*sz_axOffset];
 
-                saveas(gcf, sprintf('%s/n%d_L%s_%s.png', nameFolder_Fig_NOM_corr, nSubj, strjoin(string(iLocCorr_all), ''), nameVarY_fileTitle))
-                close(gcf)
+                saveAndCloseFigure(fig, sprintf('%s/n%d_L%s_%s.png', nameFolder_Fig_NOM_corr, nSubj, strjoin(string(iLocCorr_all), ''), nameVarY_fileTitle))
 
             end % iTunC
         end % iFeature
@@ -1315,7 +1311,7 @@ for iRun=1%[1,3,4]
     clc; fprintf('\n%s: Fig 9/23: Corr CS vs tuning characteristics STARTED.\n', string(datetime('now')))
 
     % Load data
-    load(nameFolder_Data_SaveCompile, 'margTunC*_allCond', 'CS_allSubj')
+    load(nameFolder_Output_SaveCompile, 'margTunC*_allCond', 'CS_allSubj')
 
     nameVarX = 'CS';
     nameVarY = 'tunC';
@@ -1373,6 +1369,7 @@ for iRun=1%[1,3,4]
                 %----------------------------%
                 [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob);
                 %----------------------------%
+                fig = gcf;
                 % Save CI for automatic CI range calcuation in CorrAsym
                 save(sprintf('%s/n%d_L%s_%s.mat', nameFolder_Outputs_NOM_corr, nSubj, strjoin(string(iLocCorr_all), ''), nameVarY_fileTitle), 'PearsonR', 'SpearmanRho')
 
@@ -1394,8 +1391,7 @@ for iRun=1%[1,3,4]
                     1 - ti(1) - ti(3) - 2*sz_axOffset, ...
                     1 - ti(2) - ti(4) - 2*sz_axOffset];
 
-                saveas(gcf, sprintf('%s/n%d_L%s_%s.png', nameFolder_Fig_NOM_corr, nSubj, strjoin(string(iLocCorr_all), ''), nameVarY_fileTitle))
-                close(gcf)
+                saveAndCloseFigure(fig, sprintf('%s/n%d_L%s_%s.png', nameFolder_Fig_NOM_corr, nSubj, strjoin(string(iLocCorr_all), ''), nameVarY_fileTitle))
 
             end % iTunC
         end % iFeature
@@ -1407,7 +1403,7 @@ for iRun=1%[1,3,4]
     clc; fprintf('\n%s: Fig 10/23: Corr CS vs pA STARTED.\n', string(datetime('now')))
 
     % Load data
-    load(nameFolder_Data_SaveCompile, 'metric_data_allCond', 'CS_allSubj')
+    load(nameFolder_Output_SaveCompile, 'metric_data_allCond', 'CS_allSubj')
 
     nameVarX = 'CS';
     nameVarY = 'pA'; iMetric_pA = 2;
@@ -1450,6 +1446,7 @@ for iRun=1%[1,3,4]
         %----------------------------%
         [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob);
         %----------------------------%
+        fig = gcf;
         % Save CI for automatic CI range calcuation in CorrAsym
         save(sprintf('%s/n%d_L%s_%s.mat', nameFolder_Outputs_NOM_corr, nSubj, strjoin(string(iLocCorr_all), ''), nameVarY_fileTitle), 'PearsonR', 'SpearmanRho')
 
@@ -1471,8 +1468,7 @@ for iRun=1%[1,3,4]
             1 - ti(1) - ti(3) - 2*sz_axOffset, ...
             1 - ti(2) - ti(4) - 2*sz_axOffset];
 
-        saveas(gcf, sprintf('%s/n%d_L%s.png', nameFolder_Fig_NOM_corr, nSubj, strjoin(string(iLocCorr_all), '')))
-        close(gcf)
+        saveAndCloseFigure(fig, sprintf('%s/n%d_L%s.png', nameFolder_Fig_NOM_corr, nSubj, strjoin(string(iLocCorr_all), '')))
 
     end % iSet
     clear metric_data_allCond
@@ -1612,7 +1608,7 @@ for iRun=1%[1,3,4]
     iLocCorr_all = [6,5,3];
     
     % Load data
-    load(nameFolder_Data_SaveCompile, 'margTunC_*_allCond', 'CS_allSubj')
+    load(nameFolder_Output_SaveCompile, 'margTunC_*_allCond', 'CS_allSubj')
 
     nameVarX = 'CS';
     nameVarY = 'tunC';
@@ -1716,6 +1712,7 @@ for iRun=1%[1,3,4]
                 %----------------------------%
                 fxn_drawCorrAsym(asymX_allIter_allSubj*100, asymY_allIter_allSubj*100, colors_comb(iLocPair_all, :), flag_UseRUseRho, flag_CIrange, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj)
                 %----------------------------%
+                fig = gcf;
 
                 xlabel(sprintf('\\Delta contrast sensitivity (%%)'), 'FontSize', sz_label);
                 ylabel(sprintf('\\Delta %s %s (%%)', namesFeature{iFeature}, namesTunCs_noUnit{iTunC}), 'fontsize', sz_label)
@@ -1735,8 +1732,7 @@ for iRun=1%[1,3,4]
                     1 - ti(1) - ti(3) - 2*sz_axOffset, ...
                     1 - ti(2) - ti(4) - 2*sz_axOffset];
 
-                saveas(gcf, sprintf('%s/n%d_L%d%d_%s.png', nameFolder_Fig_NOM_CorrAsym, nSubj, iLocPair_all, nameVarY_fileTitle))
-                close(gcf)
+                saveAndCloseFigure(fig, sprintf('%s/n%d_L%d%d_%s.png', nameFolder_Fig_NOM_CorrAsym, nSubj, iLocPair_all, nameVarY_fileTitle))
 
             end % iTunC
         end % iFeature
@@ -1748,7 +1744,7 @@ for iRun=1%[1,3,4]
     clc; fprintf('\n%s: Fig 13/23: CorrAsym CS vs pA STARTED.\n', string(datetime('now')))
 
     % Load data
-    load(nameFolder_Data_SaveCompile, 'metric_data_allCond', 'CS_allSubj', 'pA_allSubj')
+    load(nameFolder_Output_SaveCompile, 'metric_data_allCond', 'CS_allSubj', 'pA_allSubj')
 
     nameVarX = 'CS';
     nameVarY = 'pA';
@@ -1822,6 +1818,7 @@ for iRun=1%[1,3,4]
         fxn_drawCorrAsym(asymX_allIter_allSubj*100, asymY_allIter_allSubj*100, ...
             colors_comb(iLocPair_all, :), flag_UseRUseRho, flag_CIrange, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj)
         %----------------------------%
+        fig = gcf;
 
         xlabel(sprintf('%s of contrast sensitivity (%%)', nameAsymX), 'fontsize', sz_label)
         ylabel(sprintf('%s of %s (%%)', nameAsymX, nameVarY_figTitle), 'fontsize', sz_label)
@@ -1841,8 +1838,7 @@ for iRun=1%[1,3,4]
             1 - ti(1) - ti(3) - 2*sz_axOffset, ...
             1 - ti(2) - ti(4) - 2*sz_axOffset];
 
-        saveas(gcf, sprintf('%s/n%d_L%d%d.png', nameFolder_Fig_NOM_CorrAsym, nSubj, iLocPair_all))
-        close(gcf)
+        saveAndCloseFigure(fig, sprintf('%s/n%d_L%d%d.png', nameFolder_Fig_NOM_CorrAsym, nSubj, iLocPair_all))
 
     end % iGroup
     clear metric_data_allCond
@@ -1852,7 +1848,7 @@ for iRun=1%[1,3,4]
     clc; fprintf('\n%s: Fig 14/23: NOM metrics vs DV (group averages) STARTED.\n', string(datetime('now')))
 
     % Load data
-    load(nameFolder_Data_SaveCompile);
+    load(nameFolder_Output_SaveCompile);
     % Define folder for saving figures for each model A and model B
     nameFolder_Fig_NOM_metrics = sprintf('%s/NOMmetrics_A%d_group', nameFolder_Fig_NOM_Trialwise, iModelA_plot);
     if isempty(dir(nameFolder_Fig_NOM_metrics)), mkdir(nameFolder_Fig_NOM_metrics), end
@@ -1913,7 +1909,7 @@ for iRun=1%[1,3,4]
 
             %%% --- PLOT ---
             for iMetric_prob = 1:nMetrics_prob
-                figure('Position', [0 0 500/scaleMode 500/scaleMode]); hold on
+                fig = figure('Position', [0 0 500/scaleMode 500/scaleMode]); hold on
 
                 % R2 table: rows = plotted ModelB, cols = locations in this set
                 % R2_tab = nan(numel(iLocSingle_perSet), 2); % ave and sem
@@ -2155,9 +2151,8 @@ for iRun=1%[1,3,4]
                     'FontSize', 10/scaleMode);
 
                 % Save
-                saveas(gcf, sprintf('%s/n%d_L%s_%s_%s.png', ...
+                saveAndCloseFigure(fig, sprintf('%s/n%d_L%s_%s_%s.png', ...
                     nameFolder_Fig_NOM_metrics, nSubj, strjoin(string(iLocSingle_perSet), ''), namesMetrics_prob{iMetric_prob}, str_plotMode));
-                close(gcf)
 
             end % iMetric_prob
         end % iPlotMode
@@ -2174,7 +2169,7 @@ for iRun=1%[1,3,4]
     iModelB_all_plot = 1;
 
     % Load data
-    load(nameFolder_Data_SaveCompile);
+    load(nameFolder_Output_SaveCompile);
 
     % Define folder for saving figures for each model A and model B
     nameFolder_Fig_NOM_metrics = sprintf('%s/NOMmetrics_A%d_idvd', nameFolder_Fig_NOM_Trialwise, iModelA_plot);
@@ -2186,7 +2181,7 @@ for iRun=1%[1,3,4]
 
         %%%%%%%%%%%%
         for iMetric_prob = 1:nMetrics_prob
-            figure('Position', [0 0 2e3 1.5e3])
+            fig = figure('Position', [0 0 2e3 1.5e3]);
 
             for isubj = 1:nSubj
                 subplot(nRows_subj, nCols_subj, isubj), hold on
@@ -2259,8 +2254,7 @@ for iRun=1%[1,3,4]
             % set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
 
             % Save the figure
-            saveas(gcf, sprintf('%s/n%d_%s_L%d_A%d.png', nameFolder_Fig_NOM_metrics, nSubj, namesMetrics_prob{iMetric_prob}, iLocSingle, iModelA_plot))
-            close(gcf)
+            saveAndCloseFigure(fig, sprintf('%s/n%d_%s_L%d_A%d.png', nameFolder_Fig_NOM_metrics, nSubj, namesMetrics_prob{iMetric_prob}, iLocSingle, iModelA_plot))
         end % iMetric
 
         fprintf('DONE\n')
@@ -2272,7 +2266,7 @@ for iRun=1%[1,3,4]
     clc; fprintf('\n%s: Fig 16/23: ANOVA nLL (collapsed factors) STARTED.\n', string(datetime('now')))
 
     % Load data
-    load(nameFolder_Data_SaveCompile, 'nLL_allCond')
+    load(nameFolder_Output_SaveCompile, 'nLL_allCond')
 
     % Define folder for saving GoF figures
     nameFolder_Fig_NOM_nLL = fullfile(nameFolder_Fig_NOM_Trialwise, 'NOM_NLL');
@@ -2337,7 +2331,7 @@ for iRun=1%[1,3,4]
                 eta2p_Loc_med, eta2p_Loc_lb, eta2p_Loc_ub, ...
                 eta2p_Int_med, eta2p_Int_lb, eta2p_Int_ub);
 
-            figure('Position', [0 0 1e3 500])
+            fig = figure('Position', [0 0 1e3 500]);
 
             for iDimCollapse = 1:2
                 subplot(1,2,iDimCollapse);
@@ -2380,7 +2374,7 @@ for iRun=1%[1,3,4]
                 wd = 2;
 
                 %------------------------------%
-                fxn_drawBars(dnLL_collapse, ref, colors, x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd)
+                fxn_drawBars(dnLL_collapse, ref, colors, x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd);
                 %------------------------------%
 
                 ylabel(sprintf('\\Delta nLL'), 'FontSize', sz_label);
@@ -2393,8 +2387,7 @@ for iRun=1%[1,3,4]
                 sprintf('eta2p_obs (median-iter): ModelB=%.2f, Loc=%.2f, Int=%.2f', eta2p_obs_ModelB, eta2p_obs_Loc, eta2p_obs_Int)));
 
             % save
-            saveas(gcf, fullfile(nameFolder_Fig_NOM_nLL, sprintf('n%d_L%s_ModelB%s.png', nSubj, strjoin(string(iLocSingle_perSet), ''), strjoin(string(iModelB_all), ''))));
-            close(gcf)
+            saveAndCloseFigure(fig, fullfile(nameFolder_Fig_NOM_nLL, sprintf('n%d_L%s_ModelB%s.png', nSubj, strjoin(string(iLocSingle_perSet), ''), strjoin(string(iModelB_all), ''))));
 
         end % iSetLoc
     end % iSetModelB
@@ -2404,7 +2397,7 @@ for iRun=1%[1,3,4]
 
     %% 17. [NOM] ANOVA on nLL (ModelB x Loc; NO vars collapsed)
     % Load data
-    load(nameFolder_Data_SaveCompile, 'nLL_allCond')
+    load(nameFolder_Output_SaveCompile, 'nLL_allCond')
     clc; fprintf('\n%s: Fig 17/23: ANOVA nLL (no collapse) STARTED.\n', string(datetime('now')))
 
     % Define folder for saving GoF figures
@@ -2462,6 +2455,7 @@ for iRun=1%[1,3,4]
         % ------------------------------%
         [pperm_allPairs , pairs] = fxn_drawBars(dnLL_allIter_allSubj, ref, repmat(colors_comb(iLocSingle, :), nBars, 1), namesModelB(iModelB_selected), y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, 1, markers_allSubj, sz_text, wd);
         % ------------------------------%
+        figMain = gcf;
         % ylim(y_ticks([1, end]))
 
         ylabel('\Delta nLL', 'FontSize', sz_label);
@@ -2580,13 +2574,12 @@ for iRun=1%[1,3,4]
         % set(ax_inset, 'LineWidth', 1.5);
         % %========================
 
-        saveas(gcf, fullfile(nameFolder_Fig_NOM_nLL, sprintf('n%d_L%d_ModelB%s.png', nSubj, iLocSingle, strjoin(string(iModelB_selected), ''))));
-        % close(gcf); % do NOT close here, as we need to copy the axis geometry for the box-code figure; close at the end of the loop after copying geometry.
+        saveas(figMain, fullfile(nameFolder_Fig_NOM_nLL, sprintf('n%d_L%d_ModelB%s.png', nSubj, iLocSingle, strjoin(string(iModelB_selected), ''))));
+        % close(figMain); % do NOT close here, as we need to copy the axis geometry for the box-code figure; close at the end of the loop after copying geometry.
 
         % ======== Plot the box-code figure (only once) ========
         if iLocSingle==1
 
-            figMain = gcf;
             axMain  = gca;
 
             % Copy main-axis geometry as normalized proportions
@@ -2658,7 +2651,7 @@ for iRun=1%[1,3,4]
             close(figBox);
         end % if
 
-        close(gcf) % MUST be here!! as the axis inherited for the box-code figure is from the main figure, so we can't close the main figure before copying the axis geometry.
+        close(figMain) % MUST be here!! as the axis inherited for the box-code figure is from the main figure, so we can't close the main figure before copying the axis geometry.
 
     end % iLocSingle
 
@@ -2667,7 +2660,7 @@ for iRun=1%[1,3,4]
 
     %% 18. [NOM] Compare NOM parameters across locations
     % Load data
-    load(nameFolder_Data_SaveCompile, 'params_allCond')
+    load(nameFolder_Output_SaveCompile, 'params_allCond')
     clc; fprintf('\n%s: Fig 18/23: Compare NOM params across locations STARTED.\n', string(datetime('now')))
 
     % Define folder for saving GoF figures
@@ -2721,10 +2714,10 @@ for iRun=1%[1,3,4]
                     %------------------------------%
                     fxn_drawBars(NOMp_allIter_allSubj, ref, colors_comb(iLocPair_all, :), x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd);
                     %------------------------------%
+                    fig = gcf;
                     ylabel(sprintf('%s', namesModelBparams{iModelB_NOMplot}{iParam}))
                     % Save the figure
-                    saveas(gcf, sprintf('%s/n%d_A%dB%d_L%s_NOMp%d.png', nameFolder_Fig_NOM_params, nSubj, iModelA_plot, iModelB_NOMplot, strjoin(string(iLocPair_all), ''), iParam))
-                    close(gcf);
+                    saveAndCloseFigure(fig, sprintf('%s/n%d_A%dB%d_L%s_NOMp%d.png', nameFolder_Fig_NOM_params, nSubj, iModelA_plot, iModelB_NOMplot, strjoin(string(iLocPair_all), ''), iParam));
                 end % iParam
             end % iGroup
         end % ii
@@ -2736,7 +2729,7 @@ for iRun=1%[1,3,4]
     clc; fprintf('\n%s: Fig 19/23: Corr pA vs NOM params STARTED.\n', string(datetime('now')))
 
     % Load data
-    load(nameFolder_Data_SaveCompile, 'params_allCond', 'pA_allSubj')
+    load(nameFolder_Output_SaveCompile, 'params_allCond', 'pA_allSubj')
     nameVarX = 'pA';
     nameVarY = 'NOMparams';
 
@@ -2795,6 +2788,7 @@ for iRun=1%[1,3,4]
                 %----------------------------%
                 [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob);
                 %----------------------------%
+                fig = gcf;
                 % Save CI for automatic CI range calcuation in CorrAsym
                 save(sprintf('%s/n%d_B%d_L%s_NOMp%d.mat', nameFolder_Outputs_NOM_corr, nSubj, iModelB_NOMplot, strjoin(string(iLocCorr_all), ''), iNOMparam), 'PearsonR', 'SpearmanRho')
 
@@ -2816,8 +2810,7 @@ for iRun=1%[1,3,4]
                     1 - ti(1) - ti(3) - 2*sz_axOffset, ...
                     1 - ti(2) - ti(4) - 2*sz_axOffset];
 
-                saveas(gcf, sprintf('%s/n%d_B%d_L%s_NOMp%d.png', nameFolder_Fig_NOM_corr, nSubj, iModelB_NOMplot, strjoin(string(iLocCorr_all), ''), iNOMparam))
-                close(gcf)
+                saveAndCloseFigure(fig, sprintf('%s/n%d_B%d_L%s_NOMp%d.png', nameFolder_Fig_NOM_corr, nSubj, iModelB_NOMplot, strjoin(string(iLocCorr_all), ''), iNOMparam))
             end % iNOMparam
         end % iSet
     end % iModelB_NOMplot
@@ -2925,7 +2918,7 @@ for iRun=1%[1,3,4]
     clc; fprintf('\n%s: Fig 20/23: Corr CS vs NOM params STARTED.\n', string(datetime('now')))
 
     % Load data
-    load(nameFolder_Data_SaveCompile, 'params_allCond', 'CS_allSubj')
+    load(nameFolder_Output_SaveCompile, 'params_allCond', 'CS_allSubj')
 
     nameVarX = 'CS';
     nameVarY = 'NOMparams';
@@ -2987,6 +2980,7 @@ for iRun=1%[1,3,4]
                 %----------------------------%
                 [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob);
                 %----------------------------%
+                fig = gcf;
                 % Save CI for automatic CI range calcuation in CorrAsym
                 save(sprintf('%s/n%d_B%d_L%s_NOMp%d.mat', nameFolder_Outputs_NOM_corr, nSubj, iModelB_NOMplot, strjoin(string(iLocCorr_all), ''), iNOMparam), 'PearsonR', 'SpearmanRho')
 
@@ -3008,8 +3002,7 @@ for iRun=1%[1,3,4]
                     1 - ti(1) - ti(3) - 2*sz_axOffset, ...
                     1 - ti(2) - ti(4) - 2*sz_axOffset];
 
-                saveas(gcf, sprintf('%s/n%d_B%d_L%s_NOMp%d.png', nameFolder_Fig_NOM_corr, nSubj, iModelB_NOMplot, strjoin(string(iLocCorr_all), ''), iNOMparam))
-                close(gcf)
+                saveAndCloseFigure(fig, sprintf('%s/n%d_B%d_L%s_NOMp%d.png', nameFolder_Fig_NOM_corr, nSubj, iModelB_NOMplot, strjoin(string(iLocCorr_all), ''), iNOMparam))
             end % iNOMparam
         end % iSet
     end % iModelB_NOMplot
@@ -3020,7 +3013,7 @@ for iRun=1%[1,3,4]
     clc; fprintf('\n%s: Fig 21/23: CorrAsym CS vs NOM params STARTED.\n', string(datetime('now')))
 
     % Load data
-    load(nameFolder_Data_SaveCompile, 'params_allCond', 'CS_allSubj')
+    load(nameFolder_Output_SaveCompile, 'params_allCond', 'CS_allSubj')
 
     nameVarX = 'CS';
     nameVarY = 'NOMparams';
@@ -3099,6 +3092,7 @@ for iRun=1%[1,3,4]
                 %----------------------------%
                 fxn_drawCorrAsym(asymX_allIter_allSubj*100, asymY_allIter_allSubj*100, colors_comb(iLocPair_all, :), flag_UseRUseRho, flag_CIrange, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj)
                 %----------------------------%
+                fig = gcf;
 
                 xlabel(sprintf('\\Delta contrast sensitivity (%%)'), 'FontSize', sz_label);
                 ylabel(sprintf('\\Delta %s (%%)', nameVarY_figTitle), 'fontsize', sz_label)
@@ -3118,8 +3112,7 @@ for iRun=1%[1,3,4]
                     1 - ti(1) - ti(3) - 2*sz_axOffset, ...
                     1 - ti(2) - ti(4) - 2*sz_axOffset];
 
-                saveas(gcf, sprintf('%s/n%d_B%d_L%s_NOMp%d.png', nameFolder_Fig_NOM_CorrAsym, nSubj, iModelB_NOMplot, strjoin(string(iLocPair_all), ''), iNOMparam))
-                close(gcf)
+                saveAndCloseFigure(fig, sprintf('%s/n%d_B%d_L%s_NOMp%d.png', nameFolder_Fig_NOM_CorrAsym, nSubj, iModelB_NOMplot, strjoin(string(iLocPair_all), ''), iNOMparam))
 
             end % iNOMparam
         end % iGroup
@@ -3228,76 +3221,14 @@ for iRun=1%[1,3,4]
     % clear params_allCond
     % fprintf('\n%s: DONE.\n', string(datetime('now')))
 
-    %% Corr: how much pA differs from 0.5 and criterion
-
-    % clc; fprintf('\n%s: Fig 23/23: Corr pA deviance vs criterion STARTED.\n', string(datetime('now')))
-    % 
-    % % Load data
-    % load(nameFolder_Data_SaveCompile, 'metric_*_allCond')
-    % load(nameFolder_Data_SaveCompile, 'metrics_allCond')
-    % 
-    % % Define folder for saving figures for each model A and model B
-    % 
-    % nameFolder_Fig_pAdev_corr = sprintf('%s/Corr/pAdev_criterion', nameFolder_Fig_NOM_Trialwise);
-    % if isempty(dir(nameFolder_Fig_pAdev_corr)), mkdir(nameFolder_Fig_pAdev_corr), end
-    % 
-    % iModelB = 1;
-    % iLocCorr_all = [6,5,3];
-    % flag_plotIdvdCI = 0;
-    % flag_plotUnikSymbol = 0;
-    % % Obtain criterion
-    % iCriterion=2;
-    % iDataset_plotNOM=1;
-    % criterion_allIter_allSubj = squeeze(metrics_allCond(iModelA_plot, iLocCorr_all, :, :, iDataset_plotNOM, iCriterion)); % nLoc x nSubj x nIter
-    % criterion_allIter_allSubj = permute(criterion_allIter_allSubj, [2,1,3]);
-    % 
-    % % Obtain deviance from 0.5
-    % iMetric_pA = 2;
-    % pAdev_allIter_allSubj = nan(nSubj, numel(iLocCorr_all), nIterxJob);
-    % for iiLoc = 1:numel(iLocCorr_all)
-    %     pA_perLoc= squeeze(metric_data_allCond(iModelA_plot, iModelB, iLocCorr_all(iiLoc), iMetric_pA, :, :, :));
-    %     for isubj=1:nSubj
-    %         pAdev_allIter_allSubj(isubj, iiLoc, :) = squeeze(min(pA_perLoc(isubj, :, :), [], 3)-.5);
-    %     end
-    % end % iiLoc
-    % 
-    % % ===== PLOT ====
-    % nameVarX = 'Criterion';
-    % nameVarY_figTitle = 'pA deviance';
-    % str_title = sprintf('n=%d, nIter=%d A%dB%d %s vs. %s [L%s]', nSubj, nIterxJob, iModelA_plot, iModelB_NOMplot, nameVarX, nameVarY_figTitle, strjoin(string(iLocCorr_all), ''));
-    % 
-    % x_ticks = linspace(-1, .5, 5);
-    % x_ticklabels = x_ticks;
-    % y_ticks = linspace(0, .3, 5);
-    % y_ticklabels = y_ticks ;
-    % %----------------------------%
-    % [PearsonR, SpearmanRho] = fxn_drawCorr(criterion_allIter_allSubj, pAdev_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob);
-    % %----------------------------%
-    % 
-    % xline(0, '--', 'color', ones(1,3)/2, 'linewidth', 2);
-    % yline(0, '--', 'color', ones(1,3)/2, 'linewidth', 2);
-    % 
-    % xlabel(nameVarX, 'fontsize', sz_label)
-    % ylabel(nameVarY_figTitle, 'fontsize', sz_label)
-    % 
-    % % Adjust distance between components
-    % ax = gca;
-    % ti = ax.TightInset; % [left bottom right top] padding needed for labels/ticks
-    % ax.XLabel.Units = 'normalized';
-    % ax.YLabel.Units = 'normalized';
-    % 
-    % ax.XLabel.Position(2) = ax.XLabel.Position(2) - sz_labelOffset; % move label down
-    % ax.YLabel.Position(1) = ax.YLabel.Position(1) - sz_labelOffset; % move label left
-    % 
-    % ax.Position = [ ...
-    %     ti(1) + sz_axOffset, ...
-    %     ti(2) + sz_axOffset, ...
-    %     1 - ti(1) - ti(3) - 2*sz_axOffset, ...
-    %     1 - ti(2) - ti(4) - 2*sz_axOffset];
-    % 
-    % saveas(gcf, sprintf('%s/n%d_A%dB%d_L%s.png', nameFolder_Fig_pAdev_corr, nSubj, iModelA_plot, iModelB_NOMplot, strjoin(string(iLocCorr_all), '')))
-    % close(gcf)
-    % fprintf('\n%s: DONE.\n', string(datetime('now')))
-
 
 end% iRun
+
+function saveAndCloseFigure(figHandle, outName)
+if ~isgraphics(figHandle, 'figure')
+    return
+end
+
+saveas(figHandle, outName);
+close(figHandle);
+end
