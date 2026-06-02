@@ -305,13 +305,13 @@ end
 %% [Plot] ticks, limits
 xticks(1:nCond); xticklabels([])
 % if ~isempty(x_ticklabels), xticklabels(x_ticklabels), end
-if ~isnan(y_ticks)
-    yticks(y_ticks);
-    ylim(y_ticks([1, end]));
-end
-if ~isnan(y_ticklabels)
-    yticklabels(y_ticklabels);
-end
+% if ~isnan(y_ticks)
+%     yticks(y_ticks);
+%     ylim(y_ticks([1, end]));
+% end
+% if ~isnan(y_ticklabels)
+%     yticklabels(y_ticklabels);
+% end
 
 if flag_plotIDVD
     buffer = .6;
@@ -345,6 +345,9 @@ if nCond == 2 && flag_plotDiff
 
     % --- draw horizontal line between the two conditions ---
     plot([1, 2], [yBar, yBar], 'k-', 'LineWidth', wd, 'HandleVisibility', 'off');
+    capHeight = 0.03 * (yMax - yMin);
+    plot([1, 1], [yBar-capHeight, yBar], 'k-', 'LineWidth', wd, 'HandleVisibility', 'off');
+    plot([2, 2], [yBar-capHeight, yBar], 'k-', 'LineWidth', wd, 'HandleVisibility', 'off');
 
     % --- draw CI errorbar at the center ---
     errorbar(1.5, yBar, diffPair_sem_neg, diffPair_sem_pos, 'k-', 'LineWidth', wd, 'HandleVisibility', 'off', 'CapSize', 0);
@@ -360,8 +363,8 @@ if nCond == 2 && flag_plotDiff
     end
 
     % Prepare the string
-    str_delta = sprintf('$\\Delta=%s$ [%s, %s]\n$\\mathit{p}=%.3f$', ...
-        fxn_formatSignedDecimal(diffPair_med), fxn_formatSignedDecimal(diffPair_lb), fxn_formatSignedDecimal(diffPair_ub), pperm_allPairs);
+    str_delta = sprintf('$\\Delta_{CI95}=[%s, %s]$\n$\\mathit{p}=%.3f$', ...
+        fxn_formatSignedDecimal(diffPair_lb), fxn_formatSignedDecimal(diffPair_ub), pperm_allPairs);
 
     % Print
     text(xText, yText, str_delta, ...
@@ -373,11 +376,13 @@ if nCond == 2 && flag_plotDiff
         'Clipping', 'off');
 end
 
-
 %% Plot p value of ANOVA results If nCond>2
 if nCond > 2
     % --- draw horizontal line across conditions ---
     plot([1, nCond], [yBar, yBar], 'k-', 'LineWidth', wd, 'HandleVisibility', 'off');
+    capHeight = 0.015 * (yMax - yMin);
+    plot([1, 1], [yBar-capHeight, yBar], 'k-', 'LineWidth', wd, 'HandleVisibility', 'off');
+    plot([nCond, nCond], [yBar-capHeight, yBar], 'k-', 'LineWidth', wd, 'HandleVisibility', 'off');
 
     % Prepare the string with LaTeX formatting (keep everything in one math environment)
     str_ANOVA_p = sprintf('$F(%d,%d) = %.2f, \\; \\mathit{p} = %.3f$', df_ANOVA_num, df_ANOVA_den, Fvalue_obs, pperm_ANOVA);
@@ -403,7 +408,7 @@ if nCond > 2
 end
 
 %% [Plot] Title
-title(sprintf('%s\n%s\n%s%s\n\n', str_title, str_ANOVA, str_diffPair, str_diffRef), 'fontsize', sz_title);
+title(sprintf('%s\n%s\n%s%s\n\n', str_title, str_ANOVA, str_diffPair, str_diffRef), 'fontsize', 5);
 
 
 end

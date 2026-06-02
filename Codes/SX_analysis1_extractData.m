@@ -49,10 +49,25 @@ for isubj = 1:nsubj
     dirFile_Data = dir(nameFile_Data); % find out all possible files
     nBlocks = length(dirFile_Data); % number of blocks finished
 
+    % Skip observers with no matched data files.
+    if nBlocks == 0
+        fprintf('\n%s: %s has no data files matching %s, skipped (S%d/%d).\n', ...
+            datetime('now'), subjName, nameFile_Data, isubj, nsubj)
+        continue
+    end
+
     %% if not consider all blocks
     ib_start = 1;
     if strcmp(subjName, 'SP'), ib_start = 81; end
     ib_end = nBlocks;
+
+    % Skip if the requested starting block exceeds available blocks.
+    if ib_end < ib_start
+        fprintf('\n%s: %s has only %d blocks (< ib_start=%d), skipped (S%d/%d).\n', ...
+            datetime('now'), subjName, ib_end, ib_start, isubj, nsubj)
+        continue
+    end
+
     nBlocks = ib_end - ib_start+1;
     fprintf('\n%s: %s%d (S%d/%d) ...\n', datetime('now'), subjName, nBlocks, isubj, nsubj)
 

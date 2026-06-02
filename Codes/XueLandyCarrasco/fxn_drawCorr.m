@@ -29,6 +29,7 @@ seedPerm = 1;
 seedBoot = 2;
 nSamplesLine = 200;
 sigMark = @(lb,ub) ternary((lb*ub>0), '*', '');
+sigMarkP = @(p) ternary(p < 0.05, '*', '');
 
 %% ---------------- validate / reshape ----------------
 assert(ndims(X_allIter_allSubj) == 3 && ndims(Y_allIter_allSubj) == 3, ...
@@ -330,52 +331,55 @@ for iCond = 1:nCond
 end
 
 %% ---------------- Plot regression bands + lines ----------------
-if ~any(isnan(x_global)) && ~any(isnan(yfit_global))
-    patch([x_global, fliplr(x_global)], [yfit_global_lb, fliplr(yfit_global_ub)], ones(1,3)*0.6, 'EdgeColor','none', 'FaceAlpha', 0.20, 'HandleVisibility','off');
-    plot(x_global, yfit_global, '-k', 'LineWidth', wd_border*1.6, 'HandleVisibility','off');
-end
 
+% Per location
 for iCond = 1:nCond
     if any(isnan(x_perCond(iCond,:))) || any(isnan(yfit_allCond(iCond,:)))
         continue;
     end
 
-    if ~isnan(pperm_rho_allCond(iCond)) && pperm_rho_allCond(iCond) < 0.1
-        ls = '-';
-    else
-        ls = '--';
-    end
+    % if ~isnan(pperm_rho_allCond(iCond)) && pperm_rho_allCond(iCond) < 0.1
+    %     ls = '-';
+    % else
+    %     ls = '--';
+    % end
 
     % Plot 68% CI
     patch([x_perCond(iCond,:) fliplr(x_perCond(iCond,:))], [yfit_lb_allLoc(iCond,:) fliplr(yfit_ub_allLoc(iCond,:))], colors(iCond,:), 'EdgeColor','none', 'FaceAlpha', 0.12, 'HandleVisibility','off');
 
     % plot the median fits (optional)
-    % plot(x_perCond(iCond,:), yfit_allCond(iCond,:), ls, 'Color', colors(iCond,:), 'LineWidth', wd_border, 'HandleVisibility','off');
+    plot(x_perCond(iCond,:), yfit_allCond(iCond,:), '-', 'Color', 'w', 'LineWidth', wd_border, 'HandleVisibility','off');
 end
+
+% Global
+% if ~any(isnan(x_global)) && ~any(isnan(yfit_global))
+    patch([x_global, fliplr(x_global)], [yfit_global_lb, fliplr(yfit_global_ub)], ones(1,3)*0.6, 'EdgeColor','none', 'FaceAlpha', 0.20, 'HandleVisibility','off');
+    plot(x_global, yfit_global, '-k', 'LineWidth', wd_border*1.6, 'HandleVisibility','off');
+% end
 
 %% ---------------- strings ----------------
 str_demean = sprintf( ...
     'Location-demeaned corr: r%s=%.2f [%.2f, %.2f], p=%.3f, \\rho%s=%.2f [%.2f, %.2f], p=%.3f' , ...
-    sigMark(r_demean_lb, r_demean_ub), ...
-    r_demean_med, r_demean_lb, r_demean_ub, pperm_r_demean, ...
-    sigMark(rho_demean_lb, rho_demean_ub), ...
-    rho_demean_med, rho_demean_lb, rho_demean_ub, pperm_rho_demean);
+    sigMarkP(pperm_r_demean), ...
+    r_demean_obs, r_demean_lb, r_demean_ub, pperm_r_demean, ...
+    sigMarkP(pperm_rho_demean), ...
+    rho_demean_obs, rho_demean_lb, rho_demean_ub, pperm_rho_demean);
 
 str_partial_pc = sprintf( ...
     'Partial (partialcorr): r%s=%.2f [%.2f, %.2f], p=%.3f, \\rho%s=%.2f [%.2f, %.2f], p=%.3f' , ...
-    sigMark(r_partial_pc_lb, r_partial_pc_ub), ...
-    r_partial_pc_med, r_partial_pc_lb, r_partial_pc_ub, pperm_r_partial_pc, ...
-    sigMark(rho_partial_pc_lb, rho_partial_pc_ub), ...
-    rho_partial_pc_med, rho_partial_pc_lb, rho_partial_pc_ub, pperm_rho_partial_pc);
+    sigMarkP(pperm_r_partial_pc), ...
+    r_partial_pc_obs, r_partial_pc_lb, r_partial_pc_ub, pperm_r_partial_pc, ...
+    sigMarkP(pperm_rho_partial_pc), ...
+    rho_partial_pc_obs, rho_partial_pc_lb, rho_partial_pc_ub, pperm_rho_partial_pc);
 
 str_perLoc = sprintf('Corr per location:\n');
 for iCond = 1:nCond
     str_perLoc = [str_perLoc sprintf( ...
         'Cond#%d: r%s=%.2f [%.2f, %.2f] (p=%.3f), \\rho%s=%.2f [%.2f, %.2f] (p=%.3f)\n', ...
         iCond, ...
-        sigMark(r_allCond_lb(iCond), r_allCond_ub(iCond)), ...
+        sigMarkP(pperm_r_allCond(iCond)), ...
         r_obs_allCond(iCond), r_allCond_lb(iCond), r_allCond_ub(iCond), pperm_r_allCond(iCond), ...
-        sigMark(rho_allCond_lb(iCond), rho_allCond_ub(iCond)), ...
+        sigMarkP(pperm_rho_allCond(iCond)), ...
         rho_obs_allCond(iCond), rho_allCond_lb(iCond), rho_allCond_ub(iCond), pperm_rho_allCond(iCond))];
 end
 
@@ -394,25 +398,25 @@ ax.LineWidth = wd_border;
 %% ---------------- print stats ----------------
 switch flag_UseRUseRho
     case 'useR'
-        str_print = sprintf('r_p=%+.2f [%+.2f, %+.2f], p=%.3f' , r_partial_pc_med, r_partial_pc_lb, r_partial_pc_ub, pperm_r_partial_pc);
+        str_print = sprintf('$r_{CI95}=[%+.2f, %+.2f], p=%.3f$' , r_partial_pc_lb, r_partial_pc_ub, pperm_r_partial_pc);
     case 'useRho'
-        str_print = sprintf('\\rho=%+.2f [%+.2f, %+.2f], p=%.3f' , rho_partial_pc_med, rho_partial_pc_lb, rho_partial_pc_ub, pperm_rho_partial_pc);
+        str_print = sprintf('$\\rho_{CI95}= [%+.2f, %+.2f], p=%.3f$' , rho_partial_pc_lb, rho_partial_pc_ub, pperm_rho_partial_pc);
 end
 
 y_str = 0.02; % Figure 6: 0.02
 text(ax, 0.5, y_str, str_print, 'Units', 'normalized', ...
     'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom', ...
-    'FontSize', 45, 'Color', 'k', 'Interpreter', 'tex', 'Clipping', 'off');
+    'FontSize', 45, 'Color', 'k', 'Interpreter', 'latex', 'Clipping', 'off');
 
 title(sprintf('%s\n%s\n%s\n%s\n', str_title, str_demean, str_partial_pc, str_perLoc), 'FontSize', 10);
 
 %% Save CI and permutation-p summaries for automatic CI range calculation in CorrAsym
-PearsonR = [r_partial_pc_med, r_partial_pc_lb, r_partial_pc_ub, pperm_r_partial_pc];
-SpearmanRho = [rho_partial_pc_med, rho_partial_pc_lb, rho_partial_pc_ub, pperm_rho_partial_pc];
+PearsonR = [r_partial_pc_obs, r_partial_pc_lb, r_partial_pc_ub, pperm_r_partial_pc];
+SpearmanRho = [rho_partial_pc_obs, rho_partial_pc_lb, rho_partial_pc_ub, pperm_rho_partial_pc];
 
 end
 
-%% ========================= helper: safeCorr =========================
+%% Helper: safeCorr 
 function r = safeCorr(x,y,typeName)
 x = x(:); y = y(:);
 ok = ~isnan(x) & ~isnan(y);
@@ -423,7 +427,7 @@ end
 r = corr(x, y, 'Type', typeName, 'Rows', 'complete');
 end
 
-%% ========================= helper: permutation p-value =========================
+%% Helper: permutation p-value
 function p = fxn_perm_pval(nullStats, obsStat, type_tail)
 nullStats = nullStats(~isnan(nullStats));
 n = numel(nullStats);
@@ -440,7 +444,7 @@ switch lower(type_tail)
 end
 end
 
-%% ========================= helper: linear fit -> yhat on grid =========================
+%% Helper: linear fit -> yhat on grid 
 function [beta, yhat] = local_linfit_yhat(x, y, xgrid)
 x = x(:); y = y(:);
 ok = ~isnan(x) & ~isnan(y);
@@ -456,7 +460,7 @@ beta = polyfit(x, y, 1);
 yhat = polyval(beta, xgrid);
 end
 
-%% ===== helper: simple ternary =====
+%% Helper: simple ternary
 function out = ternary(cond, a, b)
 if cond, out = a; else, out = b; end
 end

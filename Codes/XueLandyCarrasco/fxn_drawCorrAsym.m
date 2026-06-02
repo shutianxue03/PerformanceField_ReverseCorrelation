@@ -276,10 +276,10 @@ xline(0, '--', 'Color', ones(1,3)/2, 'LineWidth', wd_ref);
 yline(0, '--', 'Color', ones(1,3)/2, 'LineWidth', wd_ref);
 
 %% ---- 9) Axes ticks/limits ----
-% if ~isnan(x_ticks), xticks(x_ticks); xlim(x_ticks([1 end])); end
-% if ~isnan(y_ticks), yticks(y_ticks); ylim(y_ticks([1 end])); end
-% if ~isnan(x_ticklabels), xticklabels(x_ticklabels); end
-% if ~isnan(y_ticklabels), yticklabels(y_ticklabels); end
+if ~isnan(x_ticks), xticks(x_ticks); xlim(x_ticks([1 end])); end
+if ~isnan(y_ticks), yticks(y_ticks); ylim(y_ticks([1 end])); end
+if ~isnan(x_ticklabels), xticklabels(x_ticklabels); end
+if ~isnan(y_ticklabels), yticklabels(y_ticklabels); end
 
 axis square
 xabs = gca;
@@ -306,8 +306,8 @@ title(sprintf('%s %.0f%% CI \n%s\n', str_title, CI_level*100, str_corr));
 
 %% Print string at the bottom-center
 if flag_CIrange == 1
-    p_print_pearson = min(p_perm_pearson_all(1:2));
-    p_print_spearman = min(p_perm_spearman_all(1:2));
+    p_print_pearson = min(p_perm_pearson_all);
+    p_print_spearman = min(p_perm_spearman_all);
 else
     p_print_pearson = p_perm_pearson_all(2);
     p_print_spearman = p_perm_spearman_all(2);
@@ -316,6 +316,7 @@ end
 switch flag_UseRUseRho
     case 'useR'
         str_print = sprintf('r=%+.2f, CI_{%.0f}=[%+.2f, %+.2f], p=%.3f', r_med, CI_level*100, r_lb, r_ub, p_print_pearson);
+        str_print = sprintf('r_{CI%.0f}=[%+.2f, %+.2f] | p=%.3f', CI_level*100, r_lb, r_ub, p_print_pearson);
     case 'useRho'
         str_print = sprintf('\\rho=%+.2f, CI_{%.0f}=[%+.2f, %+.2f], p=%.3f', rho_med, CI_level*100, rho_lb, rho_ub, p_print_spearman);
 end
@@ -326,6 +327,8 @@ text(xabs, 0.5, 0.02, str_print, ...
     'HorizontalAlignment', 'center', ...
     'VerticalAlignment', 'bottom', ...
     'FontSize', 50, ...
+    'BackgroundColor', 'w', ...
+    'EdgeColor', 'none', ...
     'Color', 'k', ...
     'Interpreter', 'tex', ...
     'Clipping', 'off');

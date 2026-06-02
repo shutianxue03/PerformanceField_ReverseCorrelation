@@ -22,15 +22,15 @@ function tuningC = fxn_getTuningC(x, iFeature, iFamily, pred, params)
 %   9/8. half height
 %   10/9. full width (in cpd): on linear scale
 
-nFilters = length(x);
 x = x(:)';
 pred = pred(:)';
+familyName = mapFamilyCodeToName(iFamily);
 
 if iFeature == 1
     switch iFamily
         case 1 % scaled Gaussian
             % ORI-peak and bottom
-            peakAmp_ORI = pred(ceil(nFilters/2)); % the same as max(pred) after mirroring
+            peakAmp_ORI = max(pred); % define peak amplitude as the highest predicted value
             bottom_ORI = pred(1); % the same as min(pred), assuming Gaussian and mirroring
             % width_ORI = params(2)*sqrt(2*log(2)); % half width at half height; has a math expression because the model is Gaussian
             width_ORI = params(2)*sqrt(log(2)); % half width at half height; no "2" because my gaussian function is exp(-((x-mu)/sigma).^2);
@@ -50,7 +50,7 @@ if iFeature == 1
             % SX_normPDF = @(x,mu,sigma) exp(-((x-mu)/sigma).^2);
             % fxn = @(x, params) params(1)*(exp(-(x/params(3)).^2) - params(2)*exp(-(x/params(4)).^2)) + params(5);
             % peak amp
-            peakAmp_ORI = pred(ceil(nFilters/2));
+            peakAmp_ORI = max(pred); % define peak amplitude as the highest predicted value
             % trough depth
             trough_depth = min(pred);
             %% trough ori
@@ -85,7 +85,7 @@ else % iF=2, SF
 
     switch iFamily
         case 12
-            pred_itp = predSFkernel(x_ln, iFamily, params, 0);
+            pred_itp = predSFkernel(x_ln, familyName, params, 0);
             localMax_ = islocalmax(pred_itp);
             localMax = find(localMax_==1);
             if isempty(localMax), disp('NO local max'), [~, peakSF1_ln] = max(pred_itp); peakSF1_ln = x_ln(peakSF1_ln);
@@ -104,8 +104,8 @@ else % iF=2, SF
                 end
             else, peakSF2_ln = x_ln(localMax(2));
             end
-            peakAmp1 = predSFkernel(peakSF1_ln, 12, params, 0);
-            peakAmp2 = predSFkernel(peakSF2_ln, 12, params, 0);
+            peakAmp1 = predSFkernel(peakSF1_ln, familyName, params, 0);
+            peakAmp2 = predSFkernel(peakSF2_ln, familyName, params, 0);
 
             if params(1) <= params(5)
                 % pred1 = predSFkernel(x_ln, 2, params(1:4), 0);
@@ -128,7 +128,7 @@ else % iF=2, SF
 
             %% plot for F12
             figure, hold on
-            pred = predSFkernel(x_ln, iFamily, params, 0);
+            pred = predSFkernel(x_ln, familyName, params, 0);
             plot(x_ln, pred, 'k-', 'linewidth', 4), yline(0, 'k-');
             pred1 = predSFkernel(x_ln, 2, params(1:4), 0);
             pred2 = predSFkernel(x_ln, 2, params(5:8), 0);
@@ -145,16 +145,44 @@ else % iF=2, SF
         case 2
             % Math:         y = gain * 10.^(-(log10(x / peakSF) / width).^2) + base;
             peakSF = params(1);
-            peakAmp = max(pred);
+            peakAmp = predSFkernel(peakSF, familyName, params, 0); % amplitude at the peak SF
             baseline = params(4);
             %===============%
-            [width_full_oct] = getSFbandwidth(params, 'aboveBase'); % aboveBase or absPeak
+            [width_full_oct, ~, fL, fR, y_half] = getSFbandwidth(params, 'aboveBase'); % aboveBase or absPeak
             %===============%
             tuningC = [peakSF, peakAmp, width_full_oct, baseline];
+
+            %% Plot the same for this SF family (mark the necessary reference points for sanity check)
+            % set(0, 'DefaultFigureVisible', 'on');
+            % fig = figure; hold on
+            % pred_plot = predSFkernel(x_ln, familyName, params, 0);
+            % plot(x_ln, pred_plot, 'k-', 'LineWidth', 2)
+            % 
+            % % Mark peak and half-height crossings.
+            % plot(peakSF, peakAmp, 'ro', 'MarkerSize', 10, 'LineWidth', 2)
+            % y_half_L = predSFkernel(fL, familyName, params, 0);
+            % y_half_R = predSFkernel(fR, familyName, params, 0);
+            % plot(fL, y_half_L, 'bx', 'MarkerSize', 10, 'LineWidth', 2)
+            % plot(fR, y_half_R, 'bx', 'MarkerSize', 10, 'LineWidth', 2)
+            % 
+            % % Draw half-height width references.
+            % plot([peakSF, fR], [y_half, y_half], 'g-', 'LineWidth', 2)
+            % plot([fL, fR], [y_half, y_half], 'c-', 'LineWidth', 2)
+            % 
+            % yline(peakAmp);
+            % yline(y_half);
+            % yline(baseline);
+            % xline(peakSF);
+            % xline(fL);
+            % xline(fR);
+            % xlabel('ln SF')
+            % ylabel('Response (a.u.)')
+            % close(fig);
+
             %%
         case 3
-            peakAmp = max(pred);
             peakSF = params(1);
+            peakAmp = predSFkernel(peakSF, mapFamilyCodeToName(2), params(1:4), 0); % true peak height at peak SF (before truncation)
             % bottom_SF = pred(end);
             baseline = params(4);
             % peakSF and peak (from the true fxn without the trunc)
@@ -170,7 +198,7 @@ else % iF=2, SF
             % Asymmetric Gaussian in linear SF space:
             % y = gain*exp(-((x-peakSF)/width_side)^2) + base
             peakSF = params(1);
-            peakAmp = max(pred);
+            peakAmp = predSFkernel(peakSF, familyName, params, 0); % amplitude at the peak SF
             baseline = params(5);
 
             [width_left_oct, width_right_oct] = getSFbandwidth_asym_gaussian_oct(params);
@@ -191,53 +219,99 @@ dev = nan(length(x_all), 1);
 for ii = 1:length(x_all)
     x_p = x_all(ii);
     %     y_sim = fxn(x_p, params);
-    y_sim = predSFkernel(x_p, ifamily, params, 0);
+    y_sim = predSFkernel(x_p, mapFamilyCodeToName(ifamily), params, 0);
     dev(ii) = abs(y-y_sim);
 end
 [~, ix] = min(dev);
 x = x_all(ix);
 end
 
-function [peakAmp, width_half, baseline] = get_ORI_amp_width_baseline_from_curve(x, pred)
+%%
+function [y_peakAmp, x_width_half, y_baseline] = get_ORI_amp_width_baseline_from_curve(x, pred)
 idx = isfinite(x) & isfinite(pred);
 x = x(idx);
 pred = pred(idx);
 if isempty(x)
-    peakAmp = nan;
-    width_half = nan;
-    baseline = nan;
+    y_peakAmp = nan;
+    x_width_half = nan;
+    y_baseline = nan;
     return
 end
 
-[peakAmp, iPk] = max(pred);
-baseline = min(pred);
-xPk = x(iPk);
-yHalf = baseline + 0.5 * (peakAmp - baseline);
+% Densify the curve so half-height crossing is robust to coarse x sampling.
+[x_sorted, ix_sort] = sort(x);
+pred_sorted = pred(ix_sort);
+[x_unique, ix_unique] = unique(x_sorted, 'stable');
+pred_unique = pred_sorted(ix_unique);
 
-% Estimate half-width on the right side in x-units using linear interpolation.
-width_half = nan;
-if iPk < numel(x)
-    xR = x(iPk:end);
-    yR = pred(iPk:end);
-    iCross = find(yR <= yHalf, 1, 'first');
-    if ~isempty(iCross)
-        if iCross == 1
-            xHalf = xPk;
-        else
-            x1 = xR(iCross-1); y1 = yR(iCross-1);
-            x2 = xR(iCross);   y2 = yR(iCross);
-            if y2 ~= y1
-                t = (yHalf - y1) / (y2 - y1);
-                xHalf = x1 + t * (x2 - x1);
-            else
-                xHalf = x2;
-            end
-        end
-        width_half = abs(xHalf - xPk);
+if numel(x_unique) < 2
+    y_peakAmp = max(pred_unique);
+    y_baseline = min(pred_unique);
+    x_width_half = nan;
+    return
+end
+
+nFine = 1e4;
+x_fine = linspace(x_unique(1), x_unique(end), nFine);
+y_fine = interp1(x_unique, pred_unique, x_fine, 'pchip');
+
+[y_peakAmp, ix_Peak] = max(y_fine);
+y_baseline = min(y_fine);
+xPeak = x_fine(ix_Peak);
+y_half = y_baseline + 0.5 * (y_peakAmp - y_baseline);
+
+% Find the first right-side crossing of half-height on the dense curve.
+x_RightSeg = x_fine(ix_Peak:end);
+y_RightSeg = y_fine(ix_Peak:end);
+iCross = find(y_RightSeg <= y_half, 1, 'first');
+
+if isempty(iCross)
+    xHalf = nan;
+elseif iCross == 1
+    xHalf = xPeak;
+else
+    x1 = x_RightSeg(iCross-1);
+    y1 = y_RightSeg(iCross-1);
+    x2 = x_RightSeg(iCross);
+    y2 = y_RightSeg(iCross);
+
+    % Linear interpolation to find the x value at half-height.
+    if y2 ~= y1
+        t = (y_half - y1) / (y2 - y1);
+        xHalf = x1 + t * (x2 - x1);
+    else
+        xHalf = x2;
     end
 end
+
+% Half-width is the distance from the peak to the half-height point.
+x_width_half = abs(xHalf - xPeak);
+
+%% Plot the tunning curve, and mark the peak, half-height, and half-width for sanity check
+% set(0, 'DefaultFigureVisible', 'on');
+% fig = figure; hold on
+% plot(x, pred, 'k-', 'linewidth', 2)
+% 
+% % plot reference lines
+% yline(y_peakAmp);
+% yline(y_half);
+% yline(y_baseline);
+% xline(xPeak);
+% xline(xHalf);
+% plot([xPeak, xHalf], [y_half, y_half], 'g-', 'linewidth', 2)
+% 
+% xlabel('ORI (deg)')
+% ylabel('Response (a.u.)') 
+% 
+% ylim([-2, 12]*1e-3)
+% % Print tunC in the title
+% title(sprintf('Peak=%.4f, Half-width=%.2fº, Baseline=%.4f', y_peakAmp, x_width_half, y_baseline))
+% set(findall(gcf, '-property', 'FontSize'), 'FontSize', 15)
+% close(fig);
 end
 
+
+%%
 function [width_left_oct, width_right_oct] = getSFbandwidth_asym_gaussian_oct(params)
 peakSF = params(1);
 width_left = params(3);
@@ -259,7 +333,7 @@ width_left_oct = log2(peakSF / fL);
 width_right_oct = log2(fR / peakSF);
 end
 
-
+%%
 function [width_full_oct, width_full_cpd, fL, fR, y_half] = getSFbandwidth(params, halfDef)
 % getSFbandwidth  Bandwidth for SF tuning in OCTAVES and CPD
 %
@@ -316,4 +390,26 @@ fR = peakSF * 10^(+w * c);
 width_full_oct = log2(fR / fL);
 width_full_cpd = fR - fL;
 
+end
+
+%%
+function familyName = mapFamilyCodeToName(iFamily)
+switch iFamily
+    case 1
+        familyName = 'gaussian_zero_mean';
+    case 2
+        familyName = 'log_parabola';
+    case 3
+        familyName = 'log_parabola_truncated';
+    case 8
+        familyName = 'DoG';
+    case 10
+        familyName = 'von_mises';
+    case 12
+        familyName = 'double_peak';
+    case 14
+        familyName = 'asym_gaussian';
+    otherwise
+        error('fxn_getTuningC: unsupported iFamily=%d for predSFkernel mapping.', iFamily);
+end
 end

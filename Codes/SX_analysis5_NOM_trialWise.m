@@ -697,6 +697,7 @@ for iRun=4%[1,3,4]
 
         % Adjust distance between components
         ax = gca;
+        drawnow; % Ensure text/tick extents are up to date before reading TightInset
         ti = ax.TightInset; % [left bottom right top] padding needed for labels/ticks
         ax.XLabel.Units = 'normalized';
         ax.YLabel.Units = 'normalized';
@@ -704,11 +705,14 @@ for iRun=4%[1,3,4]
         ax.XLabel.Position(2) = ax.XLabel.Position(2) - sz_labelOffset; % move label down
         ax.YLabel.Position(1) = ax.YLabel.Position(1) - sz_labelOffset; % move label left
 
-        ax.Position = [ ...
+        newPos = [ ...
             ti(1) + sz_axOffset, ...
             ti(2) + sz_axOffset, ...
             1 - ti(1) - ti(3) - 2*sz_axOffset, ...
             1 - ti(2) - ti(4) - 2*sz_axOffset];
+        if all(isfinite(newPos)) && newPos(3) >= 0.55 && newPos(4) >= 0.55
+            ax.Position = newPos;
+        end
 
         % ---- save ----
         outName = sprintf('%s/n%d_L%s_A%d_%s.png', nameFolder_Fig_Sep, nSubj, str_loc, iModelA_plot, str_dataset);
@@ -816,15 +820,15 @@ for iRun=4%[1,3,4]
                     xline(iFeature-1, '--', 'handlevisibility', 'off', 'linewidth', wd_border*2, 'color', [.7, .7, .7]);
 
                     % Set ticks, labels and limits (for EACH loc, to print R2 at the right loc)
-                    xlabel(namesFeature_axis{iFeature})
-                    ylabel(namesFeature_axis_Tuning{iFeature})
-
                     xlim(axisLim{iFeature})
-                    % ylim([ymin, ymax])
-                    % yticks(yticks_)
-                    % xlabel(xlabels_tuning{ifeature}, 'FontSize', sz_label)
+                    ylim([ymin, ymax])
+                    yticks(yticks_)
+                    
                     xticks(axisTicks_tuning{iFeature})
                     xticklabels(axisTL_tuning{iFeature})
+                    xlabel(namesFeature_axis{iFeature}, 'FontSize', sz_label)
+                    ylabel(namesFeature_axis_Tuning{iFeature})
+
                     if iFeature==2, xticklabels(round(axisTL_tuning{iFeature}, 2)), end
 
                     % Print R2 in normalized axes coordinates so placement is stable across y-ranges
@@ -877,6 +881,8 @@ for iRun=4%[1,3,4]
 
         for iFeature = 1:nFeatures
 
+            fprintf('\n   - L%s %s', strjoin(string(iLocPair_all), ''), namesFeature{iFeature})
+
             xaxis = axis_tuning{iFeature};
 
             for iDataset = 1%:nDatasets
@@ -905,21 +911,22 @@ for iRun=4%[1,3,4]
                         color_comb = colors_comb(iLoc, :);
 
                         % Set y-ticks
-                        if iFeature==1
+                        if iFeature==1 % ORI
                             marg_allCond = margORI_allCond;
                             margPred_allCond = margPred_ORI_allCond;
                             margParams_allCond = margParams_ORI_allCond;
                             margR2_allCond = margR2_ORI_allCond;
-                            if iLoc==1, yticks_ = [-.03, 0, .05, .10, .15]; % fov vs. peri, higher ub
-                            else, yticks_ = [-.02, linspace(0, .12, 4)];
+                            if iLoc==1, yticks_ = linspace(-4,10,5)*1e-3; % fov vs. peri, higher ub
+                            else, yticks_ = linspace(-4,6,5)*1e-3;
                             end
-                        else
+                            
+                        else % SF
                             marg_allCond = margSF_allCond;
                             margPred_allCond = margPred_SF_allCond;
                             margParams_allCond = margParams_SF_allCond;
                             margR2_allCond = margR2_SF_allCond;
-                            if iLoc==1, yticks_ = [-.01, linspace(0, .08, 4)];
-                            else, yticks_ = [-.01, linspace(0, .06, 4)]; %[-.02, 0, .02, .04, .06];
+                            if iLoc==1, yticks_ = linspace(-4,4,5)*1e-3;
+                            else, yticks_ = linspace(-2,4,5)*1e-3;
                             end
                         end
 
@@ -927,34 +934,49 @@ for iRun=4%[1,3,4]
                         ymin = min(yticks_);
 
                         % Obtain data, prediction, and params
-                        [marg_med, ~, ~, marg_lb, marg_ub] = getCI(marg_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :), 1, 5);
-                        [margPred_med, margPred_lb, margPred_ub] = getCI(margPred_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :), 1, 5);
-                        [margParam_med, margParam_lb, margParam_ub] = getCI(margParams_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :), 1, 5);
-                        [margR2_med, margR2_lb, margR2_mub] = getCI(margR2_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :), 1, 5);
+                        [marg_med_perS, ~, ~, marg_sem_neg_perS, marg_sem_pos_perS] = getCI(marg_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :), 1, 5);
+                        [margPred_med_perS, margPred_lb_perS, margPred_ub_perS] = getCI(margPred_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :), 1, 5);
+                        margParam_med_perS = getCI(margParams_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :), 1, 5);
+                        margR2_med_perS = getCI(margR2_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :), 1, 5);
 
                         % Data (dots + errorbars)
-                        errorbar(xaxis, marg_med, marg_sem_neg, marg_sem_pos, markerStyle, 'Color', color_comb, 'CapSize',0, 'linewidth', wd_border/2)
-                        plot(xaxis, marg_med, markerStyle, 'color', color_comb, 'linewidth', wd_border/2, 'MarkerFaceColor', 'w', 'MarkerSize', 6, 'HandleVisibility','off')
+                        errorbar(xaxis, marg_med_perS, marg_sem_neg_perS, marg_sem_pos_perS, markerStyle, 'Color', color_comb, 'CapSize',0, 'linewidth', wd_border/2)
+                        plot(xaxis, marg_med_perS, markerStyle, 'color', color_comb, 'linewidth', wd_border/2, 'MarkerFaceColor', 'w', 'MarkerSize', 6, 'HandleVisibility','off')
 
                         % Prediction (lines + bands)
-                        patch([xaxis, flip(xaxis)], [margPred_lb', flip(margPred_ub')], color_comb, 'FaceAlpha', .3, 'linestyle', 'none')
-                        plot(xaxis, margPred_med, '-', 'color', color_comb, 'linewidth', wd_border)
+                        patch([xaxis, flip(xaxis)], [margPred_lb_perS', flip(margPred_ub_perS')], color_comb, 'FaceAlpha', .3, 'linestyle', 'none')
+                        plot(xaxis, margPred_med_perS, '-', 'color', color_comb, 'linewidth', wd_border)
 
-                        % Print estimated parameters
-                        str_TunParams = sprintf('%s\n[L%d] [R2=%.0f%%] %s', str_TunParams, iLoc, margR2_med*100, strjoin(string(round(margParam_med,2)), ', '));
+                        % Print estimated parameters with scale-aware formatting.
+                        paramStr = arrayfun(@formatMixedNumber, margParam_med_perS, 'UniformOutput', false);
+                        str_TunParams = sprintf('%s\n[L%d] [R2=%.0f%%] %s', str_TunParams, iLoc, margR2_med_perS*100, strjoin(paramStr, ', '));
                     end % iLoc
+
+                    % Draw peak SF
+                    if iFeature==2
+                        xline(margParam_med_perS(1), 'Color', color_comb);
+                    end
 
                     % Draw reference lines
                     yline(0, 'handlevisibility', 'off', 'linewidth', wd_border, 'color', [.7, .7, .7]);
                     xline(iFeature-1, 'handlevisibility', 'off', 'linewidth', wd_border, 'color', [.7, .7, .7]);
 
-                    xlabel('Orientation (deg)')
-                    ylabel('Amplitude')
-                    title(sprintf('%s\n%s\n', subjName, str_TunParams))
+                    % y ticks
+                    yticks(yticks_)
+                    ylim([ymin, ymax])
+
+                    % x ticks
+                    xticks(axisTicks_tuning{iFeature})
+                    xticklabels(axisTL_tuning{iFeature})
+                    xlabel(namesFeature_axis{iFeature})
+                    ylabel('Marg. weights (a.u.)')
+                    title(sprintf('%s\n%s\n', subjName, str_TunParams));
                     % legend('Location', 'best')
 
                 end % isubj
-                sgtitle(sprintf('n=%d L%d%d [A%d] %s tuning (%s)', nSubj, iLocPair_all, iModelA_plot, namesFeature{iFeature}, namesDataset{iDataset}))
+                sgtitle(sprintf('n=%d L%d%d [A%d] %s tuning (%s)\nParams in the title: [%s]\n', ...
+                    nSubj, iLocPair_all, iModelA_plot, namesFeature{iFeature}, namesDataset{iDataset}, ...
+                    strjoin(namesParams_all{iFamily_perF(iFeature)}, ', ')))
                 set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
 
                 % Save the figure
@@ -980,12 +1002,15 @@ for iRun=4%[1,3,4]
     flag_plotDiff = 1;
     paramMode = 2;
 
+    sz_text = 22;
+    wd = 2;
+
     for iGroup = 1:nGroups % e.g., {[1, 8]} or more pairs if desired
         iLocPair_all = iLocGroups_all{iGroup};
 
         sz_wd_perBar = 200;
         nBars = numel(iLocPair_all);
-        sz_fig = [nBars*sz_wd_perBar, 350+nchoosek(nBars,2)*50];
+        sz_fig = [nBars*sz_wd_perBar, 400+nchoosek(nBars,2)*50];
 
         % Plotting settings
         colors = colors_comb(iLocPair_all, :);
@@ -1052,7 +1077,7 @@ for iRun=4%[1,3,4]
                         case 2 % SF tuniningC | log parabola
                             if flag_plotIDVD
 
-                                y_ticks_all{1} = linspace(0, 2, 5); % peak SF
+                                y_ticks_all{1} = linspace(-2, 2, 5); % peak SF
                                 if find(iLocPair_all==1)
                                     y_ticks_all{2} = linspace(.01, .2, 5); % SF peak amp
                                 else
@@ -1183,8 +1208,6 @@ for iRun=4%[1,3,4]
 
                 str_title = sprintf('n=%d nIter=%d L%d%d [A%d] [%s] | %s %s | %s', ...
                     nSubj, nIterxJob, iLocPair_all, iModelA_plot, namesDataset{iDataset_plotRC}, namesFeature{iFeature}, namesTunC{iTunC}, str_family);
-                sz_text = 22;
-                wd = 3;
 
                 switch flag_plotDist
                     case 0
@@ -1201,6 +1224,28 @@ for iRun=4%[1,3,4]
                         xlabel(sprintf('%s %s [%s]', namesFeature{iFeature}, namesTunC{iTunC}, str_family))
                         ylabel('Probabillity')
                 end
+
+                % Constrain axis layout for Fig 7 to keep long y-labels visible.
+                drawnow;
+                ax = gca;
+                if isgraphics(ax, 'axes')
+                    oldUnits = ax.Units;
+                    ax.Units = 'normalized';
+                    ti = ax.TightInset; % [left bottom right top]
+
+                    left = max(0.26, ti(1) + 0.04);
+                    bottom = max(0.14, ti(2) + 0.03);
+                    right = max(0.03, ti(3) + 0.02);
+                    top = max(0.05, ti(4) + 0.02);
+
+                    w = 1 - left - right;
+                    h = 1 - bottom - top;
+                    if isfinite(w) && isfinite(h) && w > 0.30 && h > 0.30
+                        ax.Position = [left, bottom, w, h];
+                    end
+                    ax.Units = oldUnits;
+                end
+
                 % Save the figure
                     saveAndCloseFigure(fig, sprintf('%s/n%d_L%d%d_A%d_%s%d.png', nameFolder_Fig_tunC, nSubj, iLocPair_all, iModelA_plot, namesFeature{iFeature}, iTunC))
 
@@ -1286,6 +1331,7 @@ for iRun=4%[1,3,4]
 
                 % Adjust distance between components
                 ax = gca;
+                drawnow; % Ensure text/tick extents are up to date before reading TightInset
                 ti = ax.TightInset; % [left bottom right top] padding needed for labels/ticks
                 ax.XLabel.Units = 'normalized';
                 ax.YLabel.Units = 'normalized';
@@ -1293,11 +1339,14 @@ for iRun=4%[1,3,4]
                 ax.XLabel.Position(2) = ax.XLabel.Position(2) - sz_labelOffset; % move label down
                 ax.YLabel.Position(1) = ax.YLabel.Position(1) - sz_labelOffset; % move label left
 
-                ax.Position = [ ...
+                newPos = [ ...
                     ti(1) + sz_axOffset, ...
                     ti(2) + sz_axOffset, ...
                     1 - ti(1) - ti(3) - 2*sz_axOffset, ...
                     1 - ti(2) - ti(4) - 2*sz_axOffset];
+                if all(isfinite(newPos)) && newPos(3) >= 0.55 && newPos(4) >= 0.55
+                    ax.Position = newPos;
+                end
 
                 saveAndCloseFigure(fig, sprintf('%s/n%d_L%s_%s.png', nameFolder_Fig_NOM_corr, nSubj, strjoin(string(iLocCorr_all), ''), nameVarY_fileTitle))
 
@@ -1353,13 +1402,16 @@ for iRun=4%[1,3,4]
 
                 switch iFeature
                     case 1, y_ticks_allTunC_lb = [0, 15, -.1]; y_ticks_allTunC_ub = [.008, 25, .1];% 3 values are ORI peak amplitude, width, baseline
-                    case 2, y_ticks_allTunC_lb = [0, 0, .5, -.1]; y_ticks_allTunC_ub = [4, .004, 3.5, .1]; % 4 values are SF peak, peak amplitude, width, baseline
+                    case 2, y_ticks_allTunC_lb = [-2, 0, .5, -.1]; y_ticks_allTunC_ub = [2, .004, 3.5, .1]; % 4 values are SF peak, peak amplitude, width, baseline
                 end
 
                 y_ticks = linspace(y_ticks_allTunC_lb(iTunC), y_ticks_allTunC_ub(iTunC), 5);
 
                 x_ticklabels = x_ticks;
                 y_ticklabels = y_ticks;
+                if iFeature==2 && iTunC==1 % SF peak, needs to convert y tick label to linear scale
+                    y_ticklabels = 2.^y_ticks;
+                end
 
                 nameVarY_figTitle = sprintf('%s %s', namesFeature{iFeature}, namesTunCs{iTunC});
                 nameVarY_fileTitle = sprintf('%s%d', namesFeature{iFeature}, iTunC);
@@ -1378,6 +1430,7 @@ for iRun=4%[1,3,4]
 
                 % Adjust distance between components
                 ax = gca;
+                drawnow; % Ensure text/tick extents are up to date before reading TightInset
                 ti = ax.TightInset; % [left bottom right top] padding needed for labels/ticks
                 ax.XLabel.Units = 'normalized';
                 ax.YLabel.Units = 'normalized';
@@ -1385,11 +1438,14 @@ for iRun=4%[1,3,4]
                 ax.XLabel.Position(2) = ax.XLabel.Position(2) - sz_labelOffset; % move label down
                 ax.YLabel.Position(1) = ax.YLabel.Position(1) - sz_labelOffset; % move label left
 
-                ax.Position = [ ...
+                newPos = [ ...
                     ti(1) + sz_axOffset, ...
                     ti(2) + sz_axOffset, ...
                     1 - ti(1) - ti(3) - 2*sz_axOffset, ...
                     1 - ti(2) - ti(4) - 2*sz_axOffset];
+                if all(isfinite(newPos)) && newPos(3) >= 0.55 && newPos(4) >= 0.55
+                    ax.Position = newPos;
+                end
 
                 saveAndCloseFigure(fig, sprintf('%s/n%d_L%s_%s.png', nameFolder_Fig_NOM_corr, nSubj, strjoin(string(iLocCorr_all), ''), nameVarY_fileTitle))
 
@@ -1455,6 +1511,7 @@ for iRun=4%[1,3,4]
 
         % Adjust distance between components
         ax = gca;
+        drawnow; % Ensure text/tick extents are up to date before reading TightInset
         ti = ax.TightInset; % [left bottom right top] padding needed for labels/ticks
         ax.XLabel.Units = 'normalized';
         ax.YLabel.Units = 'normalized';
@@ -1462,11 +1519,14 @@ for iRun=4%[1,3,4]
         ax.XLabel.Position(2) = ax.XLabel.Position(2) - sz_labelOffset; % move label down
         ax.YLabel.Position(1) = ax.YLabel.Position(1) - sz_labelOffset; % move label left
 
-        ax.Position = [ ...
+        newPos = [ ...
             ti(1) + sz_axOffset, ...
             ti(2) + sz_axOffset, ...
             1 - ti(1) - ti(3) - 2*sz_axOffset, ...
             1 - ti(2) - ti(4) - 2*sz_axOffset];
+        if all(isfinite(newPos)) && newPos(3) >= 0.55 && newPos(4) >= 0.55
+            ax.Position = newPos;
+        end
 
         saveAndCloseFigure(fig, sprintf('%s/n%d_L%s.png', nameFolder_Fig_NOM_corr, nSubj, strjoin(string(iLocCorr_all), '')))
 
@@ -1670,22 +1730,21 @@ for iRun=4%[1,3,4]
                         switch iFamily
                             case 1, y_ticks_allTunC_lb = -[0, 40, 100]; y_ticks_allTunC_ub = [80, 40, 160];
                                 % case 8, y_ticks_allTunC_lb = -[60, 30, 45, 160, 20, 220]; y_ticks_allTunC_ub = [100, 40, 55, 160, 40, 220];
-                            case 2, y_ticks_allTunC_lb = -[10, -20, 50, 180]; y_ticks_allTunC_ub = [50, 70, 50, 200];
-                            case 14, y_ticks_allTunC_lb = -[10, -20, 50, 180]; y_ticks_allTunC_ub = [50, 70, 50, 200];
+                            case 2, y_ticks_allTunC_lb = -[40, -20, 50, 180]; y_ticks_allTunC_ub = [60, 70, 50, 200];
+                            case 10, y_ticks_allTunC_lb = -[10, -20, 50]; y_ticks_allTunC_ub = [50, 70, 50];
                         end
                     case 6 % HVA
                         switch iFamily
-                            case 1, y_ticks_allTunC_lb = -[60, 60, 200]; y_ticks_allTunC_ub = [60, 60, 200];
-                                % case 8, y_ticks_allTunC_lb = -[60, 30, 45, 160, 20, 220]; y_ticks_allTunC_ub = [100, 40, 55, 160, 40, 220];
-                            case 2, y_ticks_allTunC_lb = -[50, 60, 80, 160]; y_ticks_allTunC_ub = [50, 60, 80, 200];
-                            case 14, y_ticks_allTunC_lb = -[50, 60, 80, 160]; y_ticks_allTunC_ub = [50, 60, 80, 200];
+                            % case 1, y_ticks_allTunC_lb = -[60, 60, 200]; y_ticks_allTunC_ub = [60, 60, 200]; % ORI—peak, width, baseline
+                            case 2, y_ticks_allTunC_lb = -[50, 60, 60, 160]; y_ticks_allTunC_ub = [50, 60, 60, 200]; % SF—peak, peak amplitude, width, baseline
+                            case 10, y_ticks_allTunC_lb = -[40, 18, 20]; y_ticks_allTunC_ub = [60, 10, 10]; % ORI—peak, width, baseline;
                         end
                     case 5 % VMA
                         switch iFamily
-                            case 1, y_ticks_allTunC_lb = -[100, 80, 200]; y_ticks_allTunC_ub = [100, 60, 200];
+                            % case 1, y_ticks_allTunC_lb = -[100, 80, 200]; y_ticks_allTunC_ub = [100, 60, 200];
                                 % case 8, y_ticks_allTunC_lb = -[100, 40, 300, 320, 50, 320]; y_ticks_allTunC_ub = [100, 44, 300, 320, 50, 320];
-                            case 2, y_ticks_allTunC_lb = -[50, 100, 100, 300]; y_ticks_allTunC_ub = [70, 100, 100, 300];
-                            case 14, y_ticks_allTunC_lb = -[50, 100, 100, 300]; y_ticks_allTunC_ub = [70, 100, 100, 300];
+                            case 2, y_ticks_allTunC_lb = -[50, 90, 90, 300]; y_ticks_allTunC_ub = [70, 90, 90, 300];
+                            case 10, y_ticks_allTunC_lb = -[80, 30, 100]; y_ticks_allTunC_ub = [100, 30, 100];
                         end
                 end
                 y_ticks = linspace(y_ticks_allTunC_lb(iTunC), y_ticks_allTunC_ub(iTunC), 5);
@@ -1714,11 +1773,12 @@ for iRun=4%[1,3,4]
                 %----------------------------%
                 fig = gcf;
 
-                xlabel(sprintf('\\Delta contrast sensitivity (%%)'), 'FontSize', sz_label);
-                ylabel(sprintf('\\Delta %s %s (%%)', namesFeature{iFeature}, namesTunCs_noUnit{iTunC}), 'fontsize', sz_label)
+                xlabel(sprintf('%s of contrast sensitivity (%%)', nameAsymX), 'FontSize', sz_label);
+                ylabel(sprintf('%s of %s %s (%%)', nameAsymY, namesFeature{iFeature}, namesTunCs_noUnit{iTunC}), 'fontsize', sz_label)
 
                 % Adjust distance between components
                 ax = gca;
+                drawnow; % Ensure text/tick extents are up to date before reading TightInset
                 ti = ax.TightInset; % [left bottom right top] padding needed for labels/ticks
 
                 ax.XLabel.Units = 'normalized';
@@ -1726,11 +1786,14 @@ for iRun=4%[1,3,4]
 
                 ax.XLabel.Position(2) = ax.XLabel.Position(2) - sz_labelOffset; % move label down
                 ax.YLabel.Position(1) = ax.YLabel.Position(1) - sz_labelOffset; % move label left
-                ax.Position = [ ...
+                newPos = [ ...
                     ti(1) + sz_axOffset, ...
                     ti(2) + sz_axOffset, ...
                     1 - ti(1) - ti(3) - 2*sz_axOffset, ...
                     1 - ti(2) - ti(4) - 2*sz_axOffset];
+                if all(isfinite(newPos)) && newPos(3) >= 0.55 && newPos(4) >= 0.55
+                    ax.Position = newPos;
+                end
 
                 saveAndCloseFigure(fig, sprintf('%s/n%d_L%d%d_%s.png', nameFolder_Fig_NOM_CorrAsym, nSubj, iLocPair_all, nameVarY_fileTitle))
 
@@ -1759,7 +1822,7 @@ for iRun=4%[1,3,4]
     if isempty(dir(nameFolder_Outputs_NOM_corr)); mkdir(nameFolder_Outputs_NOM_corr), end
 
     sz_label = 60;
-    sz_labelOffset = 0.05;
+    sz_labelOffset = 0.02;
     sz_axOffset = 0.05; % extra breathing room
 
     for iGroup = 1:nGroups
@@ -1825,6 +1888,7 @@ for iRun=4%[1,3,4]
 
         % Adjust distance between components
         ax = gca;
+        drawnow; % Ensure text/tick extents are up to date before reading TightInset
         ti = ax.TightInset; % [left bottom right top] padding needed for labels/ticks
 
         ax.XLabel.Units = 'normalized';
@@ -1832,11 +1896,14 @@ for iRun=4%[1,3,4]
 
         ax.XLabel.Position(2) = ax.XLabel.Position(2) - sz_labelOffset; % move label down
         ax.YLabel.Position(1) = ax.YLabel.Position(1) - sz_labelOffset; % move label left
-        ax.Position = [ ...
+        newPos = [ ...
             ti(1) + sz_axOffset, ...
             ti(2) + sz_axOffset, ...
             1 - ti(1) - ti(3) - 2*sz_axOffset, ...
             1 - ti(2) - ti(4) - 2*sz_axOffset];
+        if all(isfinite(newPos)) && newPos(3) >= 0.55 && newPos(4) >= 0.55
+            ax.Position = newPos;
+        end
 
         saveAndCloseFigure(fig, sprintf('%s/n%d_L%d%d.png', nameFolder_Fig_NOM_CorrAsym, nSubj, iLocPair_all))
 
@@ -2300,11 +2367,11 @@ for iRun=4%[1,3,4]
             nLoc = numel(iLocSingle_perSet);
 
             % Subject-level cell means (median across iterations)
-            nLL_med = squeeze(median(nLL_ANOVA, 4, 'omitnan')); % [nModelB x nLoc x nSubj]
-            nLL_med = permute(nLL_med, [3, 1, 2]); % [nSubj x nModelB x nLoc]
+            NLL_med = squeeze(median(nLL_ANOVA, 4, 'omitnan')); % [nModelB x nLoc x nSubj]
+            NLL_med = permute(NLL_med, [3, 1, 2]); % [nSubj x nModelB x nLoc]
 
             % Observed partial eta^2 on the subject-level table
-            [eta2p_obs_ModelB, eta2p_obs_Loc, eta2p_obs_Int] = fxn_eta2p_rm2(nLL_med);
+            [eta2p_obs_ModelB, eta2p_obs_Loc, eta2p_obs_Int] = fxn_eta2p_rm2(NLL_med);
 
             % Bootstrap distribution of partial eta^2
             eta2p_ModelB_allBoot = nan(nBoot, 1);
@@ -2316,7 +2383,7 @@ for iRun=4%[1,3,4]
             indRand_allBoot = randi(nSubj, [nBoot, nSubj], 'uint16');
             parfor iBoot = 1:nBoot
                 indRandBoot = double(indRand_allBoot(iBoot, :));
-                nLL_b = nLL_med(indRandBoot, :, :); % [nSubj x nModelB x nLoc]
+                nLL_b = NLL_med(indRandBoot, :, :); % [nSubj x nModelB x nLoc]
                 [eta2p_ModelB_allBoot(iBoot), eta2p_Loc_allBoot(iBoot), eta2p_Int_allBoot(iBoot)] = fxn_eta2p_rm2(nLL_b);
             end
 
@@ -2409,19 +2476,19 @@ for iRun=4%[1,3,4]
     % ModelB ordering + plotting flags
     iModelB_selected = 1:7;
     flag_plotIDVD = 0;
-    flag_plotDiff = 1;
+    flag_plotDiff = 0;
     
     y_ticks = linspace(0, 20, 5);
-    sz_label = 20;
+    sz_label = 60;
     sz_text = sz_label;
-    wd = 2;
+    wd = 4;
     y_ticklabels = nan;
 
     % Loop over locations
     for iLocSingle = 1:nLocComb8
 
         nBars = numel(iModelB_selected);
-        sz_fig = [nBars * 180, 0+nchoosek(nBars, 2)*40];
+        sz_fig = [nBars * 180, 200+nchoosek(nBars, 2)*40];
 
         % Extract raw nLL: [ModelB x Subj x Iter]
         nLL_allIter = squeeze(nLL_allCond(iModelA_selected, iModelB_selected, iLocSingle, :, :, :));
@@ -2436,16 +2503,16 @@ for iRun=4%[1,3,4]
             error('Unexpected nLL dimensionality after squeeze: ndims=%d', ndims(nLL_allIter));
         end
 
-        nLL_med = getCI(nLL_allIter, 1, 3); % [nCond x nSubj]
-        nLL_min_perSubj = min(nLL_med, [], 1); % [1 x nSubj]
-        dnLL_med = nLL_med - nLL_min_perSubj; % [nBars x nSubj], >=0
+        NLL_med = getCI(nLL_allIter, 1, 3); % [nCond x nSubj]
+        NLL_min_perSubj = min(NLL_med, [], 1); % [1 x nSubj]
+        dNLL_med = NLL_med - NLL_min_perSubj; % [nBars x nSubj], >=0
 
         % ------------------------------------------------------------
         % fxn_drawBars expects [nIter x nSubj x nCond]
         % We now have only one "iteration" (the median-collapsed value), so set nIter=1.
         % ------------------------------------------------------------
-        dnLL_allIter_allSubj = nan(1, nSubj, nBars);
-        dnLL_allIter_allSubj(1,:,:) = dnLL_med.'; % transpose -> [nSubj x nBars]
+        dNLL_allIter_allSubj = nan(1, nSubj, nBars);
+        dNLL_allIter_allSubj(1,:,:) = dNLL_med.'; % transpose -> [nSubj x nBars]
 
         % Strings / plotting params
         str_title = sprintf('n=%d | Loc L%d | ModelB [%s] | nIter=%d', nSubj, iLocSingle, strjoin(string(iModelB_selected), ' '), nIterxJob);
@@ -2453,22 +2520,22 @@ for iRun=4%[1,3,4]
         ref = nan;
 
         % ------------------------------%
-        [pperm_allPairs , pairs] = fxn_drawBars(dnLL_allIter_allSubj, ref, repmat(colors_comb(iLocSingle, :), nBars, 1), namesModelB(iModelB_selected), y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, 1, markers_allSubj, sz_text, wd);
+        [pperm_allPairs , pairs] = fxn_drawBars(dNLL_allIter_allSubj, ref, repmat(colors_comb(iLocSingle, :), nBars, 1), namesModelB(iModelB_selected), y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, 1, markers_allSubj, sz_text, wd);
         % ------------------------------%
         figMain = gcf;
         % ylim(y_ticks([1, end]))
 
-        ylabel('\Delta nLL', 'FontSize', sz_label);
+        ylabel('\Delta NLL', 'FontSize', sz_label);
 
         % [Plot] planned comparison brackets + CI of mean difference at midpoint
         pairs_bracket = [1 2; 1 3; 1 4]; % requested comparisons
         pairs_bracket = [1 2]; % requested comparisons
 
         % dnLL_allIter_allSubj must be [nIter x nSubj x nCond]
-        [~, nSubj, nCond] = size(dnLL_allIter_allSubj);
+        [~, nSubj, nCond] = size(dNLL_allIter_allSubj);
 
         % (1) Subject-level summary across iterations (median)
-        data_med_allSubj = squeeze(median(dnLL_allIter_allSubj, 1, 'omitnan')); % [nSubj x nCond]
+        data_med_allSubj = squeeze(median(dNLL_allIter_allSubj, 1, 'omitnan')); % [nSubj x nCond]
 
         % (2) Bootstrap group mean + CI for bars
         ave_allBoot = nan(nBoot, nCond);
@@ -2522,8 +2589,8 @@ for iRun=4%[1,3,4]
         % Place brackets above the tallest bar+CI
         topData = y_ticks(end);
         if isnan(topData), topData = yMax; end
-        yBase = yMin + 0.4*yRange;
-        yStep = 0.02 * yRange; % vertical spacing between brackets
+        yBase = yMin + 0.2*yRange; % lower the scalar, lower yBase
+        yStep = .1; % vertical spacing between brackets
 
         % Helper: find index in "pairs" for a given (iA,iB)
         getPairIdx = @(iA,iB) find(pairs_all(:,1)==min(iA,iB) & pairs_all(:,2)==max(iA,iB), 1, 'first');
@@ -2537,10 +2604,13 @@ for iRun=4%[1,3,4]
 
             % --- bracket line ---
             plot([iA iB], [y y], 'k-', 'LineWidth', wd, 'HandleVisibility','off');
+            capHeight = 0.015 * yRange;
+            plot([iA iA], [y-capHeight, y], 'k-', 'LineWidth', wd, 'HandleVisibility','off');
+            plot([iB iB], [y-capHeight, y], 'k-', 'LineWidth', wd, 'HandleVisibility','off');
 
             % --- text label (left-aligned, above the bracket line) ---
             % "pperm_allPairs(1)" is hard-coded!! 1=comparing Full vs. NoMul
-            str_delta = sprintf('$\\Delta=%+.2f, \\; [%+.2f, %+.2f], p=%.3f$', diffCond_med(iPair), diffCond_lb(iPair), diffCond_ub(iPair), pperm_allPairs(1));
+            str_delta = sprintf('$\\Delta_{CI95}=[%+.2f, %+.2f]$\n$\\mathit{p}=%.3f$', diffCond_lb(iPair), diffCond_ub(iPair), pperm_allPairs(1));
 
             xText = iA; % left end of bracket
             yText = y + 0.02*yRange; % a bit above the bracket line (tune 0.02)
@@ -2573,6 +2643,18 @@ for iRun=4%[1,3,4]
         % title('B1 vs B2 (nLL_{med})', 'FontSize', 10);
         % set(ax_inset, 'LineWidth', 1.5);
         % %========================
+
+        % xTL
+        xticks(1:size(ave_allBoot, 2))
+        xticklabels(namesModelB)
+        xtickangle(45)
+
+        % set axis font size
+        ax = gca;
+        ax.FontSize = sz_label * 0.8;
+        ax.LineWidth = wd;  
+        
+        title(str_title, 'FontSize', 10);
 
         saveas(figMain, fullfile(nameFolder_Fig_NOM_nLL, sprintf('n%d_L%d_ModelB%s.png', nSubj, iLocSingle, strjoin(string(iModelB_selected), ''))));
         % close(figMain); % do NOT close here, as we need to copy the axis geometry for the box-code figure; close at the end of the loop after copying geometry.
@@ -2670,7 +2752,9 @@ for iRun=4%[1,3,4]
     flag_plotIDVD = 1;
     flag_plotDiff = 1;
     nBars = 2;
-    sz_fig = [nBars * 150, 300+nchoosek(nBars, 2)*30];
+    sz_fig = [nBars * 200, 400+nchoosek(nBars, 2)*30];
+    sz_text = 22;
+    wd = 2;
 
     for iModelB_NOMplot = 2; %iModelB_plot_all % Only plot NoMul
 
@@ -2701,16 +2785,15 @@ for iRun=4%[1,3,4]
                             end
                         case 2 % NoMul
                             switch iParam
-                                case 1, y_ticks = linspace(NOMp1_lb, 3, 5);
-                                case 2, y_ticks = linspace(NOMp2_lb, 3, 5);
+                                case 1, y_ticks = linspace(0, 2.8, 5);
+                                case 2, y_ticks = linspace(0, 2.8, 5);
                                 case 3, y_ticks = linspace(NOMp3_lb, 40, 5);
                             end
                     end
                     y_ticklabels = round(y_ticks, 2);
 
                     str_title = sprintf('n=%d nIter=%d L%s [A%dB%d] %s', nSubj, nIterxJob, strjoin(string(iLocPair_all), ''), iModelA_plot, iModelB_NOMplot, namesModelBparams{iModelB_NOMplot}{iParam});
-                    sz_text = 20;
-                    wd = 2;
+                    
                     %------------------------------%
                     fxn_drawBars(NOMp_allIter_allSubj, ref, colors_comb(iLocPair_all, :), x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd);
                     %------------------------------%
@@ -2766,7 +2849,7 @@ for iRun=4%[1,3,4]
 
                 switch iModelB_NOMplot
                     case 1, y_ticks_lb = [0, 0, 0, 0]; y_ticks_ub = [.8, 30, 30, 40];
-                    case 2, y_ticks_lb = [0, 0, 0]; y_ticks_ub = [3, 3, 40];
+                    case 2, y_ticks_lb = [0, 0, 0]; y_ticks_ub = [2.8, 2.8, 40]; %*
                     case 3, y_ticks_lb = [0, 0, 0]; y_ticks_ub = [.8, 30, 40];
                     case 4, y_ticks_lb = [0, 0, 0]; y_ticks_ub = [.8, 30, 40];
                     case 5, y_ticks_lb = [0, 0]; y_ticks_ub = [.8, 40];
@@ -2797,6 +2880,7 @@ for iRun=4%[1,3,4]
 
                 % Adjust distance between components
                 ax = gca;
+                drawnow; % Ensure text/tick extents are up to date before reading TightInset
                 ti = ax.TightInset; % [left bottom right top] padding needed for labels/ticks
                 ax.XLabel.Units = 'normalized';
                 ax.YLabel.Units = 'normalized';
@@ -2804,11 +2888,14 @@ for iRun=4%[1,3,4]
                 ax.XLabel.Position(2) = ax.XLabel.Position(2) - sz_labelOffset; % move label down
                 ax.YLabel.Position(1) = ax.YLabel.Position(1) - sz_labelOffset; % move label left
 
-                ax.Position = [ ...
+                newPos = [ ...
                     ti(1) + sz_axOffset, ...
                     ti(2) + sz_axOffset, ...
                     1 - ti(1) - ti(3) - 2*sz_axOffset, ...
                     1 - ti(2) - ti(4) - 2*sz_axOffset];
+                if all(isfinite(newPos)) && newPos(3) >= 0.55 && newPos(4) >= 0.55
+                    ax.Position = newPos;
+                end
 
                 saveAndCloseFigure(fig, sprintf('%s/n%d_B%d_L%s_NOMp%d.png', nameFolder_Fig_NOM_corr, nSubj, iModelB_NOMplot, strjoin(string(iLocCorr_all), ''), iNOMparam))
             end % iNOMparam
@@ -2958,7 +3045,7 @@ for iRun=4%[1,3,4]
 
                 switch iModelB_NOMplot
                     case 1, y_ticks_lb = [0, 0, 0, 0]; y_ticks_ub = [.6, 32, 32, 40];
-                    case 2, y_ticks_lb = [0, 0, 0]; y_ticks_ub = [3, 3, 40];
+                    case 2, y_ticks_lb = [0, 0, 0]; y_ticks_ub = [2.8, 2.8, 40]; %NoMul*
                     case 3, y_ticks_lb = [0, 0, 0]; y_ticks_ub = [.6, 32, 40];
                     case 4, y_ticks_lb = [0, 0, 0]; y_ticks_ub = [.6, 32, 40];
                     case 5, y_ticks_lb = [0, 0]; y_ticks_ub = [.6, 40];
@@ -2989,6 +3076,7 @@ for iRun=4%[1,3,4]
 
                 % Adjust distance between components
                 ax = gca;
+                drawnow; % Ensure text/tick extents are up to date before reading TightInset
                 ti = ax.TightInset; % [left bottom right top] padding needed for labels/ticks
                 ax.XLabel.Units = 'normalized';
                 ax.YLabel.Units = 'normalized';
@@ -2996,11 +3084,14 @@ for iRun=4%[1,3,4]
                 ax.XLabel.Position(2) = ax.XLabel.Position(2) - sz_labelOffset; % move label down
                 ax.YLabel.Position(1) = ax.YLabel.Position(1) - sz_labelOffset; % move label left
 
-                ax.Position = [ ...
+                newPos = [ ...
                     ti(1) + sz_axOffset, ...
                     ti(2) + sz_axOffset, ...
                     1 - ti(1) - ti(3) - 2*sz_axOffset, ...
                     1 - ti(2) - ti(4) - 2*sz_axOffset];
+                if all(isfinite(newPos)) && newPos(3) >= 0.55 && newPos(4) >= 0.55
+                    ax.Position = newPos;
+                end
 
                 saveAndCloseFigure(fig, sprintf('%s/n%d_B%d_L%s_NOMp%d.png', nameFolder_Fig_NOM_corr, nSubj, iModelB_NOMplot, strjoin(string(iLocCorr_all), ''), iNOMparam))
             end % iNOMparam
@@ -3060,7 +3151,7 @@ for iRun=4%[1,3,4]
 
                 switch iModelB_NOMplot
                     case 1, y_ticks_lb = -[90, 50, 50, 40]; y_ticks_ub = [90, 50, 50, 40];
-                    case 2, y_ticks_lb = -[50, 50, 40]; y_ticks_ub = [50, 50, 40];
+                    case 2, y_ticks_lb = -[40, 40, 40]; y_ticks_ub = [40, 40, 40]; %*
                     case 3, y_ticks_lb = -[90, 50, 40]; y_ticks_ub = [90, 50, 40];
                     case 4, y_ticks_lb = -[90, 50, 40]; y_ticks_ub = [90, 50, 40];
                     case 5, y_ticks_lb = -[90, 40]; y_ticks_ub = [90, 40];
@@ -3094,11 +3185,12 @@ for iRun=4%[1,3,4]
                 %----------------------------%
                 fig = gcf;
 
-                xlabel(sprintf('\\Delta contrast sensitivity (%%)'), 'FontSize', sz_label);
-                ylabel(sprintf('\\Delta %s (%%)', nameVarY_figTitle), 'fontsize', sz_label)
+                xlabel(sprintf('%s of contrast sensitivity (%%)', nameAsymX), 'FontSize', sz_label);
+                ylabel(sprintf('%s of %s (%%)', nameAsymY, nameVarY_figTitle), 'fontsize', sz_label)
 
                 % Adjust distance between components
                 ax = gca;
+                drawnow; % Ensure text/tick extents are up to date before reading TightInset
                 ti = ax.TightInset; % [left bottom right top] padding needed for labels/ticks
 
                 ax.XLabel.Units = 'normalized';
@@ -3106,11 +3198,14 @@ for iRun=4%[1,3,4]
 
                 ax.XLabel.Position(2) = ax.XLabel.Position(2) - sz_labelOffset; % move label down
                 ax.YLabel.Position(1) = ax.YLabel.Position(1) - sz_labelOffset; % move label left
-                ax.Position = [ ...
+                newPos = [ ...
                     ti(1) + sz_axOffset, ...
                     ti(2) + sz_axOffset, ...
                     1 - ti(1) - ti(3) - 2*sz_axOffset, ...
                     1 - ti(2) - ti(4) - 2*sz_axOffset];
+                if all(isfinite(newPos)) && newPos(3) >= 0.55 && newPos(4) >= 0.55
+                    ax.Position = newPos;
+                end
 
                 saveAndCloseFigure(fig, sprintf('%s/n%d_B%d_L%s_NOMp%d.png', nameFolder_Fig_NOM_CorrAsym, nSubj, iModelB_NOMplot, strjoin(string(iLocPair_all), ''), iNOMparam))
 
@@ -3224,11 +3319,74 @@ for iRun=4%[1,3,4]
 
 end% iRun
 
+%%
 function saveAndCloseFigure(figHandle, outName)
 if ~isgraphics(figHandle, 'figure')
     return
 end
 
-saveas(figHandle, outName);
+drawnow;
+set(figHandle, 'PaperPositionMode', 'auto');
+
+% Recover from occasional collapsed single-axis layout in batch/invisible mode.
+axList = findall(figHandle, 'Type', 'axes');
+if numel(axList) == 1
+    ax = axList(1);
+    oldUnits = ax.Units;
+    ax.Units = 'normalized';
+
+    % Keep large labels/ticks visible in exported images by reserving
+    % margin from the current tight inset rather than using a fixed box.
+    drawnow;
+    ti = ax.TightInset; % [left bottom right top]
+
+    % Figure 7 (TuningCs) often needs extra left margin for long y-labels.
+    isTuningCsFig = ~isempty(strfind(outName, [filesep 'TuningCs' filesep]));
+    if isTuningCsFig
+        minLeft = 0.30;
+        minBottom = 0.20;
+        minTop = 0.12;
+    else
+        minLeft = 0.20;
+        minBottom = 0.18;
+        minTop = 0.04;
+    end
+
+    left = max(minLeft, ti(1) + 0.05);
+    bottom = max(minBottom, ti(2) + 0.05);
+    right = max(0.04, ti(3) + 0.02);
+    top = max(minTop, ti(4) + 0.02);
+
+    w = 1 - left - right;
+    h = 1 - bottom - top;
+    if isfinite(w) && isfinite(h) && w > 0.40 && h > 0.40
+        ax.Position = [left, bottom, w, h];
+    else
+        ax.Position = [0.18, 0.16, 0.74, 0.74];
+    end
+
+    ax.Units = oldUnits;
+end
+
+try
+    exportgraphics(figHandle, outName, 'Resolution', 300);
+catch
+    saveas(figHandle, outName);
+end
 close(figHandle);
+end
+
+function s = formatMixedNumber(v)
+av = abs(v);
+if isnan(v)
+    s = 'NaN';
+elseif av >= 0.1
+    s = sprintf('%.2f', v);
+elseif av >= 0.01
+    s = sprintf('%.3f', v);
+elseif av == 0
+    s = '0';
+else
+    s = sprintf('%.1e', v);
+end
 end

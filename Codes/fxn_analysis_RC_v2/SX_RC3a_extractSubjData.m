@@ -110,6 +110,11 @@ dur = toc;
 fprintf('DONE (Dur %.1f min)\n', dur/60)
 
 %%
+if ib_end < 1 || ib_end > numel(dirFile_Data)
+    error('SX_RC3a_extractSubjData:InvalidBlockIndex', ...
+        'ib_end=%d is out of range for dirFile_Data (n=%d).', ib_end, numel(dirFile_Data));
+end
+
 [iCuedLoc_allT_, thresh_exp, correctness, iPRS, iPair, resp, run_allTrials, RT] = extractRecord(dirFile_Data(ib_end));
 iCuedLoc_allT_ = repmat(iCuedLoc_allT_(:, 1), [1, nTrialsPerBlock]); % make sure that the iCued in the following columns are correct
 
