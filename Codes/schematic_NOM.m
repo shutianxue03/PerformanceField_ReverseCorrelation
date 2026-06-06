@@ -283,139 +283,139 @@ close all
 
 %% Prediction of reduced models
 % close all; clc;
-% 
+%
 % % ---------------- Ground-truth parameters ----------------
 % Nmul_true = .6; % induced (multiplicative) noise
 % SDadd_ind_true = 15; % baseline (additive) noise
 % SDadd_sha_true = 15; % correlation between passes
-% 
+%
 % % IV range (internal variable mean)
 % IV = linspace(0, 150, 100); % row vector
 % medianIV = median(IV);
-% 
+%
 % % Criterion in z-units
 % c_zscore = -.3;
-% 
+%
 % % ---------------- Helper: full model sigma(IV) ----------------
 % sigma_true = sqrt((Nmul_true .* IV).^2 + SDadd_ind_true.^2);
 % sigma_true = max(sigma_true, 1e-6); % avoid zero
 % criterion_true = c_zscore .* sigma_true + medianIV; % trial-wise criterion in IV units
-% 
+%
 % % ---------------- 1D: pYES for full and reduced models ----------------
 % % Full model: V ~ N(IV, sigma_true^2), YES if V > criterion_true
 % pYES_true = 1 - normcdf(criterion_true, IV, sigma_true);
-% 
+%
 % % Model without induced noise (Nmul = 0)
 % Nmul_noInduced = 0;
 % sigma_noInduced = sqrt((Nmul_noInduced .* IV).^2 + SDadd_ind_true.^2);
 % sigma_noInduced = max(sigma_noInduced, 1e-6);
 % criterion_noInduced = c_zscore .* sigma_noInduced + medianIV;
 % pYES_noInduced = 1 - normcdf(criterion_noInduced, IV, sigma_noInduced);
-% 
+%
 % % Model without constant noise (SDadd = 0)
 % SDadd_noConst = 0;
 % sigma_noConst = sqrt((Nmul_true .* IV).^2 + SDadd_noConst.^2);
 % sigma_noConst = max(sigma_noConst, 1e-6);
 % criterion_noConst = c_zscore .* sigma_noConst + medianIV;
 % pYES_noConst = 1 - normcdf(criterion_noConst, IV, sigma_noConst);
-% 
+%
 % % "Model without correlation" for pYES:
 % % Note: correlation does NOT affect the marginal, so this is identical to pYES_true
 % pYES_noRho = pYES_true;
-% 
+%
 % % ---------------- 2D: pA (probability of agreement) ----------------
 % % Agreement: both YES or both NO for two passes
-% 
+%
 % pA_true = zeros(size(IV));
 % pA_noRho = zeros(size(IV));
 % pA_noInduced = zeros(size(IV));
 % pA_noConst = zeros(size(IV));
-% 
+%
 % for iTrial = 1:numel(IV)
 %     mu_i = [IV(iTrial), IV(iTrial)];
-% 
+%
 %     % Full model sigma and criterion at this IV
 %     s_true = sigma_true(iTrial);
 %     criterion_true_i = criterion_true(iTrial);
 %     Sigma_true = [s_true^2, SDadd_sha_true*s_true^2; ...
 %         SDadd_sha_true*s_true^2, s_true^2 ];
-% 
+%
 %     % Sigma & criterion without induced noise (Nmul = 0)
 %     s_noInduced = sigma_noInduced(iTrial);
 %     criterion_noInd_i = criterion_noInduced(iTrial);
 %     Sigma_noInduced = [s_noInduced^2, SDadd_sha_true*s_noInduced^2; ...
 %         SDadd_sha_true*s_noInduced^2, s_noInduced^2 ];
-% 
+%
 %     % Sigma & criterion without constant noise (SDadd = 0)
 %     s_noConst = sigma_noConst(iTrial);
 %     criterion_noConst_i = criterion_noConst(iTrial);
 %     Sigma_noConst = [s_noConst^2, SDadd_sha_true*s_noConst^2; ...
 %         SDadd_sha_true*s_noConst^2, s_noConst^2 ];
-% 
+%
 %     % Sigma without correlation (rho = 0), same criterion as full model
 %     Sigma_noRho = [s_true^2, 0; ...
 %         0, s_true^2];
 %     criterion_noRho_i = criterion_true_i;
-% 
+%
 %     % ----- Agreement regions for each model -----
 %     % Full model
 %     lb_YY_true = [criterion_true_i, criterion_true_i];
 %     ub_YY_true = [ inf, inf];
 %     lb_NN_true = [-inf, -inf];
 %     ub_NN_true = [criterion_true_i, criterion_true_i];
-% 
+%
 %     P_YY = mvncdf(lb_YY_true, ub_YY_true, mu_i, Sigma_true);
 %     P_NN = mvncdf(lb_NN_true, ub_NN_true, mu_i, Sigma_true);
 %     pA_true(iTrial) = P_YY + P_NN;
-% 
+%
 %     % No rho
 %     lb_YY_0 = [criterion_noRho_i, criterion_noRho_i];
 %     ub_YY_0 = [ inf, inf];
 %     lb_NN_0 = [-inf, -inf];
 %     ub_NN_0 = [criterion_noRho_i, criterion_noRho_i];
-% 
+%
 %     P_YY_0 = mvncdf(lb_YY_0, ub_YY_0, mu_i, Sigma_noRho);
 %     P_NN_0 = mvncdf(lb_NN_0, ub_NN_0, mu_i, Sigma_noRho);
 %     pA_noRho(iTrial) = P_YY_0 + P_NN_0;
-% 
+%
 %     % No induced noise
 %     lb_YY_noInd = [criterion_noInd_i, criterion_noInd_i];
 %     ub_YY_noInd = [ inf, inf];
 %     lb_NN_noInd = [-inf, -inf];
 %     ub_NN_noInd = [criterion_noInd_i, criterion_noInd_i];
-% 
+%
 %     P_YY_noInd = mvncdf(lb_YY_noInd, ub_YY_noInd, mu_i, Sigma_noInduced);
 %     P_NN_noInd = mvncdf(lb_NN_noInd, ub_NN_noInd, mu_i, Sigma_noInduced);
 %     pA_noInduced(iTrial) = P_YY_noInd + P_NN_noInd;
-% 
+%
 %     % No constant noise
 %     lb_YY_noConst = [criterion_noConst_i, criterion_noConst_i];
 %     ub_YY_noConst = [ inf, inf];
 %     lb_NN_noConst = [-inf, -inf];
 %     ub_NN_noConst = [criterion_noConst_i, criterion_noConst_i];
-% 
+%
 %     P_YY_noConst = mvncdf(lb_YY_noConst, ub_YY_noConst, mu_i, Sigma_noConst);
 %     P_NN_noConst = mvncdf(lb_NN_noConst, ub_NN_noConst, mu_i, Sigma_noConst);
 %     pA_noConst(iTrial) = P_YY_noConst + P_NN_noConst;
 % end
-% 
+%
 % % ---------------- Plotting ----------------
 % sz_font = 30;
 % figure('Position', [200 200 500 400]);hold on;
 % % ---- Panel 1: pYES misfit due to excluding induced/constant noise ----
 % % subplot(1,2,1); hold on;
-% 
+%
 % plot(IV, pYES_true, 'k-', 'LineWidth', 4);
 % plot(IV, pYES_noInduced, 'k--', 'LineWidth', 4);
 % % plot(IV, pYES_noConst, 'b-', 'LineWidth', 2);
-% 
+%
 % yline(0.5, '-', 'Color', [0.5 0.5 0.5], 'HandleVisibility', 'off', 'LineWidth', 3);
 % text(IV(65), 0.42, '$p_{YES}$=0.5', 'color', [.5, .5, .5], 'Interpreter', 'latex');
-% 
+%
 % xlabel('Internal variable ($V$)', 'Interpreter', 'latex');
 % ylabel('Detection rate($p_{YES}$)', 'Interpreter', 'latex');
 % legend({'Full model', 'No $\sigma_{constant}$'}, 'Location', 'southeast', 'Interpreter', 'latex');
-% 
+%
 % set(gca, 'FontSize', 12, 'LineWidth', 1.5, 'Box', 'off');
 % set(findall(gcf, '-property', 'fontsize'), 'fontsize', sz_font)
 % ylim([0 1]);
@@ -424,17 +424,17 @@ close all
 % ax.YTick = []; % no x-ticks
 % % sgtitle('Mispredictions when excluding noise parameters');
 % saveas(gcf, sprintf('%s/NOM_excludeParams_pYES.png', nameFolder_Fig_Schematic));
-% 
+%
 % % ---- Panel 2: pA misfit (here only showing full vs no correlation) ----
 % figure('Position', [200 200 500 400]);hold on;
 % % subplot(1,2,2); hold on;
-% 
+%
 % plot(IV, pA_true, 'k-', 'LineWidth', 4);
 % plot(IV, pA_noRho, 'k--', 'LineWidth', 4);
 % % If you want to show these too, uncomment:
 % % plot(IV, pA_noInduced, 'r-', 'LineWidth', 2);
 % % plot(IV, pA_noConst, 'b-', 'LineWidth', 2);
-% 
+%
 % yline(0.5, '-', 'Color', [0.5 0.5 0.5], 'HandleVisibility', 'off', 'LineWidth', 3);
 % text(IV(65), 0.42, '$p_A$=0.5', 'color', [.5, .5, .5], 'Interpreter', 'latex');
 % xlabel('Internal variable ($V$)', 'Interpreter', 'latex');
@@ -446,10 +446,10 @@ close all
 % set(gca, 'FontSize', 12, 'LineWidth', 1.5, 'Box', 'off');
 % set(findall(gcf, '-property', 'fontsize'), 'fontsize', sz_font)
 % ylim([0 1]);
-% 
+%
 % % sgtitle('Mispredictions when excluding noise parameters');
 % saveas(gcf, sprintf('%s/NOM_excludeParams_pA.png', nameFolder_Fig_Schematic));
-% 
+%
 % close all
 
 %% Sketches for neural variability
@@ -828,3 +828,78 @@ for iFxn = 1:nFxn
     set(findall(gcf, '-property', 'linewidth'), 'linewidth',2)
 end % iFxn
 saveas(gcf, sprintf('%s/CorrAsym.png', nameFolder_Fig_Schematic))
+
+
+%% Pairs of Gabors in quadrature phases
+% Three Gabor pairs:
+% - each pair has unique spatial frequency (SF) and orientation
+% - within each pair, phase difference is 90 deg (pi/2)
+
+clear; clc; close all;
+
+% Image/grid settings
+imgSize = 256;             % pixels
+xLim = 3;                  % visual extent in arbitrary units
+[x, y] = meshgrid(linspace(-xLim, xLim, imgSize), linspace(-xLim, xLim, imgSize));
+
+sigma = 1.8;               % Gaussian envelope width (larger -> bigger Gabor)
+contrast = 1.0;            % Gabor contrast
+
+% Define 3 pairs (edit as needed)
+SFs   = [0.2, .5, .7];   % cycles per unit
+oris  = [0, 45, 90];       % orientation in degrees
+phaseA = 0;                % first Gabor phase
+phaseB = pi/2;             % second Gabor phase (90 deg offset)
+
+nPairs = 3;
+gaborPairs = cell(nPairs, 2);  % {pairIdx, 1}=phaseA, {pairIdx, 2}=phaseB
+
+% Circular aperture: edge touches the canvas borders
+centerRadiusPix = (imgSize - 1) / 2;
+[xPix, yPix] = meshgrid(1:imgSize, 1:imgSize);
+ctr = (imgSize + 1) / 2;
+maskCenter = ((xPix - ctr).^2 + (yPix - ctr).^2) <= centerRadiusPix^2;
+
+% Build Gabors
+for iPair = 1:nPairs
+    sf = SFs(iPair);
+    theta = deg2rad(oris(iPair));
+
+    % Rotate coordinates for orientation
+    xTheta =  x * cos(theta) + y * sin(theta);
+
+    % Gaussian envelope
+    env = exp(-(x.^2 + y.^2) / (2 * sigma^2));
+
+    % Pair member 1: phaseA
+    g1 = contrast * env .* cos(2*pi*sf*xTheta + phaseA);
+
+    % Pair member 2: phaseB = phaseA + 90 deg
+    g2 = contrast * env .* cos(2*pi*sf*xTheta + phaseB);
+
+    gaborPairs{iPair,1} = g1;
+    gaborPairs{iPair,2} = g2;
+end
+
+% Display results (3 rows x 2 columns)
+
+for iPair = 1:nPairs
+    for iPass = 1:2
+        figure('Color', 'w', 'Position', [100 100 300 300]);
+
+        gaborToShow = gaborPairs{iPair,iPass};
+        gaborToShow(~maskCenter) = 1; % white in gray colormap with fixed CLim
+        imagesc(gaborToShow, [-1 1]);
+        axis image off;
+        colormap gray;
+
+        if iPass == 1
+            phDeg = rad2deg(phaseA);
+        else
+            phDeg = rad2deg(phaseB);
+        end
+        saveas(gcf, sprintf('Gabor%d%d.png', iPair, iPass))
+        % title(sprintf('Pair %d | SF=%.2f | Ori=%d^\\circ | Phase=%d^\\circ', ...
+        %     k, SFs(k), oris(k), round(phDeg)));
+    end
+end

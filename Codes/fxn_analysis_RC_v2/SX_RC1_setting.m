@@ -182,23 +182,23 @@ C_contribution   = 0;  % contribution of criterion loss to the objective
 switch flag_incluCrit
     case 0
         namesModelBparams = {...
-            {'Multiplicative variability', 'Additive variability', 'Shared variability'}, ... %1
-            {                                         'Additive variability', 'Shared variability'}, ... %2
-            {'Multiplicative variability',                                'Shared variability'}, ... %3
-            {'Multiplicative variability', 'Additive variability'                                       }, ... %4
-            {'Multiplicative variability',                                                                           }, ... %5
-            {                                         'Additive variability',                                      }, ... %6
-            {                                                                        'Shared variability'}, ... %7
+            {'Multiplicative noise', 'Additive noise', 'Shared noise'}, ... %1
+            {                                         'Additive noise', 'Shared noise'}, ... %2
+            {'Multiplicative noise',                                'Shared noise'}, ... %3
+            {'Multiplicative noise', 'Additive noise'                                       }, ... %4
+            {'Multiplicative noise',                                                                           }, ... %5
+            {                                         'Additive noise',                                      }, ... %6
+            {                                                                        'Shared noise'}, ... %7
             {                                                                                                  }}; %8
     case 1
         namesModelBparams = {...
-            {'Multiplicative variability', 'Additive variability', 'Shared variability', 'CriterionNOM'}, ... %1
-            {                                         'Additive variability', 'Shared variability',  'CriterionNOM'}, ... %2
-            {'Multiplicative variability',                                'Shared variability',    'CriterionNOM'}, ... %3
-            {'Multiplicative variability', 'Additive variability'                                , 'CriterionNOM'}, ... %4
-            {'Multiplicative variability',                                                                  'CriterionNOM'}, ... %5
-            {                                         'Additive variability',                                 'CriterionNOM'}, ... %6
-            {                                                                        'Shared variability',    'CriterionNOM'}, ... %7
+            {'Multiplicative noise', 'Additive noise', 'Shared noise', 'CriterionNOM'}, ... %1
+            {                                         'Additive noise', 'Shared noise',  'CriterionNOM'}, ... %2
+            {'Multiplicative noise',                                'Shared noise',    'CriterionNOM'}, ... %3
+            {'Multiplicative noise', 'Additive noise'                                , 'CriterionNOM'}, ... %4
+            {'Multiplicative noise',                                                                  'CriterionNOM'}, ... %5
+            {                                         'Additive noise',                                 'CriterionNOM'}, ... %6
+            {                                                                        'Shared noise',    'CriterionNOM'}, ... %7
             {                                                                                                  'CriterionNOM'}}; %8
 
         namesModelBparams_short = {...

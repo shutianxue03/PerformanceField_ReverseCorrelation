@@ -304,7 +304,7 @@ end
 
 %% [Plot] ticks, limits
 xticks(1:nCond); xticklabels([])
-% if ~isempty(x_ticklabels), xticklabels(x_ticklabels), end
+if ~isempty(x_ticklabels), xticklabels(x_ticklabels), end
 % if ~isnan(y_ticks)
 %     yticks(y_ticks);
 %     ylim(y_ticks([1, end]));

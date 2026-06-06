@@ -74,7 +74,7 @@ iModelA_all = iModelA_fit_all;
 iModelB_all = iModelB_fit_all;
 
 %%
-for iRun=4%[1,3,4]
+for iRun=1%[1,3,4]
     % Define subject list
     if flag_subjIsHuman
         switch iRun
@@ -151,7 +151,7 @@ for iRun=4%[1,3,4]
     fprintf(' - SF tuning function: %s\n', namesFamily_all{iFamily_SF});
     fprintf(' - Number of Bins: %d\n', nBins);
     fprintf(' - Information Criterion to plot: %s\n\n', namesIC{iIC_plot});
-    
+
     %% Compile/load data
     nameFile_compiledData = sprintf('%s.mat', nameFolder_Output_SaveCompile);
     if ~exist(nameFile_compiledData, 'file')
@@ -491,7 +491,7 @@ for iRun=4%[1,3,4]
                 case 1, iMetric_vec = 10; x_ticks = linspace(0,4, 5); flag_plotIDVD = 1; ref=nan; % CS
                 case 2, iMetric_vec = 6; x_ticks = linspace(.5, .9, 5); flag_plotIDVD = 1; ref=nan; % pA
                 case 3, iMetric_vec = 1; x_ticks = linspace(0, 1.6, 5); flag_plotIDVD = 0; ref=d70; % dprime
-                case 4, iMetric_vec = 2; x_ticks = linspace(-1, 1, 5); flag_plotIDVD = 0; ref=0; % SDT criterion 
+                case 4, iMetric_vec = 2; x_ticks = linspace(-1, 1, 5); flag_plotIDVD = 0; ref=0; % SDT criterion
                 case 5, iMetric_vec = 3; x_ticks = linspace(.5, .9, 5); flag_plotIDVD = 0; ref=.7; % pC
                 case 6, iMetric_vec = 11; x_ticks = linspace(0, .2, 5); flag_plotIDVD = 0; ref=nan; % RT
             end
@@ -823,7 +823,7 @@ for iRun=4%[1,3,4]
                     xlim(axisLim{iFeature})
                     ylim([ymin, ymax])
                     yticks(yticks_)
-                    
+
                     xticks(axisTicks_tuning{iFeature})
                     xticklabels(axisTL_tuning{iFeature})
                     xlabel(namesFeature_axis{iFeature}, 'FontSize', sz_label)
@@ -876,14 +876,29 @@ for iRun=4%[1,3,4]
     wd_border = 4; % default 5
     sz_ticks = 30;% default 35
 
+    % Temporary diagnostics: per-iteration SF tuning plots (data + prediction + peak markers).
+    flag_temp_plotIterSF = 1;
+    temp_nIterPlotMax = 50;
+    temp_iterPauseSec = 0.1;
+    if flag_temp_plotIterSF
+        nameFolder_Fig_NOM_Tuning_tmp = sprintf('%s/TuningFxns_IDVD_tmpIterSF', nameFolder_Fig_NOM_Trialwise);
+        if isempty(dir(nameFolder_Fig_NOM_Tuning_tmp)), mkdir(nameFolder_Fig_NOM_Tuning_tmp), end
+    end
+
     for iGroup = 1:nGroups % e.g., {[1, 8]} or more pairs if desired
         iLocPair_all = iLocGroups_all{iGroup};
 
-        for iFeature = 1:nFeatures
+        for iFeature = 2%1:nFeatures
 
             fprintf('\n   - L%s %s', strjoin(string(iLocPair_all), ''), namesFeature{iFeature})
 
             xaxis = axis_tuning{iFeature};
+
+            % Sets the tolerance for peak SF estimation in octaves.
+            % This is used to calculate the percentage of iterations where the predicted peak SF is within this tolerance of the true peak SF (derived from fitted parameters). The tolerance is set to half the channel spacing in log2(SF), which reflects the resolution of the SF axis in the tuning function.
+            if iFeature == 2
+                peakSF_tol_oct = mean(diff(xaxis)) / 2; % tolerance=half channel spacing in log2(SF)
+            end
 
             for iDataset = 1%:nDatasets
                 switch iDataset
@@ -895,7 +910,11 @@ for iRun=4%[1,3,4]
                         lineStyle = '--';
                 end
 
-                fig = figure('Position', [0 0 2e3 1.5e3]);
+                if nSubj==12
+                    fig = figure('Position', [0 0 2e3 1.5e3]);
+                else
+                    fig = figure('Position', [0 0 2e3 1.2e3]);
+                end
 
                 for isubj = 1:nSubj
                     subplot(nRows_subj, nCols_subj, isubj), hold on
@@ -903,6 +922,10 @@ for iRun=4%[1,3,4]
                     subjName = subjList{isubj};
 
                     str_TunParams ='';
+
+                    % Draw reference lines
+                    yline(0, 'handlevisibility', 'off', 'linewidth', wd_border/2, 'color', [.7, .7, .7]);
+                    xline(iFeature-1, 'handlevisibility', 'off', 'linewidth', wd_border/2, 'color', [.7, .7, .7]);
 
                     for iLoc = iLocPair_all
 
@@ -919,7 +942,7 @@ for iRun=4%[1,3,4]
                             if iLoc==1, yticks_ = linspace(-4,10,5)*1e-3; % fov vs. peri, higher ub
                             else, yticks_ = linspace(-4,6,5)*1e-3;
                             end
-                            
+
                         else % SF
                             marg_allCond = margSF_allCond;
                             margPred_allCond = margPred_SF_allCond;
@@ -936,8 +959,29 @@ for iRun=4%[1,3,4]
                         % Obtain data, prediction, and params
                         [marg_med_perS, ~, ~, marg_sem_neg_perS, marg_sem_pos_perS] = getCI(marg_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :), 1, 5);
                         [margPred_med_perS, margPred_lb_perS, margPred_ub_perS] = getCI(margPred_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :), 1, 5);
-                        margParam_med_perS = getCI(margParams_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :), 1, 5);
+                        [margParam_med_perS, margParam_lb_perS, margParam_ub_perS] = getCI(margParams_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :), 1, 5);
                         margR2_med_perS = getCI(margR2_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :), 1, 5);
+
+                        % Per-iteration peakSF validation using already-compiled outputs.
+                        if iFeature == 2
+                            margPred_iter_perS = squeeze(margPred_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :));
+                            margParam_iter_perS = squeeze(margParams_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :));
+                            margPred_iter_perS = reshape(margPred_iter_perS, [], numel(xaxis));
+                            margParam_iter_perS = reshape(margParam_iter_perS, [], size(margParam_iter_perS, ndims(margParam_iter_perS)));
+
+                            xPeakParam_log2_allIter = log2(margParam_iter_perS(:, 1));
+                            [~, idxPeakPred_allIter] = max(margPred_iter_perS, [], 2);
+                            xPeakPred_log2_allIter = xaxis(idxPeakPred_allIter)';
+
+                            peakErr_oct_allIter = abs(xPeakPred_log2_allIter - xPeakParam_log2_allIter);
+                            peakErr_valid = peakErr_oct_allIter(isfinite(peakErr_oct_allIter));
+                            peakPassRate_pct = 100 * mean(peakErr_valid <= peakSF_tol_oct);
+                            peakErr_med_oct = median(peakErr_valid, 'omitnan');
+
+                            gain_allIter = margParam_iter_perS(:, 2);
+                            width_allIter = margParam_iter_perS(:, 3);
+                            nInvalidShape = sum(~isfinite(gain_allIter) | ~isfinite(width_allIter) | gain_allIter <= 0 | width_allIter <= 0);
+                        end
 
                         % Data (dots + errorbars)
                         errorbar(xaxis, marg_med_perS, marg_sem_neg_perS, marg_sem_pos_perS, markerStyle, 'Color', color_comb, 'CapSize',0, 'linewidth', wd_border/2)
@@ -950,22 +994,93 @@ for iRun=4%[1,3,4]
                         % Print estimated parameters with scale-aware formatting.
                         paramStr = arrayfun(@formatMixedNumber, margParam_med_perS, 'UniformOutput', false);
                         str_TunParams = sprintf('%s\n[L%d] [R2=%.0f%%] %s', str_TunParams, iLoc, margR2_med_perS*100, strjoin(paramStr, ', '));
+                        if iFeature == 2
+                            fprintf('\npeakChk: %.0f%%<=%.3f oct, medErr=%.3f, bad(g<=0|w<=0)=%d', peakPassRate_pct, peakSF_tol_oct, peakErr_med_oct, nInvalidShape);
+                        end
+
+                        % Draw peak SF
+                        if iFeature==2
+                            % Peak from the displayed median fitted curve (guaranteed to align visually).
+                            [~, idxPeakPred] = max(margPred_med_perS);
+                            xPeakPred_log2 = xaxis(idxPeakPred);
+                            xline(xPeakPred_log2, 'Color', color_comb, 'LineWidth', wd_border);
+
+                            % Parameter-median peakSF as reference (can differ from peak of median curve).
+                            xPeakParam_log2 = log2(margParam_med_perS(1));
+                            xline(xPeakParam_log2, '--', 'Color', color_comb, 'LineWidth', wd_border/1.5, 'HandleVisibility', 'off');
+                            errorbar(xPeakParam_log2, 0, log2(margParam_med_perS(1))-log2(margParam_lb_perS(1)), log2(margParam_ub_perS(1))-log2(margParam_med_perS(1)), 'horizontal', 'Color', color_comb, 'LineWidth', wd_border)
+                        end
+
+                        % Temp: plot per-iteration SF tuning function (one figure per iteration).
+                        if iFeature == 2 && flag_temp_plotIterSF
+                            marg_iter_perS = squeeze(marg_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :));
+                            margPred_iter_perS = squeeze(margPred_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :));
+                            margParam_iter_perS = squeeze(margParams_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :));
+                            margR2_iter_perS = squeeze(margR2_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :));
+
+                            marg_iter_perS = reshape(marg_iter_perS, [], numel(xaxis));
+                            margPred_iter_perS = reshape(margPred_iter_perS, [], numel(xaxis));
+                            margParam_iter_perS = reshape(margParam_iter_perS, [], size(margParam_iter_perS, ndims(margParam_iter_perS)));
+                            margR2_iter_perS = reshape(margR2_iter_perS, [], 1);
+
+                            nIterAvail = size(margPred_iter_perS, 1);
+                            nIterPlot = min(temp_nIterPlotMax, nIterAvail);
+                            idxIterPlot = unique(round(linspace(1, nIterAvail, nIterPlot)));
+
+                            for iIter = idxIterPlot
+                                thisData = marg_iter_perS(iIter, :);
+                                thisPred = margPred_iter_perS(iIter, :);
+                                thisParam = margParam_iter_perS(iIter, :);
+                                thisR2 = margR2_iter_perS(iIter);
+
+                                xPeakParam_log2_iter = log2(thisParam(1));
+                                [~, idxPeakPred_iter] = max(thisPred);
+                                xPeakArgmax_log2_iter = xaxis(idxPeakPred_iter);
+
+                                y_min_iter = min([thisData(:); thisPred(:)], [], 'omitnan');
+                                y_max_iter = max([thisData(:); thisPred(:)], [], 'omitnan');
+                                y_rng_iter = y_max_iter - y_min_iter;
+                                if ~isfinite(y_rng_iter) || y_rng_iter == 0, y_rng_iter = 1; end
+                                y_peakMarker = y_min_iter - 0.08 * y_rng_iter;
+
+                                fig_tmp = figure('Position', [100 80 1000 700]);
+                                ax_tmp = axes(fig_tmp); hold(ax_tmp, 'on')
+
+                                h_data = plot(xaxis, thisData, 'o', 'Color', [0.55 0.55 0.55], 'MarkerFaceColor', 'w', 'MarkerSize', 6, 'LineWidth', 1.1);
+                                h_pred = plot(xaxis, thisPred, '-', 'Color', [0.15 0.45 0.85], 'LineWidth', 2);
+                                h_peakParam = plot(xPeakParam_log2_iter, y_peakMarker, 'x', 'Color', [0.85 0.2 0.2], 'MarkerSize', 9, 'LineWidth', 1.5);
+                                h_peakArg = plot(xPeakArgmax_log2_iter, y_peakMarker, 'o', 'Color', [0.1 0.6 0.1], 'MarkerSize', 7, 'LineWidth', 1.2);
+                                xline(xPeakParam_log2_iter, '--', 'Color', [0.85 0.2 0.2], 'LineWidth', 1.2, 'HandleVisibility', 'off');
+                                xline(xPeakArgmax_log2_iter, '-', 'Color', [0.1 0.6 0.1], 'LineWidth', 1.2, 'HandleVisibility', 'off');
+
+                                xlim(axisTicks_tuning{iFeature}([1, end]))
+                                xticks(axisTicks_tuning{iFeature})
+                                xticklabels(axisTL_tuning{iFeature})
+                                ylim([y_peakMarker - 0.05 * y_rng_iter, y_max_iter + 0.08 * y_rng_iter])
+                                xlabel(namesFeature_axis{iFeature})
+                                ylabel('Marg. weights (a.u.)')
+
+                                paramStr_iter = arrayfun(@formatMixedNumber, thisParam, 'UniformOutput', false);
+                                title(sprintf('TEMP iter-SF | %s | L%d | %s | iter %d/%d | R2=%.1f%%\nparams=[%s]', ...
+                                    subjName, iLoc, namesDataset{iDataset}, iIter, nIterAvail, thisR2*100, strjoin(paramStr_iter, ', ')))
+                                legend([h_data, h_pred, h_peakParam, h_peakArg], {'data', 'prediction', 'peakSF param (log2)', 'argmax(pred)'}, 'Location', 'best')
+
+                                drawnow
+                                % if temp_iterPauseSec > 0, pause(temp_iterPauseSec), end
+                                close(fig_tmp) stop here and figure out why there is discrepancy in the est. peak amp and peak of the tuningfxn
+                               
+                            end
+                        end
+
+
                     end % iLoc
-
-                    % Draw peak SF
-                    if iFeature==2
-                        xline(margParam_med_perS(1), 'Color', color_comb);
-                    end
-
-                    % Draw reference lines
-                    yline(0, 'handlevisibility', 'off', 'linewidth', wd_border, 'color', [.7, .7, .7]);
-                    xline(iFeature-1, 'handlevisibility', 'off', 'linewidth', wd_border, 'color', [.7, .7, .7]);
 
                     % y ticks
                     yticks(yticks_)
                     ylim([ymin, ymax])
 
                     % x ticks
+                    xlim(axisTicks_tuning{iFeature}([1, end]))
                     xticks(axisTicks_tuning{iFeature})
                     xticklabels(axisTL_tuning{iFeature})
                     xlabel(namesFeature_axis{iFeature})
@@ -974,7 +1089,7 @@ for iRun=4%[1,3,4]
                     % legend('Location', 'best')
 
                 end % isubj
-                sgtitle(sprintf('n=%d L%d%d [A%d] %s tuning (%s)\nParams in the title: [%s]\n', ...
+                sgtitle(sprintf('n=%d L%d%d [A%d] %s tuning (%s)\nParams (NOT tunC) are printed in the title: [%s]\n', ...
                     nSubj, iLocPair_all, iModelA_plot, namesFeature{iFeature}, namesDataset{iDataset}, ...
                     strjoin(namesParams_all{iFamily_perF(iFeature)}, ', ')))
                 set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
@@ -991,7 +1106,7 @@ for iRun=4%[1,3,4]
     clc; fprintf('\n%s: Fig 7/23: Tuning characteristics STARTED.\n', string(datetime('now')))
 
     % Load data
-    load(nameFolder_Output_SaveCompile, 'margTunC_*_allCond')
+    load(nameFolder_Output_SaveCompile, 'margParams_*_allCond')
 
     % Define folder for saving figures
     nameFolder_Fig_tunC = sprintf('%s/TuningCs', nameFolder_Fig_NOM_Trialwise);
@@ -1024,8 +1139,7 @@ for iRun=4%[1,3,4]
             nfilters = length(xaxis);
             iFamily = iFamily_perF(iFeature);
             str_family = sprintf('F%d %s', iFamily, namesFamily_all{iFamily});
-            namesTunC = namesTunC_unit_perF{iFamily, paramMode};
-            if iFeature == 2, namesTunC = namesTunC_SF_unit; end
+            namesTunC = namesParams_all{iFamily};
             nTunC_full = length(namesTunC);
 
             y_ticks_all = [];
@@ -1167,15 +1281,15 @@ for iRun=4%[1,3,4]
             for iTunC = 1:nTunC_full
 
                 % Compute median for each observer
-                % margTunC_ORI_allCond: nModelA x nModelB x nLoc_pair x nSubj x nIter x nDataset x nTunC
+                % margParams_ORI_allCond: nModelA x nModelB x nLoc_pair x nSubj x nIter x nDataset x nParam
                 % tunC_allSubj_allIter: nLoc_pair x nSubj x nIter
                 switch iFeature
                     case 1
-                        data_allIter_allSubj = squeeze(margTunC_ORI_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iDataset_plotRC, iTunC));
-                        data_obs_allSubj = squeeze(margTunC_ORI_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, 1, 2, iTunC)); % full data, without resampling
+                        data_allIter_allSubj = squeeze(margParams_ORI_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iDataset_plotRC, iTunC));
+                        data_obs_allSubj = squeeze(margParams_ORI_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, 1, 2, iTunC)); % full data, without resampling
                     case 2
-                        data_allIter_allSubj = squeeze(margTunC_SF_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iDataset_plotRC, iTunC));
-                        data_obs_allSubj = squeeze(margTunC_SF_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, 1, 2, iTunC));
+                        data_allIter_allSubj = squeeze(margParams_SF_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iDataset_plotRC, iTunC));
+                        data_obs_allSubj = squeeze(margParams_SF_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, 1, 2, iTunC));
                 end
 
                 % Let MATLAB format y-axis ticks automatically unless a custom unit remapping is needed.
@@ -1191,7 +1305,7 @@ for iRun=4%[1,3,4]
                     case 2 % log parabola
                         switch iTunC
                             case 1
-                                y_ticklabels = 2.^y_ticks_all{iTunC}; 
+                                y_ticklabels = 2.^y_ticks_all{iTunC};
                                 y_ticklabels = round(y_ticklabels, 2);
                                 ref = log2(2);
                                 data_allIter_allSubj = log2(data_allIter_allSubj); % pref SF
@@ -1360,7 +1474,7 @@ for iRun=4%[1,3,4]
     clc; fprintf('\n%s: Fig 9/23: Corr CS vs tuning characteristics STARTED.\n', string(datetime('now')))
 
     % Load data
-    load(nameFolder_Output_SaveCompile, 'margTunC*_allCond', 'CS_allSubj')
+    load(nameFolder_Output_SaveCompile, 'margParams*_allCond', 'CS_allSubj')
 
     nameVarX = 'CS';
     nameVarY = 'tunC';
@@ -1390,14 +1504,14 @@ for iRun=4%[1,3,4]
         for iFeature = 1:nFeatures
             iFamily = iFamily_perF(iFeature);
             str_family = sprintf('F%d %s', iFamily, namesFamily_all{iFamily});
-            if iFeature == 1, namesTunCs = namesTunC_unit_perF{iFamily, 2}; else, namesTunCs = namesTunC_SF_unit; end
+            namesTunCs = namesParams_all{iFamily};
             nTunCs_full = length(namesTunCs);
 
             for iTunC = 1:nTunCs_full
                 fprintf(' - L%s %s%d [%s]\n', strjoin(string(iLocCorr_all), ''), namesFeature{iFeature}, iTunC, str_family)
                 switch iFeature
-                    case 1, NOMp_allIter_allSubj = squeeze(margTunC_ORI_allCond(iModelA_plot, iModelB_plot, iLocCorr_all, :, :, iDataset_plotRC, iTunC));
-                    case 2, NOMp_allIter_allSubj = squeeze(margTunC_SF_allCond(iModelA_plot, iModelB_plot, iLocCorr_all, :, :, iDataset_plotRC, iTunC));
+                    case 1, NOMp_allIter_allSubj = squeeze(margParams_ORI_allCond(iModelA_plot, iModelB_plot, iLocCorr_all, :, :, iDataset_plotRC, iTunC));
+                    case 2, NOMp_allIter_allSubj = squeeze(margParams_SF_allCond(iModelA_plot, iModelB_plot, iLocCorr_all, :, :, iDataset_plotRC, iTunC));
                 end
 
                 switch iFeature
@@ -1666,9 +1780,9 @@ for iRun=4%[1,3,4]
     flag_plotIdvdCI = 1;
     flag_plotUnikSymbol = 0;
     iLocCorr_all = [6,5,3];
-    
+
     % Load data
-    load(nameFolder_Output_SaveCompile, 'margTunC_*_allCond', 'CS_allSubj')
+    load(nameFolder_Output_SaveCompile, 'margParams_*_allCond', 'CS_allSubj')
 
     nameVarX = 'CS';
     nameVarY = 'tunC';
@@ -1719,8 +1833,10 @@ for iRun=4%[1,3,4]
 
                 % Y-axis
                 switch iFeature
-                    case 1, NOMp_allIter_allSubj = squeeze(margTunC_ORI_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iDataset_plotRC, iTunC));
-                    case 2, NOMp_allIter_allSubj = squeeze(margTunC_SF_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iDataset_plotRC, iTunC));
+                    % case 1, NOMp_allIter_allSubj = squeeze(margTunC_ORI_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iDataset_plotRC, iTunC));
+                    % case 2, NOMp_allIter_allSubj = squeeze(margTunC_SF_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iDataset_plotRC, iTunC));
+                        case 1, NOMp_allIter_allSubj = squeeze(margParams_ORI_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iDataset_plotRC, iTunC));
+                    case 2, NOMp_allIter_allSubj = squeeze(margParams_SF_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iDataset_plotRC, iTunC));
                 end
 
                 asymY_allIter_allSubj = squeeze((NOMp_allIter_allSubj(1, :, :)-NOMp_allIter_allSubj(2, :, :))./(NOMp_allIter_allSubj(1, :, :)+NOMp_allIter_allSubj(2, :, :)));
@@ -1736,14 +1852,14 @@ for iRun=4%[1,3,4]
                     case 6 % HVA
                         switch iFamily
                             % case 1, y_ticks_allTunC_lb = -[60, 60, 200]; y_ticks_allTunC_ub = [60, 60, 200]; % ORI—peak, width, baseline
-                            case 2, y_ticks_allTunC_lb = -[50, 60, 60, 160]; y_ticks_allTunC_ub = [50, 60, 60, 200]; % SF—peak, peak amplitude, width, baseline
+                            case 2, y_ticks_allTunC_lb = -[50, 100, 60, 160]; y_ticks_allTunC_ub = [50, 100, 60, 200]; % SF—peak, peak amplitude, width, baseline
                             case 10, y_ticks_allTunC_lb = -[40, 18, 20]; y_ticks_allTunC_ub = [60, 10, 10]; % ORI—peak, width, baseline;
                         end
                     case 5 % VMA
                         switch iFamily
                             % case 1, y_ticks_allTunC_lb = -[100, 80, 200]; y_ticks_allTunC_ub = [100, 60, 200];
                                 % case 8, y_ticks_allTunC_lb = -[100, 40, 300, 320, 50, 320]; y_ticks_allTunC_ub = [100, 44, 300, 320, 50, 320];
-                            case 2, y_ticks_allTunC_lb = -[50, 90, 90, 300]; y_ticks_allTunC_ub = [70, 90, 90, 300];
+                            case 2, y_ticks_allTunC_lb = -[50, 120, 120, 300]; y_ticks_allTunC_ub = [70, 120, 120, 300];
                             case 10, y_ticks_allTunC_lb = -[80, 30, 100]; y_ticks_allTunC_ub = [100, 30, 100];
                         end
                 end
@@ -2475,11 +2591,15 @@ for iRun=4%[1,3,4]
 
     % ModelB ordering + plotting flags
     iModelB_selected = 1:7;
+    iModelB_selected = [2,3,5,6];
+    pairs_bracket = [1 2; 1 3; 1 4]; % requested comparisons
+    pairs_bracket = [1 2]; % requested comparisons
+    pairs_bracket = nan; % no comparison needed
     flag_plotIDVD = 0;
     flag_plotDiff = 0;
-    
+
     y_ticks = linspace(0, 20, 5);
-    sz_label = 60;
+    sz_label = 20;
     sz_text = sz_label;
     wd = 4;
     y_ticklabels = nan;
@@ -2526,10 +2646,6 @@ for iRun=4%[1,3,4]
         % ylim(y_ticks([1, end]))
 
         ylabel('\Delta NLL', 'FontSize', sz_label);
-
-        % [Plot] planned comparison brackets + CI of mean difference at midpoint
-        pairs_bracket = [1 2; 1 3; 1 4]; % requested comparisons
-        pairs_bracket = [1 2]; % requested comparisons
 
         % dnLL_allIter_allSubj must be [nIter x nSubj x nCond]
         [~, nSubj, nCond] = size(dNLL_allIter_allSubj);
@@ -2595,35 +2711,39 @@ for iRun=4%[1,3,4]
         % Helper: find index in "pairs" for a given (iA,iB)
         getPairIdx = @(iA,iB) find(pairs_all(:,1)==min(iA,iB) & pairs_all(:,2)==max(iA,iB), 1, 'first');
 
-        for iPair = 1:size(pairs_bracket,1)
 
-            iA = pairs_bracket(iPair,1);
-            iB = pairs_bracket(iPair,2);
+        % [Plot] planned comparison brackets + CI of mean difference atmidpoint
 
-            y = yBase + (iPair-1)*yStep;
+        if ~isnan(pairs_bracket)
+            for iPair = 1:size(pairs_bracket,1)
 
-            % --- bracket line ---
-            plot([iA iB], [y y], 'k-', 'LineWidth', wd, 'HandleVisibility','off');
-            capHeight = 0.015 * yRange;
-            plot([iA iA], [y-capHeight, y], 'k-', 'LineWidth', wd, 'HandleVisibility','off');
-            plot([iB iB], [y-capHeight, y], 'k-', 'LineWidth', wd, 'HandleVisibility','off');
+                iA = pairs_bracket(iPair,1);
+                iB = pairs_bracket(iPair,2);
 
-            % --- text label (left-aligned, above the bracket line) ---
-            % "pperm_allPairs(1)" is hard-coded!! 1=comparing Full vs. NoMul
-            str_delta = sprintf('$\\Delta_{CI95}=[%+.2f, %+.2f]$\n$\\mathit{p}=%.3f$', diffCond_lb(iPair), diffCond_ub(iPair), pperm_allPairs(1));
+                y = yBase + (iPair-1)*yStep;
 
-            xText = iA; % left end of bracket
-            yText = y + 0.02*yRange; % a bit above the bracket line (tune 0.02)
+                % --- bracket line ---
+                plot([iA iB], [y y], 'k-', 'LineWidth', wd, 'HandleVisibility','off');
+                capHeight = 0.015 * yRange;
+                plot([iA iA], [y-capHeight, y], 'k-', 'LineWidth', wd, 'HandleVisibility','off');
+                plot([iB iB], [y-capHeight, y], 'k-', 'LineWidth', wd, 'HandleVisibility','off');
 
-            text(xText, yText, str_delta, ...
-                'HorizontalAlignment', 'left', ...
-                'VerticalAlignment', 'bottom', ...
-                'FontSize', sz_text, ...
-                'Color', 'k', ...
-                'Interpreter', 'latex', ...
-                'HandleVisibility', 'off');
-        end % iPair
+                % --- text label (left-aligned, above the bracket line) ---
+                % "pperm_allPairs(1)" is hard-coded!! 1=comparing Full vs. NoMul
+                str_delta = sprintf('$\\Delta_{CI95}=[%+.2f, %+.2f]$\n$\\mathit{p}=%.3f$', diffCond_lb(iPair), diffCond_ub(iPair), pperm_allPairs(1));
 
+                xText = iA; % left end of bracket
+                yText = y + 0.02*yRange; % a bit above the bracket line (tune 0.02)
+
+                text(xText, yText, str_delta, ...
+                    'HorizontalAlignment', 'left', ...
+                    'VerticalAlignment', 'bottom', ...
+                    'FontSize', sz_text, ...
+                    'Color', 'k', ...
+                    'Interpreter', 'latex', ...
+                    'HandleVisibility', 'off');
+            end % iPair
+        end
         % % ======== Inset ========
         % % Compare raw nLL_med (not delta nLL) for B1 vs B2 using fxn_drawBars
         % ax_inset = axes('Position', [0.08, 0.62, 0.33, 0.28]);
@@ -2652,8 +2772,8 @@ for iRun=4%[1,3,4]
         % set axis font size
         ax = gca;
         ax.FontSize = sz_label * 0.8;
-        ax.LineWidth = wd;  
-        
+        ax.LineWidth = wd;
+
         title(str_title, 'FontSize', 10);
 
         saveas(figMain, fullfile(nameFolder_Fig_NOM_nLL, sprintf('n%d_L%d_ModelB%s.png', nSubj, iLocSingle, strjoin(string(iModelB_selected), ''))));
@@ -2793,7 +2913,7 @@ for iRun=4%[1,3,4]
                     y_ticklabels = round(y_ticks, 2);
 
                     str_title = sprintf('n=%d nIter=%d L%s [A%dB%d] %s', nSubj, nIterxJob, strjoin(string(iLocPair_all), ''), iModelA_plot, iModelB_NOMplot, namesModelBparams{iModelB_NOMplot}{iParam});
-                    
+
                     %------------------------------%
                     fxn_drawBars(NOMp_allIter_allSubj, ref, colors_comb(iLocPair_all, :), x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd);
                     %------------------------------%

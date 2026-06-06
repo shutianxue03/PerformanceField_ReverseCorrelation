@@ -28,6 +28,11 @@ nSF=nSF;
 axisORI = filtersOri_all - 90;
 axisSF = filtersSF_all_log;
 
+iFamily_ORI = 'von_mises'; % input to predKernelSF, 1=scaled gaussian, 8=DoG, 10=von Mises,
+iFamily_SF = 'log_parabola'; % 2=log parabola, 14=asymmetric Gaussian in log2 space,
+iFamily_ORI_idx = 10; % von Mises
+iFamily_SF_idx = 2;   % log parabola
+
 %% Deterministic RNG (grand seed + per-iteration substreams)
 S_seed = GetGrandSeed(nIter, iJob, nJob, nameFolder_Data);
 
@@ -82,10 +87,6 @@ end
 
 % Settings for fitting tuning functions
 nRep = 20;
-iFamily_ORI = 'von_mises'; % input to predKernelSF, 1=scaled gaussian, 8=DoG, 10=von Mises,
-iFamily_SF = 'log_parabola'; % 2=log parabola, 14=asymmetric Gaussian in log2 space,
-iFamily_ORI_idx = 10; % von Mises
-iFamily_SF_idx = 2;   % log parabola
 problem_setting = MultiStart('StartPointsToRun', 'bounds','UseParallel', 1, 'Display', 'off');
 
 % Local fmincon options used by runMultistartFmincon (parfor-safe path).
