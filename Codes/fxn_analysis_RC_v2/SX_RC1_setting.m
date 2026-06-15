@@ -116,7 +116,7 @@ assert(nORI == length(filtersOri_all));
 
 % SF filter
 nSF = nORI; % could generate 0.5: 17, 29, 37
-noise.SF_low = .25; % used to be 1.1869
+noise.SF_low = 1; % used to be 1.1869
 noise.SF_high = 2/noise.SF_low*2;
 noise.SF_high = 4;
 noise.filtersSF_all_log = linspace(log2(noise.SF_low), log2(noise.SF_high), nSF);

@@ -50,7 +50,7 @@ flag_UseRUseRho = 'useR'; % useR or useRho for correlation analysis (for both dr
 % Define locations and their combinations
 iLocComb_all = [6,7, 5,3, 1,8]; % combination of locations
 iLocGroups_all = {[6,7], [5,3], [1,8]} ; nGroups = length(iLocGroups_all);
-% iLocGroups_all = {[6,3]} ; nGroups = length(iLocGroups_all);
+iLocGroups_all = {[1,8]} ; nGroups = length(iLocGroups_all);
 iLocSingle_all = 1:5; nLocSingle = length(iLocSingle_all);
 iLocSingle_allSets = {[1,6,5,3]};
 
@@ -740,6 +740,7 @@ for iRun=4%[1,3,4]
     nameFolder_Fig_NOM_Tuning = sprintf('%s/TuningFxns_group', nameFolder_Fig_NOM_Trialwise);
     if isempty(dir(nameFolder_Fig_NOM_Tuning)), mkdir(nameFolder_Fig_NOM_Tuning), end
 
+    sz_label = 55;
     wd_border = 3.5; % default 5
     sz_ticks = 30;% default 35
     sz_label = sz_ticks;
@@ -2033,7 +2034,7 @@ for iRun=4%[1,3,4]
 
         %----------------------------%
         fxn_drawCorrAsym(asymX_allIter_allSubj*100, asymY_allIter_allSubj*100, ...
-            colors_comb(iLocPair_all, :), flag_UseRUseRho, flag_CIrange, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, flag_plotPurpose)
+            colors_comb(iLocPair_all, :), flag_UseRUseRho, flag_CIrange, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj)
         %----------------------------%
         fig = gcf;
 
@@ -3204,7 +3205,7 @@ for iRun=4%[1,3,4]
 
                 switch iModelB_NOMplot
                     case 1, y_ticks_lb = [0, 0, 0, 0]; y_ticks_ub = [.6, 32, 32, 40];
-                    case 2, y_ticks_lb = [0, 0, 0]; y_ticks_ub = [2.8, 2.8, 40]; %NoMul*
+                    case 2, y_ticks_lb = [0, 0, -1]; y_ticks_ub = [2.8, 2.8, 5]; %NoMul*
                     case 3, y_ticks_lb = [0, 0, 0]; y_ticks_ub = [.6, 32, 40];
                     case 4, y_ticks_lb = [0, 0, 0]; y_ticks_ub = [.6, 32, 40];
                     case 5, y_ticks_lb = [0, 0]; y_ticks_ub = [.6, 40];
@@ -3536,6 +3537,7 @@ end
 close(figHandle);
 end
 
+%%
 function s = formatMixedNumber(v)
 av = abs(v);
 if isnan(v)

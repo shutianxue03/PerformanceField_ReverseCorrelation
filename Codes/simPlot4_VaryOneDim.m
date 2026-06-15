@@ -607,7 +607,7 @@ setting.fig1_pct_fields = {'nBasisORI_mode_pct', 'nBasisSF_mode_pct', 'basisFxnO
 setting.fig1_pct_labels = {'ORI mode selection rate', 'SF mode selection rate', 'ORI basis family mode selection rate', 'SF basis family mode selection rate',  'ORI width mode selection rate', 'SF width mode selection rate', 'Ridge mode selection rate', 'SF asymmetry mode selection rate'};
 
 setting.varFields = {'Nmul_true', 'Nadd_true', 'Nshared_true', 'gaborCST', 'cSDT_true'};
-setting.varNames  = {'Multiplicative var.', 'Additive var.', 'Shared var.', 'Signal contrast', 'SDT criterion'};
+setting.varNames  = {'Multiplicative noise', 'Additive noise', 'Shared noise', 'Signal contrast', 'SDT criterion'};
 
 setting.fig1_varFields = setting.varFields;
 setting.fig1_varNames  = setting.varNames;
@@ -1281,6 +1281,8 @@ for iCol = 1:nVars
         end
         ylim([yMinTop - yPadTop, yMaxTop + yPadTop]);
     end
+    yticks(180:10:220)
+    ylim([180, 220])
     if iCol == 1
         ylabel('Template-estimation NLL');
     end
