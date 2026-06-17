@@ -1,7 +1,7 @@
 function [PearsonR, SpearmanRho] = fxn_drawCorr( ...
     X_allIter_allSubj, Y_allIter_allSubj, colors, flag_UseRUseRho, x_ticks, y_ticks, ...
     x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, ...
-    flag_plotUnikSymbol, str_title, markers_allSubj, nIter)
+    flag_plotUnikSymbol, str_title, markers_allSubj, nIter, flag_plotPurpose)
 
 % =========================================================================
 % fxn_drawCorr
@@ -17,9 +17,27 @@ function [PearsonR, SpearmanRho] = fxn_drawCorr( ...
 % =========================================================================
 
 %% ---------------- settings ----------------
-wd_border = 3;
-sz_ticks = 40;
-sz_marker = 18;
+switch lower(flag_plotPurpose)
+    case 'paper'
+        wd_border = 3;
+        sz_ticks = 40;
+        sz_marker = 18;
+        sz_text_stats = 45;
+        sz_title = 10;
+        wd_idvd_ci = 1.5;
+        fig_pos = [0 200 1000 1000];
+    case 'slide'
+        % Placeholder slide style values. Tune as needed for presentation output.
+        wd_border = 3;
+        sz_ticks = 40;
+        sz_marker = 18;
+        sz_text_stats = 45;
+        sz_title = 10;
+        wd_idvd_ci = 1.5;
+        fig_pos = [0 200 1000 1000];
+    otherwise
+        error('Unknown flag_plotPurpose: %s. Use ''paper'' or ''slide''.', string(flag_plotPurpose));
+end
 
 CI68 = .68; % per-point CI bars (X/Y across iterations) if flag_plotIdvdCI==1
 CI95 = .95; % CIs reported for correlations and regression bands
@@ -293,7 +311,7 @@ for iCond = 1:nCond
 end
 
 %% ---------------- PLOT: scatter of medians ----------------
-figure('Position', [0 200 1000 1000]);
+figure('Position', fig_pos);
 hold on; box on;
 
 for iCond = 1:nCond
@@ -319,7 +337,7 @@ for iCond = 1:nCond
         if flag_plotIdvdCI == 1
             % errorbar([X_lb_plot(iSubj,iCond), X_ub_plot(iSubj,iCond)], [y0 y0], '-', 'Color', ones(1,3)*0.5, 'LineWidth', 1.5, 'HandleVisibility','off');
             % plot([x0 x0], [Y_lb_plot(iSubj,iCond), Y_ub_plot(iSubj,iCond)], '-', 'Color', ones(1,3)*0.5, 'LineWidth', 1.5, 'HandleVisibility','off');
-            errorbar(X_med(iSubj,iCond), Y_med(iSubj,iCond), Y_sem_neg(iSubj,iCond), Y_sem_pos(iSubj,iCond), 'vertical', '-', 'Color', ones(1,3)*0.5, 'LineWidth', 1.5, 'HandleVisibility','off', 'CapSize', 0)
+            errorbar(X_med(iSubj,iCond), Y_med(iSubj,iCond), Y_sem_neg(iSubj,iCond), Y_sem_pos(iSubj,iCond), 'vertical', '-', 'Color', ones(1,3)*0.5, 'LineWidth', wd_idvd_ci, 'HandleVisibility','off', 'CapSize', 0)
         end
 
         plot(x0, y0, mk, ...
@@ -406,9 +424,9 @@ end
 y_str = 0.02; % Figure 6: 0.02
 text(ax, 0.5, y_str, str_print, 'Units', 'normalized', ...
     'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom', ...
-    'FontSize', 45, 'Color', 'k', 'Interpreter', 'latex', 'Clipping', 'off');
+    'FontSize', sz_text_stats, 'Color', 'k', 'Interpreter', 'latex', 'Clipping', 'off');
 
-title(sprintf('%s\n%s\n%s\n%s\n', str_title, str_demean, str_partial_pc, str_perLoc), 'FontSize', 10);
+title(sprintf('%s\n%s\n%s\n%s\n', str_title, str_demean, str_partial_pc, str_perLoc), 'FontSize', sz_title);
 
 %% Save CI and permutation-p summaries for automatic CI range calculation in CorrAsym
 PearsonR = [r_partial_pc_obs, r_partial_pc_lb, r_partial_pc_ub, pperm_r_partial_pc];
@@ -416,7 +434,7 @@ SpearmanRho = [rho_partial_pc_obs, rho_partial_pc_lb, rho_partial_pc_ub, pperm_r
 
 end
 
-%% Helper: safeCorr 
+%% Helper: safeCorr
 function r = safeCorr(x,y,typeName)
 x = x(:); y = y(:);
 ok = ~isnan(x) & ~isnan(y);
@@ -444,7 +462,7 @@ switch lower(type_tail)
 end
 end
 
-%% Helper: linear fit -> yhat on grid 
+%% Helper: linear fit -> yhat on grid
 function [beta, yhat] = local_linfit_yhat(x, y, xgrid)
 x = x(:); y = y(:);
 ok = ~isnan(x) & ~isnan(y);

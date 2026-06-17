@@ -22,6 +22,7 @@ nJob = 5;
 nIterxJob = nIter*nJob;
 iModelA_fit_all = [1]; % 1=RC-derived template, 2=use IO template, 2=randomize template,
 iModelB_fit_all = [1:7]; % see SX_RC1_setting for namesModelB
+flag_plotPurpose = 'slide'; % 'slide' or 'paper'
 
 % Define model families for tuning curves
 iFamily_ORI = 10; %1=scaled Gaussian
@@ -51,7 +52,7 @@ iLocComb_all = [6,7, 5,3, 1,8]; % combination of locations
 iLocGroups_all = {[6,7], [5,3], [1,8]} ; nGroups = length(iLocGroups_all);
 % iLocGroups_all = {[6,3]} ; nGroups = length(iLocGroups_all);
 iLocSingle_all = 1:5; nLocSingle = length(iLocSingle_all);
-iLocSingle_allSets = {[6,5,3]};
+iLocSingle_allSets = {[1,6,5,3]};
 
 % Define the number of bins for the NOM analysis
 namesMetrics_prob = {'pYES', 'pA'}; nMetrics_prob = length(namesMetrics_prob); namesMetrics_prob_full = {sprintf('Predicted detection prob.\nMeasured detection rate'), sprintf('Predicted consistency prob.\nMeasured resp. consistency')};
@@ -74,7 +75,7 @@ iModelA_all = iModelA_fit_all;
 iModelB_all = iModelB_fit_all;
 
 %%
-for iRun=1%[1,3,4]
+for iRun=4%[1,3,4]
     % Define subject list
     if flag_subjIsHuman
         switch iRun
@@ -480,7 +481,12 @@ for iRun=1%[1,3,4]
     namesMetrics_behav_long = {'Contrast sensitivity', 'Consistency rate', 'Dprime', 'Criterion', 'Accuracy', 'Resp. time'};
     [d70,~] = SX_sim06_SDT(.7, .3);
 
+    switch flag_plotPurpose
+        case 'paper'
     sz_wd_perBar = 180;
+        case 'slide'
+            sz_wd_perBar = 100;
+    end
     nBars = 2;
     sz_fig = [nBars*sz_wd_perBar, 300+nchoosek(nBars,2)*50];
 
@@ -488,7 +494,7 @@ for iRun=1%[1,3,4]
         iLocPair_all = iLocGroups_all{iGroup};
         for iMetric_prob = 1:nMetrics_behav
             switch iMetric_prob
-                case 1, iMetric_vec = 10; x_ticks = linspace(0,4, 5); flag_plotIDVD = 1; ref=nan; % CS
+                case 1, iMetric_vec = 10; x_ticks = linspace(2, 3.6, 5); flag_plotIDVD = 1; ref=nan; % CS
                 case 2, iMetric_vec = 6; x_ticks = linspace(.5, .9, 5); flag_plotIDVD = 1; ref=nan; % pA
                 case 3, iMetric_vec = 1; x_ticks = linspace(0, 1.6, 5); flag_plotIDVD = 0; ref=d70; % dprime
                 case 4, iMetric_vec = 2; x_ticks = linspace(-1, 1, 5); flag_plotIDVD = 0; ref=0; % SDT criterion
@@ -503,10 +509,12 @@ for iRun=1%[1,3,4]
             sz_text = 22;
             wd = 3;
             %------------------------------%
-            fxn_drawBars(data_allIter_allSubj, ref, colors_comb(iLocPair_all, :), namesLocComb(iLocPair_all), x_ticks, x_ticks, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd);
+            fxn_drawBars(data_allIter_allSubj, ref, colors_comb(iLocPair_all, :), namesLocComb(iLocPair_all), x_ticks, x_ticks, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd, flag_plotPurpose);
             %------------------------------%
             fig = gcf;
+            if strcmp(flag_plotPurpose, 'paper')
             ylabel(namesMetrics_behav_long{iMetric_prob})
+            end
             saveAndCloseFigure(fig, sprintf('%s/n%d_L%d%d_%s.png', nameFolder_Fig_behav, nSubj, iLocPair_all, namesMetrics_behav{iMetric_prob}))
         end % iMetric
     end % iGroup
@@ -554,7 +562,7 @@ for iRun=1%[1,3,4]
             sz_text = 22;
             wd = 3;
             %------------------------------%
-            fxn_drawBars(data_allIter_allSubj, ref, colors_comb(iLocSingle_perSet, :), namesLocComb(iLocSingle_perSet), x_ticks, x_ticks, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd);
+            fxn_drawBars(data_allIter_allSubj, ref, colors_comb(iLocSingle_perSet, :), namesLocComb(iLocSingle_perSet), x_ticks, x_ticks, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd, flag_plotPurpose);
             % ------------------------------%
             fig = gcf;
             ylabel(namesMetrics_behav_long{iMetric_prob})
@@ -690,7 +698,7 @@ for iRun=1%[1,3,4]
         wd = 3;
 
         % -------------------%
-        fxn_drawBars(data_allIter_allSubj, ref, colors, x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd);
+        fxn_drawBars(data_allIter_allSubj, ref, colors, x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd, flag_plotPurpose);
         % -------------------%
         fig = gcf;
         ylabel('Separability (Pearson''s r)')
@@ -734,6 +742,7 @@ for iRun=1%[1,3,4]
 
     wd_border = 3.5; % default 5
     sz_ticks = 30;% default 35
+    sz_label = sz_ticks;
 
     iplots = reshape((1:nGroups*nFeatures)', nGroups, nFeatures)';
     for iDataset=1%1:nDatasets
@@ -753,7 +762,12 @@ for iRun=1%[1,3,4]
 
                 xaxis = axis_tuning{iFeature};
 
-                fig = figure('Position', [0 0 1.1e3 6e2]); % default 8e2
+                switch flag_plotPurpose
+                    case 'paper'
+                fig = figure('Position', [0 0 8e2 6e2]); % default 8e2
+                    case 'slide'
+                        fig = figure('Position', [0 0 1.1e3 6e2]); % default 8e2
+                end
                 hold on
                 for iLoc = iLocPair_all
 
@@ -767,14 +781,14 @@ for iRun=1%[1,3,4]
                         marg_allCond = margORI_allCond;
                         margPred_allCond = margPred_ORI_allCond;
                         margR2_allCond = margR2_ORI_allCond;
-                        if find(iLocPair_all==1), yticks_ = [-.03, linspace(0, .24, 4)]; % fov vs. peri, higher ub
+                        if find(iLocPair_all==1), yticks_ = [-1, linspace(0, 5, 4)]*1e-3; % fov vs. peri, higher ub
                         else, yticks_ = linspace(-1, 5, 5)*1e-3; %yticks_ = [-.03, linspace(0, .12, 4)];
                         end
                     else % SF tuning fxn
                         marg_allCond = margSF_allCond;
                         margPred_allCond = margPred_SF_allCond;
                         margR2_allCond = margR2_SF_allCond;
-                        if find(iLocPair_all==1), yticks_ = [-.01, linspace(0, .12, 4)];
+                        if find(iLocPair_all==1), yticks_ = [-.5, linspace(0, 2, 4)]*1e-3;
                         else, yticks_ = linspace(-.5, 2, 5)*1e-3; %[-.02, 0, .02, .04, .06];
                         end
                     end
@@ -1067,8 +1081,8 @@ for iRun=1%[1,3,4]
 
                                 drawnow
                                 % if temp_iterPauseSec > 0, pause(temp_iterPauseSec), end
-                                close(fig_tmp) stop here and figure out why there is discrepancy in the est. peak amp and peak of the tuningfxn
-                               
+                                close(fig_tmp) 
+
                             end
                         end
 
@@ -1123,7 +1137,12 @@ for iRun=1%[1,3,4]
     for iGroup = 1:nGroups % e.g., {[1, 8]} or more pairs if desired
         iLocPair_all = iLocGroups_all{iGroup};
 
-        sz_wd_perBar = 200;
+        switch flag_plotPurpose
+            case 'paper'
+                sz_wd_perBar = 200;
+            case 'slide'
+                sz_wd_perBar = 250;
+        end
         nBars = numel(iLocPair_all);
         sz_fig = [nBars*sz_wd_perBar, 400+nchoosek(nBars,2)*50];
 
@@ -1171,11 +1190,11 @@ for iRun=1%[1,3,4]
                         case 10 % ORI tuningC | von Mises
                             if flag_plotIDVD
                                 if find(iLocPair_all==1)
-                                    y_ticks_all{1} = linspace(0, .4, 5); % ORI peak amp
+                                    y_ticks_all{1} = linspace(0, 16, 5)*1e-3; % ORI peak amp
                                 else
-                                    y_ticks_all{1} = linspace(0, 8, 5)*1e-3; % ORI peak amp
+                                    y_ticks_all{1} = linspace(0, 16, 5)*1e-3; % ORI peak amp
                                 end
-                                y_ticks_all{2} = linspace(10, 30, 5); % ORI band
+                                y_ticks_all{2} = linspace(0,6, 5); % ORI band
                                 y_ticks_all{3} = linspace(-.05, .03, 5); % ORI baseline
                             else
                                 if find(iLocPair_all==1)
@@ -1184,7 +1203,7 @@ for iRun=1%[1,3,4]
                                     y_ticks_all{1} = linspace(0, .12, 5); % ORI peak amp
                                 end
 
-                                y_ticks_all{2} = linspace(0, 60, 5); % ORI band
+                                y_ticks_all{2} = linspace(0, 6, 5); % ORI band
                                 y_ticks_all{3} = linspace(-.08, .08, 5); % ORI baseline
                             end
 
@@ -1326,7 +1345,7 @@ for iRun=1%[1,3,4]
                 switch flag_plotDist
                     case 0
                         %------------------------------%
-                        fxn_drawBars(data_allIter_allSubj, ref, colors, x_ticks, y_ticks_all{iTunC}, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd);
+                        fxn_drawBars(data_allIter_allSubj, ref, colors, x_ticks, y_ticks_all{iTunC}, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd, flag_plotPurpose);
                         % ------------------------------%
                         fig = gcf;
                         ylabel(sprintf('%s %s', namesFeature{iFeature}, namesTunC{iTunC}))
@@ -1429,7 +1448,7 @@ for iRun=1%[1,3,4]
                 str_title = sprintf('n=%d, nIter=%d %s vs. %s [L%s]', nSubj, nIterxJob, nameVarX, nameVarY_figTitle, strjoin(string(iLocCorr_all), ''));
 
                 %----------------------------%
-                [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob);
+                [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob, flag_plotPurpose);
                 %----------------------------%
                 fig = gcf;
 
@@ -1515,7 +1534,7 @@ for iRun=1%[1,3,4]
                 end
 
                 switch iFeature
-                    case 1, y_ticks_allTunC_lb = [0, 15, -.1]; y_ticks_allTunC_ub = [.008, 25, .1];% 3 values are ORI peak amplitude, width, baseline
+                    case 1, y_ticks_allTunC_lb = [-.004, 0, -.1]; y_ticks_allTunC_ub = [.02, 6, .1];% 3 values are ORI peak amplitude, width, baseline
                     case 2, y_ticks_allTunC_lb = [-2, 0, .5, -.1]; y_ticks_allTunC_ub = [2, .004, 3.5, .1]; % 4 values are SF peak, peak amplitude, width, baseline
                 end
 
@@ -1533,7 +1552,7 @@ for iRun=1%[1,3,4]
                 str_title = sprintf('n=%d, nIter=%d %s vs. %s [L%s]', nSubj, nIterxJob, nameVarX, nameVarY_figTitle, strjoin(string(iLocCorr_all), ''));
 
                 %----------------------------%
-                [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob);
+                [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob, flag_plotPurpose);
                 %----------------------------%
                 fig = gcf;
                 % Save CI for automatic CI range calcuation in CorrAsym
@@ -1614,7 +1633,7 @@ for iRun=1%[1,3,4]
         str_title = sprintf('n=%d, nIter=%d%s vs. %s [L%s]', nSubj, nIterxJob, nameVarX, nameVarY_figTitle, strjoin(string(iLocCorr_all), ''));
 
         %----------------------------%
-        [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob);
+        [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob, flag_plotPurpose);
         %----------------------------%
         fig = gcf;
         % Save CI for automatic CI range calcuation in CorrAsym
@@ -1885,7 +1904,7 @@ for iRun=1%[1,3,4]
                 end
 
                 %----------------------------%
-                fxn_drawCorrAsym(asymX_allIter_allSubj*100, asymY_allIter_allSubj*100, colors_comb(iLocPair_all, :), flag_UseRUseRho, flag_CIrange, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj)
+                fxn_drawCorrAsym(asymX_allIter_allSubj*100, asymY_allIter_allSubj*100, colors_comb(iLocPair_all, :), flag_UseRUseRho, flag_CIrange, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, flag_plotPurpose)
                 %----------------------------%
                 fig = gcf;
 
@@ -1995,7 +2014,7 @@ for iRun=1%[1,3,4]
 
         %----------------------------%
         fxn_drawCorrAsym(asymX_allIter_allSubj*100, asymY_allIter_allSubj*100, ...
-            colors_comb(iLocPair_all, :), flag_UseRUseRho, flag_CIrange, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj)
+            colors_comb(iLocPair_all, :), flag_UseRUseRho, flag_CIrange, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, flag_plotPurpose)
         %----------------------------%
         fig = gcf;
 
@@ -2108,7 +2127,7 @@ for iRun=1%[1,3,4]
                     NRMSE_w_lb = R2_w_ave;
                     NRMSE_w_ub = R2_w_ave;
 
-                    for iiLoc = 1:numel(iLocSingle_perSet)
+                    for iiLoc = 1%1:numel(iLocSingle_perSet)
                         % ===== Bootstrap group averages (DATA + PRED) and plot median + 68% CI bands =====
                         locID = iLocSingle_perSet(iiLoc);
 
@@ -2279,10 +2298,10 @@ for iRun=1%[1,3,4]
                 end
                 ylabel(namesMetrics_prob_full{iMetric_prob})
 
-                if any(iLocSingle_perSet == 1), x_ticks = linspace(0, 180, 5);
+                if any(iLocSingle_perSet == 1), x_ticks = 0:2:6;
                 else, x_ticks = 0:2:6;
                 end
-                xlim([-1,6])
+                xlim([0,6])
                 xticks(x_ticks);
                 xticklabels(x_ticks);
                 xlabel('Binned decision variable')
@@ -2317,7 +2336,7 @@ for iRun=1%[1,3,4]
                         'Units','normalized', ...
                         'HorizontalAlignment','left', ...
                         'VerticalAlignment','middle', ...
-                        'FontSize', sz_font*scaleMode, ...
+                        'FontSize', sz_font*scaleMode/1.5, ...
                         'FontWeight','normal', ...
                         'Interpreter','tex', ...
                         'Color', c);
@@ -2325,7 +2344,7 @@ for iRun=1%[1,3,4]
 
                 % axis cosmetics
                 ax = gca;
-                ax.FontSize = sz_font/scaleMode;
+                ax.FontSize = sz_font/scaleMode/1.5;
                 ax.LineWidth = wd/scaleMode;
 
                 title(sprintf('n=%d [A%d] [L%s] [nIter=%d] %s | %s', ...
@@ -2557,7 +2576,7 @@ for iRun=1%[1,3,4]
                 wd = 2;
 
                 %------------------------------%
-                fxn_drawBars(dnLL_collapse, ref, colors, x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd);
+                fxn_drawBars(dnLL_collapse, ref, colors, x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd, flag_plotPurpose);
                 %------------------------------%
 
                 ylabel(sprintf('\\Delta nLL'), 'FontSize', sz_label);
@@ -2640,7 +2659,7 @@ for iRun=1%[1,3,4]
         ref = nan;
 
         % ------------------------------%
-        [pperm_allPairs , pairs] = fxn_drawBars(dNLL_allIter_allSubj, ref, repmat(colors_comb(iLocSingle, :), nBars, 1), namesModelB(iModelB_selected), y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, 1, markers_allSubj, sz_text, wd);
+        [pperm_allPairs , pairs] = fxn_drawBars(dNLL_allIter_allSubj, ref, repmat(colors_comb(iLocSingle, :), nBars, 1), namesModelB(iModelB_selected), y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, 1, markers_allSubj, sz_text, wd, flag_plotPurpose);
         % ------------------------------%
         figMain = gcf;
         % ylim(y_ticks([1, end]))
@@ -2915,7 +2934,7 @@ for iRun=1%[1,3,4]
                     str_title = sprintf('n=%d nIter=%d L%s [A%dB%d] %s', nSubj, nIterxJob, strjoin(string(iLocPair_all), ''), iModelA_plot, iModelB_NOMplot, namesModelBparams{iModelB_NOMplot}{iParam});
 
                     %------------------------------%
-                    fxn_drawBars(NOMp_allIter_allSubj, ref, colors_comb(iLocPair_all, :), x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd);
+                    fxn_drawBars(NOMp_allIter_allSubj, ref, colors_comb(iLocPair_all, :), x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd, flag_plotPurpose);
                     %------------------------------%
                     fig = gcf;
                     ylabel(sprintf('%s', namesModelBparams{iModelB_NOMplot}{iParam}))
@@ -2989,7 +3008,7 @@ for iRun=1%[1,3,4]
                 str_title = sprintf('n=%d, nIter=%d B%d %s vs. %s [L%s]', nSubj, nIterxJob, iModelB_NOMplot, nameVarX, nameVarY_figTitle, strjoin(string(iLocCorr_all), ''));
 
                 %----------------------------%
-                [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob);
+                [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob, flag_plotPurpose);
                 %----------------------------%
                 fig = gcf;
                 % Save CI for automatic CI range calcuation in CorrAsym
@@ -3091,7 +3110,7 @@ for iRun=1%[1,3,4]
     %             str_title = sprintf('n=%d, nIter=%d B%d %s (%s) vs. %s (%s)', nSubj, nIterxJob, iModelB_NOMplot, nameVarX, nameAsymX, nameVarY_figTitle, nameAsymY);
     %
     %             %----------------------------%
-    %             fxn_drawCorrAsym(asymX_allIter_allSubj*100, asymY_allIter_allSubj*100, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj)
+    %             fxn_drawCorrAsym(asymX_allIter_allSubj*100, asymY_allIter_allSubj*100, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, flag_plotPurpose)
     %             %----------------------------%
     %
     %             xlabel(sprintf('%s of %s (%%)', nameAsymX, nameVarX), 'fontsize', sz_label)
@@ -3185,7 +3204,7 @@ for iRun=1%[1,3,4]
                 str_title = sprintf('n=%d, nIter=%d B%d %s vs. %s [L%s]', nSubj, nIterxJob, iModelB_NOMplot, nameVarX, nameVarY_figTitle, strjoin(string(iLocCorr_all), ''));
 
                 %----------------------------%
-                [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob);
+                [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob, flag_plotPurpose);
                 %----------------------------%
                 fig = gcf;
                 % Save CI for automatic CI range calcuation in CorrAsym
@@ -3241,7 +3260,7 @@ for iRun=1%[1,3,4]
     sz_axOffset = 0.05; % extra breathing room
     flag_plotIdvdCI = 1;
     flag_plotUnikSymbol = 0;
-    iLocCorr_all = [6,5,3];
+    % iLocCorr_all = [6,5,3];
 
     for iModelB_NOMplot = 2; %iModelB_plot_all % Only plot NoMul!
         nNOMparams = length(namesModelBparams{iModelB_NOMplot});
@@ -3301,7 +3320,7 @@ for iRun=1%[1,3,4]
                 end
 
                 %----------------------------%
-                fxn_drawCorrAsym(asymX_allIter_allSubj*100, asymY_allIter_allSubj*100, colors_comb(iLocPair_all, :), flag_UseRUseRho, flag_CIrange, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj)
+                fxn_drawCorrAsym(asymX_allIter_allSubj*100, asymY_allIter_allSubj*100, colors_comb(iLocPair_all, :), flag_UseRUseRho, flag_CIrange, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, flag_plotPurpose)
                 %----------------------------%
                 fig = gcf;
 

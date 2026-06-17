@@ -1,6 +1,6 @@
 function [pperm_allPairs, pairs]=fxn_drawBars( ...
     data_allIter_allSubj, ref, colors, x_ticklabels, y_ticks, y_ticklabels, ...
-    flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIter, markers_allSubj, sz_text, wd)
+    flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIter, markers_allSubj, sz_text, wd, flag_plotPurpose)
 
 % fxn_drawBars
 % - Omnibus RM one-way ANOVA (per iter -> CI; perm p via within-subj label shuffle on median)
@@ -12,9 +12,19 @@ function [pperm_allPairs, pairs]=fxn_drawBars( ...
 % sz_text = 22; % behav, sep: 25; tunC: 22; nLL: 35;  NOM params: 25
 % wd = 3; % behav: 3; sep: 2; tunC: 3
 
-wd_bar = .5;
-sz_title = 10;
-sz_marker_idvd = 10;
+switch lower(flag_plotPurpose)
+    case 'paper'
+        wd_bar = .5;
+        sz_title = 5;
+        sz_marker_idvd = 10;
+    case 'slide'
+        % Placeholder slide style values. Tune as needed for presentation output.
+        wd_bar = .5;
+        sz_title = 5;
+        sz_marker_idvd = 10;
+    otherwise
+        error('Unknown flag_plotPurpose: %s. Use ''paper'' or ''slide''.', string(flag_plotPurpose));
+end
 
 CI95 = .95;
 CI68 = .68;          % 68% for plotting (visual readability)
@@ -304,14 +314,14 @@ end
 
 %% [Plot] ticks, limits
 xticks(1:nCond); xticklabels([])
-if ~isempty(x_ticklabels), xticklabels(x_ticklabels), end
-% if ~isnan(y_ticks)
-%     yticks(y_ticks);
-%     ylim(y_ticks([1, end]));
-% end
-% if ~isnan(y_ticklabels)
-%     yticklabels(y_ticklabels);
-% end
+if ~isempty(x_ticklabels) && strcmp(flag_plotPurpose, 'paper'), xticklabels(x_ticklabels), end
+if ~isnan(y_ticks)
+    yticks(y_ticks);
+    ylim(y_ticks([1, end]));
+end
+if ~isnan(y_ticklabels)
+    yticklabels(y_ticklabels);
+end
 
 if flag_plotIDVD
     buffer = .6;
@@ -331,7 +341,12 @@ yMin = yl(1);
 yMax = yl(2);
 
 % Base height at 80% of y-axis span
-yBar = yMin + 0.80 * (yMax - yMin);
+switch flag_plotPurpose
+    case 'paper'
+        yBar = yMin + 0.80 * (yMax - yMin);
+    case 'slide'
+        yBar = yMin + 0.90 * (yMax - yMin);
+end
 
 % If CI would exceed yMax, nudge downward
 yTop = yBar + diffPair_sem_pos;
@@ -339,7 +354,7 @@ if yTop > yMax
     yBar = yMax - diffPair_sem_pos - 0.02 * (yMax - yMin);
 end
 
-%% [Plot] "diff bar" (nCond==2 only) (must be placed after axis are set)
+%% [Plot] "diff bar" and text (nCond==2 only) (must be placed after axis are set)
 % Use bootstrap CI of the mean paired difference (not SEM).
 if nCond == 2 && flag_plotDiff
 
@@ -362,6 +377,8 @@ if nCond == 2 && flag_plotDiff
         yText = yMax - 0.01 * (yMax - yMin);
     end
 
+    switch flag_plotPurpose
+        case 'paper'
     % Prepare the string
     str_delta = sprintf('$\\Delta_{CI95}=[%s, %s]$\n$\\mathit{p}=%.3f$', ...
         fxn_formatSignedDecimal(diffPair_lb), fxn_formatSignedDecimal(diffPair_ub), pperm_allPairs);
@@ -374,10 +391,11 @@ if nCond == 2 && flag_plotDiff
         'Color', 'k', ...
         'Interpreter', 'latex', ...
         'Clipping', 'off');
+    end
 end
 
 %% Plot p value of ANOVA results If nCond>2
-if nCond > 2
+if nCond > 2 && strcmp(flag_plotPurpose, 'paper')
     % --- draw horizontal line across conditions ---
     plot([1, nCond], [yBar, yBar], 'k-', 'LineWidth', wd, 'HandleVisibility', 'off');
     capHeight = 0.015 * (yMax - yMin);
@@ -392,6 +410,7 @@ if nCond > 2
     yPad  = 0.1 * (yMax - yMin);                  % padding in axis units
     yText = yBar + yPad;          % above upper CI
 
+    
     % If that would exceed yMax, clamp a bit
     if yText > yMax
         yText = yMax - 0.01 * (yMax - yMin);
@@ -408,11 +427,11 @@ if nCond > 2
 end
 
 %% [Plot] Title
-title(sprintf('%s\n%s\n%s%s\n\n', str_title, str_ANOVA, str_diffPair, str_diffRef), 'fontsize', 5);
+title(sprintf('%s\n%s\n%s%s\n\n', str_title, str_ANOVA, str_diffPair, str_diffRef), 'fontsize', sz_title);
 
 
 end
-%% 
+%%
 function str = fxn_formatSignedDecimal(val)
 if isnan(val)
     str = 'NaN';

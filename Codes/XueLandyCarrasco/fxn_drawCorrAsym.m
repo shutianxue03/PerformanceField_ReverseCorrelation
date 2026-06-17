@@ -1,7 +1,7 @@
 function fxn_drawCorrAsym( ...
     X_allIter_allSubj, Y_allIter_allSubj, colors, flag_UseRUseRho, flag_CIrange, x_ticks, y_ticks, ...
     x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, ...
-    str_title, markers_allSubj)
+    str_title, markers_allSubj, flag_plotPurpose)
 
 % =========================================================================
 % fxn_drawCorrAsym (REVISED)
@@ -18,10 +18,25 @@ function fxn_drawCorrAsym( ...
 % =========================================================================
 
 %% ---- Figure settings ----
-wd_ref  = 5;   % reference line width
-wd_border = 4;   % axis/marker line width
-fsz_ticks = 45;
-sz_marker = 35;
+switch lower(flag_plotPurpose)
+    case 'paper'
+        wd_ref  = 5;   % reference line width
+        wd_border = 4; % axis/marker line width
+        fsz_ticks = 45;
+        sz_marker = 35;
+        sz_text_print = 50;
+        fig_pos = [0 200 1e3 1e3];
+    case 'slide'
+        % Placeholder slide style values. Tune as needed for presentation output.
+        wd_ref  = 5;
+        wd_border = 4;
+        fsz_ticks = 45;
+        sz_marker = 35;
+        sz_text_print = 50;
+        fig_pos = [0 200 1e3 1e3];
+    otherwise
+        error('Unknown flag_plotPurpose: %s. Use ''paper'' or ''slide''.', string(flag_plotPurpose));
+end
 
 CI68 = 0.68;     % per-point CI bars in plot (from iterations)
 nPerm = 1e4;
@@ -99,7 +114,7 @@ tail_all = {'left','both','right'};
 tail_lab = {'L','2','R'};
 nTails = numel(tail_all);
 
-% 
+%
 p_perm_pearson_all  = nan(1,nTails);
 p_perm_spearman_all = nan(1,nTails);
 p_perm_kendall_all  = nan(1,nTails);
@@ -230,7 +245,7 @@ edgeColor_allSubj(right,:) = (1-sR).*green_light + sR.*green;
 
 
 %% ---- 5) Plot individual data (medians + optional per-point CI bars) ----
-figure('Position', [0 200 1e3 1e3]); hold on; box on
+figure('Position', fig_pos); hold on; box on
 
 for iSubj = 1:nSubj
 
@@ -277,9 +292,9 @@ yline(0, '--', 'Color', ones(1,3)/2, 'LineWidth', wd_ref);
 
 %% ---- 9) Axes ticks/limits ----
 if ~isnan(x_ticks), xticks(x_ticks); xlim(x_ticks([1 end])); end
-if ~isnan(y_ticks), yticks(y_ticks); ylim(y_ticks([1 end])); end
 if ~isnan(x_ticklabels), xticklabels(x_ticklabels); end
-if ~isnan(y_ticklabels), yticklabels(y_ticklabels); end
+% if ~isnan(y_ticks), yticks(y_ticks); ylim(y_ticks([1 end])); end
+% if ~isnan(y_ticklabels), yticklabels(y_ticklabels); end
 
 axis square
 xabs = gca;
@@ -326,7 +341,7 @@ text(xabs, 0.5, 0.02, str_print, ...
     'Units', 'normalized', ...
     'HorizontalAlignment', 'center', ...
     'VerticalAlignment', 'bottom', ...
-    'FontSize', 50, ...
+    'FontSize', sz_text_print, ...
     'BackgroundColor', 'w', ...
     'EdgeColor', 'none', ...
     'Color', 'k', ...
