@@ -763,9 +763,9 @@ for iRun=4%[1,3,4]
                 xaxis = axis_tuning{iFeature};
 
                 switch flag_plotPurpose
-                    case 'paper'
-                fig = figure('Position', [0 0 8e2 6e2]); % default 8e2
                     case 'slide'
+                fig = figure('Position', [0 0 8e2 6e2]); % default 8e2
+                    case 'paper'
                         fig = figure('Position', [0 0 1.1e3 6e2]); % default 8e2
                 end
                 hold on
@@ -781,7 +781,7 @@ for iRun=4%[1,3,4]
                         marg_allCond = margORI_allCond;
                         margPred_allCond = margPred_ORI_allCond;
                         margR2_allCond = margR2_ORI_allCond;
-                        if find(iLocPair_all==1), yticks_ = [-1, linspace(0, 5, 4)]*1e-3; % fov vs. peri, higher ub
+                        if find(iLocPair_all==1), yticks_ = linspace(-2, 8, 5)*1e-3; % fov vs. peri, higher ub
                         else, yticks_ = linspace(-1, 5, 5)*1e-3; %yticks_ = [-.03, linspace(0, .12, 4)];
                         end
                     else % SF tuning fxn
@@ -904,7 +904,7 @@ for iRun=4%[1,3,4]
 
         for iFeature = 2%1:nFeatures
 
-            fprintf('\n   - L%s %s', strjoin(string(iLocPair_all), ''), namesFeature{iFeature})
+            fprintf('\n   - L%s %s...', strjoin(string(iLocPair_all), ''), namesFeature{iFeature})
 
             xaxis = axis_tuning{iFeature};
 
@@ -1009,7 +1009,7 @@ for iRun=4%[1,3,4]
                         paramStr = arrayfun(@formatMixedNumber, margParam_med_perS, 'UniformOutput', false);
                         str_TunParams = sprintf('%s\n[L%d] [R2=%.0f%%] %s', str_TunParams, iLoc, margR2_med_perS*100, strjoin(paramStr, ', '));
                         if iFeature == 2
-                            fprintf('\npeakChk: %.0f%%<=%.3f oct, medErr=%.3f, bad(g<=0|w<=0)=%d', peakPassRate_pct, peakSF_tol_oct, peakErr_med_oct, nInvalidShape);
+                            % fprintf('\npeakChk: %.0f%%<=%.3f oct, medErr=%.3f, bad(g<=0|w<=0)=%d', peakPassRate_pct, peakSF_tol_oct, peakErr_med_oct, nInvalidShape);
                         end
 
                         % Draw peak SF
@@ -1085,8 +1085,6 @@ for iRun=4%[1,3,4]
 
                             end
                         end
-
-
                     end % iLoc
 
                     % y ticks
@@ -1189,11 +1187,7 @@ for iRun=4%[1,3,4]
 
                         case 10 % ORI tuningC | von Mises
                             if flag_plotIDVD
-                                if find(iLocPair_all==1)
-                                    y_ticks_all{1} = linspace(0, 16, 5)*1e-3; % ORI peak amp
-                                else
-                                    y_ticks_all{1} = linspace(0, 16, 5)*1e-3; % ORI peak amp
-                                end
+                                y_ticks_all{1} = linspace(0, 16, 5)*1e-3; % ORI peak amp
                                 y_ticks_all{2} = linspace(0,6, 5); % ORI band
                                 y_ticks_all{3} = linspace(-.05, .03, 5); % ORI baseline
                             else
@@ -1380,7 +1374,7 @@ for iRun=4%[1,3,4]
                 end
 
                 % Save the figure
-                    saveAndCloseFigure(fig, sprintf('%s/n%d_L%d%d_A%d_%s%d.png', nameFolder_Fig_tunC, nSubj, iLocPair_all, iModelA_plot, namesFeature{iFeature}, iTunC))
+                saveAndCloseFigure(fig, sprintf('%s/n%d_L%d%d_A%d_%s%d.png', nameFolder_Fig_tunC, nSubj, iLocPair_all, iModelA_plot, namesFeature{iFeature}, iTunC))
 
             end % end of iTunC
         end % end of iFeature
@@ -1821,7 +1815,7 @@ for iRun=4%[1,3,4]
         iLocPair_all = iLocGroups_all{iGroup};
 
         switch iLocPair_all(1)
-            case 1, nameAsymX = 'Ecc. effect'; nameAsymY = 'Ecc. effect';
+            case 1, nameAsymX = 'EE'; nameAsymY = 'EE';
             case 6, nameAsymX = 'HVA'; nameAsymY = 'HVA';
             case 5, nameAsymX = 'VMA'; nameAsymY = 'VMA';
         end
@@ -1833,6 +1827,7 @@ for iRun=4%[1,3,4]
             case 6, x_ticks = linspace(-5, 15, 5); % HVA
             case 5, x_ticks = linspace(0, 12, 5); % VMA (extent is smaller)
         end
+        x_ticks = linspace(-3, 17, 5); 
         asymX_allIter_allSubj = repmat(asymX_allSubj, 1, nIterxJob)';
 
         for iFeature = 1:nFeatures
@@ -1882,8 +1877,14 @@ for iRun=4%[1,3,4]
                             case 10, y_ticks_allTunC_lb = -[80, 30, 100]; y_ticks_allTunC_ub = [100, 30, 100];
                         end
                 end
-                y_ticks = linspace(y_ticks_allTunC_lb(iTunC), y_ticks_allTunC_ub(iTunC), 5);
 
+                % Apply the same yticks to all panels
+                switch iFamily
+                    case 2, y_ticks_allTunC_lb = -[100, 100, 100, 100]; y_ticks_allTunC_ub = [100, 100, 100, 100];
+                    case 10, y_ticks_allTunC_lb = -[100, 100, 100]; y_ticks_allTunC_ub = [100, 100, 100];
+                end
+
+                y_ticks = linspace(y_ticks_allTunC_lb(iTunC), y_ticks_allTunC_ub(iTunC), 5);
                 x_ticklabels = nan;
                 y_ticklabels = nan;
 
@@ -2057,8 +2058,8 @@ for iRun=4%[1,3,4]
 
     x_base = 0.60; % move a bit further left to make space for name column
     x_width = 0.4; % total width of the table block
-    y_base = 0.05;
-    y_height = 0.35;
+    y_base = 0.1; % bottom of the R2 table; increase to move up; decrease to move down
+    y_height = 0.3; % height of the R2 table; increase to make table taller, decrease to make it shorter
 
     lineStyle_all = {'-', '--', ':', '-.'};
     % Build plot modes from iModelB_plot_all:
@@ -2085,7 +2086,7 @@ for iRun=4%[1,3,4]
     end
 
     szScaling = 10; %if any(iLocComb==[6,7]), scalingF=100; elseif iLocComb==8, scalingF=200; else, scalingF=50; end
-    szBase = 5;
+    szBase = 8;
     sz_font = 22; % full model: xx; reduced models: 15
     wd = 2;
 
@@ -2127,7 +2128,7 @@ for iRun=4%[1,3,4]
                     NRMSE_w_lb = R2_w_ave;
                     NRMSE_w_ub = R2_w_ave;
 
-                    for iiLoc = 1%1:numel(iLocSingle_perSet)
+                    for iiLoc = 1:numel(iLocSingle_perSet)
                         % ===== Bootstrap group averages (DATA + PRED) and plot median + 68% CI bands =====
                         locID = iLocSingle_perSet(iiLoc);
 
@@ -2274,33 +2275,30 @@ for iRun=4%[1,3,4]
 
                 end % rModel
 
+                % --------------------------
                 % Add size legend (by plotting symbols with integer sizes)
-                nEx = [10 50 100];
-                ms = (nEx./szScaling + szBase) ./ scaleMode;
-                ax = gca;
-                x0 = ax.XLim(1) - 0.05*range(ax.XLim); % ensure scatters are OUTSIDE the visible part of the canvas
-                y0 = ax.YLim(2) + 0.08*range(ax.YLim);
-                dy = 0.06*range(ax.YLim);
-
-                hLeg = gobjects(numel(nEx),1);
-                for k = 1:numel(nEx)
-                    hLeg(k) = plot(x0, y0-(k-1)*dy, 's', 'MarkerEdgeColor','k','MarkerFaceColor','w', 'MarkerSize', ms(k), 'LineWidth', wd);
+                % --------------------------
+                legend_nTrials_all = [10 25 50];
+                ms = (legend_nTrials_all./szScaling + szBase) ./ scaleMode;
+                hLegend = gobjects(numel(legend_nTrials_all),1);
+                for iSz = 1:numel(legend_nTrials_all)
+                    hLegend(iSz) = plot(nan, nan, 's', 'MarkerEdgeColor','k','MarkerFaceColor','w', 'MarkerSize', ms(iSz), 'LineWidth', wd, 'LineStyle', 'none');
                 end
-                lgd = legend(hLeg, compose('%d trials', nEx), 'Location','northwest', 'Box','off');
+                lgd = legend(hLegend, compose('%d trials', legend_nTrials_all), 'Location','northwest', 'Box','off');
                 lgd.Title.String = '# trials';
 
+                % --------------------------
                 % Draw reference line and y formatting
+                % --------------------------
                 yline(.5, '--', 'LineWidth', 2/scaleMode, 'Color', ones(1,3)/2, 'HandleVisibility', 'off');
-
+                
                 switch iMetric_prob
                     case 1, ylim([0, 1]); yticks(0:.2:1)
                     case 2, ylim([.45, 1]); yticks(.5:.1:1)
                 end
                 ylabel(namesMetrics_prob_full{iMetric_prob})
 
-                if any(iLocSingle_perSet == 1), x_ticks = 0:2:6;
-                else, x_ticks = 0:2:6;
-                end
+                x_ticks = 0:2:6;
                 xlim([0,6])
                 xticks(x_ticks);
                 xticklabels(x_ticks);
@@ -2309,43 +2307,41 @@ for iRun=4%[1,3,4]
                 % --------------------------
                 % Plot weighted R2 summary
                 % --------------------------
-                ax = gca;
+                if flag_plotPred
+                    ax = gca;
 
-                % nRows = nModelB_plot;
-                nRows = numel(iLocSingle_perSet);
+                    % nRows = nModelB_plot;
+                    nRows = numel(iLocSingle_perSet);
 
-                % --- layout (more horizontal spacing) ---
-                % Use a fixed-width "table box" in normalized coordinates.
-                % x_width controls spacing between columns; increase it if you want more gap.
+                    % --- layout (more horizontal spacing) ---
+                    % centers of each column/row
+                    x_cells = 0.55/scaleMode;
+                    y_cells = y_base + ((nRows+1:-1:1) - 0.5*scaleMode) * (y_height / (nRows+1)); % 1 x nRows (top to bottom)
 
-                % centers of each column/row
-                x_cells = 0.55/scaleMode;
-                y_cells = y_base + ((nRows+1:-1:1) - 0.5*scaleMode) * (y_height / (nRows+1)); % 1 x nRows (top to bottom)
+                    % --- draw numbers ---
+                    for iRow = 0:nRows
+                        if iRow==0
+                            str_cell = sprintf('Weighted R^2:');
+                            c='k';
+                        else
+                            str_cell = sprintf('%.0f%% [%.0f%%, %.0f%%]', 100*R2_w_ave(iRow), 100*R2_w_lb(iRow), 100*R2_w_ub(iRow));
+                            c = colors_comb(iLocSingle_perSet(iRow), :);
+                        end
 
-                % --- draw numbers ---
-                for iRow = 0:nRows
-                    if iRow==0
-                        str_cell = sprintf('Weighted R^2:');
-                        c='k';
-                    else
-                        str_cell = sprintf('%.0f%% [%.0f%%, %.0f%%]', 100*R2_w_ave(iRow), 100*R2_w_lb(iRow), 100*R2_w_ub(iRow));
-                        c = colors_comb(iLocSingle_perSet(iRow), :);
-                    end
-
-                    text(x_cells, y_cells(iRow+1), str_cell, ...
-                        'Units','normalized', ...
-                        'HorizontalAlignment','left', ...
-                        'VerticalAlignment','middle', ...
-                        'FontSize', sz_font*scaleMode/1.5, ...
-                        'FontWeight','normal', ...
-                        'Interpreter','tex', ...
-                        'Color', c);
-                end % iRow
-
+                        text(x_cells, y_cells(iRow+1), str_cell, ...
+                            'Units','normalized', ...
+                            'HorizontalAlignment','left', ...
+                            'VerticalAlignment','middle', ...
+                            'FontSize', sz_font*scaleMode/1.5, ...
+                            'FontWeight','normal', ...
+                            'Interpreter','tex', ...
+                            'Color', c);
+                    end % iRow
+                end
                 % axis cosmetics
                 ax = gca;
-                ax.FontSize = sz_font/scaleMode/1.5;
-                ax.LineWidth = wd/scaleMode;
+                ax.FontSize = sz_font/scaleMode;
+                ax.LineWidth = wd/scaleMode/1.5;
 
                 title(sprintf('n=%d [A%d] [L%s] [nIter=%d] %s | %s', ...
                     nSubj, iModelA_plot, strjoin(string(iLocSingle_perSet), ''), nIterxJob, ...
@@ -2477,7 +2473,10 @@ for iRun=4%[1,3,4]
     % [NOM] Plot comparison when collapsing modelB or location
     iModelB_allSets = {[1:7]};
     DimCollapse_all = {'ModelB', 'Loc'};
-    sz_label = 20;
+    switch flag_plotPurpose
+        case 'paper', sz_label = 20;
+        case 'slide', sz_label = 30;
+    end
 
     for iSetModelB = 1:numel(iModelB_allSets)
         iModelB_all = iModelB_allSets{iSetModelB};
@@ -2609,25 +2608,30 @@ for iRun=4%[1,3,4]
     iModelA_selected = 1;
 
     % ModelB ordering + plotting flags
-    iModelB_selected = 1:7;
-    iModelB_selected = [2,3,5,6];
+    iModelB_selected = 1:7; y_ticks = linspace(0, 20, 5);
+    iModelB_selected = 1:4; y_ticks = linspace(0, 6, 5);
     pairs_bracket = [1 2; 1 3; 1 4]; % requested comparisons
     pairs_bracket = [1 2]; % requested comparisons
-    pairs_bracket = nan; % no comparison needed
+    % pairs_bracket = nan; % no comparison needed
     flag_plotIDVD = 0;
     flag_plotDiff = 0;
 
-    y_ticks = linspace(0, 20, 5);
-    sz_label = 20;
+    switch flag_plotPurpose
+        case 'paper', sz_label = 20;
+        case 'slide', sz_label = 30;
+    end
     sz_text = sz_label;
-    wd = 4;
+    wd = 3;
     y_ticklabels = nan;
 
     % Loop over locations
     for iLocSingle = 1:nLocComb8
 
         nBars = numel(iModelB_selected);
-        sz_fig = [nBars * 180, 200+nchoosek(nBars, 2)*40];
+        switch flag_plotPurpose
+            case 'paper', sz_fig = [nBars * 180, 200+nchoosek(nBars, 2)*40];
+            case 'slide', sz_fig = [nBars * 180, 300+nchoosek(nBars, 2)*40];
+        end
 
         % Extract raw nLL: [ModelB x Subj x Iter]
         nLL_allIter = squeeze(nLL_allCond(iModelA_selected, iModelB_selected, iLocSingle, :, :, :));
@@ -2730,9 +2734,7 @@ for iRun=4%[1,3,4]
         % Helper: find index in "pairs" for a given (iA,iB)
         getPairIdx = @(iA,iB) find(pairs_all(:,1)==min(iA,iB) & pairs_all(:,2)==max(iA,iB), 1, 'first');
 
-
         % [Plot] planned comparison brackets + CI of mean difference atmidpoint
-
         if ~isnan(pairs_bracket)
             for iPair = 1:size(pairs_bracket,1)
 
@@ -2785,7 +2787,7 @@ for iRun=4%[1,3,4]
 
         % xTL
         xticks(1:size(ave_allBoot, 2))
-        xticklabels(namesModelB)
+        xticklabels(namesModelB(iModelB_selected))
         xtickangle(45)
 
         % set axis font size
@@ -3270,7 +3272,7 @@ for iRun=4%[1,3,4]
             fprintf(' - B%d L%s\n', iModelB_NOMplot, strjoin(string(iLocPair_all), ''))
 
             switch iLocPair_all(1)
-                case 1, nameAsymX = 'Ecc. effect'; nameAsymY = 'Ecc. effect';
+                case 1, nameAsymX = 'EE'; nameAsymY = 'EE';
                 case 6, nameAsymX = 'HVA'; nameAsymY = 'HVA';
                 case 5, nameAsymX = 'VMA'; nameAsymY = 'VMA';
             end
@@ -3281,6 +3283,7 @@ for iRun=4%[1,3,4]
                 case 6, x_ticks = linspace(-5, 15, 5); % HVA
                 case 5, x_ticks = linspace(0, 12, 5); % VMA (extent is smaller)
             end
+            x_ticks = linspace(-3, 17, 5);
             asymX_allIter_allSubj = repmat(asymX_allSubj, 1, nIterxJob)';
 
             for iNOMparam = 1:nNOMparams
@@ -3290,7 +3293,7 @@ for iRun=4%[1,3,4]
 
                 switch iModelB_NOMplot
                     case 1, y_ticks_lb = -[90, 50, 50, 40]; y_ticks_ub = [90, 50, 50, 40];
-                    case 2, y_ticks_lb = -[40, 40, 40]; y_ticks_ub = [40, 40, 40]; %*
+                    case 2, y_ticks_lb = -[50, 50, 40]; y_ticks_ub = [50, 50, 40]; %* NoMul
                     case 3, y_ticks_lb = -[90, 50, 40]; y_ticks_ub = [90, 50, 40];
                     case 4, y_ticks_lb = -[90, 50, 40]; y_ticks_ub = [90, 50, 40];
                     case 5, y_ticks_lb = -[90, 40]; y_ticks_ub = [90, 40];

@@ -5,7 +5,7 @@ SX_RC1_setting
 %--------------
 
 % Define folder for saving figures
-nameFolder_Fig_Schematic = sprintf('%s/Schematic', nameFolder_Figures);
+nameFolder_Fig_Schematic = sprintf('%s/Schematics', nameFolder_Figures);
 if isempty(dir(nameFolder_Fig_Schematic)), mkdir(nameFolder_Fig_Schematic), end
 
 %% 1D probability distribution for pYES
