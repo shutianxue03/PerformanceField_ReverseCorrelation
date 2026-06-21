@@ -429,8 +429,9 @@ end
 %% [Plot] Title
 title(sprintf('%s\n%s\n%s%s\n\n', str_title, str_ANOVA, str_diffPair, str_diffRef), 'fontsize', sz_title);
 
-
 end
+
+
 %%
 function str = fxn_formatSignedDecimal(val)
 if isnan(val)

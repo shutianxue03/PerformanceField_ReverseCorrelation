@@ -791,6 +791,9 @@ for iRun=4%[1,3,4]
                         if find(iLocPair_all==1), yticks_ = [-.5, linspace(0, 2, 4)]*1e-3;
                         else, yticks_ = linspace(-.5, 2, 5)*1e-3; %[-.02, 0, .02, .04, .06];
                         end
+                        if find(iLocPair_all==1), yticks_ = linspace(-2, 8, 5)*1e-3; % fov vs. peri, higher ub
+                        else, yticks_ = linspace(-1, 5, 5)*1e-3; %yticks_ = [-.03, linspace(0, .12, 4)];
+                        end
                     end
 
                     ymax = max(yticks_);
@@ -1119,6 +1122,7 @@ for iRun=4%[1,3,4]
 
     % Load data
     load(nameFolder_Output_SaveCompile, 'margParams_*_allCond')
+    load(nameFolder_Output_SaveCompile, 'margTunC_*_allCond')
 
     % Define folder for saving figures
     nameFolder_Fig_tunC = sprintf('%s/TuningCs', nameFolder_Fig_NOM_Trialwise);
@@ -1156,7 +1160,8 @@ for iRun=4%[1,3,4]
             nfilters = length(xaxis);
             iFamily = iFamily_perF(iFeature);
             str_family = sprintf('F%d %s', iFamily, namesFamily_all{iFamily});
-            namesTunC = namesParams_all{iFamily};
+            % namesTunC = namesParams_all{iFamily};
+            namesTunC = namesTunC_unit_perF{iFamily,2};
             nTunC_full = length(namesTunC);
 
             y_ticks_all = [];
@@ -1165,129 +1170,133 @@ for iRun=4%[1,3,4]
             switch flag_plotDist
                 case 0
                     switch iFamily_perF(iFeature)
-                        case 1 % ORI tuniningC | Scaled Gaussian
-                            if flag_plotIDVD
-                                if find(iLocPair_all==1)
-                                    y_ticks_all{1} = linspace(0, .4, 5); % ORI peak amp
-                                else
-                                    y_ticks_all{1} = linspace(0, .2, 5); % ORI peak amp
-                                end
-                                y_ticks_all{2} = linspace(0, 60, 5); % ORI band
-                                y_ticks_all{3} = linspace(-.05, .03, 5); % ORI baseline
-                            else
-                                if find(iLocPair_all==1)
-                                    y_ticks_all{1} = linspace(0, .24, 5); % ORI peak amp
-                                else
-                                    y_ticks_all{1} = linspace(0, .12, 5); % ORI peak amp
-                                end
-
-                                y_ticks_all{2} = linspace(0, 60, 5); % ORI band
-                                y_ticks_all{3} = linspace(-.08, .08, 5); % ORI baseline
-                            end
+                        % case 1 % ORI tuniningC | Scaled Gaussian
+                        %     if flag_plotIDVD
+                        %         if find(iLocPair_all==1)
+                        %             y_ticks_all{1} = linspace(0, .4, 5); % ORI peak amp
+                        %         else
+                        %             y_ticks_all{1} = linspace(0, .2, 5); % ORI peak amp
+                        %         end
+                        %         y_ticks_all{2} = linspace(0, 60, 5); % ORI band
+                        %         y_ticks_all{3} = linspace(-.05, .03, 5); % ORI baseline
+                        %     else
+                        %         % if find(iLocPair_all==1)
+                        %         %     y_ticks_all{1} = linspace(0, .24, 5); % ORI peak amp
+                        %         % else
+                        %         %     y_ticks_all{1} = linspace(0, .12, 5); % ORI peak amp
+                        %         % end
+                        %         % 
+                        %         % y_ticks_all{2} = linspace(0, 60, 5); % ORI band
+                        %         % y_ticks_all{3} = linspace(-.08, .08, 5); % ORI baseline
+                        %     end
 
                         case 10 % ORI tuningC | von Mises
                             if flag_plotIDVD
-                                y_ticks_all{1} = linspace(0, 16, 5)*1e-3; % ORI peak amp
-                                y_ticks_all{2} = linspace(0,6, 5); % ORI band
+                                % if find(iLocPair_all==1)
+                                y_ticks_all{1} = linspace(0, 12, 5)*1e-3; % ORI peak amp; tunParams: [0,16]; tunC: [0, 8]
+                                % else
+                                    % y_ticks_all{1} = linspace(0, 8, 5)*1e-3; % ORI peak amp; tunParams: [0,16]; tunC: [0, 8]
+                                % end
+                                y_ticks_all{2} = linspace(10, 30, 5); % ORI band; tunParams: [0,6]; tunC: [10, 50]
                                 y_ticks_all{3} = linspace(-.05, .03, 5); % ORI baseline
                             else
-                                if find(iLocPair_all==1)
-                                    y_ticks_all{1} = linspace(0, .24, 5); % ORI peak amp
-                                else
-                                    y_ticks_all{1} = linspace(0, .12, 5); % ORI peak amp
-                                end
-
-                                y_ticks_all{2} = linspace(0, 6, 5); % ORI band
-                                y_ticks_all{3} = linspace(-.08, .08, 5); % ORI baseline
+                                % if find(iLocPair_all==1)
+                                %     y_ticks_all{1} = linspace(0, .24, 5); % ORI peak amp
+                                % else
+                                %     y_ticks_all{1} = linspace(0, .12, 5); % ORI peak amp
+                                % end
+                                % 
+                                % y_ticks_all{2} = linspace(10, 60, 5); % ORI band; tunParams: [0,6]; tunC: [10, 50]
+                                % y_ticks_all{3} = linspace(-.08, .08, 5); % ORI baseline
                             end
 
                         case 2 % SF tuniningC | log parabola
                             if flag_plotIDVD
 
                                 y_ticks_all{1} = linspace(-2, 2, 5); % peak SF
-                                if find(iLocPair_all==1)
-                                    y_ticks_all{2} = linspace(.01, .2, 5); % SF peak amp
-                                else
-                                    y_ticks_all{2} = linspace(.0, 4, 5)*1e-3; % SF peak amp
-                                end
+                                % if find(iLocPair_all==1)
+                                    y_ticks_all{2} = linspace(0, .2, 5); % SF peak amp
+                                % else
+                                %     y_ticks_all{2} = linspace(.0, 4, 5)*1e-3; % SF peak amp
+                                % end
                                 y_ticks_all{3} = linspace(1, 3, 5); % SF bandwidth
                                 y_ticks_all{4} = linspace(-.1, .1, 5); % SF baseline
                             else
-                                y_ticks_all{1} = linspace(0, 2, 5); % peak SF
-
-                                if find(iLocPair_all==1)
-                                    y_ticks_all{2} = linspace(.02, .12, 5); % SF peak amp
-                                else
-                                    y_ticks_all{2} = linspace(.02, .06, 5); % SF peak amp
-                                end
-                                y_ticks_all{3} = linspace(.3, 2, 5); % SF bandwidth
-                                y_ticks_all{4} = linspace(-.08, 0, 5); % SF baseline
+                                % y_ticks_all{1} = linspace(0, 2, 5); % peak SF
+                                % 
+                                % if find(iLocPair_all==1)
+                                %     y_ticks_all{2} = linspace(.02, .12, 5); % SF peak amp
+                                % else
+                                %     y_ticks_all{2} = linspace(.02, .06, 5); % SF peak amp
+                                % end
+                                % y_ticks_all{3} = linspace(.3, 2, 5); % SF bandwidth
+                                % y_ticks_all{4} = linspace(-.08, 0, 5); % SF baseline
                             end
 
                         case 14 % SF tuningC | asymmetric Gaussian
-                            if flag_plotIDVD
-
-                                y_ticks_all{1} = linspace(0, 2, 5); % peak SF
-                                if find(iLocPair_all==1)
-                                    y_ticks_all{2} = linspace(.01, .2, 5); % SF peak amp
-                                else
-                                    y_ticks_all{2} = linspace(.0, .12, 5); % SF peak amp
-                                end
-                                y_ticks_all{3} = linspace(.6, 5, 5); % SF width (left+right), octaves
-                                y_ticks_all{4} = linspace(-.1, .1, 5); % SF baseline
-                            else
-                                y_ticks_all{1} = linspace(0, 2, 5); % peak SF
-
-                                if find(iLocPair_all==1)
-                                    y_ticks_all{2} = linspace(.02, .12, 5); % SF peak amp
-                                else
-                                    y_ticks_all{2} = linspace(.02, .06, 5); % SF peak amp
-                                end
-                                y_ticks_all{3} = linspace(.6, 4, 5); % SF width (left+right), octaves
-                                y_ticks_all{4} = linspace(-.08, 0, 5); % SF baseline
-                            end
+                            % if flag_plotIDVD
+                            % 
+                            %     y_ticks_all{1} = linspace(0, 2, 5); % peak SF
+                            %     if find(iLocPair_all==1)
+                            %         y_ticks_all{2} = linspace(.01, .2, 5); % SF peak amp
+                            %     else
+                            %         y_ticks_all{2} = linspace(.0, .12, 5); % SF peak amp
+                            %     end
+                            %     y_ticks_all{3} = linspace(.6, 5, 5); % SF width (left+right), octaves
+                            %     y_ticks_all{4} = linspace(-.1, .1, 5); % SF baseline
+                            % else
+                            %     % y_ticks_all{1} = linspace(0, 2, 5); % peak SF
+                            %     % 
+                            %     % if find(iLocPair_all==1)
+                            %     %     y_ticks_all{2} = linspace(.02, .12, 5); % SF peak amp
+                            %     % else
+                            %     %     y_ticks_all{2} = linspace(.02, .06, 5); % SF peak amp
+                            %     % end
+                            %     % y_ticks_all{3} = linspace(.6, 4, 5); % SF width (left+right), octaves
+                            %     % y_ticks_all{4} = linspace(-.08, 0, 5); % SF baseline
+                            % end
                     end
                 case 1 % plot distribution of group averages, not bars
-                    switch iFamily_perF(iFeature)
-                        case 1 % ORI tuniningC | Scaled Gaussian
-                            if find(iLocPair_all==1)
-                                y_ticks_all{1} = linspace(0, .3, 5); % ORI peak amp (fovea)
-                            else
-                                y_ticks_all{1} = linspace(.06, .14, 5); % ORI peak amp
-                            end
-                            y_ticks_all{2} = linspace(10, 50, 5); % ORI band
-                            y_ticks_all{3} = linspace(-.03, .01, 5); % ORI baseline
+                    % switch iFamily_perF(iFeature)
+                    %     case 1 % ORI tuniningC | Scaled Gaussian
+                    %         if find(iLocPair_all==1)
+                    %             y_ticks_all{1} = linspace(0, .3, 5); % ORI peak amp (fovea)
+                    %         else
+                    %             y_ticks_all{1} = linspace(.06, .14, 5); % ORI peak amp
+                    %         end
+                    %         y_ticks_all{2} = linspace(10, 50, 5); % ORI band
+                    %         y_ticks_all{3} = linspace(-.03, .01, 5); % ORI baseline
+                    % 
+                    %     case 10 % ORI tuningC | von Mises
+                    %         if find(iLocPair_all==1)
+                    %             y_ticks_all{1} = linspace(0, .3, 5); % ORI peak amp (fovea)
+                    %         else
+                    %             y_ticks_all{1} = linspace(.06, .14, 5); % ORI peak amp
+                    %         end
+                    %         y_ticks_all{2} = linspace(10, 50, 5); % ORI band
+                    %         y_ticks_all{3} = linspace(-.03, .01, 5); % ORI baseline
+                    % 
+                    %     case 2 % SF tuniningC | log parabola
+                    %         y_ticks_all{1} = linspace(log2(1.4), log2(2.8), 5); % peak SF
+                    %         if find(iLocPair_all==1)
+                    %             y_ticks_all{2} = linspace(.01, .13, 5); % SF peak amp (fovea)
+                    %         else
+                    %             y_ticks_all{2} = linspace(.03, .07, 5); % SF peak amp
+                    %         end
+                    %         y_ticks_all{3} = linspace(.5, .9, 5); % SF bandwidth
+                    %         y_ticks_all{4} = linspace(-.04, .04, 5); % SF baseline
+                    % 
+                    %     case 14 % SF tuningC | asymmetric Gaussian
+                    %         y_ticks_all{1} = linspace(log2(1.4), log2(2.8), 5); % peak SF
+                    %         if find(iLocPair_all==1)
+                    %             y_ticks_all{2} = linspace(.01, .13, 5); % SF peak amp (fovea)
+                    %         else
+                    %             y_ticks_all{2} = linspace(.03, .07, 5); % SF peak amp
+                    %         end
+                    %         y_ticks_all{3} = linspace(1, 1.8, 5); % SF width (left+right), octaves
+                    %         y_ticks_all{4} = linspace(-.04, .04, 5); % SF baseline
 
-                        case 10 % ORI tuningC | von Mises
-                            if find(iLocPair_all==1)
-                                y_ticks_all{1} = linspace(0, .3, 5); % ORI peak amp (fovea)
-                            else
-                                y_ticks_all{1} = linspace(.06, .14, 5); % ORI peak amp
-                            end
-                            y_ticks_all{2} = linspace(10, 50, 5); % ORI band
-                            y_ticks_all{3} = linspace(-.03, .01, 5); % ORI baseline
-
-                        case 2 % SF tuniningC | log parabola
-                            y_ticks_all{1} = linspace(log2(1.4), log2(2.8), 5); % peak SF
-                            if find(iLocPair_all==1)
-                                y_ticks_all{2} = linspace(.01, .13, 5); % SF peak amp (fovea)
-                            else
-                                y_ticks_all{2} = linspace(.03, .07, 5); % SF peak amp
-                            end
-                            y_ticks_all{3} = linspace(.5, .9, 5); % SF bandwidth
-                            y_ticks_all{4} = linspace(-.04, .04, 5); % SF baseline
-
-                        case 14 % SF tuningC | asymmetric Gaussian
-                            y_ticks_all{1} = linspace(log2(1.4), log2(2.8), 5); % peak SF
-                            if find(iLocPair_all==1)
-                                y_ticks_all{2} = linspace(.01, .13, 5); % SF peak amp (fovea)
-                            else
-                                y_ticks_all{2} = linspace(.03, .07, 5); % SF peak amp
-                            end
-                            y_ticks_all{3} = linspace(1, 1.8, 5); % SF width (left+right), octaves
-                            y_ticks_all{4} = linspace(-.04, .04, 5); % SF baseline
-
-                    end
+                    % end % switch
             end
 
             % Loop through each tuning characteristic
@@ -1296,13 +1305,22 @@ for iRun=4%[1,3,4]
                 % Compute median for each observer
                 % margParams_ORI_allCond: nModelA x nModelB x nLoc_pair x nSubj x nIter x nDataset x nParam
                 % tunC_allSubj_allIter: nLoc_pair x nSubj x nIter
+                % switch iFeature
+                %     case 1
+                %         data_allIter_allSubj = squeeze(margParams_ORI_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iDataset_plotRC, iTunC));
+                %         data_obs_allSubj = squeeze(margParams_ORI_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, 1, 2, iTunC)); % full data, without resampling
+                %     case 2
+                %         data_allIter_allSubj = squeeze(margParams_SF_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iDataset_plotRC, iTunC));
+                %         data_obs_allSubj = squeeze(margParams_SF_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, 1, 2, iTunC));
+                % end
+
                 switch iFeature
                     case 1
-                        data_allIter_allSubj = squeeze(margParams_ORI_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iDataset_plotRC, iTunC));
-                        data_obs_allSubj = squeeze(margParams_ORI_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, 1, 2, iTunC)); % full data, without resampling
+                        data_allIter_allSubj = squeeze(margTunC_ORI_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iDataset_plotRC, iTunC));
+                        data_obs_allSubj = squeeze(margTunC_ORI_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, 1, 2, iTunC)); % full data, without resampling
                     case 2
-                        data_allIter_allSubj = squeeze(margParams_SF_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iDataset_plotRC, iTunC));
-                        data_obs_allSubj = squeeze(margParams_SF_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, 1, 2, iTunC));
+                        data_allIter_allSubj = squeeze(margTunC_SF_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iDataset_plotRC, iTunC));
+                        data_obs_allSubj = squeeze(margTunC_SF_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, 1, 2, iTunC));
                 end
 
                 % Let MATLAB format y-axis ticks automatically unless a custom unit remapping is needed.
