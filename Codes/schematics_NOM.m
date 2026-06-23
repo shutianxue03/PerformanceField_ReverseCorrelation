@@ -84,7 +84,6 @@ for flag_stage = 1:5
             % Plot Gaussian
             plot(x_i, y_i, 'Color', baseColor, 'LineWidth', LW_MAIN);
 
-
             % Update global ranges
             x_min = min(x_min, min(x_i));
             x_max = max(x_max, max(x_i));
@@ -111,7 +110,6 @@ for flag_stage = 1:5
         % use global y max (or a default if no PDFs were drawn for some reason)
         if y_max_global == 0, y_max_global = 1; end
         plot([criterion criterion], [0 .5], '--', 'Color', color_cri, 'LineWidth', LW_MAIN);
-
     end
 
     % ----------------- Draw IV dots at y=0 -----------------
