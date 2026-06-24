@@ -58,6 +58,13 @@ locations.LVM = screenCenter + [0, eccPx];
 locationNames = {'fovea', 'rightHM', 'leftHM', 'UVM', 'LVM'};
 locationXY = cell2mat(cellfun(@(name) locations.(name), locationNames, 'UniformOutput', false)');
 
+%% Create same-size placeholder-only image
+nameFile_placeholderImage = fullfile(dirOutput, 'placeholder_only_no_fixation_no_stimulus.png');
+placeholderOnlyFrame = background * ones(screenPx);
+placeholderOnlyFrame = drawAllBlackPlaceholders(placeholderOnlyFrame, locationXY, placeholderHalfWidthPx, placeholderArmPx);
+imwrite(repmat(grayDoubleToUint8(placeholderOnlyFrame), 1, 1, 3), nameFile_placeholderImage);
+fprintf('Created %s\n', nameFile_placeholderImage);
+
 %% Generate fixed distractors
 %------------------------------------%
 [~, aperture] = makeNoisyGaborPatch(patchDiameterPx, pxPerDeg, signalSF, signalSigmaSp, signalOrientation, signalRMS(1), noiseRMS, noiseLowSF, noiseHighSF);
@@ -78,10 +85,24 @@ conditions = {
 for iSignalRMS = 1:numel(signalRMS)
     thisSignalRMS = signalRMS(iSignalRMS);
     %--------------------------------------------%
-    [targetPatch, aperture] = makeNoisyGaborPatch(patchDiameterPx, pxPerDeg, signalSF, signalSigmaSp, signalOrientation, thisSignalRMS, noiseRMS, noiseLowSF, noiseHighSF);
+    [sharedTargetPatch, sharedAperture] = makeNoisyGaborPatch(patchDiameterPx, pxPerDeg, signalSF, signalSigmaSp, signalOrientation, thisSignalRMS, noiseRMS, noiseLowSF, noiseHighSF);
     %--------------------------------------------%
     rmsLabel = sprintf('%.1f', thisSignalRMS*100);
+    nameFile_stimPatch = fullfile(dirOutput, sprintf('shared_stimulus_patch_%s.mat', rmsLabel));
+    save(nameFile_stimPatch, 'sharedTargetPatch', 'sharedAperture', 'thisSignalRMS');
+    nameFile_stimPatchImage = fullfile(dirOutput, sprintf('stimulus_patch_center_right_top_%s.png', rmsLabel));
+    stimPatchPreviewFrame = background * ones(screenPx);
+    stimPatchPreviewFrame = drawAllBlackPlaceholders(stimPatchPreviewFrame, locationXY, placeholderHalfWidthPx, placeholderArmPx);
+    previewLocations = {'fovea', 'rightHM', 'UVM'};
+    for iPreviewLoc = 1:numel(previewLocations)
+        stimPatchPreviewFrame = pastePatch(stimPatchPreviewFrame, sharedTargetPatch, sharedAperture, locations.(previewLocations{iPreviewLoc}));
+    end
+    imwrite(repmat(grayDoubleToUint8(stimPatchPreviewFrame), 1, 1, 3), nameFile_stimPatchImage);
+    fprintf('Created %s\n', nameFile_stimPatchImage);
     for iCond = 1:size(conditions, 1)
+        load(nameFile_stimPatch, 'sharedTargetPatch', 'sharedAperture');
+        targetPatch = sharedTargetPatch;
+        aperture = sharedAperture;
         targetLocation = conditions{iCond, 1};
         [~, baseName, extension] = fileparts(conditions{iCond, 2});
         nameFile_video = fullfile(dirOutput, sprintf('%s_%s%s', baseName, rmsLabel, extension));
@@ -197,6 +218,11 @@ function frame = drawPlaceholders(frame, locationXY, targetXY, halfWidthPx, armP
     if showFixation
         frame = drawLine(frame, [size(frame, 2)/2-fixationArmPx, size(frame, 1)/2], [size(frame, 2)/2+fixationArmPx, size(frame, 1)/2], 0, 3);
         frame = drawLine(frame, [size(frame, 2)/2, size(frame, 1)/2-fixationArmPx], [size(frame, 2)/2, size(frame, 1)/2+fixationArmPx], 0, 3);
+    end
+end
+function frame = drawAllBlackPlaceholders(frame, locationXY, halfWidthPx, armPx)
+    for i = 1:size(locationXY, 1)
+        frame = drawCornerPlaceholder(frame, locationXY(i, :), halfWidthPx, armPx, 0, 3);
     end
 end
 function frame = drawCornerPlaceholder(frame, centerXY, halfWidthPx, armPx, value, thickness)

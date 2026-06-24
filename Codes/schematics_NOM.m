@@ -72,7 +72,6 @@ facealpha = .3;
 sz_hl = 30;
 sz_hw = sz_hl;
 
-
 for flag_stage = 1:5
 
  % ----------------- Stage names ---------------------------------------
