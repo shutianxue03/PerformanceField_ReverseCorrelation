@@ -521,10 +521,10 @@ if ~exist(nameFile_R, 'file')
     fprintf('\n\n%s: All files compiled. \n\n', datetime('now'))
 
     % Save the compiled record to /Output
-    save(nameFile_R, 'R')
+    save(nameFile_R, '-v7.3');
     fprintf('\n\n%s: Outputs saved as %s. \n\n', datetime('now'), nameFile_R)
 else
-    % fprintf('Output file already exists, skipping compilation: %s\n', nameFile_R);
+    fprintf('Output file already exists, skipping compilation: %s\n', nameFile_R);
     % Load output file
     load(nameFile_R, 'R')
     fprintf('\n\n%s: Loading compiled record R with %d entries.\n\n', datetime('now'), numel(R));
@@ -576,7 +576,7 @@ setting.axisLineWidth = 1.0;
 setting.gridAlpha = 0.25;
 setting.tickDir   = 'out';
 setting.fig4_axisBufferProp = 0.45;
-setting.fig4_markerSizeMin = 7;
+setting.fig4_markerSizeMin = 5;
 setting.fig4_markerSizeMax = 20;
 setting.fig4_markerSizeExp = 0.5;
 setting.fig2_top_axisBufferProp = 0.12;
@@ -1031,11 +1031,11 @@ if ~isempty(keyVars_fig0)
     T0 = T0(ia_fig0, :);
 end
 
-h = figure('Position', [100 100 1600 720]);
+h = figure('Position', [100 100 1600 900]);
 tiledlayout(2, 3, 'Padding', 'loose', 'TileSpacing', 'loose');
 
 fig0Fields = {'iModelB_sim', 'gaborCST', 'cSDT_true', 'Nmul_true', 'Nadd_true', 'Nshared_true'};
-fig0Labels = {'Generating model', 'signal contrast', 'SDT criterion', 'multiplicative variability', 'additive variability', 'shared variability'};
+fig0Labels = {'Generating model', 'signal contrast', 'SDT criterion', 'multiplicative noise', 'additive noise', 'shared noise'};
 
 % B-model shading: B1 = black (0.0), B7 = light grey (0.78)
 Bsim_all = unique(T0.iModelB_sim);
@@ -1131,7 +1131,7 @@ for iPanel = 1:numel(fig0Fields)
 end % for iPanel
 
 sgtitle('Figure 0: Number of conditions by simulation variable');
-set(findall(gcf,'-property','FontSize'), 'FontSize', 15);
+set(findall(gcf,'-property','FontSize'), 'FontSize', 18);
 
 saveas(h, fullfile(nameFolder_Figures_part4, 'FigS0_conditionComposition.png'));
 close(h);
@@ -1459,7 +1459,7 @@ for iRow_metric = 1:nMetric_fig3
     switch mName
         case 'pYES';  metricTitle = 'Detection rate';
         case 'pC';    metricTitle = 'Accuracy';
-        case 'pA';    metricTitle = 'Consistency rate';
+        case 'pA';    metricTitle = 'Resp. consistency';
         otherwise;    metricTitle = mName;
     end
 
@@ -1479,8 +1479,11 @@ for iRow_metric = 1:nMetric_fig3
         [Cdata, nDataBins] = fxn_collapse_curve_with_counts(R_data, 'DV_allBins_med', dataField, 'nTrials_allBins_med', setting.curveNGrid, @median);
         dot_nMin = nan; dot_nMax = nan;
         dot_nVals = [];
-        dot_sMin = max(4, setting.markerSize * 0.5);
-        dot_sMax = max(dot_sMin + 2, setting.markerSize * 1.5);
+        dot_sMin = setting.fig4_markerSizeMin;
+        dot_sMax = setting.fig4_markerSizeMax;
+        if dot_sMax <= dot_sMin
+            dot_sMax = dot_sMin + 1;
+        end
         % First pass: collect predicted curves and compute RMSE for all fit models.
         nFit = numel(Bfit_unik);
         CpredAll_fig3 = cell(1, nFit);
@@ -1540,24 +1543,32 @@ for iRow_metric = 1:nMetric_fig3
         % Plot dots
         if ~isempty(Cdata.x)
             mSizes = setting.markerSize * ones(size(Cdata.x));
+            nTrials_sample = [10, 100, 1000];
+            mSizes_sample = [5, 10, 15]; % just hard-code...
+            % mSizes_sample = setting.markerSize * ones(size(nTrials_sample));
             if ~isempty(nDataBins) && numel(nDataBins) == numel(Cdata.x)
                 nDot = nDataBins(:)';
-                % if any(isfinite(nDot))
-                % dot_nVals = nDot(isfinite(nDot));
-                nMin = min(nDot);
-                nMax = max(nDot);
-                % dot_nMin = nMin; dot_nMax = nMax;
-                % if nMax > nMin
-                frac = (nDot - nMin) / (nMax - nMin);
-                % else
-                %     frac = zeros(size(nDot));
-                % end
-                mSizes = dot_sMin + (dot_sMax - dot_sMin) * (frac .^ setting.fig4_markerSizeExp);
+                finMask = isfinite(nDot);
+                if any(finMask)
+                    nMin = min(nDot(finMask));
+                    nMax = max(nDot(finMask));
+                    if nMax > nMin
+                        frac = (nDot - nMin) / (nMax - nMin);
+                        frac = max(0, min(1, frac));
+                    else
+                        frac = zeros(size(nDot));
+                    end
+                    mSizes = dot_sMin + (dot_sMax - dot_sMin) * (frac .^ setting.fig4_markerSizeExp);
 
-                % Sample dot size for 10, 100 and 1000 trials
-                nTrials_sample = [250,500,1000];
-                mSizes_sample = mSizes(1) * nTrials_sample /nDot(1);
-                % end
+                    % Use the same nonlinear mapping for legend examples.
+                    % if nMax > nMin
+                    %     frac_sample = (nTrials_sample - nMin) / (nMax - nMin);
+                    %     frac_sample = max(0, min(1, frac_sample));
+                    % else
+                    %     frac_sample = zeros(size(nTrials_sample));
+                    % end
+                    % mSizes_sample = dot_sMin + (dot_sMax - dot_sMin) * (frac_sample .^ setting.fig4_markerSizeExp);
+                end
             end
             for iDot = 1:numel(Cdata.x)
                 hTmpDot_fig3 = plot(Cdata.x(iDot), Cdata.y(iDot), 'ko', 'MarkerSize', mSizes(iDot), 'MarkerFaceColor', 'w', 'LineWidth', setting.lineWidth);
@@ -1582,7 +1593,7 @@ for iRow_metric = 1:nMetric_fig3
 
         % Title
         if iRow_metric == 1
-            title(sprintf('M%d %s', iCol_Bsim, namesModelB{iCol_Bsim}));
+            title(sprintf('M%d %s\n', iCol_Bsim, namesModelB{iCol_Bsim}));
         else
             title('');
         end
@@ -1597,7 +1608,6 @@ for iRow_metric = 1:nMetric_fig3
             case 'pYES';  ylim([0 1]); yticks(0:.2:1)
             case {'pC','pA'};  ylim([0.5 1]); yticks(0.5:.1:1)
         end
-
 
         % Add legends for the top-left panel
         if iCol_Bsim==1 && iRow_metric==1
@@ -1636,11 +1646,8 @@ for iRow_metric = 1:nMetric_fig3
             hDot3 = plot(axDot, nan, nan, 'ko', 'MarkerSize', mSizes_sample(3), 'MarkerEdgeColor', 'k', 'MarkerFaceColor', 'w', 'LineWidth', setting.lineWidth, 'LineStyle', 'none');
             legDot = legend(axDot, [hDot1 hDot2 hDot3], compose('%.0f', nTrials_sample), 'Location', 'northwest', 'FontSize', setting.fontSize-2, 'Box', 'off');
             title(legDot, '# trials');
-
-        end %
-
+        end % if 
     end % iCol_Bsim
-
 
     % ------------------------------------------------------------------ %
     % Heatmap of mean NLL  (rows = fit model, cols = sim) %
@@ -1675,7 +1682,7 @@ for iRow_metric = 1:nMetric_fig3
         'XLim', [0.5, nSim_fig3+0.5], 'YLim', [0.5, nFit_fig3+0.5]);
     xlabel(axHeat, 'Generating model');
     ylabel(axHeat, 'Fitting model');
-    title(axHeat, [metricTitle ' NLL']);
+    title(axHeat, sprintf('%s NLL\n', metricTitle));
     axis(axHeat, 'square');
     clim(axHeat, [cLo_h cHi_h]);
     cbar_h = colorbar(axHeat, 'Location', 'eastoutside');
@@ -1695,19 +1702,17 @@ for iRow_metric = 1:nMetric_fig3
         bestRow_h = finIdx_h(iLoc_h);
         rectangle('Parent', axHeat, 'Position', [iSim_h-0.5, bestRow_h-0.5, 1, 1], 'EdgeColor', 'k', 'LineWidth', 2.5, 'LineStyle', '--');
     end
-
-
 end % iRow_metric
 
 % Save heatmap and curve panels as separate figures
 
 sgtitle(tileLayout_curve, 'Fig 3a: metric curves', 'FontWeight', 'bold');
-set(findall(handle_curve,'-property','FontSize'), 'FontSize', 18);
+set(findall(handle_curve,'-property','FontSize'), 'FontSize', 20);
 saveas(handle_curve, fullfile(nameFolder_Figures_part4, 'FigS3a_MetricCurves.png'));
 close(handle_curve);
 
 sgtitle(tileLayout_heat, 'Fig 3b: metric NLL heatmaps', 'FontWeight', 'bold');
-set(findall(handle_heat,'-property','FontSize'), 'FontSize', 18);
+set(findall(handle_heat,'-property','FontSize'), 'FontSize', 20);
 saveas(handle_heat, fullfile(nameFolder_Figures_part4, 'FigS3b_MetricHeatmap.png'));
 close(handle_heat);
 
@@ -2523,14 +2528,14 @@ end % if exist(permFile_fig6)
 
 % PLOTTING
 if cacheLoaded_fig6
-    h = figure('Position', [80 80 330*nRows_fig6 210*nCols_fig6]);
+    h = figure('Position', [0,0, 350*nRows_fig6, 250*nCols_fig6]);
     tiledlayout(nCols_fig6, nRows_fig6, 'TileSpacing', 'compact', 'Padding', 'compact');
 
     for iPair = 1:nCols_fig6
         for iModel = 1:nRows_fig6
             nexttile((iPair-1)*nRows_fig6 + iModel); hold on;
 
-            panelTitle_fig6 = sprintf('M%d %s', Bdiag_fig6(iModel), namesModelB{Bdiag_fig6(iModel)});
+            panelTitle_fig6 = sprintf('M%d %s\n', Bdiag_fig6(iModel), namesModelB{Bdiag_fig6(iModel)});
             if iPair == 1
                 title(panelTitle_fig6);
             end
@@ -2593,7 +2598,7 @@ if cacheLoaded_fig6
     end
 
     sgtitle('Fig 6: r by signalCST x cSDT | rows: param pair, cols: model variant (Bfit=Bsim)', 'FontWeight', 'bold');
-    set(findall(h,'-property','FontSize'), 'FontSize', 20);
+    set(findall(h,'-property','FontSize'), 'FontSize', 24);
     saveas(h, fullfile(nameFolder_Figures_part4, 'FigS6_paramCorr_summaryBars.png'));
     close(h);
 end

@@ -142,10 +142,11 @@ else % iF=2, SF
             errorbar(peakSF1_ln, peakAmp1, bw_ln1/2, 'r', 'horizontal')
             errorbar(peakSF2_ln, peakAmp2, bw_ln2/2, 'b', 'horizontal')
 
-        case 2
+        case 2 %***
             % Math:         y = gain * 10.^(-(log10(x / peakSF) / width).^2) + base;
             peakSF = params(1);
-            peakAmp = predSFkernel(peakSF, familyName, params, 0); % amplitude at the peak SF
+            % peakAmp = predSFkernel(peakSF, familyName, params, 0); % amplitude at the peak SF
+            peakAmp = max(pred);
             baseline = params(4);
             %===============%
             [width_full_oct, ~, fL, fR, y_half] = getSFbandwidth(params, 'aboveBase'); % aboveBase or absPeak
@@ -227,13 +228,13 @@ x = x_all(ix);
 end
 
 %%
-function [y_peakAmp, x_width_half, y_baseline] = get_ORI_amp_width_baseline_from_curve(x, pred)
+function [y_peakAmp, x_width, y_baseline] = get_ORI_amp_width_baseline_from_curve(x, pred)
 idx = isfinite(x) & isfinite(pred);
 x = x(idx);
 pred = pred(idx);
 if isempty(x)
     y_peakAmp = nan;
-    x_width_half = nan;
+    x_width = nan;
     y_baseline = nan;
     return
 end
@@ -247,7 +248,7 @@ pred_unique = pred_sorted(ix_unique);
 if numel(x_unique) < 2
     y_peakAmp = max(pred_unique);
     y_baseline = min(pred_unique);
-    x_width_half = nan;
+    x_width = nan;
     return
 end
 
@@ -285,7 +286,7 @@ else
 end
 
 % Half-width is the distance from the peak to the half-height point.
-x_width_half = abs(xHalf - xPeak);
+x_width = abs(xHalf - xPeak)*2;
 
 %% Plot the tunning curve, and mark the peak, half-height, and half-width for sanity check
 % set(0, 'DefaultFigureVisible', 'on');
@@ -305,7 +306,7 @@ x_width_half = abs(xHalf - xPeak);
 % 
 % ylim([-2, 12]*1e-3)
 % % Print tunC in the title
-% title(sprintf('Peak=%.4f, Half-width=%.2fº, Baseline=%.4f', y_peakAmp, x_width_half, y_baseline))
+% title(sprintf('Peak=%.4f, Half-width=%.2fº, Baseline=%.4f', y_peakAmp, x_width, y_baseline))
 % set(findall(gcf, '-property', 'FontSize'), 'FontSize', 15)
 % close(fig);
 end

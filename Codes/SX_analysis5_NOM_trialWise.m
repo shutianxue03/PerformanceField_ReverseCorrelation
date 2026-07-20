@@ -22,7 +22,8 @@ nJob = 5;
 nIterxJob = nIter*nJob;
 iModelA_fit_all = [1]; % 1=RC-derived template, 2=use IO template, 2=randomize template,
 iModelB_fit_all = [1:7]; % see SX_RC1_setting for namesModelB
-flag_plotPurpose = 'slide'; % 'slide' or 'paper'
+flag_plotPurpose = 'paper'; % 'slide' or 'paper'
+tuningPlotSpecs = local_getTuningPlotSpecs();
 
 % Define model families for tuning curves
 iFamily_ORI = 10; %1=scaled Gaussian
@@ -45,14 +46,15 @@ nPerm = 1e4; % the same as all fxn_xx
 nBoot = 1e4; % the same as all fxn_xx
 seedPerm = 1; % the same as all fxn_xx
 seedBoot = 2; % the same as all fxn_xx
-flag_UseRUseRho = 'useR'; % useR or useRho for correlation analysis (for both drawCorr and drawCorrAsym)
+flag_UseRUseRho_corrAsym = 'useRho'; % 'useR 'or 'useRho' for correlation analysis (for both drawCorr and drawCorrAsym)
+flag_UseRUseRho_corr = 'useR';
 
 % Define locations and their combinations
 iLocComb_all = [6,7, 5,3, 1,8]; % combination of locations
 iLocGroups_all = {[6,7], [5,3], [1,8]} ; nGroups = length(iLocGroups_all);
-iLocGroups_all = {[1,8]} ; nGroups = length(iLocGroups_all);
+% iLocGroups_all = {[1,8]} ; nGroups = length(iLocGroups_all);
 iLocSingle_all = 1:5; nLocSingle = length(iLocSingle_all);
-iLocSingle_allSets = {[1,6,5,3]};
+iLocSingle_allSets = {[6,5,3]};
 
 % Define the number of bins for the NOM analysis
 namesMetrics_prob = {'pYES', 'pA'}; nMetrics_prob = length(namesMetrics_prob); namesMetrics_prob_full = {sprintf('Predicted detection prob.\nMeasured detection rate'), sprintf('Predicted consistency prob.\nMeasured resp. consistency')};
@@ -117,7 +119,6 @@ for iRun=4%[1,3,4]
     nSubj = length(subjList);
 
     markers_allSubj = markers_allSubj_full(1:nSubj);
-
 
     % Names of the performance metrics being analyzed
     nModelsA = length(iModelA_all);
@@ -290,8 +291,8 @@ for iRun=4%[1,3,4]
                                     % SF
                                     iFeature=2;
                                     %======================%
-                                    tuningC_SF = fxn_getTuningC(axis_tuning{iFeature}, iFeature, iFamily_SF, squeeze(margPred_SF_allIter(iIter, iDataset, :)), squeeze(margParams_SF_allIter(iIter, iDataset, :)));
-                                    margTuningC_SF_allIter(iIter, iDataset, :) = tuningC_SF;
+                                    margTuningC_SF_allIter(iIter, iDataset, :) = fxn_getTuningC( ...
+                                        axis_tuning{iFeature}, iFeature, iFamily_SF, squeeze(margPred_SF_allIter(iIter, iDataset, :)), squeeze(margParams_SF_allIter(iIter, iDataset, :)));
                                     %======================%
                                 end
                             end % end of iIter
@@ -466,7 +467,7 @@ for iRun=4%[1,3,4]
     end
 
     %% 1. Behavioral metrics: paired locations
-    clc; fprintf('\n%s: Fig 1/23: Behavioral metrics (paired locations) STARTED.\n', string(datetime('now')))
+    clc; fprintf('\n%s: Fig 1/22: Behavioral metrics (paired locations) STARTED.\n', string(datetime('now')))
 
     % Load data
     load(nameFolder_Output_SaveCompile, 'metrics_allCond')
@@ -478,12 +479,12 @@ for iRun=4%[1,3,4]
     flag_plotIDVD = 1;
     flag_plotDiff = 1;
     namesMetrics_behav = {'CS', 'pA', 'dprime', 'criterion', 'pC', 'RT'}; nMetrics_behav = length(namesMetrics_behav);
-    namesMetrics_behav_long = {'Contrast sensitivity', 'Consistency rate', 'Dprime', 'Criterion', 'Accuracy', 'Resp. time'};
+    namesMetrics_behav_long = {'Contrast sensitivity', 'Response consistency', 'Dprime', 'Criterion', 'Accuracy', 'Resp. time'};
     [d70,~] = SX_sim06_SDT(.7, .3);
 
     switch flag_plotPurpose
         case 'paper'
-    sz_wd_perBar = 180;
+            sz_wd_perBar = 150;
         case 'slide'
             sz_wd_perBar = 100;
     end
@@ -506,8 +507,8 @@ for iRun=4%[1,3,4]
             data_allIter_allSubj = squeeze(metrics_allCond(iModelA_plot, iLocPair_all, :, :, iDataset_plotNOM, iMetric_vec));
 
             str_title = sprintf('n=%d %s nIter=%d L%d%d', nSubj, namesMetrics_behav{iMetric_prob}, nIterxJob, iLocPair_all);
-            sz_text = 22;
-            wd = 3;
+            sz_text = 18;
+            wd = 2;
             %------------------------------%
             fxn_drawBars(data_allIter_allSubj, ref, colors_comb(iLocPair_all, :), namesLocComb(iLocPair_all), x_ticks, x_ticks, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd, flag_plotPurpose);
             %------------------------------%
@@ -522,7 +523,7 @@ for iRun=4%[1,3,4]
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
     %% 2. Behavioral metrics: single locations
-    clc; fprintf('\n%s: Fig 2/23: Behavioral metrics (single locations) STARTED.\n', string(datetime('now')))
+    clc; fprintf('\n%s: Fig 2/22: Behavioral metrics (single locations) STARTED.\n', string(datetime('now')))
     % Load data
     load(nameFolder_Output_SaveCompile, 'metrics_allCond')
 
@@ -560,7 +561,7 @@ for iRun=4%[1,3,4]
 
             str_title = sprintf('n=%d %s nIter=%d L%s', nSubj, namesMetrics_behav{iMetric_prob}, nIterxJob, strjoin(string(iLocSingle_perSet), ''));
             sz_text = 22;
-            wd = 3;
+            wd = 2;
             %------------------------------%
             fxn_drawBars(data_allIter_allSubj, ref, colors_comb(iLocSingle_perSet, :), namesLocComb(iLocSingle_perSet), x_ticks, x_ticks, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd, flag_plotPurpose);
             % ------------------------------%
@@ -573,8 +574,8 @@ for iRun=4%[1,3,4]
     clear metrics_allCond
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
-    %% 3. Templates for IDVD and group averages
-    clc; fprintf('\n%s: Fig 3/23: Templates (group averages) STARTED.\n', string(datetime('now')))
+    %% 3a. Templates for group averages
+    clc; fprintf('\n%s: Fig 3a/22: Templates (group averages) STARTED.\n', string(datetime('now')))
     % Load data
     load(nameFolder_Output_SaveCompile, 'template_*_allCond')
 
@@ -603,18 +604,34 @@ for iRun=4%[1,3,4]
             if iLocComb==1
                 cLim = [-.03, .26];
             else
-                cLim = [-1, 8]*1e-3;
+                cLim = [-1, 7]*1e-3;
                 pixMin = min(pixMin, min(e2D_ave(:)));
                 pixMax = max(pixMax, max(e2D_ave(:)));
             end
             %-----------------%
-            RCplot_2Dkernel(e2D_ave, nan)
+            RCplot_2Dkernel(e2D_ave, cLim)
             %-----------------%
             title(sprintf('n=%d nIter=%d L%d %s (%s)', nSubj, nIterxJob, iLocComb, namesLocComb{iLocComb}, str_dataset))
-            saveAndCloseFigure(fig, sprintf('%s/n%d_group_L%d_A%d_%s.png', nameFolder_Fig_NOM_Template, nSubj, iLocComb, iModelA_plot, str_dataset))
+            % saveAndCloseFigure(fig, sprintf('%s/n%d_group_L%d_A%d_%s.png', nameFolder_Fig_NOM_Template, nSubj, iLocComb, iModelA_plot, str_dataset))
+            saveas(gcf, sprintf('%s/n%d_group_L%d_A%d_%s.png', nameFolder_Fig_NOM_Template, nSubj, iLocComb, iModelA_plot, str_dataset))
         end % iiLoc
+    end % iDataset
 
-        % %% Idvd data in one figure, per loc %%%%%
+    % Print min and max pixel value from group averages
+    fprintf('\n Summary: Min = %.3f, Max=%.3f\n', pixMin, pixMax)
+
+    %% 3b. Templates for IDVD
+    clc; fprintf('\n%s: Fig 3b/22: Templates (IDVD) STARTED.\n', string(datetime('now')))
+
+    for iDataset = 1%1:nDatasets
+        switch iDataset % needs to match OOD_NOM_Trialwise_compDV_A12 (1=template, 2=full)
+            case 1 % Template set
+                template_med_allSubj = squeeze(template_tmpl_allCond(iModelA_plot, iModelB_plot, :, :, :, :)); % ... nLoc x nSubj x nORI x nSF
+            case 2 % Full set
+                template_med_allSubj = squeeze(template_full_allCond(iModelA_plot, iModelB_plot, :, :, :, :)); % ... nLoc x nSubj x nORI x nSF
+        end
+        str_dataset = namesDataset{iDataset};
+
         for iiLoc = 1:nLocComb8
 
             fig = figure('Position', [0, 0, 2e3, 1.8e3]);
@@ -637,14 +654,11 @@ for iRun=4%[1,3,4]
         end % iiLoc
     end % iDataset
 
-    % Print min and max pixel value
-    fprintf('\n Summary: Min = %.3f, Max=%.3f\n', pixMin, pixMax)
-
     clear template_*_allCond
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
     %% 4. Separability
-    clc; fprintf('\n%s: Fig 4/23: Separability analysis STARTED.\n', string(datetime('now')))
+    clc; fprintf('\n%s: Fig 4/22: Separability analysis STARTED.\n', string(datetime('now')))
     str_dataset = namesDataset{iDataset_plotRC};
 
     % Load compiled separability: sep_allCond
@@ -695,8 +709,7 @@ for iRun=4%[1,3,4]
         str_loc = strjoin(string(iLocSingle_perSet), '');
         str_title = sprintf('n%d nIter=%d [A%dB%d] L%s %s', nSubj, nIterxJob, iModelA_plot, iModelB_plot, str_loc, str_dataset);
         sz_text = 22;
-        wd = 3;
-
+        wd = 2;
         % -------------------%
         fxn_drawBars(data_allIter_allSubj, ref, colors, x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd, flag_plotPurpose);
         % -------------------%
@@ -732,7 +745,7 @@ for iRun=4%[1,3,4]
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
     %% 5. Tuning functions: group averages
-    clc; fprintf('\n%s: Fig 5/23: Tuning functions (group averages) STARTED.\n', string(datetime('now')))
+    clc; fprintf('\n%s: Fig 5/22: Tuning functions (group averages) STARTED.\n', string(datetime('now')))
     % Load data
     load(nameFolder_Output_SaveCompile, 'marg*_allCond', 'margPred*_allCond', 'margR2*_allCond')
 
@@ -765,7 +778,7 @@ for iRun=4%[1,3,4]
 
                 switch flag_plotPurpose
                     case 'slide'
-                fig = figure('Position', [0 0 8e2 6e2]); % default 8e2
+                        fig = figure('Position', [0 0 8e2 6e2]); % default 8e2
                     case 'paper'
                         fig = figure('Position', [0 0 1.1e3 6e2]); % default 8e2
                 end
@@ -790,11 +803,11 @@ for iRun=4%[1,3,4]
                         margPred_allCond = margPred_SF_allCond;
                         margR2_allCond = margR2_SF_allCond;
                         if find(iLocPair_all==1), yticks_ = [-.5, linspace(0, 2, 4)]*1e-3;
-                        else, yticks_ = linspace(-.5, 2, 5)*1e-3; %[-.02, 0, .02, .04, .06];
+                        else, yticks_ = linspace(-1, 3, 5)*1e-3; %[-.02, 0, .02, .04, .06];
                         end
-                        if find(iLocPair_all==1), yticks_ = linspace(-2, 8, 5)*1e-3; % fov vs. peri, higher ub
-                        else, yticks_ = linspace(-1, 5, 5)*1e-3; %yticks_ = [-.03, linspace(0, .12, 4)];
-                        end
+                        % if find(iLocPair_all==1), yticks_ = linspace(-2, 8, 5)*1e-3; % fov vs. peri, higher ub
+                        % else, yticks_ = linspace(-1, 5, 5)*1e-3; %yticks_ = [-.03, linspace(0, .12, 4)];
+                        % end
                     end
 
                     ymax = max(yticks_);
@@ -857,7 +870,7 @@ for iRun=4%[1,3,4]
                         sprintf('R^2 = %.2f [%.2f, %.2f]', R2_med, R2_lb, R2_ub), ...
                         'Units', 'normalized', ...
                         'Interpreter', 'tex', ...
-                        'FontSize', 35, ...
+                        'FontSize', 30, ...
                         'Color', color_comb, ...
                         'HorizontalAlignment', 'right', ...
                         'VerticalAlignment', 'top', ...
@@ -882,727 +895,437 @@ for iRun=4%[1,3,4]
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
     %% 6. Tuning functions: idvd (LARGE FIGURES!!)
-    clc; fprintf('\n%s: Fig 6/23: Tuning functions (individual) STARTED.\n', string(datetime('now')))
-
-    % Load data
-    load(nameFolder_Output_SaveCompile, 'marg*_allCond', 'margPred*_allCond', 'margParams*_allCond', 'margR2*_allCond')
-
-    % Define folder for saving figures
-    nameFolder_Fig_NOM_Tuning = sprintf('%s/TuningFxns_IDVD', nameFolder_Fig_NOM_Trialwise);
-    if isempty(dir(nameFolder_Fig_NOM_Tuning)), mkdir(nameFolder_Fig_NOM_Tuning), end
-
-    wd_border = 4; % default 5
-    sz_ticks = 30;% default 35
-
-    % Temporary diagnostics: per-iteration SF tuning plots (data + prediction + peak markers).
-    flag_temp_plotIterSF = 1;
-    temp_nIterPlotMax = 50;
-    temp_iterPauseSec = 0.1;
-    if flag_temp_plotIterSF
-        nameFolder_Fig_NOM_Tuning_tmp = sprintf('%s/TuningFxns_IDVD_tmpIterSF', nameFolder_Fig_NOM_Trialwise);
-        if isempty(dir(nameFolder_Fig_NOM_Tuning_tmp)), mkdir(nameFolder_Fig_NOM_Tuning_tmp), end
-    end
-
-    for iGroup = 1:nGroups % e.g., {[1, 8]} or more pairs if desired
-        iLocPair_all = iLocGroups_all{iGroup};
-
-        for iFeature = 2%1:nFeatures
-
-            fprintf('\n   - L%s %s...', strjoin(string(iLocPair_all), ''), namesFeature{iFeature})
-
-            xaxis = axis_tuning{iFeature};
-
-            % Sets the tolerance for peak SF estimation in octaves.
-            % This is used to calculate the percentage of iterations where the predicted peak SF is within this tolerance of the true peak SF (derived from fitted parameters). The tolerance is set to half the channel spacing in log2(SF), which reflects the resolution of the SF axis in the tuning function.
-            if iFeature == 2
-                peakSF_tol_oct = mean(diff(xaxis)) / 2; % tolerance=half channel spacing in log2(SF)
-            end
-
-            for iDataset = 1%:nDatasets
-                switch iDataset
-                    case 1 % TmplSet
-                        markerStyle = 'o';
-                        lineStyle = '-';
-                    case 2 % FullSet
-                        markerStyle = 's';
-                        lineStyle = '--';
-                end
-
-                if nSubj==12
-                    fig = figure('Position', [0 0 2e3 1.5e3]);
-                else
-                    fig = figure('Position', [0 0 2e3 1.2e3]);
-                end
-
-                for isubj = 1:nSubj
-                    subplot(nRows_subj, nCols_subj, isubj), hold on
-
-                    subjName = subjList{isubj};
-
-                    str_TunParams ='';
-
-                    % Draw reference lines
-                    yline(0, 'handlevisibility', 'off', 'linewidth', wd_border/2, 'color', [.7, .7, .7]);
-                    xline(iFeature-1, 'handlevisibility', 'off', 'linewidth', wd_border/2, 'color', [.7, .7, .7]);
-
-                    for iLoc = iLocPair_all
-
-                        % fprintf('\nL%d...', iLoc)
-                        % Set color
-                        color_comb = colors_comb(iLoc, :);
-
-                        % Set y-ticks
-                        if iFeature==1 % ORI
-                            marg_allCond = margORI_allCond;
-                            margPred_allCond = margPred_ORI_allCond;
-                            margParams_allCond = margParams_ORI_allCond;
-                            margR2_allCond = margR2_ORI_allCond;
-                            if iLoc==1, yticks_ = linspace(-4,10,5)*1e-3; % fov vs. peri, higher ub
-                            else, yticks_ = linspace(-4,6,5)*1e-3;
-                            end
-
-                        else % SF
-                            marg_allCond = margSF_allCond;
-                            margPred_allCond = margPred_SF_allCond;
-                            margParams_allCond = margParams_SF_allCond;
-                            margR2_allCond = margR2_SF_allCond;
-                            if iLoc==1, yticks_ = linspace(-4,4,5)*1e-3;
-                            else, yticks_ = linspace(-2,4,5)*1e-3;
-                            end
-                        end
-
-                        ymax = max(yticks_);
-                        ymin = min(yticks_);
-
-                        % Obtain data, prediction, and params
-                        [marg_med_perS, ~, ~, marg_sem_neg_perS, marg_sem_pos_perS] = getCI(marg_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :), 1, 5);
-                        [margPred_med_perS, margPred_lb_perS, margPred_ub_perS] = getCI(margPred_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :), 1, 5);
-                        [margParam_med_perS, margParam_lb_perS, margParam_ub_perS] = getCI(margParams_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :), 1, 5);
-                        margR2_med_perS = getCI(margR2_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :), 1, 5);
-
-                        % Per-iteration peakSF validation using already-compiled outputs.
-                        if iFeature == 2
-                            margPred_iter_perS = squeeze(margPred_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :));
-                            margParam_iter_perS = squeeze(margParams_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :));
-                            margPred_iter_perS = reshape(margPred_iter_perS, [], numel(xaxis));
-                            margParam_iter_perS = reshape(margParam_iter_perS, [], size(margParam_iter_perS, ndims(margParam_iter_perS)));
-
-                            xPeakParam_log2_allIter = log2(margParam_iter_perS(:, 1));
-                            [~, idxPeakPred_allIter] = max(margPred_iter_perS, [], 2);
-                            xPeakPred_log2_allIter = xaxis(idxPeakPred_allIter)';
-
-                            peakErr_oct_allIter = abs(xPeakPred_log2_allIter - xPeakParam_log2_allIter);
-                            peakErr_valid = peakErr_oct_allIter(isfinite(peakErr_oct_allIter));
-                            peakPassRate_pct = 100 * mean(peakErr_valid <= peakSF_tol_oct);
-                            peakErr_med_oct = median(peakErr_valid, 'omitnan');
-
-                            gain_allIter = margParam_iter_perS(:, 2);
-                            width_allIter = margParam_iter_perS(:, 3);
-                            nInvalidShape = sum(~isfinite(gain_allIter) | ~isfinite(width_allIter) | gain_allIter <= 0 | width_allIter <= 0);
-                        end
-
-                        % Data (dots + errorbars)
-                        errorbar(xaxis, marg_med_perS, marg_sem_neg_perS, marg_sem_pos_perS, markerStyle, 'Color', color_comb, 'CapSize',0, 'linewidth', wd_border/2)
-                        plot(xaxis, marg_med_perS, markerStyle, 'color', color_comb, 'linewidth', wd_border/2, 'MarkerFaceColor', 'w', 'MarkerSize', 6, 'HandleVisibility','off')
-
-                        % Prediction (lines + bands)
-                        patch([xaxis, flip(xaxis)], [margPred_lb_perS', flip(margPred_ub_perS')], color_comb, 'FaceAlpha', .3, 'linestyle', 'none')
-                        plot(xaxis, margPred_med_perS, '-', 'color', color_comb, 'linewidth', wd_border)
-
-                        % Print estimated parameters with scale-aware formatting.
-                        paramStr = arrayfun(@formatMixedNumber, margParam_med_perS, 'UniformOutput', false);
-                        str_TunParams = sprintf('%s\n[L%d] [R2=%.0f%%] %s', str_TunParams, iLoc, margR2_med_perS*100, strjoin(paramStr, ', '));
-                        if iFeature == 2
-                            % fprintf('\npeakChk: %.0f%%<=%.3f oct, medErr=%.3f, bad(g<=0|w<=0)=%d', peakPassRate_pct, peakSF_tol_oct, peakErr_med_oct, nInvalidShape);
-                        end
-
-                        % Draw peak SF
-                        if iFeature==2
-                            % Peak from the displayed median fitted curve (guaranteed to align visually).
-                            [~, idxPeakPred] = max(margPred_med_perS);
-                            xPeakPred_log2 = xaxis(idxPeakPred);
-                            xline(xPeakPred_log2, 'Color', color_comb, 'LineWidth', wd_border);
-
-                            % Parameter-median peakSF as reference (can differ from peak of median curve).
-                            xPeakParam_log2 = log2(margParam_med_perS(1));
-                            xline(xPeakParam_log2, '--', 'Color', color_comb, 'LineWidth', wd_border/1.5, 'HandleVisibility', 'off');
-                            errorbar(xPeakParam_log2, 0, log2(margParam_med_perS(1))-log2(margParam_lb_perS(1)), log2(margParam_ub_perS(1))-log2(margParam_med_perS(1)), 'horizontal', 'Color', color_comb, 'LineWidth', wd_border)
-                        end
-
-                        % Temp: plot per-iteration SF tuning function (one figure per iteration).
-                        if iFeature == 2 && flag_temp_plotIterSF
-                            marg_iter_perS = squeeze(marg_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :));
-                            margPred_iter_perS = squeeze(margPred_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :));
-                            margParam_iter_perS = squeeze(margParams_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :));
-                            margR2_iter_perS = squeeze(margR2_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :));
-
-                            marg_iter_perS = reshape(marg_iter_perS, [], numel(xaxis));
-                            margPred_iter_perS = reshape(margPred_iter_perS, [], numel(xaxis));
-                            margParam_iter_perS = reshape(margParam_iter_perS, [], size(margParam_iter_perS, ndims(margParam_iter_perS)));
-                            margR2_iter_perS = reshape(margR2_iter_perS, [], 1);
-
-                            nIterAvail = size(margPred_iter_perS, 1);
-                            nIterPlot = min(temp_nIterPlotMax, nIterAvail);
-                            idxIterPlot = unique(round(linspace(1, nIterAvail, nIterPlot)));
-
-                            for iIter = idxIterPlot
-                                thisData = marg_iter_perS(iIter, :);
-                                thisPred = margPred_iter_perS(iIter, :);
-                                thisParam = margParam_iter_perS(iIter, :);
-                                thisR2 = margR2_iter_perS(iIter);
-
-                                xPeakParam_log2_iter = log2(thisParam(1));
-                                [~, idxPeakPred_iter] = max(thisPred);
-                                xPeakArgmax_log2_iter = xaxis(idxPeakPred_iter);
-
-                                y_min_iter = min([thisData(:); thisPred(:)], [], 'omitnan');
-                                y_max_iter = max([thisData(:); thisPred(:)], [], 'omitnan');
-                                y_rng_iter = y_max_iter - y_min_iter;
-                                if ~isfinite(y_rng_iter) || y_rng_iter == 0, y_rng_iter = 1; end
-                                y_peakMarker = y_min_iter - 0.08 * y_rng_iter;
-
-                                fig_tmp = figure('Position', [100 80 1000 700]);
-                                ax_tmp = axes(fig_tmp); hold(ax_tmp, 'on')
-
-                                h_data = plot(xaxis, thisData, 'o', 'Color', [0.55 0.55 0.55], 'MarkerFaceColor', 'w', 'MarkerSize', 6, 'LineWidth', 1.1);
-                                h_pred = plot(xaxis, thisPred, '-', 'Color', [0.15 0.45 0.85], 'LineWidth', 2);
-                                h_peakParam = plot(xPeakParam_log2_iter, y_peakMarker, 'x', 'Color', [0.85 0.2 0.2], 'MarkerSize', 9, 'LineWidth', 1.5);
-                                h_peakArg = plot(xPeakArgmax_log2_iter, y_peakMarker, 'o', 'Color', [0.1 0.6 0.1], 'MarkerSize', 7, 'LineWidth', 1.2);
-                                xline(xPeakParam_log2_iter, '--', 'Color', [0.85 0.2 0.2], 'LineWidth', 1.2, 'HandleVisibility', 'off');
-                                xline(xPeakArgmax_log2_iter, '-', 'Color', [0.1 0.6 0.1], 'LineWidth', 1.2, 'HandleVisibility', 'off');
-
-                                xlim(axisTicks_tuning{iFeature}([1, end]))
-                                xticks(axisTicks_tuning{iFeature})
-                                xticklabels(axisTL_tuning{iFeature})
-                                ylim([y_peakMarker - 0.05 * y_rng_iter, y_max_iter + 0.08 * y_rng_iter])
-                                xlabel(namesFeature_axis{iFeature})
-                                ylabel('Marg. weights (a.u.)')
-
-                                paramStr_iter = arrayfun(@formatMixedNumber, thisParam, 'UniformOutput', false);
-                                title(sprintf('TEMP iter-SF | %s | L%d | %s | iter %d/%d | R2=%.1f%%\nparams=[%s]', ...
-                                    subjName, iLoc, namesDataset{iDataset}, iIter, nIterAvail, thisR2*100, strjoin(paramStr_iter, ', ')))
-                                legend([h_data, h_pred, h_peakParam, h_peakArg], {'data', 'prediction', 'peakSF param (log2)', 'argmax(pred)'}, 'Location', 'best')
-
-                                drawnow
-                                % if temp_iterPauseSec > 0, pause(temp_iterPauseSec), end
-                                close(fig_tmp) 
-
-                            end
-                        end
-                    end % iLoc
-
-                    % y ticks
-                    yticks(yticks_)
-                    ylim([ymin, ymax])
-
-                    % x ticks
-                    xlim(axisTicks_tuning{iFeature}([1, end]))
-                    xticks(axisTicks_tuning{iFeature})
-                    xticklabels(axisTL_tuning{iFeature})
-                    xlabel(namesFeature_axis{iFeature})
-                    ylabel('Marg. weights (a.u.)')
-                    title(sprintf('%s\n%s\n', subjName, str_TunParams));
-                    % legend('Location', 'best')
-
-                end % isubj
-                sgtitle(sprintf('n=%d L%d%d [A%d] %s tuning (%s)\nParams (NOT tunC) are printed in the title: [%s]\n', ...
-                    nSubj, iLocPair_all, iModelA_plot, namesFeature{iFeature}, namesDataset{iDataset}, ...
-                    strjoin(namesParams_all{iFamily_perF(iFeature)}, ', ')))
-                set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
-
-                % Save the figure
-                saveAndCloseFigure(fig, sprintf('%s/n%d_L%d%d_A%d_%s_%s.png', nameFolder_Fig_NOM_Tuning, nSubj, iLocPair_all, iModelA_plot, namesFeature{iFeature}, namesDataset{iDataset}))
-            end % iDataset
-        end % iFeature
-    end % iGroup
-    clear marg*_allCond margPred*_allCond
-    fprintf('\n%s: DONE.\n', string(datetime('now')))
-
-    %% 7. Tuning characteristics
-    clc; fprintf('\n%s: Fig 7/23: Tuning characteristics STARTED.\n', string(datetime('now')))
+    % clc; fprintf('\n%s: Fig 6/22: Tuning functions (individual) STARTED.\n', string(datetime('now')))
+    % 
+    % % Load data
+    % load(nameFolder_Output_SaveCompile, 'marg*_allCond', 'margPred*_allCond', 'margParams*_allCond', 'margR2*_allCond')
+    % 
+    % % Define folder for saving figures
+    % nameFolder_Fig_NOM_Tuning = sprintf('%s/TuningFxns_IDVD', nameFolder_Fig_NOM_Trialwise);
+    % if isempty(dir(nameFolder_Fig_NOM_Tuning)), mkdir(nameFolder_Fig_NOM_Tuning), end
+    % 
+    % wd_border = 4; % default 5
+    % sz_ticks = 30;% default 35
+    % 
+    % for iGroup = 1:nGroups % e.g., {[1, 8]} or more pairs if desired
+    %     iLocPair_all = iLocGroups_all{iGroup};
+    % 
+    %     for iFeature = 1:nFeatures
+    % 
+    %         fprintf('\n   - L%s %s...', strjoin(string(iLocPair_all), ''), namesFeature{iFeature})
+    % 
+    %         xaxis = axis_tuning{iFeature};
+    % 
+    %         % Sets the tolerance for peak SF estimation in octaves.
+    %         % This is used to calculate the percentage of iterations where the predicted peak SF is within this tolerance of the true peak SF (derived from fitted parameters). The tolerance is set to half the channel spacing in log2(SF), which reflects the resolution of the SF axis in the tuning function.
+    %         if iFeature == 2
+    %             peakSF_tol_oct = mean(diff(xaxis)) / 2; % tolerance=half channel spacing in log2(SF)
+    %         end
+    % 
+    %         for iDataset = 1%:nDatasets
+    %             switch iDataset
+    %                 case 1 % TmplSet
+    %                     markerStyle = 'o';
+    %                     lineStyle = '-';
+    %                 case 2 % FullSet
+    %                     markerStyle = 's';
+    %                     lineStyle = '--';
+    %             end
+    % 
+    %             if nSubj==12
+    %                 fig = figure('Position', [0 0 2e3 1.5e3]);
+    %             else
+    %                 fig = figure('Position', [0 0 2e3 1.2e3]);
+    %             end
+    % 
+    %             for isubj = 1:nSubj
+    %                 subplot(nRows_subj, nCols_subj, isubj), hold on
+    % 
+    %                 subjName = subjList{isubj};
+    % 
+    %                 str_TunParams ='';
+    % 
+    %                 % Draw reference lines
+    %                 yline(0, 'handlevisibility', 'off', 'linewidth', wd_border/2, 'color', [.7, .7, .7]);
+    %                 xline(iFeature-1, 'handlevisibility', 'off', 'linewidth', wd_border/2, 'color', [.7, .7, .7]);
+    % 
+    %                 for iLoc = iLocPair_all
+    % 
+    %                     % fprintf('\nL%d...', iLoc)
+    %                     % Set color
+    %                     color_comb = colors_comb(iLoc, :);
+    % 
+    %                     % Set y-ticks
+    %                     if iFeature==1 % ORI
+    %                         marg_allCond = margORI_allCond;
+    %                         margPred_allCond = margPred_ORI_allCond;
+    %                         margParams_allCond = margParams_ORI_allCond;
+    %                         margR2_allCond = margR2_ORI_allCond;
+    %                         if iLoc==1, yticks_ = linspace(-4,10,5)*1e-3; % fov vs. peri, higher ub
+    %                         else, yticks_ = linspace(-4,6,5)*1e-3;
+    %                         end
+    % 
+    %                     else % SF
+    %                         marg_allCond = margSF_allCond;
+    %                         margPred_allCond = margPred_SF_allCond;
+    %                         margParams_allCond = margParams_SF_allCond;
+    %                         margR2_allCond = margR2_SF_allCond;
+    %                         if iLoc==1, yticks_ = linspace(-4,4,5)*1e-3;
+    %                         else, yticks_ = linspace(-2,4,5)*1e-3;
+    %                         end
+    %                     end
+    % 
+    %                     ymax = max(yticks_);
+    %                     ymin = min(yticks_);
+    % 
+    %                     % Obtain data, prediction, and params
+    %                     [marg_med_perS, ~, ~, marg_sem_neg_perS, marg_sem_pos_perS] = getCI(marg_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :), 1, 5);
+    %                     [margPred_med_perS, margPred_lb_perS, margPred_ub_perS] = getCI(margPred_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :), 1, 5);
+    %                     [margParam_med_perS, margParam_lb_perS, margParam_ub_perS] = getCI(margParams_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :), 1, 5);
+    %                     margR2_med_perS = getCI(margR2_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :), 1, 5);
+    % 
+    %                     % Per-iteration peakSF validation using already-compiled outputs.
+    %                     if iFeature == 2
+    %                         margPred_iter_perS = squeeze(margPred_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :));
+    %                         margParam_iter_perS = squeeze(margParams_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :));
+    %                         margPred_iter_perS = reshape(margPred_iter_perS, [], numel(xaxis));
+    %                         margParam_iter_perS = reshape(margParam_iter_perS, [], size(margParam_iter_perS, ndims(margParam_iter_perS)));
+    % 
+    %                         xPeakParam_log2_allIter = log2(margParam_iter_perS(:, 1));
+    %                         [~, idxPeakPred_allIter] = max(margPred_iter_perS, [], 2);
+    %                         xPeakPred_log2_allIter = xaxis(idxPeakPred_allIter)';
+    % 
+    %                         peakErr_oct_allIter = abs(xPeakPred_log2_allIter - xPeakParam_log2_allIter);
+    %                         peakErr_valid = peakErr_oct_allIter(isfinite(peakErr_oct_allIter));
+    %                         peakPassRate_pct = 100 * mean(peakErr_valid <= peakSF_tol_oct);
+    %                         peakErr_med_oct = median(peakErr_valid, 'omitnan');
+    % 
+    %                         gain_allIter = margParam_iter_perS(:, 2);
+    %                         width_allIter = margParam_iter_perS(:, 3);
+    %                         nInvalidShape = sum(~isfinite(gain_allIter) | ~isfinite(width_allIter) | gain_allIter <= 0 | width_allIter <= 0);
+    %                     end
+    % 
+    %                     % Data (dots + errorbars)
+    %                     errorbar(xaxis, marg_med_perS, marg_sem_neg_perS, marg_sem_pos_perS, markerStyle, 'Color', color_comb, 'CapSize',0, 'linewidth', wd_border/2)
+    %                     plot(xaxis, marg_med_perS, markerStyle, 'color', color_comb, 'linewidth', wd_border/2, 'MarkerFaceColor', 'w', 'MarkerSize', 6, 'HandleVisibility','off')
+    % 
+    %                     % Prediction (lines + bands)
+    %                     patch([xaxis, flip(xaxis)], [margPred_lb_perS', flip(margPred_ub_perS')], color_comb, 'FaceAlpha', .3, 'linestyle', 'none')
+    %                     plot(xaxis, margPred_med_perS, '-', 'color', color_comb, 'linewidth', wd_border)
+    % 
+    %                     % Print estimated parameters with scale-aware formatting.
+    %                     paramStr = arrayfun(@formatMixedNumber, margParam_med_perS, 'UniformOutput', false);
+    %                     str_TunParams = sprintf('%s\n[L%d] [R2=%.0f%%] %s', str_TunParams, iLoc, margR2_med_perS*100, strjoin(paramStr, ', '));
+    %                     if iFeature == 2
+    %                         % fprintf('\npeakChk: %.0f%%<=%.3f oct, medErr=%.3f, bad(g<=0|w<=0)=%d', peakPassRate_pct, peakSF_tol_oct, peakErr_med_oct, nInvalidShape);
+    %                     end
+    % 
+    %                     % Draw peak SF
+    %                     if iFeature==2
+    %                         % Peak from the displayed median fitted curve (guaranteed to align visually).
+    %                         [~, idxPeakPred] = max(margPred_med_perS);
+    %                         xPeakPred_log2 = xaxis(idxPeakPred);
+    %                         xline(xPeakPred_log2, 'Color', color_comb, 'LineWidth', wd_border);
+    % 
+    %                         % Parameter-median peakSF as reference (can differ from peak of median curve).
+    %                         xPeakParam_log2 = log2(margParam_med_perS(1));
+    %                         xline(xPeakParam_log2, '--', 'Color', color_comb, 'LineWidth', wd_border/1.5, 'HandleVisibility', 'off');
+    %                         errorbar(xPeakParam_log2, 0, log2(margParam_med_perS(1))-log2(margParam_lb_perS(1)), log2(margParam_ub_perS(1))-log2(margParam_med_perS(1)), 'horizontal', 'Color', color_comb, 'LineWidth', wd_border)
+    %                     end
+    % 
+    %                     % Temp: plot per-iteration SF tuning function (one figure per iteration).
+    %                     if iFeature == 2 %&& flag_temp_plotIterSF
+    %                         marg_iter_perS = squeeze(marg_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :));
+    %                         margPred_iter_perS = squeeze(margPred_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :));
+    %                         margParam_iter_perS = squeeze(margParams_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :));
+    %                         margR2_iter_perS = squeeze(margR2_allCond(iModelA_plot, iModelB_plot, iLoc, isubj, :, iDataset, :));
+    % 
+    %                         marg_iter_perS = reshape(marg_iter_perS, [], numel(xaxis));
+    %                         margPred_iter_perS = reshape(margPred_iter_perS, [], numel(xaxis));
+    %                         margParam_iter_perS = reshape(margParam_iter_perS, [], size(margParam_iter_perS, ndims(margParam_iter_perS)));
+    %                         margR2_iter_perS = reshape(margR2_iter_perS, [], 1);
+    % 
+    %                         nIterAvail = size(margPred_iter_perS, 1);
+    %                         nIterPlot = 1000;%min(temp_nIterPlotMax, nIterAvail);
+    %                         idxIterPlot = unique(round(linspace(1, nIterAvail, nIterPlot)));
+    % 
+    %                         for iIter = idxIterPlot
+    %                             thisData = marg_iter_perS(iIter, :);
+    %                             thisPred = margPred_iter_perS(iIter, :);
+    %                             thisParam = margParam_iter_perS(iIter, :);
+    %                             thisR2 = margR2_iter_perS(iIter);
+    % 
+    %                             xPeakParam_log2_iter = log2(thisParam(1));
+    %                             [~, idxPeakPred_iter] = max(thisPred);
+    %                             xPeakArgmax_log2_iter = xaxis(idxPeakPred_iter);
+    % 
+    %                             y_min_iter = min([thisData(:); thisPred(:)], [], 'omitnan');
+    %                             y_max_iter = max([thisData(:); thisPred(:)], [], 'omitnan');
+    %                             y_rng_iter = y_max_iter - y_min_iter;
+    %                             if ~isfinite(y_rng_iter) || y_rng_iter == 0, y_rng_iter = 1; end
+    %                             y_peakMarker = y_min_iter - 0.08 * y_rng_iter;
+    % 
+    %                             fig_tmp = figure('Position', [100 80 1000 700]);
+    %                             ax_tmp = axes(fig_tmp); hold(ax_tmp, 'on')
+    % 
+    %                             h_data = plot(xaxis, thisData, 'o', 'Color', [0.55 0.55 0.55], 'MarkerFaceColor', 'w', 'MarkerSize', 6, 'LineWidth', 1.1);
+    %                             h_pred = plot(xaxis, thisPred, '-', 'Color', [0.15 0.45 0.85], 'LineWidth', 2);
+    %                             h_peakParam = plot(xPeakParam_log2_iter, y_peakMarker, 'x', 'Color', [0.85 0.2 0.2], 'MarkerSize', 9, 'LineWidth', 1.5);
+    %                             h_peakArg = plot(xPeakArgmax_log2_iter, y_peakMarker, 'o', 'Color', [0.1 0.6 0.1], 'MarkerSize', 7, 'LineWidth', 1.2);
+    %                             xline(xPeakParam_log2_iter, '--', 'Color', [0.85 0.2 0.2], 'LineWidth', 1.2, 'HandleVisibility', 'off');
+    %                             xline(xPeakArgmax_log2_iter, '-', 'Color', [0.1 0.6 0.1], 'LineWidth', 1.2, 'HandleVisibility', 'off');
+    % 
+    %                             xlim(axisTicks_tuning{iFeature}([1, end]))
+    %                             xticks(axisTicks_tuning{iFeature})
+    %                             xticklabels(axisTL_tuning{iFeature})
+    %                             ylim([y_peakMarker - 0.05 * y_rng_iter, y_max_iter + 0.08 * y_rng_iter])
+    %                             xlabel(namesFeature_axis{iFeature})
+    %                             ylabel('Marg. weights (a.u.)')
+    % 
+    %                             paramStr_iter = arrayfun(@formatMixedNumber, thisParam, 'UniformOutput', false);
+    %                             title(sprintf('TEMP iter-SF | %s | L%d | %s | iter %d/%d | R2=%.1f%%\nparams=[%s]', ...
+    %                                 subjName, iLoc, namesDataset{iDataset}, iIter, nIterAvail, thisR2*100, strjoin(paramStr_iter, ', ')))
+    %                             legend([h_data, h_pred, h_peakParam, h_peakArg], {'data', 'prediction', 'peakSF param (log2)', 'argmax(pred)'}, 'Location', 'best')
+    % 
+    %                             drawnow
+    %                             % if temp_iterPauseSec > 0, pause(temp_iterPauseSec), end
+    %                             close(fig_tmp) 
+    % 
+    %                         end
+    %                     end
+    %                 end % iLoc
+    % 
+    %                 % y ticks
+    %                 yticks(yticks_)
+    %                 ylim([ymin, ymax])
+    % 
+    %                 % x ticks
+    %                 xlim(axisTicks_tuning{iFeature}([1, end]))
+    %                 xticks(axisTicks_tuning{iFeature})
+    %                 xticklabels(axisTL_tuning{iFeature})
+    %                 xlabel(namesFeature_axis{iFeature})
+    %                 ylabel('Marg. weights (a.u.)')
+    %                 title(sprintf('%s\n%s\n', subjName, str_TunParams));
+    %                 % legend('Location', 'best')
+    % 
+    %             end % isubj
+    %             sgtitle(sprintf('n=%d L%d%d [A%d] %s tuning (%s)\nParams (NOT tunC) are printed in the title: [%s]\n', ...
+    %                 nSubj, iLocPair_all, iModelA_plot, namesFeature{iFeature}, namesDataset{iDataset}, ...
+    %                 strjoin(namesParams_all{iFamily_perF(iFeature)}, ', ')))
+    %             set(findall(gcf, '-property', 'fontsize'), 'fontsize', 15)
+    % 
+    %             % Save the figure
+    %             saveAndCloseFigure(fig, sprintf('%s/n%d_L%d%d_A%d_%s_%s.png', nameFolder_Fig_NOM_Tuning, nSubj, iLocPair_all, iModelA_plot, namesFeature{iFeature}, namesDataset{iDataset}))
+    %         end % iDataset
+    %     end % iFeature
+    % end % iGroup
+    % clear marg*_allCond margPred*_allCond
+    % fprintf('\n%s: DONE.\n', string(datetime('now')))
+    
+     %% 7. Tuning summaries (params + tuning characteristics)
+    clc; fprintf('\n%s: Fig 7/22: Tuning summaries STARTED.\n', string(datetime('now')))
 
     % Load data
     load(nameFolder_Output_SaveCompile, 'margParams_*_allCond')
     load(nameFolder_Output_SaveCompile, 'margTunC_*_allCond')
 
-    % Define folder for saving figures
-    nameFolder_Fig_tunC = sprintf('%s/TuningCs', nameFolder_Fig_NOM_Trialwise);
-    if isempty(dir(nameFolder_Fig_tunC)), mkdir(nameFolder_Fig_tunC), end
-
     flag_plotDist = 0;
     flag_plotIDVD = 1;
     flag_plotDiff = 1;
-    paramMode = 2;
 
     sz_text = 22;
     wd = 2;
 
-    for iGroup = 1:nGroups % e.g., {[1, 8]} or more pairs if desired
-        iLocPair_all = iLocGroups_all{iGroup};
+    for iSpec = 1:numel(tuningPlotSpecs)
+        tuningSpec = tuningPlotSpecs(iSpec);
+        nameFolder_Fig_tuning = sprintf('%s/%s', nameFolder_Fig_NOM_Trialwise, tuningSpec.folderName);
+        if isempty(dir(nameFolder_Fig_tuning)), mkdir(nameFolder_Fig_tuning), end
 
-        switch flag_plotPurpose
-            case 'paper'
-                sz_wd_perBar = 200;
-            case 'slide'
-                sz_wd_perBar = 250;
-        end
-        nBars = numel(iLocPair_all);
-        sz_fig = [nBars*sz_wd_perBar, 400+nchoosek(nBars,2)*50];
+        for iGroup = 1:nGroups % e.g., {[1, 8]} or more pairs if desired
+            iLocPair_all = iLocGroups_all{iGroup};
 
-        % Plotting settings
-        colors = colors_comb(iLocPair_all, :);
-        x_ticks = namesLocComb(iLocPair_all);
-
-        % Loop through each feature
-        for iFeature = 1:nFeatures
-
-            % Define the x-axis and parameters for the current feature
-            xaxis = axis_tuning{iFeature};
-            nfilters = length(xaxis);
-            iFamily = iFamily_perF(iFeature);
-            str_family = sprintf('F%d %s', iFamily, namesFamily_all{iFamily});
-            % namesTunC = namesParams_all{iFamily};
-            namesTunC = namesTunC_unit_perF{iFamily,2};
-            nTunC_full = length(namesTunC);
-
-            y_ticks_all = [];
-
-            % Obtain y_ticks of ORI/SF domain
-            switch flag_plotDist
-                case 0
-                    switch iFamily_perF(iFeature)
-                        % case 1 % ORI tuniningC | Scaled Gaussian
-                        %     if flag_plotIDVD
-                        %         if find(iLocPair_all==1)
-                        %             y_ticks_all{1} = linspace(0, .4, 5); % ORI peak amp
-                        %         else
-                        %             y_ticks_all{1} = linspace(0, .2, 5); % ORI peak amp
-                        %         end
-                        %         y_ticks_all{2} = linspace(0, 60, 5); % ORI band
-                        %         y_ticks_all{3} = linspace(-.05, .03, 5); % ORI baseline
-                        %     else
-                        %         % if find(iLocPair_all==1)
-                        %         %     y_ticks_all{1} = linspace(0, .24, 5); % ORI peak amp
-                        %         % else
-                        %         %     y_ticks_all{1} = linspace(0, .12, 5); % ORI peak amp
-                        %         % end
-                        %         % 
-                        %         % y_ticks_all{2} = linspace(0, 60, 5); % ORI band
-                        %         % y_ticks_all{3} = linspace(-.08, .08, 5); % ORI baseline
-                        %     end
-
-                        case 10 % ORI tuningC | von Mises
-                            if flag_plotIDVD
-                                % if find(iLocPair_all==1)
-                                y_ticks_all{1} = linspace(0, 12, 5)*1e-3; % ORI peak amp; tunParams: [0,16]; tunC: [0, 8]
-                                % else
-                                    % y_ticks_all{1} = linspace(0, 8, 5)*1e-3; % ORI peak amp; tunParams: [0,16]; tunC: [0, 8]
-                                % end
-                                y_ticks_all{2} = linspace(10, 30, 5); % ORI band; tunParams: [0,6]; tunC: [10, 50]
-                                y_ticks_all{3} = linspace(-.05, .03, 5); % ORI baseline
-                            else
-                                % if find(iLocPair_all==1)
-                                %     y_ticks_all{1} = linspace(0, .24, 5); % ORI peak amp
-                                % else
-                                %     y_ticks_all{1} = linspace(0, .12, 5); % ORI peak amp
-                                % end
-                                % 
-                                % y_ticks_all{2} = linspace(10, 60, 5); % ORI band; tunParams: [0,6]; tunC: [10, 50]
-                                % y_ticks_all{3} = linspace(-.08, .08, 5); % ORI baseline
-                            end
-
-                        case 2 % SF tuniningC | log parabola
-                            if flag_plotIDVD
-
-                                y_ticks_all{1} = linspace(-2, 2, 5); % peak SF
-                                % if find(iLocPair_all==1)
-                                    y_ticks_all{2} = linspace(0, .2, 5); % SF peak amp
-                                % else
-                                %     y_ticks_all{2} = linspace(.0, 4, 5)*1e-3; % SF peak amp
-                                % end
-                                y_ticks_all{3} = linspace(1, 3, 5); % SF bandwidth
-                                y_ticks_all{4} = linspace(-.1, .1, 5); % SF baseline
-                            else
-                                % y_ticks_all{1} = linspace(0, 2, 5); % peak SF
-                                % 
-                                % if find(iLocPair_all==1)
-                                %     y_ticks_all{2} = linspace(.02, .12, 5); % SF peak amp
-                                % else
-                                %     y_ticks_all{2} = linspace(.02, .06, 5); % SF peak amp
-                                % end
-                                % y_ticks_all{3} = linspace(.3, 2, 5); % SF bandwidth
-                                % y_ticks_all{4} = linspace(-.08, 0, 5); % SF baseline
-                            end
-
-                        case 14 % SF tuningC | asymmetric Gaussian
-                            % if flag_plotIDVD
-                            % 
-                            %     y_ticks_all{1} = linspace(0, 2, 5); % peak SF
-                            %     if find(iLocPair_all==1)
-                            %         y_ticks_all{2} = linspace(.01, .2, 5); % SF peak amp
-                            %     else
-                            %         y_ticks_all{2} = linspace(.0, .12, 5); % SF peak amp
-                            %     end
-                            %     y_ticks_all{3} = linspace(.6, 5, 5); % SF width (left+right), octaves
-                            %     y_ticks_all{4} = linspace(-.1, .1, 5); % SF baseline
-                            % else
-                            %     % y_ticks_all{1} = linspace(0, 2, 5); % peak SF
-                            %     % 
-                            %     % if find(iLocPair_all==1)
-                            %     %     y_ticks_all{2} = linspace(.02, .12, 5); % SF peak amp
-                            %     % else
-                            %     %     y_ticks_all{2} = linspace(.02, .06, 5); % SF peak amp
-                            %     % end
-                            %     % y_ticks_all{3} = linspace(.6, 4, 5); % SF width (left+right), octaves
-                            %     % y_ticks_all{4} = linspace(-.08, 0, 5); % SF baseline
-                            % end
-                    end
-                case 1 % plot distribution of group averages, not bars
-                    % switch iFamily_perF(iFeature)
-                    %     case 1 % ORI tuniningC | Scaled Gaussian
-                    %         if find(iLocPair_all==1)
-                    %             y_ticks_all{1} = linspace(0, .3, 5); % ORI peak amp (fovea)
-                    %         else
-                    %             y_ticks_all{1} = linspace(.06, .14, 5); % ORI peak amp
-                    %         end
-                    %         y_ticks_all{2} = linspace(10, 50, 5); % ORI band
-                    %         y_ticks_all{3} = linspace(-.03, .01, 5); % ORI baseline
-                    % 
-                    %     case 10 % ORI tuningC | von Mises
-                    %         if find(iLocPair_all==1)
-                    %             y_ticks_all{1} = linspace(0, .3, 5); % ORI peak amp (fovea)
-                    %         else
-                    %             y_ticks_all{1} = linspace(.06, .14, 5); % ORI peak amp
-                    %         end
-                    %         y_ticks_all{2} = linspace(10, 50, 5); % ORI band
-                    %         y_ticks_all{3} = linspace(-.03, .01, 5); % ORI baseline
-                    % 
-                    %     case 2 % SF tuniningC | log parabola
-                    %         y_ticks_all{1} = linspace(log2(1.4), log2(2.8), 5); % peak SF
-                    %         if find(iLocPair_all==1)
-                    %             y_ticks_all{2} = linspace(.01, .13, 5); % SF peak amp (fovea)
-                    %         else
-                    %             y_ticks_all{2} = linspace(.03, .07, 5); % SF peak amp
-                    %         end
-                    %         y_ticks_all{3} = linspace(.5, .9, 5); % SF bandwidth
-                    %         y_ticks_all{4} = linspace(-.04, .04, 5); % SF baseline
-                    % 
-                    %     case 14 % SF tuningC | asymmetric Gaussian
-                    %         y_ticks_all{1} = linspace(log2(1.4), log2(2.8), 5); % peak SF
-                    %         if find(iLocPair_all==1)
-                    %             y_ticks_all{2} = linspace(.01, .13, 5); % SF peak amp (fovea)
-                    %         else
-                    %             y_ticks_all{2} = linspace(.03, .07, 5); % SF peak amp
-                    %         end
-                    %         y_ticks_all{3} = linspace(1, 1.8, 5); % SF width (left+right), octaves
-                    %         y_ticks_all{4} = linspace(-.04, .04, 5); % SF baseline
-
-                    % end % switch
+            switch flag_plotPurpose
+                case 'paper'
+                    sz_wd_perBar = 200;
+                case 'slide'
+                    sz_wd_perBar = 250;
             end
+            nBars = numel(iLocPair_all);
+            sz_fig = [nBars*sz_wd_perBar, 400+nchoosek(nBars,2)*50];
 
-            % Loop through each tuning characteristic
-            for iTunC = 1:nTunC_full
+            colors = colors_comb(iLocPair_all, :);
+            x_ticks = namesLocComb(iLocPair_all);
 
-                % Compute median for each observer
-                % margParams_ORI_allCond: nModelA x nModelB x nLoc_pair x nSubj x nIter x nDataset x nParam
-                % tunC_allSubj_allIter: nLoc_pair x nSubj x nIter
-                % switch iFeature
-                %     case 1
-                %         data_allIter_allSubj = squeeze(margParams_ORI_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iDataset_plotRC, iTunC));
-                %         data_obs_allSubj = squeeze(margParams_ORI_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, 1, 2, iTunC)); % full data, without resampling
-                %     case 2
-                %         data_allIter_allSubj = squeeze(margParams_SF_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iDataset_plotRC, iTunC));
-                %         data_obs_allSubj = squeeze(margParams_SF_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, 1, 2, iTunC));
-                % end
+            for iFeature = 1:nFeatures
+                iFamily = iFamily_perF(iFeature);
+                str_family = sprintf('F%d %s', iFamily, namesFamily_all{iFamily});
+                %--------------------------------------------------%
+                [namesTuningUnit, ~] = local_getTuningMeasureNames(tuningSpec.measureKind, iFeature, iFamily, namesParams_all, namesTunC_unit_perF, namesTunC_noUnit, namesTunC_SF_unit, namesTunC_SF_noUnit);
+                %--------------------------------------------------%
+                nTunC_full = length(namesTuningUnit);
+                %--------------------------------%
+                y_ticks_all = local_getSection7Ticks(tuningSpec.measureKind, iFamily, flag_plotDist, flag_plotIDVD);
+                %--------------------------------%
 
-                switch iFeature
-                    case 1
-                        data_allIter_allSubj = squeeze(margTunC_ORI_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iDataset_plotRC, iTunC));
-                        data_obs_allSubj = squeeze(margTunC_ORI_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, 1, 2, iTunC)); % full data, without resampling
-                    case 2
-                        data_allIter_allSubj = squeeze(margTunC_SF_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iDataset_plotRC, iTunC));
-                        data_obs_allSubj = squeeze(margTunC_SF_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, 1, 2, iTunC));
-                end
+                for iTunC = 1:nTunC_full
+                    y_ticks = local_getTicksForMeasure(y_ticks_all, iTunC);
+                    [data_allIter_allSubj, ref, y_ticklabels] = local_getTuningMeasureData(tuningSpec.measureKind, iFeature, iTunC, ...
+                        iModelA_plot, iModelB_plot, iLocPair_all, iDataset_plotRC, iFamily, y_ticks, ...
+                        margParams_ORI_allCond, margParams_SF_allCond, margTunC_ORI_allCond, margTunC_SF_allCond);
 
-                % Let MATLAB format y-axis ticks automatically unless a custom unit remapping is needed.
-                y_ticklabels = nan;
-                ref = nan;
-                switch iFamily_perF(iFeature)
-                    case 1
-                        if find(iTunC==3), ref = 0; end
+                    str_title = sprintf('n=%d nIter=%d L%d%d [A%d] [%s] | %s %s | %s [%s]', ...
+                        nSubj, nIterxJob, iLocPair_all, iModelA_plot, namesDataset{iDataset_plotRC}, ...
+                        namesFeature{iFeature}, namesTuningUnit{iTunC}, str_family, tuningSpec.titleTag);
 
-                    case 10
-                        if find(iTunC==3), ref = 0; end
-
-                    case 2 % log parabola
-                        switch iTunC
-                            case 1
-                                y_ticklabels = 2.^y_ticks_all{iTunC};
-                                y_ticklabels = round(y_ticklabels, 2);
-                                ref = log2(2);
-                                data_allIter_allSubj = log2(data_allIter_allSubj); % pref SF
-                            case 4, ref = 0; % baseline
-                        end
-
-                    case 14 % asymmetric Gaussian
-                        switch iTunC
-                            case 1, y_ticklabels = round(2.^y_ticks_all{iTunC}, 1); ref = log2(2);
-                                data_allIter_allSubj = log2(data_allIter_allSubj); % pref SF
-                            case 4, ref = 0; % baseline
-                        end
-                end
-
-                str_title = sprintf('n=%d nIter=%d L%d%d [A%d] [%s] | %s %s | %s', ...
-                    nSubj, nIterxJob, iLocPair_all, iModelA_plot, namesDataset{iDataset_plotRC}, namesFeature{iFeature}, namesTunC{iTunC}, str_family);
-
-                switch flag_plotDist
-                    case 0
-                        %------------------------------%
-                        fxn_drawBars(data_allIter_allSubj, ref, colors, x_ticks, y_ticks_all{iTunC}, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd, flag_plotPurpose);
-                        % ------------------------------%
-                        fig = gcf;
-                        ylabel(sprintf('%s %s', namesFeature{iFeature}, namesTunC{iTunC}))
-                    case 1
-                        %------------------------------%
-                        fxn_drawDist(data_allIter_allSubj, ref, colors, x_ticks, y_ticks_all{iTunC}, y_ticklabels, str_title, sz_fig, nIterxJob, nSubj)
-                        %------------------------------%
-                        fig = gcf;
-                        xlabel(sprintf('%s %s [%s]', namesFeature{iFeature}, namesTunC{iTunC}, str_family))
-                        ylabel('Probabillity')
-                end
-
-                % Constrain axis layout for Fig 7 to keep long y-labels visible.
-                drawnow;
-                ax = gca;
-                if isgraphics(ax, 'axes')
-                    oldUnits = ax.Units;
-                    ax.Units = 'normalized';
-                    ti = ax.TightInset; % [left bottom right top]
-
-                    left = max(0.26, ti(1) + 0.04);
-                    bottom = max(0.14, ti(2) + 0.03);
-                    right = max(0.03, ti(3) + 0.02);
-                    top = max(0.05, ti(4) + 0.02);
-
-                    w = 1 - left - right;
-                    h = 1 - bottom - top;
-                    if isfinite(w) && isfinite(h) && w > 0.30 && h > 0.30
-                        ax.Position = [left, bottom, w, h];
+                    switch flag_plotDist
+                        case 0
+                            fxn_drawBars(data_allIter_allSubj, ref, colors, x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd, flag_plotPurpose);
+                            fig = gcf;
+                            ylabel(sprintf('%s %s', namesFeature{iFeature}, namesTuningUnit{iTunC}))
+                        case 1
+                            fxn_drawDist(data_allIter_allSubj, ref, colors, x_ticks, y_ticks, y_ticklabels, str_title, sz_fig, nIterxJob, nSubj)
+                            fig = gcf;
+                            xlabel(sprintf('%s %s [%s]', namesFeature{iFeature}, namesTuningUnit{iTunC}, str_family))
+                            ylabel('Probabillity')
                     end
-                    ax.Units = oldUnits;
+
+                    drawnow;
+                    ax = gca;
+                    if isgraphics(ax, 'axes')
+                        oldUnits = ax.Units;
+                        ax.Units = 'normalized';
+                        ti = ax.TightInset;
+
+                        left = max(0.26, ti(1) + 0.04);
+                        bottom = max(0.14, ti(2) + 0.03);
+                        right = max(0.03, ti(3) + 0.02);
+                        top = max(0.05, ti(4) + 0.02);
+
+                        w = 1 - left - right;
+                        h = 1 - bottom - top;
+                        if isfinite(w) && isfinite(h) && w > 0.30 && h > 0.30
+                            ax.Position = [left, bottom, w, h];
+                        end
+                        ax.Units = oldUnits;
+                    end
+
+                    saveAndCloseFigure(fig, sprintf('%s/n%d_L%d%d_A%d_%s%d.png', nameFolder_Fig_tuning, nSubj, iLocPair_all, iModelA_plot, namesFeature{iFeature}, iTunC))
                 end
-
-                % Save the figure
-                saveAndCloseFigure(fig, sprintf('%s/n%d_L%d%d_A%d_%s%d.png', nameFolder_Fig_tunC, nSubj, iLocPair_all, iModelA_plot, namesFeature{iFeature}, iTunC))
-
-            end % end of iTunC
-        end % end of iFeature
-    end % end of iGroup
-    clear margTunC_*_allCond
+            end
+        end
+    end
+    clear margParams_*_allCond margTunC_*_allCond
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
-    %% 8. Corr0: Corr between CS and tunParams (just to check bound-hitting)
-    clc; fprintf('\n%s: Fig 8/23: Corr CS vs tuning params STARTED.\n', string(datetime('now')))
+    %% 8. Corr between CS and tuningC and tunParams
+    clc; fprintf('\n%s: Fig 8/22: Corr CS vs tuningC and tunParams STARTED.\n', string(datetime('now')))
 
     % Load data
-    load(nameFolder_Output_SaveCompile, 'margParams*_allCond', 'CS_allSubj')
+    load(nameFolder_Output_SaveCompile, 'margParams*_allCond', 'margTunC*_allCond', 'CS_allSubj')
 
     nameVarX = 'CS';
-    nameVarY = 'tunParam';
-    sz_label = 55;
-    sz_labelOffset = .05;
-    sz_axOffset = 0.05; % extra breathing room
-
-    nameFolder_Fig_NOM_corr = sprintf('%s/Corr/%s_%s', nameFolder_Fig_NOM_Trialwise, nameVarX, nameVarY);
-    if isempty(dir(nameFolder_Fig_NOM_corr)); mkdir(nameFolder_Fig_NOM_corr), end
-
-    nameFolder_Outputs_NOM_corr = sprintf('%s/Corr/%s_%s', nameFolder_Outputs_NOM_Trialwise, nameVarX, nameVarY);
-    if isempty(dir(nameFolder_Outputs_NOM_corr)); mkdir(nameFolder_Outputs_NOM_corr), end
-
     flag_zeroMean = 0;
     flag_plotIdvdCI = 0;
     flag_plotUnikSymbol = 0; % 1=each subj has a unique marker; 0=all are circles
 
-    for iSet = 1:length(iLocSingle_allSets)
+    for iSpec = 1:numel(tuningPlotSpecs)
+        tuningSpec = tuningPlotSpecs(iSpec);
 
-        iLocCorr_all = iLocSingle_allSets{iSet};
-        fprintf(' - L%s\n', strjoin(string(iLocCorr_all), ''))
+        switch tuningSpec.measureKind
+            case 'tunParam'
+                sz_label = 55;
+                sz_labelOffset = .05;
+            case 'tunC'
+                sz_label = 50;
+                sz_labelOffset = .03;
+        end
+        sz_axOffset = 0.05;
 
-        % Obtain CS (x-axis)
-        X_allSubj = CS_allSubj(:, iLocCorr_all);
-        x_ticks = linspace(1.5, 3.5, 5); % EE
-        X_allIter_allSubj = repmat(X_allSubj, 1, 1, nIterxJob);
+        nameFolder_Fig_NOM_corr = sprintf('%s/Corr/%s_%s', nameFolder_Fig_NOM_Trialwise, nameVarX, tuningSpec.measureKind);
+        if isempty(dir(nameFolder_Fig_NOM_corr)); mkdir(nameFolder_Fig_NOM_corr), end
 
-        for iFeature = 1:nFeatures
-            iFamily = iFamily_perF(iFeature);
-            namesTunCs = namesTunC_unit_perF{iFamily, 1};
-            nTunCs_full = length(namesTunCs);
+        nameFolder_Outputs_NOM_corr = sprintf('%s/Corr/%s_%s', nameFolder_Outputs_NOM_Trialwise, nameVarX, tuningSpec.measureKind);
+        if isempty(dir(nameFolder_Outputs_NOM_corr)); mkdir(nameFolder_Outputs_NOM_corr), end
 
-            for iTunC = 1:nTunCs_full
-                switch iFeature
-                    case 1, NOMp_allIter_allSubj = squeeze(margParams_ORI_allCond(iModelA_plot, iModelB_plot, iLocCorr_all, :, :, iDataset_plotRC, iTunC));
-                    case 2, NOMp_allIter_allSubj = squeeze(margParams_SF_allCond(iModelA_plot, iModelB_plot, iLocCorr_all, :, :, iDataset_plotRC, iTunC));
+        for iSet = 1:numel(iLocSingle_allSets)
+            iLocCorr_all = iLocSingle_allSets{iSet};
+            fprintf(' [%s] - L%s\n', tuningSpec.measureKind, strjoin(string(iLocCorr_all), ''))
+
+            X_allSubj = CS_allSubj(:, iLocCorr_all);
+            x_ticks = linspace(1.5, 3.5, 5);
+            X_allIter_allSubj = repmat(X_allSubj, 1, 1, nIterxJob);
+
+            for iFeature = 1:nFeatures
+                iFamily = iFamily_perF(iFeature);
+                str_family = sprintf('F%d %s', iFamily, namesFamily_all{iFamily});
+                %---------------------------------------------------%
+                [namesTuningUnit, ~] = local_getTuningMeasureNames(tuningSpec.measureKind, iFeature, iFamily, namesParams_all, namesTunC_unit_perF, namesTunC_noUnit, namesTunC_SF_unit, namesTunC_SF_noUnit);
+                %---------------------------------------------------%
+                nTunC_full = length(namesTuningUnit);
+
+                for iTunC = 1:nTunC_full
+                    fprintf(' - L%s %s%d [%s] (%s)\n', strjoin(string(iLocCorr_all), ''), namesFeature{iFeature}, iTunC, str_family, tuningSpec.measureKind)
+                    %---------------------------------------------------------------%
+                    [NOMp_allIter_allSubj, ~, y_ticklabels] = local_getTuningMeasureData(tuningSpec.measureKind, iFeature, iTunC, ...
+                        iModelA_plot, iModelB_plot, iLocCorr_all, iDataset_plotRC, iFamily, ...
+                        local_getCorrTicks(tuningSpec.measureKind, iFeature, iTunC), ...
+                        margParams_ORI_allCond, margParams_SF_allCond, margTunC_ORI_allCond, margTunC_SF_allCond);
+                    %---------------------------------------------------------------%
+                    %------------------------%
+                    y_ticks = local_getCorrTicks(tuningSpec.measureKind, iFeature, iTunC);
+                    %------------------------%
+                    x_ticklabels = x_ticks;
+                    if isscalar(y_ticklabels) && isnan(y_ticklabels)
+                        y_ticklabels = y_ticks;
+                    end
+
+                    nameVarY_figTitle = sprintf('%s %s', namesFeature{iFeature}, namesTuningUnit{iTunC});
+                    nameVarY_fileTitle = sprintf('%s%d', namesFeature{iFeature}, iTunC);
+                    str_title = sprintf('n=%d, nIter=%d %s vs. %s [L%s]', nSubj, nIterxJob, nameVarX, nameVarY_figTitle, strjoin(string(iLocCorr_all), ''));
+
+                    %--------------------------------------%
+                    [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho_corr, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob, flag_plotPurpose);
+                    %--------------------------------------%
+                    fig = gcf;
+
+                    save(sprintf('%s/n%d_L%s_%s.mat', nameFolder_Outputs_NOM_corr, nSubj, strjoin(string(iLocCorr_all), ''), nameVarY_fileTitle), 'PearsonR', 'SpearmanRho')
+
+                    if strcmp(tuningSpec.measureKind, 'tunParam')
+                        yline(ub_full_all{iFamily}(iTunC), 'k--');
+                        yline(lb_full_all{iFamily}(iTunC), 'k--');
+                    end
+
+                    xlabel('Contrast sensitivity (1/contrast)', 'fontsize', sz_label)
+                    ylabel(sprintf('%s %s', namesFeature{iFeature}, namesTuningUnit{iTunC}), 'fontsize', sz_label)
+
+                    ax = gca;
+                    drawnow;
+                    ti = ax.TightInset;
+                    ax.XLabel.Units = 'normalized';
+                    ax.YLabel.Units = 'normalized';
+
+                    ax.XLabel.Position(2) = ax.XLabel.Position(2) - sz_labelOffset;
+                    ax.YLabel.Position(1) = ax.YLabel.Position(1) - sz_labelOffset;
+
+                    newPos = [ ...
+                        ti(1) + sz_axOffset, ...
+                        ti(2) + sz_axOffset, ...
+                        1 - ti(1) - ti(3) - 2*sz_axOffset, ...
+                        1 - ti(2) - ti(4) - 2*sz_axOffset];
+                    if all(isfinite(newPos)) && newPos(3) >= 0.55 && newPos(4) >= 0.55
+                        ax.Position = newPos;
+                    end
+
+                    saveAndCloseFigure(fig, sprintf('%s/n%d_L%s_%s.png', nameFolder_Fig_NOM_corr, nSubj, strjoin(string(iLocCorr_all), ''), nameVarY_fileTitle))
                 end
-
-                switch iFeature
-                    case 1, y_ticks_allTunC_lb = [0, 0, -.1]; y_ticks_allTunC_ub = [.36, 60, .1];% 3 values are ORI peak amplitude, width, baseline
-                    case 2, y_ticks_allTunC_lb = [0, 0, 0, -.1]; y_ticks_allTunC_ub = [4, .24, 1, .1]; % 4 values are SF peak, peak amplitude, width, baseline
-                end
-
-                % y_ticks = linspace(y_ticks_allTunC_lb(iTunC), y_ticks_allTunC_ub(iTunC), 5);
-                y_ticks = [];
-
-                x_ticklabels = x_ticks;
-                y_ticklabels = y_ticks;
-
-                nameVarY_figTitle = sprintf('%s %s', namesFeature{iFeature}, namesTunCs{iTunC});
-                nameVarY_fileTitle = sprintf('%s%d', namesFeature{iFeature}, iTunC);
-
-                str_title = sprintf('n=%d, nIter=%d %s vs. %s [L%s]', nSubj, nIterxJob, nameVarX, nameVarY_figTitle, strjoin(string(iLocCorr_all), ''));
-
-                %----------------------------%
-                [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob, flag_plotPurpose);
-                %----------------------------%
-                fig = gcf;
-
-                % Save CI for automatic CI range calcuation in CorrAsym
-                save(sprintf('%s/n%d_L%s_%s.mat', nameFolder_Outputs_NOM_corr, nSubj, strjoin(string(iLocCorr_all), ''), nameVarY_fileTitle), 'PearsonR', 'SpearmanRho')
-
-                % plot ub and lb when fitting
-                yline(ub_full_all{iFamily}(iTunC), 'k--');
-                yline(lb_full_all{iFamily}(iTunC), 'k--');
-
-                xlabel('Contrast sensitivity (1/contrast)', 'fontsize', sz_label)
-                ylabel(sprintf('%s %s', namesFeature{iFeature}, namesTunCs{iTunC}), 'fontsize', sz_label)
-
-                % Adjust distance between components
-                ax = gca;
-                drawnow; % Ensure text/tick extents are up to date before reading TightInset
-                ti = ax.TightInset; % [left bottom right top] padding needed for labels/ticks
-                ax.XLabel.Units = 'normalized';
-                ax.YLabel.Units = 'normalized';
-
-                ax.XLabel.Position(2) = ax.XLabel.Position(2) - sz_labelOffset; % move label down
-                ax.YLabel.Position(1) = ax.YLabel.Position(1) - sz_labelOffset; % move label left
-
-                newPos = [ ...
-                    ti(1) + sz_axOffset, ...
-                    ti(2) + sz_axOffset, ...
-                    1 - ti(1) - ti(3) - 2*sz_axOffset, ...
-                    1 - ti(2) - ti(4) - 2*sz_axOffset];
-                if all(isfinite(newPos)) && newPos(3) >= 0.55 && newPos(4) >= 0.55
-                    ax.Position = newPos;
-                end
-
-                saveAndCloseFigure(fig, sprintf('%s/n%d_L%s_%s.png', nameFolder_Fig_NOM_corr, nSubj, strjoin(string(iLocCorr_all), ''), nameVarY_fileTitle))
-
-            end % iTunC
-        end % iFeature
-    end % iSet
-    clear margParams*_allCond
-    fprintf('\n%s: DONE.\n', string(datetime('now')))
-
-    %% 9. Corr1: Corr between CS and tunC
-    clc; fprintf('\n%s: Fig 9/23: Corr CS vs tuning characteristics STARTED.\n', string(datetime('now')))
-
-    % Load data
-    load(nameFolder_Output_SaveCompile, 'margParams*_allCond', 'CS_allSubj')
-
-    nameVarX = 'CS';
-    nameVarY = 'tunC';
-    sz_label = 50;
-    sz_labelOffset = .03;
-    sz_axOffset = 0.05; % extra breathing room
-
-    nameFolder_Fig_NOM_corr = sprintf('%s/Corr/%s_%s', nameFolder_Fig_NOM_Trialwise, nameVarX, nameVarY);
-    if isempty(dir(nameFolder_Fig_NOM_corr)); mkdir(nameFolder_Fig_NOM_corr), end
-
-    nameFolder_Outputs_NOM_corr = sprintf('%s/Corr/%s_%s', nameFolder_Outputs_NOM_Trialwise, nameVarX, nameVarY);
-    if isempty(dir(nameFolder_Outputs_NOM_corr)); mkdir(nameFolder_Outputs_NOM_corr), end
-
-    flag_zeroMean = 0;
-    flag_plotIdvdCI = 0;
-    flag_plotUnikSymbol = 0; % 1=each subj has a unique marker; 0=all are circles
-
-    for iSet = 1:numel(iLocSingle_allSets)
-
-        iLocCorr_all = iLocSingle_allSets{iSet};
-
-        % Obtain CS (x-axis)
-        X_allSubj = CS_allSubj(:, iLocCorr_all);
-        x_ticks = linspace(1.5, 3.5, 5); % Asymmetry in CS
-        X_allIter_allSubj = repmat(X_allSubj, 1, 1, nIterxJob);
-
-        for iFeature = 1:nFeatures
-            iFamily = iFamily_perF(iFeature);
-            str_family = sprintf('F%d %s', iFamily, namesFamily_all{iFamily});
-            namesTunCs = namesParams_all{iFamily};
-            nTunCs_full = length(namesTunCs);
-
-            for iTunC = 1:nTunCs_full
-                fprintf(' - L%s %s%d [%s]\n', strjoin(string(iLocCorr_all), ''), namesFeature{iFeature}, iTunC, str_family)
-                switch iFeature
-                    case 1, NOMp_allIter_allSubj = squeeze(margParams_ORI_allCond(iModelA_plot, iModelB_plot, iLocCorr_all, :, :, iDataset_plotRC, iTunC));
-                    case 2, NOMp_allIter_allSubj = squeeze(margParams_SF_allCond(iModelA_plot, iModelB_plot, iLocCorr_all, :, :, iDataset_plotRC, iTunC));
-                end
-
-                switch iFeature
-                    case 1, y_ticks_allTunC_lb = [-.004, 0, -.1]; y_ticks_allTunC_ub = [.02, 6, .1];% 3 values are ORI peak amplitude, width, baseline
-                    case 2, y_ticks_allTunC_lb = [-2, 0, .5, -.1]; y_ticks_allTunC_ub = [2, .004, 3.5, .1]; % 4 values are SF peak, peak amplitude, width, baseline
-                end
-
-                y_ticks = linspace(y_ticks_allTunC_lb(iTunC), y_ticks_allTunC_ub(iTunC), 5);
-
-                x_ticklabels = x_ticks;
-                y_ticklabels = y_ticks;
-                if iFeature==2 && iTunC==1 % SF peak, needs to convert y tick label to linear scale
-                    y_ticklabels = 2.^y_ticks;
-                end
-
-                nameVarY_figTitle = sprintf('%s %s', namesFeature{iFeature}, namesTunCs{iTunC});
-                nameVarY_fileTitle = sprintf('%s%d', namesFeature{iFeature}, iTunC);
-
-                str_title = sprintf('n=%d, nIter=%d %s vs. %s [L%s]', nSubj, nIterxJob, nameVarX, nameVarY_figTitle, strjoin(string(iLocCorr_all), ''));
-
-                %----------------------------%
-                [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob, flag_plotPurpose);
-                %----------------------------%
-                fig = gcf;
-                % Save CI for automatic CI range calcuation in CorrAsym
-                save(sprintf('%s/n%d_L%s_%s.mat', nameFolder_Outputs_NOM_corr, nSubj, strjoin(string(iLocCorr_all), ''), nameVarY_fileTitle), 'PearsonR', 'SpearmanRho')
-
-                xlabel('Contrast sensitivity (1/contrast)', 'fontsize', sz_label)
-                ylabel(sprintf('%s %s', namesFeature{iFeature}, namesTunCs{iTunC}), 'fontsize', sz_label)
-
-                % Adjust distance between components
-                ax = gca;
-                drawnow; % Ensure text/tick extents are up to date before reading TightInset
-                ti = ax.TightInset; % [left bottom right top] padding needed for labels/ticks
-                ax.XLabel.Units = 'normalized';
-                ax.YLabel.Units = 'normalized';
-
-                ax.XLabel.Position(2) = ax.XLabel.Position(2) - sz_labelOffset; % move label down
-                ax.YLabel.Position(1) = ax.YLabel.Position(1) - sz_labelOffset; % move label left
-
-                newPos = [ ...
-                    ti(1) + sz_axOffset, ...
-                    ti(2) + sz_axOffset, ...
-                    1 - ti(1) - ti(3) - 2*sz_axOffset, ...
-                    1 - ti(2) - ti(4) - 2*sz_axOffset];
-                if all(isfinite(newPos)) && newPos(3) >= 0.55 && newPos(4) >= 0.55
-                    ax.Position = newPos;
-                end
-
-                saveAndCloseFigure(fig, sprintf('%s/n%d_L%s_%s.png', nameFolder_Fig_NOM_corr, nSubj, strjoin(string(iLocCorr_all), ''), nameVarY_fileTitle))
-
-            end % iTunC
-        end % iFeature
-    end % iSet
-    clear margTunC*_allCond
+            end
+        end
+    end
+    clear margParams*_allCond margTunC*_allCond
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
     %% Corr2: Corr between CS and pA
-    clc; fprintf('\n%s: Fig 10/23: Corr CS vs pA STARTED.\n', string(datetime('now')))
+    clc; fprintf('\n%s: Fig 9/22: Corr CS vs pA STARTED.\n', string(datetime('now')))
 
     % Load data
     load(nameFolder_Output_SaveCompile, 'metric_data_allCond', 'CS_allSubj')
@@ -1635,7 +1358,7 @@ for iRun=4%[1,3,4]
 
         NOMp_allIter_allSubj = getCI(metric_data_allCond(iModelA_plot, iModelB_plot, iLocCorr_all, iMetric_pA, :, :, :), 2, 7);
 
-        y_ticks = round(linspace(.6, .9, 5), 2);
+        y_ticks = round(linspace(.5, .9, 5), 2);
 
         x_ticklabels = x_ticks;
         y_ticklabels = y_ticks;
@@ -1646,14 +1369,14 @@ for iRun=4%[1,3,4]
         str_title = sprintf('n=%d, nIter=%d%s vs. %s [L%s]', nSubj, nIterxJob, nameVarX, nameVarY_figTitle, strjoin(string(iLocCorr_all), ''));
 
         %----------------------------%
-        [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob, flag_plotPurpose);
+        [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho_corr, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob, flag_plotPurpose);
         %----------------------------%
         fig = gcf;
         % Save CI for automatic CI range calcuation in CorrAsym
         save(sprintf('%s/n%d_L%s_%s.mat', nameFolder_Outputs_NOM_corr, nSubj, strjoin(string(iLocCorr_all), ''), nameVarY_fileTitle), 'PearsonR', 'SpearmanRho')
 
         xlabel('Contrast sensitivity (1/contrast)', 'fontsize', sz_label)
-        ylabel(nameVarY_figTitle, 'fontsize', sz_label)
+        ylabel('Response consistency', 'fontsize', sz_label)
 
         % Adjust distance between components
         ax = gca;
@@ -1681,7 +1404,7 @@ for iRun=4%[1,3,4]
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
     %% CompAsym1: CS and tunC: compare binned estimates
-    % clc; fprintf('\n%s: Fig 11/23: CompAsym CS vs tuning characteristics STARTED.\n', string(datetime('now')))
+    % clc; fprintf('\n%s: Fig 10/22: CompAsym CS vs tuning characteristics STARTED.\n', string(datetime('now')))
     %
     % % Load data
     % load(nameFolder_Data_SaveCompile, 'margTunC_*_allCond', 'CS_allSubj')
@@ -1806,160 +1529,111 @@ for iRun=4%[1,3,4]
     % clear margTunC_*_allCond
     % fprintf('\n%s: DONE.\n', string(datetime('now')))
 
-    %% 12. CorrAsym1: (CS and tunC): corr between extents of EE/HVA/VMA
-    clc; fprintf('\n%s: Fig 12/23: CorrAsym CS vs tuning characteristics STARTED.\n', string(datetime('now')))
+    %% 11. CorrAsym1: (CS vs tuning summaries): corr between extents of EE/HVA/VMA
+    clc; fprintf('\n%s: Fig 11/22: CorrAsym CS vs tuning summaries STARTED.\n', string(datetime('now')))
 
     flag_plotIdvdCI = 1;
     flag_plotUnikSymbol = 0;
     iLocCorr_all = [6,5,3];
 
     % Load data
-    load(nameFolder_Output_SaveCompile, 'margParams_*_allCond', 'CS_allSubj')
+    load(nameFolder_Output_SaveCompile, 'margParams_*_allCond', 'margTunC_*_allCond', 'CS_allSubj')
 
     nameVarX = 'CS';
-    nameVarY = 'tunC';
-
-    nameFolder_Fig_NOM_corr = sprintf('%s/Corr/%s_%s', nameFolder_Fig_NOM_Trialwise, nameVarX, nameVarY);
-    nameFolder_Fig_NOM_CorrAsym = sprintf('%s/CorrAsym/%s_%s', nameFolder_Fig_NOM_Trialwise, nameVarX, nameVarY);
-    if isempty(dir(nameFolder_Fig_NOM_CorrAsym)); mkdir(nameFolder_Fig_NOM_CorrAsym), end
-
-    nameFolder_Outputs_NOM_corr = sprintf('%s/Corr/%s_%s', nameFolder_Outputs_NOM_Trialwise, nameVarX, nameVarY);
-    if isempty(dir(nameFolder_Outputs_NOM_corr)); mkdir(nameFolder_Outputs_NOM_corr), end
-
     sz_label = 55;
     sz_labelOffset = 0.01;
     sz_axOffset = 0.05; % extra breathing room
 
-    for iGroup = 1:nGroups
-        iLocPair_all = iLocGroups_all{iGroup};
+    for iSpec = 1:numel(tuningPlotSpecs)
+        tuningSpec = tuningPlotSpecs(iSpec);
+        nameFolder_Fig_NOM_CorrAsym = sprintf('%s/CorrAsym/%s_%s', nameFolder_Fig_NOM_Trialwise, nameVarX, tuningSpec.measureKind);
+        if isempty(dir(nameFolder_Fig_NOM_CorrAsym)); mkdir(nameFolder_Fig_NOM_CorrAsym), end
+        nameFolder_Outputs_NOM_corr = sprintf('%s/Corr/%s_%s', nameFolder_Outputs_NOM_Trialwise, nameVarX, tuningSpec.measureKind);
+        if isempty(dir(nameFolder_Outputs_NOM_corr)); mkdir(nameFolder_Outputs_NOM_corr), end
 
-        switch iLocPair_all(1)
-            case 1, nameAsymX = 'EE'; nameAsymY = 'EE';
-            case 6, nameAsymX = 'HVA'; nameAsymY = 'HVA';
-            case 5, nameAsymX = 'VMA'; nameAsymY = 'VMA';
-        end
+        for iGroup = 1:nGroups
+            iLocPair_all = iLocGroups_all{iGroup};
 
-        % X-axis
-        asymX_allSubj = (CS_allSubj(:, iLocPair_all(1))-CS_allSubj(:, iLocPair_all(2)))./(CS_allSubj(:, iLocPair_all(1))+CS_allSubj(:, iLocPair_all(2)));
-        switch iLocPair_all(1)
-            case 1, x_ticks = linspace(0, 20, 5); % EE
-            case 6, x_ticks = linspace(-5, 15, 5); % HVA
-            case 5, x_ticks = linspace(0, 12, 5); % VMA (extent is smaller)
-        end
-        x_ticks = linspace(-3, 17, 5); 
-        asymX_allIter_allSubj = repmat(asymX_allSubj, 1, nIterxJob)';
-
-        for iFeature = 1:nFeatures
-            iFamily = iFamily_perF(iFeature);
-            str_family = sprintf('F%d %s', iFamily, namesFamily_all{iFamily});
-            if iFeature == 1
-                namesTunCs = namesTunC_unit_perF{iFamily, 2};
-                namesTunCs_noUnit = namesTunC_noUnit{iFamily, 2};
-            else
-                namesTunCs = namesTunC_SF_unit;
-                namesTunCs_noUnit = namesTunC_SF_noUnit;
+            switch iLocPair_all(1)
+                case 1, nameAsymX = 'EE'; nameAsymY = 'EE';
+                case 6, nameAsymX = 'HVA'; nameAsymY = 'HVA';
+                case 5, nameAsymX = 'VMA'; nameAsymY = 'VMA';
             end
-            nTunCs_full = length(namesTunCs);
 
-            for iTunC = 1:nTunCs_full
-                fprintf(' - L%s %s%d\n', strjoin(string(iLocPair_all), ''), namesFeature{iFeature}, iTunC)
+            asymX_allSubj = (CS_allSubj(:, iLocPair_all(1))-CS_allSubj(:, iLocPair_all(2)))./(CS_allSubj(:, iLocPair_all(1))+CS_allSubj(:, iLocPair_all(2)));
+            x_ticks = linspace(-5, 15, 5);
+            asymX_allIter_allSubj = repmat(asymX_allSubj, 1, nIterxJob)';
 
-                % Y-axis
-                switch iFeature
-                    % case 1, NOMp_allIter_allSubj = squeeze(margTunC_ORI_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iDataset_plotRC, iTunC));
-                    % case 2, NOMp_allIter_allSubj = squeeze(margTunC_SF_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iDataset_plotRC, iTunC));
-                        case 1, NOMp_allIter_allSubj = squeeze(margParams_ORI_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iDataset_plotRC, iTunC));
-                    case 2, NOMp_allIter_allSubj = squeeze(margParams_SF_allCond(iModelA_plot, iModelB_plot, iLocPair_all, :, :, iDataset_plotRC, iTunC));
+            for iFeature = 1:nFeatures
+                iFamily = iFamily_perF(iFeature);
+                str_family = sprintf('F%d %s', iFamily, namesFamily_all{iFamily});
+                %-----------------------------------------------------------------%
+                [namesTunCs, namesTunCs_noUnit] = local_getTuningMeasureNames(tuningSpec.measureKind, iFeature, iFamily, namesParams_all, namesTunC_unit_perF, namesTunC_noUnit, namesTunC_SF_unit, namesTunC_SF_noUnit);
+                %-----------------------------------------------------------------%
+                nTunCs_full = length(namesTunCs);
+
+                for iTunC = 1:nTunCs_full
+                    fprintf(' [%s] - L%s %s%d\n', tuningSpec.measureKind, strjoin(string(iLocPair_all), ''), namesFeature{iFeature}, iTunC)
+                    %------------------------------------------------------%
+                    [NOMp_allIter_allSubj, ~, ~] = local_getTuningMeasureData(tuningSpec.measureKind, iFeature, iTunC, ...
+                        iModelA_plot, iModelB_plot, iLocPair_all, iDataset_plotRC, iFamily, nan, ...
+                        margParams_ORI_allCond, margParams_SF_allCond, margTunC_ORI_allCond, margTunC_SF_allCond);
+                    %------------------------------------------------------%
+                    asymY_allIter_allSubj = squeeze((NOMp_allIter_allSubj(1, :, :)-NOMp_allIter_allSubj(2, :, :))./(NOMp_allIter_allSubj(1, :, :)+NOMp_allIter_allSubj(2, :, :)));
+
+                    %------------------------------%
+                    y_ticks = local_getCorrAsymTicks(tuningSpec.measureKind, iLocPair_all(1), iFamily, iTunC);
+                    %------------------------------%
+                    x_ticklabels = nan;
+                    y_ticklabels = nan;
+
+                    nameVarY_figTitle = sprintf('%s %s [%s]', namesFeature{iFeature}, namesTunCs{iTunC}, str_family);
+                    nameVarY_fileTitle = sprintf('%s%d', namesFeature{iFeature}, iTunC);
+                    str_title = sprintf('n=%d, nIter=%d %s (%s) vs. %s (%s)', nSubj, nIterxJob, nameVarX, nameAsymX, nameVarY_figTitle, nameAsymY);
+
+                    load(sprintf('%s/n%d_L%s_%s.mat', nameFolder_Outputs_NOM_corr, nSubj, strjoin(string(iLocCorr_all), ''), nameVarY_fileTitle), 'PearsonR', 'SpearmanRho');
+                    switch flag_UseRUseRho_corr
+                        case 'useR'
+                            flag_CIrange = PearsonR(4) < 0.05;
+                        case 'useRho'
+                            flag_CIrange = SpearmanRho(4) < 0.05;
+                    end
+
+                    %-----------------%
+                    fxn_drawCorrAsym(asymX_allIter_allSubj*100, asymY_allIter_allSubj*100, colors_comb(iLocPair_all, :), flag_UseRUseRho_corrAsym, flag_CIrange, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, flag_plotPurpose)
+                    %-----------------%
+                    fig = gcf;
+
+                    xlabel(sprintf('%s of contrast sensitivity (%%)', nameAsymX), 'FontSize', sz_label);
+                    ylabel(sprintf('%s of %s %s (%%)', nameAsymY, namesFeature{iFeature}, namesTunCs_noUnit{iTunC}), 'fontsize', sz_label)
+
+                    ax = gca;
+                    drawnow;
+                    ti = ax.TightInset;
+                    ax.XLabel.Units = 'normalized';
+                    ax.YLabel.Units = 'normalized';
+
+                    ax.XLabel.Position(2) = ax.XLabel.Position(2) - sz_labelOffset;
+                    ax.YLabel.Position(1) = ax.YLabel.Position(1) - sz_labelOffset;
+                    newPos = [ ...
+                        ti(1) + sz_axOffset, ...
+                        ti(2) + sz_axOffset, ...
+                        1 - ti(1) - ti(3) - 2*sz_axOffset, ...
+                        1 - ti(2) - ti(4) - 2*sz_axOffset];
+                    if all(isfinite(newPos)) && newPos(3) >= 0.55 && newPos(4) >= 0.55
+                        ax.Position = newPos;
+                    end
+
+                    saveAndCloseFigure(fig, sprintf('%s/n%d_L%d%d_%s.png', nameFolder_Fig_NOM_CorrAsym, nSubj, iLocPair_all, nameVarY_fileTitle))
                 end
-
-                asymY_allIter_allSubj = squeeze((NOMp_allIter_allSubj(1, :, :)-NOMp_allIter_allSubj(2, :, :))./(NOMp_allIter_allSubj(1, :, :)+NOMp_allIter_allSubj(2, :, :)));
-
-                switch iLocPair_all(1)
-                    case 1 % EE
-                        switch iFamily
-                            case 1, y_ticks_allTunC_lb = -[0, 40, 100]; y_ticks_allTunC_ub = [80, 40, 160];
-                                % case 8, y_ticks_allTunC_lb = -[60, 30, 45, 160, 20, 220]; y_ticks_allTunC_ub = [100, 40, 55, 160, 40, 220];
-                            case 2, y_ticks_allTunC_lb = -[40, -20, 50, 180]; y_ticks_allTunC_ub = [60, 70, 50, 200];
-                            case 10, y_ticks_allTunC_lb = -[10, -20, 50]; y_ticks_allTunC_ub = [50, 70, 50];
-                        end
-                    case 6 % HVA
-                        switch iFamily
-                            % case 1, y_ticks_allTunC_lb = -[60, 60, 200]; y_ticks_allTunC_ub = [60, 60, 200]; % ORI—peak, width, baseline
-                            case 2, y_ticks_allTunC_lb = -[50, 100, 60, 160]; y_ticks_allTunC_ub = [50, 100, 60, 200]; % SF—peak, peak amplitude, width, baseline
-                            case 10, y_ticks_allTunC_lb = -[40, 18, 20]; y_ticks_allTunC_ub = [60, 10, 10]; % ORI—peak, width, baseline;
-                        end
-                    case 5 % VMA
-                        switch iFamily
-                            % case 1, y_ticks_allTunC_lb = -[100, 80, 200]; y_ticks_allTunC_ub = [100, 60, 200];
-                                % case 8, y_ticks_allTunC_lb = -[100, 40, 300, 320, 50, 320]; y_ticks_allTunC_ub = [100, 44, 300, 320, 50, 320];
-                            case 2, y_ticks_allTunC_lb = -[50, 120, 120, 300]; y_ticks_allTunC_ub = [70, 120, 120, 300];
-                            case 10, y_ticks_allTunC_lb = -[80, 30, 100]; y_ticks_allTunC_ub = [100, 30, 100];
-                        end
-                end
-
-                % Apply the same yticks to all panels
-                switch iFamily
-                    case 2, y_ticks_allTunC_lb = -[100, 100, 100, 100]; y_ticks_allTunC_ub = [100, 100, 100, 100];
-                    case 10, y_ticks_allTunC_lb = -[100, 100, 100]; y_ticks_allTunC_ub = [100, 100, 100];
-                end
-
-                y_ticks = linspace(y_ticks_allTunC_lb(iTunC), y_ticks_allTunC_ub(iTunC), 5);
-                x_ticklabels = nan;
-                y_ticklabels = nan;
-
-                nameVarY_figTitle = sprintf('%s %s [%s]', namesFeature{iFeature}, namesTunCs{iTunC}, str_family);
-                nameVarY_fileTitle = sprintf('%s%d', namesFeature{iFeature}, iTunC);
-
-                str_title = sprintf('n=%d, nIter=%d %s (%s) vs. %s (%s)', nSubj, nIterxJob, nameVarX, nameAsymX, nameVarY_figTitle, nameAsymY);
-
-                % Load corr analysis
-                load(sprintf('%s/n%d_L%s_%s.mat', nameFolder_Outputs_NOM_corr, nSubj, strjoin(string(iLocCorr_all), ''), nameVarY_fileTitle), 'PearsonR', 'SpearmanRho');
-                switch flag_UseRUseRho
-                    case 'useR'
-                        flag_CIrange = PearsonR(4) < 0.05; % use permutation p-value to determine whether one-tailed corr should be conducted
-                        % flag_CIrange = PearsonR(2) * PearsonR(3)>0; % flag_CIrange=1 if r excludes 0, so one-tailed corr should be conducted, so CI range is 90%
-                    case 'useRho'
-                        flag_CIrange = SpearmanRho(4) < 0.05; % use permutation p-value to determine whether one-tailed corr should be conducted
-                        % flag_CIrange = SpearmanRho(2) * SpearmanRho(3)>0; % flag_CIrange=1 if r excludes 0, so one-tailed corr should be conducted, so CI range is 95%
-                end
-
-                %----------------------------%
-                fxn_drawCorrAsym(asymX_allIter_allSubj*100, asymY_allIter_allSubj*100, colors_comb(iLocPair_all, :), flag_UseRUseRho, flag_CIrange, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, flag_plotPurpose)
-                %----------------------------%
-                fig = gcf;
-
-                xlabel(sprintf('%s of contrast sensitivity (%%)', nameAsymX), 'FontSize', sz_label);
-                ylabel(sprintf('%s of %s %s (%%)', nameAsymY, namesFeature{iFeature}, namesTunCs_noUnit{iTunC}), 'fontsize', sz_label)
-
-                % Adjust distance between components
-                ax = gca;
-                drawnow; % Ensure text/tick extents are up to date before reading TightInset
-                ti = ax.TightInset; % [left bottom right top] padding needed for labels/ticks
-
-                ax.XLabel.Units = 'normalized';
-                ax.YLabel.Units = 'normalized';
-
-                ax.XLabel.Position(2) = ax.XLabel.Position(2) - sz_labelOffset; % move label down
-                ax.YLabel.Position(1) = ax.YLabel.Position(1) - sz_labelOffset; % move label left
-                newPos = [ ...
-                    ti(1) + sz_axOffset, ...
-                    ti(2) + sz_axOffset, ...
-                    1 - ti(1) - ti(3) - 2*sz_axOffset, ...
-                    1 - ti(2) - ti(4) - 2*sz_axOffset];
-                if all(isfinite(newPos)) && newPos(3) >= 0.55 && newPos(4) >= 0.55
-                    ax.Position = newPos;
-                end
-
-                saveAndCloseFigure(fig, sprintf('%s/n%d_L%d%d_%s.png', nameFolder_Fig_NOM_CorrAsym, nSubj, iLocPair_all, nameVarY_fileTitle))
-
-            end % iTunC
-        end % iFeature
-    end % iGroup
-    clear margTunC_*_allCond
+            end
+        end
+    end
+    clear margParams_*_allCond margTunC_*_allCond
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
     %% CorrAsym2: (CS and pA): corr between extents of EE/HVA/VMA
-    clc; fprintf('\n%s: Fig 13/23: CorrAsym CS vs pA STARTED.\n', string(datetime('now')))
+    clc; fprintf('\n%s: Fig 12/22: CorrAsym CS vs pA STARTED.\n', string(datetime('now')))
 
     % Load data
     load(nameFolder_Output_SaveCompile, 'metric_data_allCond', 'CS_allSubj', 'pA_allSubj')
@@ -2023,7 +1697,7 @@ for iRun=4%[1,3,4]
 
         % Load corr analysis
         load(sprintf('%s/n%d_L%s_%s.mat', nameFolder_Outputs_NOM_corr, nSubj, strjoin(string(iLocCorr_all), ''), nameVarY_fileTitle), 'PearsonR', 'SpearmanRho');
-        switch flag_UseRUseRho
+        switch flag_UseRUseRho_corr
             case 'useR'
                 flag_CIrange = PearsonR(4) < 0.05; % use permutation p-value to determine whether one-tailed corr should be conducted
                 % flag_CIrange = PearsonR(2) * PearsonR(3)>0; % flag_CIrange=1 if r excludes 0, so one-tailed corr should be conducted, so CI range is 90%
@@ -2034,7 +1708,7 @@ for iRun=4%[1,3,4]
 
         %----------------------------%
         fxn_drawCorrAsym(asymX_allIter_allSubj*100, asymY_allIter_allSubj*100, ...
-            colors_comb(iLocPair_all, :), flag_UseRUseRho, flag_CIrange, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj)
+            colors_comb(iLocPair_all, :), flag_UseRUseRho_corrAsym, flag_CIrange, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, flag_plotPurpose)
         %----------------------------%
         fig = gcf;
 
@@ -2066,8 +1740,8 @@ for iRun=4%[1,3,4]
     clear metric_data_allCond
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
-    %% 14. [NOM] Metrics vs. DV; group averages
-    clc; fprintf('\n%s: Fig 14/23: NOM metrics vs DV (group averages) STARTED.\n', string(datetime('now')))
+    %% 13. [NOM] Metrics vs. DV; group averages
+    clc; fprintf('\n%s: Fig 13/22: NOM metrics vs DV (group averages) STARTED.\n', string(datetime('now')))
 
     % Load data
     load(nameFolder_Output_SaveCompile);
@@ -2106,7 +1780,7 @@ for iRun=4%[1,3,4]
 
     szScaling = 10; %if any(iLocComb==[6,7]), scalingF=100; elseif iLocComb==8, scalingF=200; else, scalingF=50; end
     szBase = 8;
-    sz_font = 22; % full model: xx; reduced models: 15
+    sz_font = 24; % full model: xx; reduced models: 15
     wd = 2;
 
     for iSet = 1:numel(iLocSingle_allSets)
@@ -2285,10 +1959,10 @@ for iRun=4%[1,3,4]
                         end % iBin
 
                         % Plot emp detection rate converted to consistency
-                        % if iMetric_prob==2
-                        %     plot(DV_ave, pA_data_detection, 'o', 'color', cLoc)
-                        %     plot(DV_ave, pA_pred_detection, '-', 'color', cLoc)
-                        % end
+                        if iMetric_prob==2 % pA
+                            % plot(DV_ave, pA_data_detection, 'o', 'color', cLoc)
+                            plot(DV_ave, pA_pred_detection, '--', 'color', cLoc, 'LineWidth', 2/scaleMode, 'HandleVisibility', 'off')
+                        end
 
                     end % iiLoc
 
@@ -2309,7 +1983,9 @@ for iRun=4%[1,3,4]
                 % --------------------------
                 % Draw reference line and y formatting
                 % --------------------------
+                if iMetric_prob==1 % pYES
                 yline(.5, '--', 'LineWidth', 2/scaleMode, 'Color', ones(1,3)/2, 'HandleVisibility', 'off');
+                end
                 
                 switch iMetric_prob
                     case 1, ylim([0, 1]); yticks(0:.2:1)
@@ -2334,16 +2010,18 @@ for iRun=4%[1,3,4]
 
                     % --- layout (more horizontal spacing) ---
                     % centers of each column/row
-                    x_cells = 0.55/scaleMode;
+                    x_cells = 0.7/scaleMode;
                     y_cells = y_base + ((nRows+1:-1:1) - 0.5*scaleMode) * (y_height / (nRows+1)); % 1 x nRows (top to bottom)
 
                     % --- draw numbers ---
                     for iRow = 0:nRows
                         if iRow==0
-                            str_cell = sprintf('Weighted R^2:');
+                            % str_cell = sprintf('Weighted R^2:');
+                            str_cell = sprintf('Weighted R^2_{95}');
                             c='k';
                         else
-                            str_cell = sprintf('%.0f%% [%.0f%%, %.0f%%]', 100*R2_w_ave(iRow), 100*R2_w_lb(iRow), 100*R2_w_ub(iRow));
+                            % str_cell = sprintf('%.0f%% [%.0f%%, %.0f%%]', 100*R2_w_ave(iRow), 100*R2_w_lb(iRow), 100*R2_w_ub(iRow));
+                            str_cell = sprintf('[%.0f%%, %.0f%%]', 100*R2_w_lb(iRow), 100*R2_w_ub(iRow));
                             c = colors_comb(iLocSingle_perSet(iRow), :);
                         end
 
@@ -2351,7 +2029,7 @@ for iRun=4%[1,3,4]
                             'Units','normalized', ...
                             'HorizontalAlignment','left', ...
                             'VerticalAlignment','middle', ...
-                            'FontSize', sz_font*scaleMode/1.5, ...
+                            'FontSize', sz_font/1.2, ...
                             'FontWeight','normal', ...
                             'Interpreter','tex', ...
                             'Color', c);
@@ -2377,8 +2055,8 @@ for iRun=4%[1,3,4]
 
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
-    %% 15. [NOM] Metrics vs. DV; per idvd
-    clc; fprintf('\n%s: Fig 15/23: NOM metrics vs DV (individual) STARTED.\n', string(datetime('now')))
+    %% 14. [NOM] Metrics vs. DV; per idvd
+    clc; fprintf('\n%s: Fig 14/22: NOM metrics vs DV (individual) STARTED.\n', string(datetime('now')))
     lineStyle_all = {'-', '-', '--', ':', '-.', '-', '--', ':', '-.'};
 
     % iModelA_plot = 1;%iModelA_all % just plot pred of the model using RC-derived template (happens to be yhe best model)
@@ -2480,7 +2158,7 @@ for iRun=4%[1,3,4]
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
     %% [NOM] ANOVA on nLL (ModelA x ModelB x Loc; with vars collapsed)
-    clc; fprintf('\n%s: Fig 16/23: ANOVA nLL (collapsed factors) STARTED.\n', string(datetime('now')))
+    clc; fprintf('\n%s: Fig 15/22: ANOVA nLL (collapsed factors) STARTED.\n', string(datetime('now')))
 
     % Load data
     load(nameFolder_Output_SaveCompile, 'nLL_allCond')
@@ -2615,10 +2293,11 @@ for iRun=4%[1,3,4]
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
 
-    %% 17. [NOM] ANOVA on nLL (ModelB x Loc; NO vars collapsed)
+    %% 16. [NOM] ANOVA on nLL (ModelB x Loc; NO vars collapsed)    
+    clc; fprintf('\n%s: Fig 16/22: ANOVA nLL (no collapse) STARTED.\n', string(datetime('now')))
+
     % Load data
     load(nameFolder_Output_SaveCompile, 'nLL_allCond')
-    clc; fprintf('\n%s: Fig 17/23: ANOVA nLL (no collapse) STARTED.\n', string(datetime('now')))
 
     % Define folder for saving GoF figures
     nameFolder_Fig_NOM_nLL = fullfile(nameFolder_Fig_NOM_Trialwise, 'NOM_NLL');
@@ -2628,7 +2307,7 @@ for iRun=4%[1,3,4]
 
     % ModelB ordering + plotting flags
     iModelB_selected = 1:7; y_ticks = linspace(0, 20, 5);
-    iModelB_selected = 1:4; y_ticks = linspace(0, 6, 5);
+    % iModelB_selected = 1:4; y_ticks = linspace(0, 6, 5);
     pairs_bracket = [1 2; 1 3; 1 4]; % requested comparisons
     pairs_bracket = [1 2]; % requested comparisons
     % pairs_bracket = nan; % no comparison needed
@@ -2636,7 +2315,7 @@ for iRun=4%[1,3,4]
     flag_plotDiff = 0;
 
     switch flag_plotPurpose
-        case 'paper', sz_label = 20;
+        case 'paper', sz_label = 50;
         case 'slide', sz_label = 30;
     end
     sz_text = sz_label;
@@ -2648,7 +2327,7 @@ for iRun=4%[1,3,4]
 
         nBars = numel(iModelB_selected);
         switch flag_plotPurpose
-            case 'paper', sz_fig = [nBars * 180, 200+nchoosek(nBars, 2)*40];
+            case 'paper', sz_fig = [nBars * 180, 100+nchoosek(nBars, 2)*40];
             case 'slide', sz_fig = [nBars * 180, 300+nchoosek(nBars, 2)*40];
         end
 
@@ -2900,76 +2579,8 @@ for iRun=4%[1,3,4]
     clear nLL_allCond
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
-    %% 18. [NOM] Compare NOM parameters across locations
-    % Load data
-    load(nameFolder_Output_SaveCompile, 'params_allCond')
-    clc; fprintf('\n%s: Fig 18/23: Compare NOM params across locations STARTED.\n', string(datetime('now')))
-
-    % Define folder for saving GoF figures
-    nameFolder_Fig_NOM_params = fullfile(nameFolder_Fig_NOM_Trialwise, 'NOMparams');
-    if isempty(dir(nameFolder_Fig_NOM_params)), mkdir(nameFolder_Fig_NOM_params); end
-
-    flag_plotIDVD = 1;
-    flag_plotDiff = 1;
-    nBars = 2;
-    sz_fig = [nBars * 200, 400+nchoosek(nBars, 2)*30];
-    sz_text = 22;
-    wd = 2;
-
-    for iModelB_NOMplot = 2; %iModelB_plot_all % Only plot NoMul
-
-        % Number of parameters for this Model B
-        nNOMparams = numel(namesModelBparams{iModelB_NOMplot});
-
-        for ii = 1:2
-            switch ii
-                case 1, iLocG = iLocGroups_all;
-                case 2, iLocG = iLocSingle_allSets;
-            end
-            for iSetLoc = 1:numel(iLocG)
-
-                iLocPair_all = iLocG{iSetLoc};
-
-                for iParam = 1:nNOMparams
-
-                    NOMp_allIter_allSubj = squeeze(params_allCond(iModelA_plot, iModelB_NOMplot, iLocPair_all, :, :, iParam));
-
-                    x_ticks = namesLocComb(iLocPair_all);
-                    switch iModelB_NOMplot
-                        case 1 % FullModel
-                            switch iParam
-                                case 1, y_ticks = linspace(NOMp2_lb, 1.2, 5);
-                                case 2, y_ticks = linspace(NOMp3_lb, 3, 5);
-                                case 3, y_ticks = linspace(NOMp3_lb, 3, 5);
-                                case 4, y_ticks = linspace(NOMp3_lb, 40, 5);
-                            end
-                        case 2 % NoMul
-                            switch iParam
-                                case 1, y_ticks = linspace(0, 2.8, 5);
-                                case 2, y_ticks = linspace(0, 2.8, 5);
-                                case 3, y_ticks = linspace(NOMp3_lb, 40, 5);
-                            end
-                    end
-                    y_ticklabels = round(y_ticks, 2);
-
-                    str_title = sprintf('n=%d nIter=%d L%s [A%dB%d] %s', nSubj, nIterxJob, strjoin(string(iLocPair_all), ''), iModelA_plot, iModelB_NOMplot, namesModelBparams{iModelB_NOMplot}{iParam});
-
-                    %------------------------------%
-                    fxn_drawBars(NOMp_allIter_allSubj, ref, colors_comb(iLocPair_all, :), x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd, flag_plotPurpose);
-                    %------------------------------%
-                    fig = gcf;
-                    ylabel(sprintf('%s', namesModelBparams{iModelB_NOMplot}{iParam}))
-                    % Save the figure
-                    saveAndCloseFigure(fig, sprintf('%s/n%d_A%dB%d_L%s_NOMp%d.png', nameFolder_Fig_NOM_params, nSubj, iModelA_plot, iModelB_NOMplot, strjoin(string(iLocPair_all), ''), iParam));
-                end % iParam
-            end % iGroup
-        end % ii
-    end % iModelB_NOMplot
-    clear params_allCond
-    fprintf('\n%s: DONE.\n', string(datetime('now')))
-
-    %% 19. [NOM] Corr1: pA and NOM params
-    clc; fprintf('\n%s: Fig 19/23: Corr pA vs NOM params STARTED.\n', string(datetime('now')))
+    %% 17. [NOM] Corr1: pA and NOM params
+    clc; fprintf('\n%s: Fig 17/22: Corr pA vs NOM params STARTED.\n', string(datetime('now')))
 
     % Load data
     load(nameFolder_Output_SaveCompile, 'params_allCond', 'pA_allSubj')
@@ -3029,13 +2640,13 @@ for iRun=4%[1,3,4]
                 str_title = sprintf('n=%d, nIter=%d B%d %s vs. %s [L%s]', nSubj, nIterxJob, iModelB_NOMplot, nameVarX, nameVarY_figTitle, strjoin(string(iLocCorr_all), ''));
 
                 %----------------------------%
-                [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob, flag_plotPurpose);
+                [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho_corr, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob, flag_plotPurpose);
                 %----------------------------%
                 fig = gcf;
                 % Save CI for automatic CI range calcuation in CorrAsym
                 save(sprintf('%s/n%d_B%d_L%s_NOMp%d.mat', nameFolder_Outputs_NOM_corr, nSubj, iModelB_NOMplot, strjoin(string(iLocCorr_all), ''), iNOMparam), 'PearsonR', 'SpearmanRho')
 
-                xlabel('Consistency rate', 'fontsize', sz_label)
+                xlabel('Measured resp. consistency', 'fontsize', sz_label)
                 ylabel(nameVarY_figTitle, 'fontsize', sz_label)
 
                 % Adjust distance between components
@@ -3161,8 +2772,78 @@ for iRun=4%[1,3,4]
     % clear params_allCond
     % fprintf('\n\n Plotting DONE\n\n')
 
-    %% 20. [NOM] Corr2: CS and NOM params
-    clc; fprintf('\n%s: Fig 20/23: Corr CS vs NOM params STARTED.\n', string(datetime('now')))
+    %% 18. [NOM] Compare NOM parameters across locations
+    clc; fprintf('\n%s: Fig 18/22: Compare NOM params across locations STARTED.\n', string(datetime('now')))
+
+    % Load data
+    load(nameFolder_Output_SaveCompile, 'params_allCond')
+
+    % Define folder for saving GoF figures
+    nameFolder_Fig_NOM_params = fullfile(nameFolder_Fig_NOM_Trialwise, 'NOMparams');
+    if isempty(dir(nameFolder_Fig_NOM_params)), mkdir(nameFolder_Fig_NOM_params); end
+
+    flag_plotIDVD = 1;
+    flag_plotDiff = 1;
+    nBars = 2;
+    sz_fig = [nBars * 200, 400+nchoosek(nBars, 2)*30];
+    sz_text = 22;
+    wd = 2;
+
+    for iModelB_NOMplot = 2; %iModelB_plot_all % Only plot NoMul
+
+        % Number of parameters for this Model B
+        nNOMparams = numel(namesModelBparams{iModelB_NOMplot});
+
+        for ii = 1:2
+            switch ii
+                case 1, iLocG = iLocGroups_all;
+                case 2, iLocG = iLocSingle_allSets;
+            end
+            for iSetLoc = 1:numel(iLocG)
+
+                iLocPair_all = iLocG{iSetLoc};
+
+                for iParam = 1:nNOMparams
+
+                    NOMp_allIter_allSubj = squeeze(params_allCond(iModelA_plot, iModelB_NOMplot, iLocPair_all, :, :, iParam));
+
+                    x_ticks = namesLocComb(iLocPair_all);
+                    switch iModelB_NOMplot
+                        case 1 % FullModel
+                            switch iParam
+                                case 1, y_ticks = linspace(NOMp2_lb, 1.2, 5);
+                                case 2, y_ticks = linspace(NOMp3_lb, 3, 5);
+                                case 3, y_ticks = linspace(NOMp3_lb, 3, 5);
+                                case 4, y_ticks = linspace(NOMp3_lb, 40, 5);
+                            end
+                        case 2 % NoMul
+                            switch iParam
+                                case 1, y_ticks = linspace(0.5, 2.5, 5); % Additive noise
+                                case 2, y_ticks = linspace(0.5, 2.5, 5); % Shared noise
+                                case 3, y_ticks = linspace(NOMp3_lb, 40, 5);
+                            end
+                    end
+                    y_ticklabels = round(y_ticks, 2);
+
+                    str_title = sprintf('n=%d nIter=%d L%s [A%dB%d] %s', nSubj, nIterxJob, strjoin(string(iLocPair_all), ''), iModelA_plot, iModelB_NOMplot, namesModelBparams{iModelB_NOMplot}{iParam});
+
+                    %------------------------------%
+                    fxn_drawBars(NOMp_allIter_allSubj, ref, colors_comb(iLocPair_all, :), x_ticks, y_ticks, y_ticklabels, flag_plotIDVD, flag_plotDiff, str_title, sz_fig, nIterxJob, markers_allSubj, sz_text, wd, flag_plotPurpose);
+                    %------------------------------%
+                    fig = gcf;
+                    ylabel(sprintf('%s', namesModelBparams{iModelB_NOMplot}{iParam}))
+                    % Save the figure
+                    saveAndCloseFigure(fig, sprintf('%s/n%d_A%dB%d_L%s_NOMp%d.png', nameFolder_Fig_NOM_params, nSubj, iModelA_plot, iModelB_NOMplot, strjoin(string(iLocPair_all), ''), iParam));
+                end % iParam
+            end % iGroup
+        end % ii
+    end % iModelB_NOMplot
+    clear params_allCond
+    fprintf('\n%s: DONE.\n', string(datetime('now')))
+
+
+    %% 19. [NOM] Corr2: CS and NOM params
+    clc; fprintf('\n%s: Fig 19/22: Corr CS vs NOM params STARTED.\n', string(datetime('now')))
 
     % Load data
     load(nameFolder_Output_SaveCompile, 'params_allCond', 'CS_allSubj')
@@ -3205,7 +2886,7 @@ for iRun=4%[1,3,4]
 
                 switch iModelB_NOMplot
                     case 1, y_ticks_lb = [0, 0, 0, 0]; y_ticks_ub = [.6, 32, 32, 40];
-                    case 2, y_ticks_lb = [0, 0, -1]; y_ticks_ub = [2.8, 2.8, 5]; %NoMul*
+                    case 2, y_ticks_lb = [.5, .5, -1]; y_ticks_ub = [2.5, 2.5, 5]; %NoMul*
                     case 3, y_ticks_lb = [0, 0, 0]; y_ticks_ub = [.6, 32, 40];
                     case 4, y_ticks_lb = [0, 0, 0]; y_ticks_ub = [.6, 32, 40];
                     case 5, y_ticks_lb = [0, 0]; y_ticks_ub = [.6, 40];
@@ -3225,7 +2906,7 @@ for iRun=4%[1,3,4]
                 str_title = sprintf('n=%d, nIter=%d B%d %s vs. %s [L%s]', nSubj, nIterxJob, iModelB_NOMplot, nameVarX, nameVarY_figTitle, strjoin(string(iLocCorr_all), ''));
 
                 %----------------------------%
-                [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob, flag_plotPurpose);
+                [PearsonR, SpearmanRho] = fxn_drawCorr(X_allIter_allSubj, NOMp_allIter_allSubj, colors_comb(iLocCorr_all, :), flag_UseRUseRho_corr, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_zeroMean, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, nIterxJob, flag_plotPurpose);
                 %----------------------------%
                 fig = gcf;
                 % Save CI for automatic CI range calcuation in CorrAsym
@@ -3260,14 +2941,15 @@ for iRun=4%[1,3,4]
     clear params_allCond
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
-    %% 21. [NOM] CorrAsym2: CS and NOMparams: corr between extents of EE/HVA/VMA
-    clc; fprintf('\n%s: Fig 21/23: CorrAsym CS vs NOM params STARTED.\n', string(datetime('now')))
+    %% 20. [NOM] CorrAsym2: CS and NOMparams: corr between extents of EE/HVA/VMA
+    clc; fprintf('\n%s: Fig 20/22: CorrAsym CS vs NOM params STARTED.\n', string(datetime('now')))
 
     % Load data
     load(nameFolder_Output_SaveCompile, 'params_allCond', 'CS_allSubj')
 
     nameVarX = 'CS';
     nameVarY = 'NOMparams';
+    iLocCorr_all = [6,5,3]; % decide tailedness based on corr across these locations
 
     nameFolder_Fig_NOM_corr = sprintf('%s/Corr/%s_%s', nameFolder_Fig_NOM_Trialwise, nameVarX, nameVarY);
     nameFolder_Fig_NOM_CorrAsym = sprintf('%s/CorrAsym/%s_%s', nameFolder_Fig_NOM_Trialwise, nameVarX, nameVarY);
@@ -3281,7 +2963,6 @@ for iRun=4%[1,3,4]
     sz_axOffset = 0.05; % extra breathing room
     flag_plotIdvdCI = 1;
     flag_plotUnikSymbol = 0;
-    % iLocCorr_all = [6,5,3];
 
     for iModelB_NOMplot = 2; %iModelB_plot_all % Only plot NoMul!
         nNOMparams = length(namesModelBparams{iModelB_NOMplot});
@@ -3302,7 +2983,8 @@ for iRun=4%[1,3,4]
                 case 6, x_ticks = linspace(-5, 15, 5); % HVA
                 case 5, x_ticks = linspace(0, 12, 5); % VMA (extent is smaller)
             end
-            x_ticks = linspace(-3, 17, 5);
+            x_ticks = linspace(-3, 17, 5); % when L18 is presented in the same figure
+            x_ticks = linspace(-5, 15, 5); % 
             asymX_allIter_allSubj = repmat(asymX_allSubj, 1, nIterxJob)';
 
             for iNOMparam = 1:nNOMparams
@@ -3332,7 +3014,7 @@ for iRun=4%[1,3,4]
 
                 % Load corr analysis
                 load(sprintf('%s/n%d_B%d_L%s_NOMp%d.mat', nameFolder_Outputs_NOM_corr, nSubj, iModelB_NOMplot, strjoin(string(iLocCorr_all), ''), iNOMparam), 'PearsonR', 'SpearmanRho')
-                switch flag_UseRUseRho
+                switch flag_UseRUseRho_corr
                     case 'useR'
                         flag_CIrange = PearsonR(4) < 0.05; % use permutation p-value to determine whether one-tailed corr should be conducted
                         % flag_CIrange = PearsonR(2) * PearsonR(3)>0; % flag_CIrange=1 if r excludes 0, so one-tailed corr should be conducted, so CI range is 90%
@@ -3342,7 +3024,7 @@ for iRun=4%[1,3,4]
                 end
 
                 %----------------------------%
-                fxn_drawCorrAsym(asymX_allIter_allSubj*100, asymY_allIter_allSubj*100, colors_comb(iLocPair_all, :), flag_UseRUseRho, flag_CIrange, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, flag_plotPurpose)
+                fxn_drawCorrAsym(asymX_allIter_allSubj*100, asymY_allIter_allSubj*100, colors_comb(iLocPair_all, :), flag_UseRUseRho_corrAsym, flag_CIrange, x_ticks, y_ticks, x_ticklabels, y_ticklabels, flag_plotIdvdCI, flag_plotUnikSymbol, str_title, markers_allSubj, flag_plotPurpose)
                 %----------------------------%
                 fig = gcf;
 
@@ -3377,7 +3059,7 @@ for iRun=4%[1,3,4]
     fprintf('\n%s: DONE.\n', string(datetime('now')))
 
     %% [NOM] CompAsym2: CS and NOMparams: compare binned estimates
-    % clc; fprintf('\n%s: Fig 22/23: CompAsym CS vs NOM params STARTED.\n', string(datetime('now')))
+    % clc; fprintf('\n%s: Fig 21/22: CompAsym CS vs NOM params STARTED.\n', string(datetime('now')))
     %
     % % Load data
     % load(nameFolder_Data_SaveCompile, 'params_allCond', 'CS_allSubj')
@@ -3479,6 +3161,220 @@ for iRun=4%[1,3,4]
 
 
 end% iRun
+
+%%
+function tuningSpecs = local_getTuningPlotSpecs()
+tuningSpecs = struct( ...
+    'measureKind', {'tunParam', 'tunC'}, ...
+    'folderName', {'TuningParams', 'TuningCs'}, ...
+    'titleTag', {'params', 'tunC'});
+end
+
+%%
+function [namesUnit, namesNoUnit] = local_getTuningMeasureNames(measureKind, iFeature, iFamily, namesParams_all, namesTunC_unit_perF, namesTunC_noUnit, namesTunC_SF_unit, namesTunC_SF_noUnit)
+switch measureKind
+    case 'tunParam'
+        namesUnit = namesParams_all{iFamily};
+        namesNoUnit = namesUnit;
+    case 'tunC'
+        if iFeature == 2
+            namesUnit = namesTunC_SF_unit;
+            namesNoUnit = namesTunC_SF_noUnit;
+        else
+            namesUnit = namesTunC_unit_perF{iFamily, 2};
+            namesNoUnit = namesTunC_noUnit{iFamily, 2};
+        end
+    otherwise
+        error('Unknown measureKind: %s', string(measureKind));
+end
+end
+
+%%
+function y_ticks_all = local_getSection7Ticks(measureKind, iFamily, flag_plotDist, flag_plotIDVD)
+y_ticks_all = {};
+
+switch measureKind
+    case 'tunParam'
+        [y_ticks_lb, y_ticks_ub] = local_getTuningBounds(measureKind, iFamily);
+        if flag_plotDist
+            for iParam = 1:numel(y_ticks_lb)
+                y_ticks_all{iParam} = linspace(y_ticks_lb(iParam), y_ticks_ub(iParam), 5);
+            end
+        end
+    case 'tunC'
+        [y_ticks_lb, y_ticks_ub] = local_getTuningBounds(measureKind, iFamily);
+        if flag_plotDist
+            for iTunC = 1:numel(y_ticks_lb)
+                y_ticks_all{iTunC} = linspace(y_ticks_lb(iTunC), y_ticks_ub(iTunC), 5);
+            end
+        end
+end
+if flag_plotIDVD
+    [y_ticks_lb, y_ticks_ub] = local_getTuningBounds(measureKind, iFamily);
+    for iTunC = 1:numel(y_ticks_lb)
+        y_ticks_all{iTunC} = linspace(y_ticks_lb(iTunC), y_ticks_ub(iTunC), 5);
+    end
+end
+end
+
+%%
+function y_ticks = local_getTicksForMeasure(y_ticks_all, iMeasure)
+if isempty(y_ticks_all) || numel(y_ticks_all) < iMeasure || isempty(y_ticks_all{iMeasure})
+    y_ticks = nan;
+else
+    y_ticks = y_ticks_all{iMeasure};
+end
+end
+
+%%
+function y_ticks = local_getCorrTicks(measureKind, iFeature, iTunC)
+switch measureKind
+    case 'tunParam'
+        if iFeature == 1
+            iFamily = 10;
+        else
+            iFamily = 2;
+        end
+        [y_ticks_allTunC_lb, y_ticks_allTunC_ub] = local_getTuningBounds(measureKind, iFamily);
+        y_ticks = linspace(y_ticks_allTunC_lb(iTunC), y_ticks_allTunC_ub(iTunC), 5);
+    case 'tunC'
+        if iFeature == 1
+            iFamily = 10;
+        else
+            iFamily = 2;
+        end
+        [y_ticks_allTunC_lb, y_ticks_allTunC_ub] = local_getTuningBounds(measureKind, iFamily);
+        y_ticks = linspace(y_ticks_allTunC_lb(iTunC), y_ticks_allTunC_ub(iTunC), 5);
+    otherwise
+        error('Unknown measureKind: %s', string(measureKind));
+end
+end
+
+%%
+function y_ticks = local_getCorrAsymTicks(measureKind, iLocLead, iFamily, iTunC)
+% if strcmp(measureKind, 'tunParam')
+%     y_ticks = nan;
+%     return
+% end
+% 
+% switch iLocLead
+%     case 1 % EE
+%         switch iFamily
+%             case 2, y_ticks_allTunC_lb = -[40, -20, 50, 180]; y_ticks_allTunC_ub = [60, 70, 50, 200];
+%             case 10, y_ticks_allTunC_lb = -[10, -20, 50]; y_ticks_allTunC_ub = [50, 70, 50];
+%             otherwise, y_ticks = nan; return
+%         end
+%     case 6 % HVA
+%         switch iFamily
+%             case 2, y_ticks_allTunC_lb = -[50, 100, 60, 160]; y_ticks_allTunC_ub = [50, 100, 60, 200];
+%             case 10, y_ticks_allTunC_lb = -[40, 18, 20]; y_ticks_allTunC_ub = [60, 10, 10];
+%             otherwise, y_ticks = nan; return
+%         end
+%     case 5 % VMA
+%         switch iFamily
+%             case 2, y_ticks_allTunC_lb = -[50, 120, 120, 300]; y_ticks_allTunC_ub = [70, 120, 120, 300];
+%             case 10, y_ticks_allTunC_lb = -[80, 30, 100]; y_ticks_allTunC_ub = [100, 30, 100];
+%             otherwise, y_ticks = nan; return
+%         end
+%     otherwise
+%         y_ticks = nan;
+%         return
+% end
+
+switch iFamily
+    case 2
+        y_ticks_allTunC_lb = -[100, 100, 100, 100];
+        y_ticks_allTunC_ub = [100, 100, 100, 100];
+    case 10
+        y_ticks_allTunC_lb = -[100, 100, 100];
+        y_ticks_allTunC_ub = [100, 100, 100];
+end
+
+y_ticks = linspace(y_ticks_allTunC_lb(iTunC), y_ticks_allTunC_ub(iTunC), 5);
+end
+
+%%
+function [y_ticks_lb, y_ticks_ub] = local_getTuningBounds(measureKind, iFamily)
+switch measureKind
+    case 'tunParam'
+        switch iFamily
+            case 10 % ORI | Von Mises
+                y_ticks_lb = [0, 1, -.002];
+                y_ticks_ub = [.02, 5, .002];
+            case 2 % SF | Log-parabola
+                y_ticks_lb = [-2, 0, .2, -.006];
+                y_ticks_ub = [2, .2, 1, .004];
+            otherwise
+                error('Unknown family index: %d', iFamily);
+        end
+    case 'tunC'
+        switch iFamily
+            case 10
+                y_ticks_lb = [0, 30, -.05];
+                y_ticks_ub = [.008, 50, .03];
+            case 2
+                y_ticks_lb = [-2, 0, 0, -.1];
+                y_ticks_ub = [2, .008, 4, .1];
+            otherwise
+                error('Unknown family index: %d', iFamily);
+        end
+    otherwise
+        error('Unknown measureKind: %s', string(measureKind));
+end
+end
+
+%%
+function [data_allIter_allSubj, ref, y_ticklabels] = local_getTuningMeasureData(measureKind, iFeature, iTunC, iModelA_plot, iModelB_plot, iLoc_all, iDataset_plotRC, iFamily, y_ticks, margParams_ORI_allCond, margParams_SF_allCond, margTunC_ORI_allCond, margTunC_SF_allCond)
+switch measureKind
+    case 'tunParam'
+        switch iFeature
+            case 1
+                data_allIter_allSubj = squeeze(margParams_ORI_allCond(iModelA_plot, iModelB_plot, iLoc_all, :, :, iDataset_plotRC, iTunC));
+            case 2
+                data_allIter_allSubj = squeeze(margParams_SF_allCond(iModelA_plot, iModelB_plot, iLoc_all, :, :, iDataset_plotRC, iTunC));
+        end
+    case 'tunC'
+        switch iFeature
+            case 1
+                data_allIter_allSubj = squeeze(margTunC_ORI_allCond(iModelA_plot, iModelB_plot, iLoc_all, :, :, iDataset_plotRC, iTunC));
+            case 2
+                data_allIter_allSubj = squeeze(margTunC_SF_allCond(iModelA_plot, iModelB_plot, iLoc_all, :, :, iDataset_plotRC, iTunC));
+        end
+    otherwise
+        error('Unknown measureKind: %s', string(measureKind));
+end
+
+y_ticklabels = nan;
+ref = nan;
+switch iFamily
+    case {1, 10}
+        if iTunC == 3
+            ref = 0;
+        end
+    case 2
+        switch iTunC
+            case 1
+                if ~(isscalar(y_ticks) && isnan(y_ticks))
+                    y_ticklabels = round(2.^y_ticks, 2);
+                end
+                ref = log2(2);
+                data_allIter_allSubj = log2(data_allIter_allSubj);
+            case 4
+                ref = 0;
+        end
+    case 14
+        switch iTunC
+            case 1
+                if ~(isscalar(y_ticks) && isnan(y_ticks))
+                    y_ticklabels = round(2.^y_ticks, 1);
+                end
+                ref = log2(2);
+                data_allIter_allSubj = log2(data_allIter_allSubj);
+            case 4
+                ref = 0;
+        end
+end
+end
 
 %%
 function saveAndCloseFigure(figHandle, outName)

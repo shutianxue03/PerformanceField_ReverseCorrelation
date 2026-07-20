@@ -402,26 +402,38 @@ for iCond = 1:nCond
 end
 
 %% ---------------- axes formatting ----------------
-if ~isnan(x_ticks), xticks(x_ticks); xlim(x_ticks([1 end])); end
-if ~isnan(y_ticks), yticks(y_ticks); ylim(y_ticks([1 end])); end
-if ~isnan(x_ticklabels), xticklabels(x_ticklabels); end
-if ~isnan(y_ticklabels), yticklabels(y_ticklabels); end
+if ~isempty(x_ticks), xticks(x_ticks); xlim(x_ticks([1 end])); end
+if ~isempty(y_ticks), yticks(y_ticks); ylim(y_ticks([1 end])); end
+if ~isempty(x_ticklabels), xticklabels(x_ticklabels); end
+if ~isempty(y_ticklabels), yticklabels(y_ticklabels); end
 
 axis square
 ax = gca;
 ax.XAxis.FontSize = sz_ticks;
 ax.YAxis.FontSize = sz_ticks;
 ax.LineWidth = wd_border;
+ytickformat('auto');
 
-%% ---------------- print stats ----------------
+% Auto scientific exponent for small y-scale values.
+% if ~local_is_nan_sentinel(y_ticklabels) && isnumeric(y_ticklabels)
+%     yvals_for_exp = y_ticklabels;
+% elseif ~local_is_nan_sentinel(y_ticks) && isnumeric(y_ticks)
+%     yvals_for_exp = y_ticks;
+% else
+%     yvals_for_exp = yticks(ax);
+% end
+% ax.YAxis.Exponent = local_auto_axis_exponent(yvals_for_exp, 0.1);
+
+%% ---------------- Print stats ----------------
 switch flag_UseRUseRho
     case 'useR'
-        str_print = sprintf('$r_{CI95}=[%+.2f, %+.2f], p=%.3f$' , r_partial_pc_lb, r_partial_pc_ub, pperm_r_partial_pc);
+        str_print = sprintf('$r_{95}=[%+.2f, %+.2f], p=%.3f$' , r_partial_pc_lb, r_partial_pc_ub, pperm_r_partial_pc);
     case 'useRho'
-        str_print = sprintf('$\\rho_{CI95}= [%+.2f, %+.2f], p=%.3f$' , rho_partial_pc_lb, rho_partial_pc_ub, pperm_rho_partial_pc);
+        str_print = sprintf('$\\rho_{95}= [%+.2f, %+.2f], p=%.3f$' , rho_partial_pc_lb, rho_partial_pc_ub, pperm_rho_partial_pc);
 end
 
-y_str = 0.02; % Figure 6: 0.02
+% y_str = 0.8; % Figure 6: 0.8, at the top pf the panel
+y_str = 0.02; % Others (Fig 8 and 9): 0.02
 text(ax, 0.5, y_str, str_print, 'Units', 'normalized', ...
     'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom', ...
     'FontSize', sz_text_stats, 'Color', 'k', 'Interpreter', 'latex', 'Clipping', 'off');
@@ -481,4 +493,28 @@ end
 %% Helper: simple ternary
 function out = ternary(cond, a, b)
 if cond, out = a; else, out = b; end
+end
+
+%% Helper: detect scalar NaN sentinel input
+function tf = local_is_nan_sentinel(v)
+tf = isempty(v) && isnumeric(v) && isscalar(v) && isnan(v);
+end
+
+%% Helper: choose axis exponent from values
+function expOut = local_auto_axis_exponent(vals, thresh)
+vals = vals(:);
+vals = vals(isfinite(vals));
+vals = vals(vals ~= 0);
+
+if isempty(vals)
+    expOut = 0;
+    return;
+end
+
+minAbsVal = min(abs(vals));
+if minAbsVal < thresh
+    expOut = floor(log10(minAbsVal));
+else
+    expOut = 0;
+end
 end

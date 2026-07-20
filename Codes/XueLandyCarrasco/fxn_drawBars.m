@@ -52,6 +52,7 @@ assert(nSubj2 == nSubj && nCond2 == nCond, 'ALERT: Reshaped matrix has wrong nSu
 pairs  = nchoosek(1:nCond, 2);
 nPairs = size(pairs, 1);
 nPairs = min([6,nPairs]) ; % Only plot the first 6 pairs for now (to avoid clutter); change to "1:nPairs" to do all pairs
+
 %% Obtain median and CI of the data
 [data_med_allSubj, ~, ~] = getCI(data_allIter_allSubj, 1, 1, CI95); % [nSubj x nCond] median over iters
 
@@ -66,7 +67,9 @@ Fvalue_allPerm = nan(nPerm, 1);
 % Pregenerate subj indices
 rng(seedPerm, 'twister');
 indRand_allPerm = zeros(nPerm, nSubj, nCond, 'uint16');
-parfor iPerm = 1:nPerm
+% do NOT use parfor!!
+% Keep RNG draws serial here so the same seed gives identical permutations regardless of parallel pool size/scheduling.
+for iPerm = 1:nPerm
     for iSubj = 1:nSubj
         indRand_allPerm(iPerm, iSubj, :) = uint16(randperm(nCond));
     end
@@ -258,7 +261,7 @@ for iPair = 1:nPairs
 end
 
 % (3) Compare to the reference
-str_diffRef = 'No ref';
+str_diffRef = sprintf('No ref\n\n');
 if ~isnan(ref)
     str_diffRef = sprintf('Ref=%.1f (%.2f%% CI)\n', ref, CI_refPair);
 
@@ -322,6 +325,7 @@ end
 if ~isnan(y_ticklabels)
     yticklabels(y_ticklabels);
 end
+ytickformat('auto');
 
 if flag_plotIDVD
     buffer = .6;
@@ -334,6 +338,7 @@ ax = gca;
 ax.XAxis.FontSize = sz_text;
 ax.YAxis.FontSize = sz_text;
 ax.LineWidth = wd;
+
 
 %% Prepare the y-pos of the comparison line
 yl = ylim;                      % [ymin ymax]
@@ -379,18 +384,18 @@ if nCond == 2 && flag_plotDiff
 
     switch flag_plotPurpose
         case 'paper'
-    % Prepare the string
-    str_delta = sprintf('$\\Delta_{CI95}=[%s, %s]$\n$\\mathit{p}=%.3f$', ...
-        fxn_formatSignedDecimal(diffPair_lb), fxn_formatSignedDecimal(diffPair_ub), pperm_allPairs);
+            % Prepare the string
+            str_delta = sprintf('$\\Delta_{95}=[%s, %s]$\n$\\mathit{p}=%.3f$', ...
+                fxn_formatSignedDecimal(diffPair_lb), fxn_formatSignedDecimal(diffPair_ub), pperm_allPairs);
 
-    % Print
-    text(xText, yText, str_delta, ...
-        'HorizontalAlignment', 'center', ...
-        'VerticalAlignment', 'bottom', ...
-        'FontSize', sz_text, ...
-        'Color', 'k', ...
-        'Interpreter', 'latex', ...
-        'Clipping', 'off');
+            % Print
+            text(xText, yText, str_delta, ...
+                'HorizontalAlignment', 'center', ...
+                'VerticalAlignment', 'bottom', ...
+                'FontSize', sz_text, ...
+                'Color', 'k', ...
+                'Interpreter', 'latex', ...
+                'Clipping', 'off');
     end
 end
 
@@ -410,7 +415,7 @@ if nCond > 2 && strcmp(flag_plotPurpose, 'paper')
     yPad  = 0.1 * (yMax - yMin);                  % padding in axis units
     yText = yBar + yPad;          % above upper CI
 
-    
+
     % If that would exceed yMax, clamp a bit
     if yText > yMax
         yText = yMax - 0.01 * (yMax - yMin);

@@ -24,7 +24,7 @@ switch lower(flag_plotPurpose)
         wd_border = 4; % axis/marker line width
         fsz_ticks = 45;
         sz_marker = 35;
-        sz_text_print = 50;
+        sz_text_print = 60;
         fig_pos = [0 200 1e3 1e3];
     case 'slide'
         % Placeholder slide style values. Tune as needed for presentation output.
@@ -243,7 +243,6 @@ edgeColor_allSubj(left,:) = (1-sL).*purple + sL.*purple_light;
 sR = (s(right)-0.5) / 0.5; % 0..1
 edgeColor_allSubj(right,:) = (1-sR).*green_light + sR.*green;
 
-
 %% ---- 5) Plot individual data (medians + optional per-point CI bars) ----
 figure('Position', fig_pos); hold on; box on
 
@@ -330,16 +329,17 @@ end
 
 switch flag_UseRUseRho
     case 'useR'
-        str_print = sprintf('r=%+.2f, CI_{%.0f}=[%+.2f, %+.2f], p=%.3f', r_med, CI_level*100, r_lb, r_ub, p_print_pearson);
-        str_print = sprintf('$r_{CI%.0f}=[%+.2f, %+.2f], p=%.3f$', CI_level*100, r_lb, r_ub, p_print_pearson);
+        % str_print = sprintf('r=%+.2f, CI_{%.0f}=[%+.2f, %+.2f], p=%.3f', r_med, CI_level*100, r_lb, r_ub, p_print_pearson);
+        str_print = sprintf('$r_{%.0f}=[%+.2f, %+.2f]$\n$p=%.3f$', CI_level*100, r_lb, r_ub, p_print_pearson);
     case 'useRho'
-        str_print = sprintf('\\rho=%+.2f, CI_{%.0f}=[%+.2f, %+.2f], p=%.3f', rho_med, CI_level*100, rho_lb, rho_ub, p_print_spearman);
+        % str_print = sprintf('\\rho=%+.2f, CI_{%.0f}=[%+.2f, %+.2f], p=%.3f', rho_med, CI_level*100, rho_lb, rho_ub, p_print_spearman);
+        str_print = sprintf('$\\rho_{%.0f}=[%+.2f, %+.2f]$\n$p=%.3f$', CI_level*100, rho_lb, rho_ub, p_print_spearman);
 end
 
 xabs = gca;
-text(xabs, 0.5, 0.02, str_print, ...
+text(xabs, 0.05, 0.02, str_print, ...
     'Units', 'normalized', ...
-    'HorizontalAlignment', 'center', ...
+    'HorizontalAlignment', 'left', ...
     'VerticalAlignment', 'bottom', ...
     'FontSize', sz_text_print, ...
     'BackgroundColor', 'w', ...

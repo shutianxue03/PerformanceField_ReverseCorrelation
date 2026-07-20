@@ -548,9 +548,9 @@ saveas(gcf, sprintf('%s/NeuralCorr.png', nameFolder_Fig_Schematic))
 close all
 
 %% Sketch for orientation and SF tuning function
-iFamily_ORI = 10; paramsORI =[1 40 0];
+iFamily_ORI = 'von_mises'; paramsORI =[1 1 0];
 % iFamily_ORI = 8; paramsORI =[1 40 0];
-iFamily_SF = 2; paramsSF =[2 1 .3 0];
+iFamily_SF = 'log_parabola'; paramsSF =[2 1 .3 0];
 sz_wd = 10;
 sz_hw = 50;
 sz_hl = sz_hw;

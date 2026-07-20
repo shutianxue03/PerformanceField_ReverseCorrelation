@@ -133,7 +133,7 @@ axis_tuning{1} = filtersOri_all - 90;
 axis_tuning{2} = filtersSF_all_log;
 axisTicks_tuning = {-90:45:90, linspace(log2(noise.SF_low), log2(noise.SF_high), 5)}; % ticks (SF is on log scale)
 axisTL_tuning = {axisTicks_tuning{1}, round(2.^axisTicks_tuning{2}, 2)}; % label (SF is on linear scale)
-axisLim = {[-99, 99], [.1719, 1.8281]};
+axisLim = {[-99, 99], [-.1, 2.1]};
 
 limit0to1 = @(x) min(max(x, 0), 1);
 nTrialsPerSess = 100;  % Number of trials per session
@@ -339,8 +339,10 @@ clear namesTunC_unit_perF
 namesTunC_unit_perF{1,1} = {'Gain (a.u.)', 'Sigma (deg)', 'baseline (a.u.)'};
 % namesTunC_unit_perF{1,2} = {'Pref ORI (deg)', 'amplitude (a.u.)', 'width (deg)', 'baseline (a.u.)'};
 namesTunC_unit_perF{1,2} = {'amplitude (a.u.)', 'width (º)', 'baseline (a.u.)'};
+
 namesTunC_unit_perF{2,1} = {'peak SF (cpd)', 'Gain (a.u.)', 'Sigma (cpd)', 'baseline (a.u.)'};
 namesTunC_unit_perF{2,2} = {'peak SF (cpd)', 'amplitude (a.u.)', 'width (octaves)', 'baseline (a.u.)'};
+
 namesTunC_unit_perF{3,1} = {'peak SF (cpd)', 'Gain (a.u.)', 'Sigma (cpd)', 'baseline (a.u.)', 'Truncation (a.u.)'};
 namesTunC_unit_perF{3,2} = {'peak SF (cpd)', 'amplitude (a.u.)', 'width (octaves)', 'baseline (a.u.)', 'Truncation (a.u.)'};
 namesTunC_unit_perF{8,1} = {'Gain 1 (a.u.)', 'Gain 2 (a.u.)', 'Sigma 1 (deg)', 'ratio (a.u.)', 'baseline (a.u.)'};
