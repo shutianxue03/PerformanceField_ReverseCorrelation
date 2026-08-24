@@ -161,18 +161,20 @@ end
 
 if flag_plot
     figure, hold on
-    plot(x, y, 'o-')
+    
     switch str_family
         case {'gaussian_zero_mean','raised_gaussian','double_exponential','skewed_gaussian','DoG','von_mises','circ_gaussian_kernel','von_mises_basis'}
+            plot(x, y, 'o-')
             xline(0, 'k--');
             xlabel('Orientation (º)')
             xlim([-90, 90])
             xticks(-90:45:90)
         otherwise
-            xline(1, 'k--');
+            plot(log2(x), y, 'o-')
+            xline(log2(peakSF), 'k--');
             xlabel('SF (cpd)')
-            xlim([1,4])
-            xticks([1,2,4]), xticklabels([1,2,4])
+            xlim(log2([1,4]))
+            xticks(log2([1,2,4])), xticklabels([1,2,4])
     end
     ylabel('sensitivity kernel (a.u.)')
     text(3.5, 1, sprintf('f0 = %.2f\nsigma = %.2f\nalpha = %.2f\nb = %.2f\nlambda = %.2f', params))
