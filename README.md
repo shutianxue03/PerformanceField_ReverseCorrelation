@@ -1,5 +1,8 @@
 # PF_RC Project Overview
 
+Updated: Oct 5, 2026 by Shutian
+Email: shutian.xue@nyu.edu
+
 This repository contains the code and analysis pipeline for the PF_RC project: a combination of human psychophysical experimentation, model-based simulation, and NOM-based empirical data analysis. The project is organized around MATLAB scripts in `Codes/`, with supporting data folders under `Data_*` and figures under `Figures/`.
 
 The repository is structured around three complementary workflows:
